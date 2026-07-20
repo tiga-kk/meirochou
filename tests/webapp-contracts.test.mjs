@@ -53,11 +53,10 @@ const mapManifest = parseMapBundleManifest(
 );
 Config.initializeAreas(mapManifest.areas);
 
-// GAS contract tests are deferred to Task 4 when sanitized GAS is created
-/*
+// GAS contract tests are restored for Task 4
 test("webapp sends sale actions to the GAS sale endpoint", () => {
   const source = read("apps/webapp/js/data-manager.ts");
-  const gasSource = read("integrations/gas-spreadsheet/web-api.js");
+  const gasSource = read("integrations/gas-spreadsheet/src/web-api.js");
 
   assert.match(source, /action:\s*["']sale["']/);
   assert.match(source, /sheetName/);
@@ -67,8 +66,8 @@ test("webapp sends sale actions to the GAS sale endpoint", () => {
 });
 
 test("GAS sale responses expose success response contract", () => {
-  const responseSource = read("integrations/gas-spreadsheet/response.js");
-  const saleSource = read("integrations/gas-spreadsheet/web-api.js");
+  const responseSource = read("integrations/gas-spreadsheet/src/response.js");
+  const saleSource = read("integrations/gas-spreadsheet/src/web-api.js");
 
   assert.match(responseSource, /function\s+successResponse/);
   assert.match(responseSource, /status:\s*["']success["']/);
@@ -77,13 +76,15 @@ test("GAS sale responses expose success response contract", () => {
 });
 
 test("GAS circle responses include the spreadsheet title and source sheet name", () => {
-  const source = read("integrations/gas-spreadsheet/web-api.js");
+  const source = read("integrations/gas-spreadsheet/src/web-api.js");
 
   assert.match(source, /spreadsheetTitle\s*=\s*spreadsheet\.getName\(\)/);
   assert.match(source, /obj\.sheetName\s*=\s*sheetName/);
-  assert.match(source, /JSON\.stringify\(\{\s*wantToBuy:\s*combinedResult,\s*spreadsheetTitle\s*}\)/);
+  assert.match(
+    source,
+    /JSON\.stringify\(\{\s*wantToBuy:\s*combinedResult,\s*spreadsheetTitle\s*}\)/,
+  );
 });
-*/
 
 // README assertions are deferred to Task 5
 // test("spreadsheet column documentation follows the spreadsheet source of truth", () => { ... })
@@ -95,11 +96,10 @@ test("Apps Script source exists only under integrations", () => {
   );
 });
 
-/*
 test("shared webapp and GAS names use lower camel case", () => {
   const sources = [
-    read("integrations/gas-spreadsheet/config.js"),
-    read("integrations/gas-spreadsheet/web-api.js"),
+    read("integrations/gas-spreadsheet/src/config.js"),
+    read("integrations/gas-spreadsheet/src/web-api.js"),
   ].join("\n");
 
   assert.doesNotMatch(sources, /\bGAS_CONFIG\b/);
@@ -110,7 +110,6 @@ test("shared webapp and GAS names use lower camel case", () => {
   assert.doesNotMatch(sources, /\bval1\b/);
   assert.doesNotMatch(sources, /\bval2\b/);
 });
-*/
 
 test("webapp GAS calls live behind GasApiClient", () => {
   const dataManagerSource = read("apps/webapp/js/data-manager.ts");
