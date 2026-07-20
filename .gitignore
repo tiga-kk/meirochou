@@ -26,3 +26,11 @@ blob-report/
 CLAUDE.md
 CODEX.md
 GEMINI.md
+
+# User local overrides
+README.md
+integrations/gas-spreadsheet/README.md
+
+# Cache directories
+.vite/
+.vitest-cache/

@@ -86,8 +86,13 @@ test("GAS circle responses include the spreadsheet title and source sheet name",
   );
 });
 
-// README assertions are deferred to Task 5
-// test("spreadsheet column documentation follows the spreadsheet source of truth", () => { ... })
+test("spreadsheet column documentation follows the spreadsheet source of truth", () => {
+  const readme = read("README.md");
+
+  assert.match(readme, /`isSale`/);
+  assert.doesNotMatch(readme, /`soldout`/);
+  assert.doesNotMatch(readme, /apps_script_code\.js/);
+});
 
 test("Apps Script source exists only under integrations", () => {
   assert.equal(
@@ -1038,9 +1043,21 @@ test("webapp brings manually opened settings into view", () => {
   );
 });
 
-// README assertions are deferred to Task 5
-// test("webapp documents partial offline support without claiming offline startup", () => { ... })
-// test("webapp documents pin previews and route comparison", () => { ... })
+test("webapp documents partial offline support without claiming offline startup", () => {
+  const readme = read("README.md");
+
+  assert.match(readme, /部分的なオフライン対応/);
+  assert.match(readme, /LocalStorage/);
+  assert.match(readme, /Service Worker/);
+});
+
+test("webapp documents pin previews and route comparison", () => {
+  const readme = read("README.md");
+
+  assert.match(readme, /地図ピン/);
+  assert.match(readme, /経路変更/);
+  assert.match(readme, /現在の経路と候補経路/);
+});
 
 test("webapp route overlay SVG follows image pixel coordinates without handling pointer events", () => {
   const overlay = buildRouteOverlaySvg({
