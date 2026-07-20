@@ -1,0 +1,22 @@
+# OS files
+.DS_Store
+
+# IDEs and local agent context
+.vscode/
+CODEX.md
+GEMINI.md
+.local-docs/
+.superpowers/
+
+# Node.js and generated output
+node_modules/
+dist/
+playwright-report/
+test-results/
+blob-report/
+
+# Local environment settings
+.env
+.env.local
+.env.private
+.env.*.local
