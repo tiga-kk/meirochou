@@ -1,0 +1,71 @@
+/* Compact Stats (Table) */
+.stats-container {
+  overflow-x: auto;
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.stats-table th {
+  padding: 4px;
+  color: var(--text-sub);
+  font-weight: normal;
+  font-size: 0.75rem;
+  border-bottom: 1px solid var(--ink);
+}
+
+.stats-table td {
+  padding: 6px 4px;
+  font-weight: 700;
+  color: var(--text-main);
+  border-bottom: 1px solid #d1d5db;
+}
+
+.stats-table tr:last-child td {
+  border-bottom: none;
+}
+
+.status-label {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: var(--text-sub);
+  font-weight: normal;
+}
+
+.status-label.warning {
+  color: #b45309; /* Darker Amber */
+}
+
+/* Hold Row (Clickable) */
+.hold-row {
+  cursor: default;
+  background-color: #fff7d1;
+  transition: background-color 0.2s;
+}
+
+.hold-row:hover {
+  background-color: var(--signal-yellow);
+}
+
+.hold-row td {
+  color: #b45309;
+}
+
+/* Count cells clickable */
+.count-cell {
+  cursor: pointer;
+  /* biome-ignore lint/complexity/noImportantStyles: override default style */
+  color: var(--primary) !important;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.count-cell:hover {
+  background-color: #eff6ff;
+}

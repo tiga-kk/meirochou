@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>ComiPath - Comiket TSP</title>
+
+    <!-- Icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/buttons.css" />
+    <link rel="stylesheet" href="css/forms.css" />
+    <link rel="stylesheet" href="css/target.css" />
+    <link rel="stylesheet" href="css/stats.css" />
+    <link rel="stylesheet" href="css/modals.css" />
+    <link rel="stylesheet" href="css/gallery.css" />
+    <link rel="stylesheet" href="css/maps.css" />
+    <link rel="stylesheet" href="css/sheets.css" />
+  </head>
+  <body>
+    <header>
+      <div class="header-sign">
+        <span id="header-area-mark" class="area-mark">—</span>
+        <div class="area-copy">
+          <strong id="header-area-title">地図読込中</strong>
+          <span>地図巡回モード</span>
+          <span id="spreadsheet-title" class="spreadsheet-title hidden"></span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="btn-open-gallery" class="header-btn">一覧</button>
+        <button
+          type="button"
+          id="toggle-settings"
+          class="settings-btn"
+          aria-label="設定"
+          aria-controls="settings-area"
+          aria-expanded="false"
+        >
+          <i class="fa-solid fa-gear"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="container">
+      <!-- 設定エリア -->
+      <comipath-settings id="settings-area" class="card"></comipath-settings>
+
+      <!-- 現在地入力 -->
+      <div class="card location-card">
+        <div class="current-location-header">
+            <h2>現在地</h2>
+            <div class="location-controls">
+              <select id="loc-ewsn"></select>
+              <select id="loc-label"></select>
+              <input
+                id="loc-number"
+                type="number"
+                min="1"
+                max="99"
+                step="1"
+                inputmode="numeric"
+                value="10"
+                aria-label="現在地の番号"
+              />
+            </div>
+        </div>
+        <button
+          type="button"
+          id="btn-search"
+          class="btn btn-primary"
+          style="margin-top: 0.5rem"
+        >
+          <i class="fa-solid fa-magnifying-glass"></i> 次の目的地を検索
+        </button>
+      </div>
+
+      <!-- 次の目的地 -->
+      <div id="next-target" class="card navigation-card">
+        <div id="target-loading" class="loading-overlay hidden">
+          <i class="fa-solid fa-spinner fa-spin"></i> 計算中...
+        </div>
+
+        <div id="target-content" class="hidden">
+          <div class="navigation-map" id="navigation-map">
+            <div class="map-transform-layer" id="navigation-map-layer">
+              <img
+                id="navigation-map-image"
+                class="navigation-map-image"
+                alt="配置図"
+              />
+              <div class="pin-layer" id="navigation-pin-layer"></div>
+            </div>
+
+            <div class="route-card">
+              <span>NEXT</span>
+              <strong id="target-space-heading">---</strong>
+            </div>
+
+            <div class="map-log">
+              <div><span>FROM</span><strong id="target-start-space">---</strong></div>
+              <div><span>ROUTE</span><strong id="target-route-log">---</strong></div>
+            </div>
+          </div>
+
+          <div class="target-bottom-sheet">
+            <div class="sheet-main">
+              <div>
+                <span class="target-label" id="target-status-label">次の目的地</span>
+                <strong id="selected-target-space" class="selected-target-space">---</strong>
+                <span id="target-sheet-name" class="target-sheet-name hidden"></span>
+                <div class="target-meta-grid">
+                  <span id="target-dist">距離 -</span>
+                  <span id="target-priority">優先度 -</span>
+                  <span id="sub-target-space">次 -</span>
+                </div>
+                <a
+                  id="target-tweet-link"
+                  href="#"
+                  target="_blank"
+                  class="tweet-link"
+                >
+                  <i class="fa-brands fa-twitter"></i> Link
+                </a>
+                <div id="route-selection-controls" class="route-selection-controls hidden">
+                  <button type="button" id="btn-preview-route" class="btn btn-primary" disabled>
+                    <i class="fa-solid fa-route"></i> 経路変更
+                  </button>
+                  <p id="route-selection-message" class="route-selection-message" aria-live="polite"></p>
+                </div>
+              </div>
+              <div id="tweet-embed-container" class="tweet-preview"></div>
+            </div>
+
+            <section
+              id="route-change-confirmation"
+              class="route-change-confirmation hidden"
+              aria-labelledby="route-change-title"
+            >
+              <h3 id="route-change-title">経路を変更しますか？</h3>
+              <div class="route-comparison-summary">
+                <div>
+                  <span>現在</span>
+                  <strong id="route-change-current">---</strong>
+                  <small id="route-change-current-distance">距離 -</small>
+                </div>
+                <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                <div>
+                  <span>候補</span>
+                  <strong id="route-change-candidate">---</strong>
+                  <small id="route-change-candidate-distance">距離 -</small>
+                </div>
+              </div>
+              <div class="route-confirmation-actions">
+                <button type="button" id="btn-cancel-route-change" class="btn btn-secondary">戻る</button>
+                <button type="button" id="btn-confirm-route-change" class="btn btn-primary">この地点に変更</button>
+              </div>
+            </section>
+
+            <div id="target-map-container" class="map-embed-container hidden">
+               <!-- 著作権保護のため一時無効化中 -->
+            </div>
+
+            <div class="action-grid">
+              <button type="button" id="btn-purchased" class="btn btn-success">
+                <i class="fa-solid fa-check"></i> 購入済
+              </button>
+              <button type="button" id="btn-hold" class="btn btn-warning">
+                <i class="fa-solid fa-pause"></i> 保留
+              </button>
+            </div>
+            <div class="undo-redo-container">
+              <button type="button" id="btn-undo" class="btn btn-secondary">
+                <i class="fa-solid fa-rotate-left"></i> Undo
+              </button>
+              <button type="button" id="btn-redo" class="btn btn-secondary">
+                <i class="fa-solid fa-rotate-right"></i> Redo
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="target-empty" class="empty-state">
+          <i
+            class="fa-regular fa-map"
+            style="font-size: 2rem; margin-bottom: 0.5rem"
+          ></i>
+          <p>現在地を入力して<br />検索ボタンを押してください</p>
+        </div>
+      </div>
+
+      <!-- 地図リンク -->
+      <div id="map-links-container" class="map-links-grid hidden">
+        <!-- 著作権保護のため一時無効化中 -->
+      </div>
+
+      <!-- ステータス -->
+      <div class="card compact-card">
+        <div class="stats-container">
+          <table class="stats-table" id="stats-table">
+            <!-- JSで動的に生成 -->
+          </table>
+        </div>
+        <button
+          type="button"
+          id="btn-reset-all"
+          class="btn btn-danger btn-sm"
+          style="margin-top: 0.5rem"
+        >
+          <i class="fa-solid fa-trash"></i> リセット
+        </button>
+      </div>
+    </div>
+
+    <div id="pdf-modal" class="pdf-modal hidden">
+      <div class="pdf-modal-header">
+        <button type="button" id="btn-close-pdf" class="btn-close-modal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="pdf-container" id="modal-image-container">
+        <img id="pdf-modal-image" alt="Map" />
+      </div>
+      <button type="button" id="btn-set-target" class="btn btn-primary" style="margin-top: 10px; display: none;">
+        <i class="fa-solid fa-location-dot"></i> ここを目的地にする
+      </button>
+    </div>
+
+    <div id="gallery-modal" class="gallery-modal hidden">
+      <div class="pdf-modal-header">
+        <div class="gallery-controls-left">
+          <div class="gallery-filter-controls" id="gallery-filter-controls">
+            <span class="filter-label"><i class="fa-solid fa-filter"></i></span>
+            <button type="button" class="filter-btn active" data-priority="10">10</button>
+            <button type="button" class="filter-btn active" data-priority="9">9</button>
+            <button type="button" class="filter-btn active" data-priority="8">8</button>
+            <button type="button" class="filter-btn active" data-priority="7">7</button>
+          </div>
+          <button type="button" id="btn-gallery-undo" class="gallery-undo-btn" aria-label="Undo">
+            <i class="fa-solid fa-rotate-left"></i>
+          </button>
+        </div>
+        <button type="button" id="btn-close-gallery" class="btn-close-modal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="gallery-content-wrapper">
+        <div class="gallery-grid" id="gallery-grid">
+          <!-- JSで生成 -->
+        </div>
+        <div id="gallery-map-container" class="gallery-map-container hidden">
+            <div id="gallery-map-header" class="gallery-map-header">
+              <div class="drag-handle"></div>
+              <span><i class="fa-regular fa-map"></i> エリア地図</span>
+            </div>
+            <div id="gallery-map-scroll" class="gallery-map-scroll">
+              <img id="gallery-map-image" src="" alt="Area Map">
+            </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <!-- Twitter Widgets -->
+    <script
+      async
+      src="https://platform.twitter.com/widgets.js"
+      charset="utf-8"
+    ></script>
+
+    <!-- Main Script (Module) -->
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

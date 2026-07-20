@@ -1,0 +1,30 @@
+:root {
+  --primary: #004c8c;
+  --primary-dark: #00345f;
+  --secondary: #4b5563;
+  --success: #15803d;
+  --warning: #b7791f;
+  --danger: #d22f27;
+  --signal-yellow: #f7c600;
+  --ink: #111820;
+  --paper: #ffffff;
+  --panel: #e5e7eb;
+  --map-paper: #e9e4da;
+  --bg-body: #f1f2ef;
+  --bg-card: #ffffff;
+  --text-main: var(--ink);
+  --text-sub: #4b5563;
+  --border-radius: 6px;
+  --shadow: none;
+  --font-main: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+  --font-ui-sans:
+    "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", system-ui,
+    sans-serif;
+  --font-mono: "SFMono-Regular", Menlo, Monaco, "Osaka-Mono", monospace;
+  --button-shadow: inset -1px -1px #777, inset 1px 1px #fff;
+}
+
+* {
+  box-sizing: border-box;
+  touch-action: manipulation;
+}

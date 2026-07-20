@@ -20,3 +20,9 @@ blob-report/
 .env.local
 .env.private
 .env.*.local
+
+#documents
+/docs/
+CLAUDE.md
+CODEX.md
+GEMINI.md

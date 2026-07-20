@@ -1,0 +1,75 @@
+/* Action Buttons */
+.action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 0.5rem; /* マージン削減 */
+}
+
+.undo-redo-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.btn {
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  padding: 0.7rem;
+  font-size: 0.92rem;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.08s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.btn-sm {
+  padding: 0.4rem;
+  font-size: 0.82rem;
+  border-radius: 0;
+}
+
+.btn:active {
+  transform: translate(1px, 1px);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+.btn-success {
+  background: var(--primary);
+  color: white;
+  box-shadow: none;
+}
+.btn-warning {
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--button-shadow);
+}
+.btn-secondary {
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--button-shadow);
+}
+.btn-danger {
+  background: #fff;
+  color: var(--danger);
+}
+
+.btn-undo {
+  /* grid-column: span 2;  Removed since we split it */
+  background: #f1f5f9;
+  color: var(--text-sub);
+  font-size: 0.85rem;
+  padding: 0.5rem;
+  /* margin-top: 0.25rem; Removed */
+}

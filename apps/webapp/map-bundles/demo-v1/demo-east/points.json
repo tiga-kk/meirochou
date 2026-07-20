@@ -1,0 +1,120 @@
+{
+  "grid": {
+    "cell_size": 8,
+    "cols": 120,
+    "grid_file": "grid.bin",
+    "meta_file": "grid-meta.json",
+    "rows": 80
+  },
+  "image": {
+    "height": 640,
+    "path": "source.png",
+    "width": 960
+  },
+  "map_id": "demo-east",
+  "points": [
+    {
+      "center_x": 96,
+      "center_y": 320,
+      "group_id": "east-entrance",
+      "id": "demo-east-a10-start",
+      "identifier": "ア",
+      "number": "10",
+      "point_id": 1,
+      "portals": [
+        {
+          "col": 12,
+          "row": 40,
+          "x": 100.0,
+          "y": 324.0
+        }
+      ]
+    },
+    {
+      "center_x": 176,
+      "center_y": 176,
+      "group_id": "east-island-1",
+      "id": "demo-east-a23-west",
+      "identifier": "ア",
+      "number": "23",
+      "point_id": 2,
+      "portals": [
+        {
+          "col": 22,
+          "row": 22,
+          "x": 180.0,
+          "y": 180.0
+        }
+      ]
+    },
+    {
+      "center_x": 784,
+      "center_y": 176,
+      "group_id": "east-island-2",
+      "id": "demo-east-a23-east",
+      "identifier": "ア",
+      "number": "23",
+      "point_id": 3,
+      "portals": [
+        {
+          "col": 98,
+          "row": 22,
+          "x": 788.0,
+          "y": 180.0
+        }
+      ]
+    },
+    {
+      "center_x": 176,
+      "center_y": 464,
+      "group_id": "east-island-1",
+      "id": "demo-east-a31",
+      "identifier": "ア",
+      "number": "31",
+      "point_id": 4,
+      "portals": [
+        {
+          "col": 22,
+          "row": 58,
+          "x": 180.0,
+          "y": 468.0
+        }
+      ]
+    },
+    {
+      "center_x": 784,
+      "center_y": 464,
+      "group_id": "east-island-2",
+      "id": "demo-east-a41",
+      "identifier": "ア",
+      "number": "41",
+      "point_id": 5,
+      "portals": [
+        {
+          "col": 98,
+          "row": 58,
+          "x": 788.0,
+          "y": 468.0
+        }
+      ]
+    },
+    {
+      "center_x": 480,
+      "center_y": 96,
+      "group_id": "east-wall-1",
+      "id": "demo-east-i08",
+      "identifier": "イ",
+      "number": "08",
+      "point_id": 6,
+      "portals": [
+        {
+          "col": 60,
+          "row": 12,
+          "x": 484.0,
+          "y": 100.0
+        }
+      ]
+    }
+  ],
+  "schema_version": 1
+}

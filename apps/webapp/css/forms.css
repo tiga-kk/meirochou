@@ -1,0 +1,151 @@
+/* Location Inputs */
+.current-location-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.current-location-header h2 {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-sub);
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.location-controls {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.8fr;
+  gap: 6px;
+  flex-grow: 1;
+}
+
+/* Native select hidden */
+.location-controls select {
+  display: none;
+}
+
+input[type="number"],
+input[type="text"] {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  font-size: 0.92rem;
+  font-family: inherit;
+  background: #fff;
+  color: var(--text-main);
+  text-align: center;
+}
+
+.location-controls input[type="number"] {
+  min-width: 0;
+  height: 100%;
+}
+
+/* Custom Select UI */
+.custom-select-wrapper {
+  position: relative;
+  user-select: none;
+  width: 100%;
+}
+
+.custom-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  padding-right: 28px; /* アイコンスペース */
+  background: #fff;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 0.92rem;
+  color: var(--text-main);
+  height: 100%; /* inputと高さを合わせる */
+  position: relative;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.custom-select-trigger::after {
+  content: "";
+  width: 16px;
+  height: 16px;
+  background-image: url('data:image/svg+xml;utf8,<svg fill="black" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 16px;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.custom-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  box-shadow: none;
+  z-index: 1000;
+  display: none;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.custom-options.open {
+  display: block;
+}
+
+.custom-option {
+  padding: 10px;
+  cursor: pointer;
+  text-align: center;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.2s;
+  color: var(--text-main);
+}
+
+.custom-option:last-child {
+  border-bottom: none;
+}
+
+.custom-option:hover {
+  background-color: #f8fafc;
+}
+
+.custom-option.selected {
+  background-color: var(--primary);
+  color: #fff;
+  font-weight: 800;
+}
+
+/* Settings Area */
+#settings-area {
+  display: none;
+  scroll-margin-top: 70px;
+}
+#settings-area.show {
+  display: block;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.input-row {
+  display: flex;
+  gap: 6px;
+}

@@ -1,0 +1,86 @@
+{
+  "grid": {
+    "cell_size": 8,
+    "cols": 120,
+    "grid_file": "grid.bin",
+    "meta_file": "grid-meta.json",
+    "rows": 80
+  },
+  "image": {
+    "height": 640,
+    "path": "source.png",
+    "width": 960
+  },
+  "map_id": "demo-west",
+  "points": [
+    {
+      "center_x": 160,
+      "center_y": 160,
+      "group_id": "west-north",
+      "id": "demo-west-a10",
+      "identifier": "A",
+      "number": "10",
+      "point_id": 1,
+      "portals": [
+        {
+          "col": 20,
+          "row": 20,
+          "x": 164.0,
+          "y": 164.0
+        }
+      ]
+    },
+    {
+      "center_x": 800,
+      "center_y": 160,
+      "group_id": "west-north",
+      "id": "demo-west-b20",
+      "identifier": "B",
+      "number": "20",
+      "point_id": 2,
+      "portals": [
+        {
+          "col": 100,
+          "row": 20,
+          "x": 804.0,
+          "y": 164.0
+        }
+      ]
+    },
+    {
+      "center_x": 160,
+      "center_y": 480,
+      "group_id": "west-south",
+      "id": "demo-west-c30",
+      "identifier": "C",
+      "number": "30",
+      "point_id": 3,
+      "portals": [
+        {
+          "col": 20,
+          "row": 60,
+          "x": 164.0,
+          "y": 484.0
+        }
+      ]
+    },
+    {
+      "center_x": 800,
+      "center_y": 480,
+      "group_id": "west-south",
+      "id": "demo-west-a40",
+      "identifier": "A",
+      "number": "40",
+      "point_id": 4,
+      "portals": [
+        {
+          "col": 100,
+          "row": 60,
+          "x": 804.0,
+          "y": 484.0
+        }
+      ]
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,29 @@
+{
+  "areas": [
+    {
+      "gridFile": "./demo-east/grid.bin",
+      "gridMetaFile": "./demo-east/grid-meta.json",
+      "id": "demo-east",
+      "labels": ["ア", "イ", "ウ"],
+      "mapFile": "./demo-east/source.png",
+      "mapId": "demo-east",
+      "name": "デモ東",
+      "pointsFile": "./demo-east/points.json",
+      "prefixes": ["東"]
+    },
+    {
+      "gridFile": "./demo-west/grid.bin",
+      "gridMetaFile": "./demo-west/grid-meta.json",
+      "id": "demo-west",
+      "labels": ["A", "B", "C"],
+      "mapFile": "./demo-west/source.png",
+      "mapId": "demo-west",
+      "name": "デモ西",
+      "pointsFile": "./demo-west/points.json",
+      "prefixes": ["西"]
+    }
+  ],
+  "displayName": "ComiPath 架空会場デモ",
+  "eventId": "demo-v1",
+  "schemaVersion": 1
+}

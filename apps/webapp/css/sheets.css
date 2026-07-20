@@ -1,0 +1,34 @@
+/* Sheet List Checklist */
+.sheet-list-container {
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  padding: 0.5rem;
+  max-height: 150px;
+  overflow-y: auto;
+  background: #f8fafc;
+}
+
+.sheet-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid #d1d5db;
+}
+
+.sheet-item:last-child {
+  border-bottom: none;
+}
+
+.sheet-item input[type="checkbox"] {
+  margin-right: 8px;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.sheet-item label {
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-bottom: 0; /* reset */
+  flex-grow: 1;
+}

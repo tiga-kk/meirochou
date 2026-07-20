@@ -1,0 +1,135 @@
+/* PDF Modal (Shared & Specific) */
+.pdf-modal,
+.gallery-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 32, 0.92);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+}
+
+.pdf-modal {
+  z-index: 10000; /* Ensure it's above gallery-modal if both are open */
+}
+
+.pdf-modal-header {
+  display: flex;
+  justify-content: space-between; /* 変更: 両端揃えに */
+  align-items: center; /* 追加: 垂直中央揃え */
+  margin-bottom: 8px;
+}
+
+.gallery-controls-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gallery-filter-controls {
+  display: flex;
+  gap: 4px;
+  background: var(--panel);
+  padding: 4px;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  align-items: center;
+}
+
+.filter-label {
+  color: var(--ink);
+  font-size: 0.9rem;
+  margin: 0 4px;
+}
+
+.filter-btn {
+  background: #fff;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  font-size: 0.75rem;
+  width: 26px;
+  height: 26px;
+  border-radius: 0;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.filter-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.filter-btn.active {
+  background: var(--signal-yellow);
+  color: var(--ink);
+  border-color: var(--ink);
+  box-shadow: var(--button-shadow);
+}
+
+.gallery-undo-btn {
+  background: var(--panel);
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  border-radius: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.gallery-undo-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #fff;
+}
+
+.gallery-undo-btn:active {
+  transform: scale(0.95);
+}
+
+.btn-close-modal {
+  background: var(--panel);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: #333;
+  cursor: pointer;
+  /* margin-left: auto; Removed as we use flex justify-between */
+}
+
+.pdf-container {
+  flex: 1;
+  background: white;
+  border-radius: 0;
+  overflow: hidden;
+  position: relative;
+  /* 画像用のスタイル */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #333; /* モーダル背景は暗く */
+}
+
+#modal-image-container {
+  overflow: auto; /* モーダル内スクロール */
+}
+
+#pdf-modal-image {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: auto;
+}

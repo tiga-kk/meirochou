@@ -1,0 +1,17 @@
+{
+  "byte_order": "unsigned_uint8",
+  "cell_size": 8,
+  "cell_values": {
+    "blocked": 0,
+    "crowded": 2,
+    "normal": 1
+  },
+  "cols": 120,
+  "grid_file": "grid.bin",
+  "height": 640,
+  "layout": "row-major",
+  "map_id": "demo-east",
+  "rows": 80,
+  "schema_version": 1,
+  "width": 960
+}

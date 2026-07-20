@@ -2,6 +2,17 @@
   "name": "comipath-web",
   "private": true,
   "type": "module",
+  "scripts": {
+    "typecheck:webapp": "tsc -p apps/webapp/tsconfig.json --noEmit",
+    "check:webapp": "node --check apps/webapp/js/app.js && npm run typecheck:webapp",
+    "dev:webapp": "vite --host 127.0.0.1",
+    "dev:webapp:private": "vite --mode private --host 127.0.0.1",
+    "build:webapp": "vite build",
+    "build:webapp:private": "vite build --mode private",
+    "preview:webapp": "vite preview --host 127.0.0.1",
+    "serve:webapp:e2e": "vite --host 127.0.0.1 --port 4173",
+    "verify:webapp:build": "node scripts/verify-webapp-build.mjs"
+  },
   "volta": {
     "node": "22.14.0",
     "npm": "10.9.2"
@@ -10,6 +21,7 @@
     "lit": "^3.3.3"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.4",
     "@playwright/test": "^1.61.1",
     "happy-dom": "^20.10.6",
     "typescript": "^7.0.2",
