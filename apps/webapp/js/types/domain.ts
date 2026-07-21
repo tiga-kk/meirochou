@@ -150,3 +150,64 @@ export interface EventRegistryV1 {
   readonly schemaVersion: 1;
   readonly events: readonly EventRegistryEntryV1[];
 }
+
+export type DataSourceType = "csv" | "gas";
+
+export interface CsvDataSource {
+  readonly type: "csv";
+  readonly fileName: string;
+}
+
+export interface GasDataSource {
+  readonly type: "gas";
+  readonly gasUrl: string;
+  readonly sheetName: string;
+}
+
+export type DataSource = CsvDataSource | GasDataSource;
+
+export interface CircleRecord {
+  readonly space: string;
+  readonly priority?: number;
+  readonly account?: string;
+  readonly tweet?: string;
+  readonly memo?: string;
+  readonly removedFromSource?: boolean;
+}
+
+export interface HistoryEntry {
+  readonly type: "purchase" | "hold" | "unpurchase" | "unhold";
+  readonly space: string;
+  readonly timestamp: string;
+}
+
+export interface GasOutboxEntry {
+  readonly id: string;
+  readonly eventId: string;
+  readonly dayId: string;
+  readonly sourceGeneration: string;
+  readonly gasUrl: string;
+  readonly sheetName: string;
+  readonly space: string;
+  readonly purchased: boolean;
+  readonly createdAt: string;
+  readonly attempts: number;
+  readonly lastError: string | null;
+}
+
+export interface LocalEventDayState {
+  readonly schemaVersion: 1;
+  readonly source: DataSource;
+  readonly sourceGeneration: string;
+  readonly circles: readonly CircleRecord[];
+  readonly purchased: readonly string[];
+  readonly hold: readonly string[];
+  readonly history: readonly HistoryEntry[];
+  readonly redo: readonly HistoryEntry[];
+  readonly gasOutbox: readonly GasOutboxEntry[];
+  readonly timestamps: {
+    readonly createdAt: string;
+    readonly updatedAt: string;
+    readonly sourceUpdatedAt: string;
+  };
+}
