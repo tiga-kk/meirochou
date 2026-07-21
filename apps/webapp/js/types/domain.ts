@@ -222,3 +222,13 @@ export interface CsvIssue {
 export type CsvImportResult =
   | { readonly ok: true; readonly circles: readonly CircleRecord[] }
   | { readonly ok: false; readonly issues: readonly CsvIssue[] };
+
+export interface SourceDiff {
+  readonly added: readonly CircleRecord[];
+  readonly updated: readonly {
+    readonly before: CircleRecord;
+    readonly after: CircleRecord;
+  }[];
+  readonly removed: readonly CircleRecord[];
+  readonly unchanged: readonly CircleRecord[];
+}
