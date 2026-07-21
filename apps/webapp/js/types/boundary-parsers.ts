@@ -1,5 +1,8 @@
 import type {
   Circle,
+  EventDay,
+  EventRegistryEntryV1,
+  EventRegistryV1,
   GasCircleResponse,
   GasSheetListResponse,
   GridMeta,
@@ -404,4 +407,120 @@ export function parseGridMeta(input: unknown): GridMeta {
       ? { grid_file: value.grid_file }
       : {}),
   };
+}
+
+function validateMapBundlePath(value: unknown, path: string): string {
+  const relativePath = nonEmptyText(value, path);
+  if (
+    relativePath.startsWith("/") ||
+    relativePath.includes("\\") ||
+    relativePath.includes("?") ||
+    relativePath.includes("#") ||
+    /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(relativePath)
+  ) {
+    throw new BoundaryValidationError(path, "a safe relative path");
+  }
+
+  if (!relativePath.startsWith("../maps/")) {
+    throw new BoundaryValidationError(
+      path,
+      "a relative path starting with '../maps/'",
+    );
+  }
+
+  const segments = relativePath.split("/");
+  for (let i = 2; i < segments.length; i++) {
+    if (segments[i] === "..") {
+      throw new BoundaryValidationError(
+        path,
+        "a safe relative path within maps directory",
+      );
+    }
+  }
+
+  return relativePath;
+}
+
+export function parseEventRegistry(input: unknown): EventRegistryV1 {
+  const value = record(input, "event registry");
+  if (value.schemaVersion !== 1) {
+    throw new BoundaryValidationError(
+      "event registry.schemaVersion",
+      "the number 1",
+    );
+  }
+  if (!Array.isArray(value.events)) {
+    throw new BoundaryValidationError("event registry.events", "an array");
+  }
+
+  const events: EventRegistryEntryV1[] = [];
+  const eventIds = new Set<string>();
+
+  for (let i = 0; i < value.events.length; i++) {
+    const eventInput = value.events[i];
+    const eventPath = `event registry.events[${i}]`;
+    const eventObj = record(eventInput, eventPath);
+    const eventId = parseEventId(eventObj.eventId, `${eventPath}.eventId`);
+    if (eventIds.has(eventId)) {
+      throw new BoundaryValidationError(
+        `${eventPath}.eventId`,
+        "a unique eventId",
+      );
+    }
+    eventIds.add(eventId);
+
+    const displayName = nonEmptyText(
+      eventObj.displayName,
+      `${eventPath}.displayName`,
+    );
+    const mapBundle = validateMapBundlePath(
+      eventObj.mapBundle,
+      `${eventPath}.mapBundle`,
+    );
+
+    if (!Array.isArray(eventObj.days)) {
+      throw new BoundaryValidationError(`${eventPath}.days`, "an array");
+    }
+
+    const days: EventDay[] = [];
+    const dayIds = new Set<string>();
+    for (let j = 0; j < eventObj.days.length; j++) {
+      const dayInput = eventObj.days[j];
+      const dayPath = `${eventPath}.days[${j}]`;
+      const dayObj = record(dayInput, dayPath);
+      const dayId = parseDayId(dayObj.dayId, `${dayPath}.dayId`);
+      if (dayIds.has(dayId)) {
+        throw new BoundaryValidationError(
+          `${dayPath}.dayId`,
+          "a unique dayId within the event",
+        );
+      }
+      dayIds.add(dayId);
+
+      const dayDisplayName = nonEmptyText(
+        dayObj.displayName,
+        `${dayPath}.displayName`,
+      );
+      days.push(
+        Object.freeze({
+          dayId,
+          displayName: dayDisplayName,
+        }),
+      );
+    }
+
+    events.push(
+      Object.freeze({
+        eventId,
+        displayName,
+        mapBundle,
+        days: Object.freeze(days),
+      }),
+    );
+  }
+
+  return Object.freeze({
+    schemaVersion: 1,
+    events: Object.freeze(events),
+  });
 }

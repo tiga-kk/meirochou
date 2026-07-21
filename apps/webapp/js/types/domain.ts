@@ -133,3 +133,20 @@ export interface SourceRef {
   readonly dayId: string;
   readonly sourceGeneration: string;
 }
+
+export interface EventDay {
+  readonly dayId: string;
+  readonly displayName: string;
+}
+
+export interface EventRegistryEntryV1 {
+  readonly eventId: string;
+  readonly displayName: string;
+  readonly mapBundle: string;
+  readonly days: readonly EventDay[];
+}
+
+export interface EventRegistryV1 {
+  readonly schemaVersion: 1;
+  readonly events: readonly EventRegistryEntryV1[];
+}
