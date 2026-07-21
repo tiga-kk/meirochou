@@ -172,6 +172,7 @@ export interface CircleRecord {
   readonly account?: string;
   readonly tweet?: string;
   readonly memo?: string;
+  readonly isSale?: string;
   readonly removedFromSource?: boolean;
 }
 
@@ -211,3 +212,13 @@ export interface LocalEventDayState {
     readonly sourceUpdatedAt: string;
   };
 }
+
+export interface CsvIssue {
+  readonly row: number;
+  readonly column: string;
+  readonly message: string;
+}
+
+export type CsvImportResult =
+  | { readonly ok: true; readonly circles: readonly CircleRecord[] }
+  | { readonly ok: false; readonly issues: readonly CsvIssue[] };
