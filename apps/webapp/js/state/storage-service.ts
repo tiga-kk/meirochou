@@ -1,4 +1,4 @@
-interface StorageAdapter {
+export interface StorageAdapter {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
@@ -34,8 +34,8 @@ function getStorage(): StorageAdapter {
 export class StorageService {
   private readonly storage: StorageAdapter;
 
-  constructor() {
-    this.storage = getStorage();
+  constructor(storage: StorageAdapter = getStorage()) {
+    this.storage = storage;
   }
 
   getJson<T>(key: string, fallback: T): T {
