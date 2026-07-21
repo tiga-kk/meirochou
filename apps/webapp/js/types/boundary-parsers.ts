@@ -37,6 +37,48 @@ function nonEmptyText(value: unknown, path: string): string {
   return parsed;
 }
 
+export function parseEventId(value: unknown, path = "eventId"): string {
+  if (typeof value !== "string") {
+    throw new BoundaryValidationError(path, "a string");
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(value)) {
+    throw new BoundaryValidationError(
+      path,
+      "a valid event identifier (1-64 alphanumeric, dash, or underscore characters starting with alphanumeric)",
+    );
+  }
+  return value;
+}
+
+export function parseDayId(value: unknown, path = "dayId"): string {
+  if (typeof value !== "string") {
+    throw new BoundaryValidationError(path, "a string");
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(value)) {
+    throw new BoundaryValidationError(
+      path,
+      "a valid day identifier (1-64 alphanumeric, dash, or underscore characters starting with alphanumeric)",
+    );
+  }
+  return value;
+}
+
+export function parseSourceGeneration(
+  value: unknown,
+  path = "sourceGeneration",
+): string {
+  if (typeof value !== "string") {
+    throw new BoundaryValidationError(path, "a string");
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(value)) {
+    throw new BoundaryValidationError(
+      path,
+      "a valid source generation identifier (1-64 alphanumeric, dash, or underscore characters starting with alphanumeric)",
+    );
+  }
+  return value;
+}
+
 function uniqueTextArray(value: unknown, path: string): readonly string[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new BoundaryValidationError(
@@ -192,7 +234,7 @@ export function parseMapBundleManifest(
 
   return {
     schemaVersion: 1,
-    eventId: nonEmptyText(value.eventId, "map manifest.eventId"),
+    eventId: parseEventId(value.eventId, "map manifest.eventId"),
     displayName: nonEmptyText(value.displayName, "map manifest.displayName"),
     areas,
   };

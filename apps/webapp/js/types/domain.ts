@@ -122,3 +122,14 @@ export interface CachedCircleData {
 export type SaleUpdatePayload =
   | { action: "sale"; space: string; undo: boolean; sheetName?: string }
   | { action: "sale"; spaces: string[]; undo: true };
+
+export interface EventDayRef {
+  readonly eventId: string;
+  readonly dayId: string;
+}
+
+export interface SourceRef {
+  readonly eventId: string;
+  readonly dayId: string;
+  readonly sourceGeneration: string;
+}
