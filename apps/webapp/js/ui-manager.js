@@ -106,8 +106,8 @@ export class UIManager {
 
     // 設定読み込み
     this.updateSettingsState({
-      gasUrl: dataManager.getGasUrl(),
-      selectedSheets: dataManager.getSelectedSheets(),
+      gasUrl: "",
+      selectedSheets: [],
     });
     this.updateSpreadsheetTitle(dataManager.getSpreadsheetTitle());
 

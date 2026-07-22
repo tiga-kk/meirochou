@@ -7,19 +7,16 @@ test.beforeEach(async ({ context }) => {
   );
 });
 
-test("初回訪問では設定欄を表示する", async ({ page }) => {
+test("初回訪問では空のローカルイベント・日程で起動する", async ({ page }) => {
   await page.goto("/");
 
   const settings = page.locator("#settings-area");
-  await expect(settings).toBeVisible();
+  await expect(settings).toBeHidden();
   await expect(page.locator("#toggle-settings")).toHaveAttribute(
     "aria-expanded",
-    "true",
+    "false",
   );
-  await expect(page.locator("#toast")).toContainText(
-    "GAS URLを設定してください",
-  );
-  await expect(settings).toHaveScreenshot("first-visit-settings.png");
+  await expect(page.locator("#toast")).toContainText("CSVデータ未設定");
 });
 
 test("デモデータで地図・ピン・経路・ボトムシートを表示する", async ({
@@ -392,47 +389,21 @@ test("切替前の画像エラーで現在の次地点画像を消さない", as
   ).toHaveCount(0);
 });
 
-test("Lit設定欄からGAS取得とシート選択を操作する", async ({ page }) => {
-  let salePayload: Record<string, unknown> | null = null;
+test("Phase 2では設定欄からGAS通信を実行しない", async ({ page }) => {
+  let requestCount = 0;
   await page.route("https://example.test/gas**", async (route) => {
-    if (route.request().method() === "POST") {
-      salePayload = route.request().postDataJSON();
-      await route.fulfill({ json: { ok: true, status: "success" } });
-      return;
-    }
-    const url = new URL(route.request().url());
-    const body =
-      url.searchParams.get("action") === "getSheets"
-        ? { sheets: ["東456", "西12"], spreadsheetTitle: "C108 テスト" }
-        : {
-            wantToBuy: [{ space: "東ア23a", priority: 10, sheetName: "東456" }],
-            spreadsheetTitle: "C108 テスト",
-          };
-    await route.fulfill({ json: body });
+    requestCount += 1;
+    await route.abort();
   });
   await page.goto("/");
 
+  await page.locator("#toggle-settings").click();
   await page.locator("#gas-url").fill("https://example.test/gas");
   await page.locator("#btn-fetch-sheets").click();
-  await expect(page.getByLabel("東456")).toBeChecked();
-  await expect(page.getByLabel("西12")).toBeChecked();
-  await page.getByLabel("西12").uncheck();
-  await expect(page.getByLabel("西12")).not.toBeChecked();
-
-  await page.locator("#btn-refresh").click();
-  await expect(page.locator("#toast")).toContainText("1件 読み込みました");
-  await expect(page.locator("#spreadsheet-title")).toHaveText("C108 テスト");
-
-  await page.locator("#btn-search").click();
-  await expect(page.locator("#target-content")).toBeVisible();
-  await page.locator("#btn-purchased").click();
-  await expect(page.locator("#toast")).toContainText("購入！");
-  expect(salePayload).toEqual({
-    action: "sale",
-    space: "東ア23a",
-    sheetName: "東456",
-    undo: false,
-  });
+  await expect(page.locator("#toast")).toContainText(
+    "GAS同期はPhase 2では利用できません",
+  );
+  expect(requestCount).toBe(0);
 });
 
 test("一覧から目的地を選び購入・保留状態を更新する", async ({ page }) => {

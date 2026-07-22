@@ -8,6 +8,7 @@ const EXCLUDE_DIRS = new Set([
   "dist",
   "test-results",
   "playwright-report",
+  ".superpowers",
 ]);
 
 const FORBIDDEN_PATHS = [
@@ -44,6 +45,10 @@ export function auditPublicTree(rootUrl) {
   function walk(dir) {
     const entries = readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
+      if (entry.isDirectory() && EXCLUDE_DIRS.has(entry.name)) {
+        continue;
+      }
+
       const fullPath = join(dir, entry.name);
       const relPath = relative(rootPath, fullPath).replace(/\\/g, "/");
 
@@ -55,9 +60,6 @@ export function auditPublicTree(rootUrl) {
       }
 
       if (entry.isDirectory()) {
-        if (EXCLUDE_DIRS.has(entry.name)) {
-          continue;
-        }
         walk(fullPath);
       } else if (entry.isFile()) {
         files.push(relPath);

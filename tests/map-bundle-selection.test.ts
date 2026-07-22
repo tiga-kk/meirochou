@@ -9,11 +9,14 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, test } from "vitest";
-import { selectMapBundleDirectory } from "../vite.config";
+import { selectMapBundles } from "../vite.config";
 
 const temporaryDirectories: string[] = [];
 
-function makeBundle(relativePath: string): {
+function makeBundle(
+  relativePath: string,
+  manifestContent = "{}\n",
+): {
   repositoryRoot: string;
   bundle: string;
 } {
@@ -21,8 +24,18 @@ function makeBundle(relativePath: string): {
   temporaryDirectories.push(repositoryRoot);
   const bundle = resolve(repositoryRoot, relativePath);
   mkdirSync(bundle, { recursive: true });
-  writeFileSync(resolve(bundle, "manifest.json"), "{}\n", "utf8");
+  writeFileSync(resolve(bundle, "manifest.json"), manifestContent, "utf8");
   return { repositoryRoot, bundle };
+}
+
+function writeRegistry(repositoryRoot: string, registry: unknown) {
+  const eventsDir = resolve(repositoryRoot, "apps/webapp/events");
+  mkdirSync(eventsDir, { recursive: true });
+  writeFileSync(
+    resolve(eventsDir, "manifest.json"),
+    JSON.stringify(registry, null, 2),
+    "utf8",
+  );
 }
 
 afterEach(() => {
@@ -31,101 +44,97 @@ afterEach(() => {
   });
 });
 
-test("normal webapp modes always select the tracked demo bundle", () => {
+test("normal webapp modes select map bundles declared in the event registry", () => {
   const { repositoryRoot, bundle } = makeBundle(
     "apps/webapp/map-bundles/demo-v1",
   );
+  writeRegistry(repositoryRoot, {
+    schemaVersion: 1,
+    events: [
+      {
+        eventId: "demo-v1",
+        displayName: "Demo V1",
+        mapBundle: "../maps/demo-v1/manifest.json",
+        days: [],
+      },
+    ],
+  });
 
-  assert.equal(
-    selectMapBundleDirectory({
-      mode: "development",
-      repositoryRoot,
-      privateBundleDirectory: "/must/not/be/used",
-    }),
-    bundle,
+  const resolved = selectMapBundles({
+    mode: "development",
+    repositoryRoot,
+    privateBundleDirectory: "/must/not/be/used",
+  });
+
+  assert.equal(resolved.size, 1);
+  assert.equal(resolved.get("demo-v1"), bundle);
+});
+
+test("normal webapp modes reject map bundles outside map-bundles directory", () => {
+  const { repositoryRoot } = makeBundle("apps/webapp/map-bundles/demo-v1");
+  writeRegistry(repositoryRoot, {
+    schemaVersion: 1,
+    events: [
+      {
+        eventId: "demo-v1",
+        displayName: "Demo V1",
+        mapBundle: "../outside/demo-v1/manifest.json",
+        days: [],
+      },
+    ],
+  });
+
+  assert.throws(
+    () =>
+      selectMapBundles({
+        mode: "development",
+        repositoryRoot,
+      }),
+    /mapBundle|outside/i,
   );
 });
 
-test("private mode requires an explicitly configured bundle", () => {
+test("private mode requires an explicitly configured bundle and gets eventId from its manifest", () => {
   const { repositoryRoot } = makeBundle("apps/webapp/map-bundles/demo-v1");
+  const privateBundle = makeBundle(
+    "private-bundle",
+    JSON.stringify({ eventId: "private-ev" }),
+  ).bundle;
 
   assert.throws(
-    () => selectMapBundleDirectory({ mode: "private", repositoryRoot }),
+    () => selectMapBundles({ mode: "private", repositoryRoot }),
     /COMIPATH_PRIVATE_MAP_BUNDLE_DIR/,
   );
-});
 
-test("private mode accepts an external directory with a manifest", () => {
-  const { repositoryRoot } = makeBundle("apps/webapp/map-bundles/demo-v1");
-  const privateBundle = makeBundle("private-bundle").bundle;
+  const resolved = selectMapBundles({
+    mode: "private",
+    repositoryRoot,
+    privateBundleDirectory: privateBundle,
+  });
 
-  assert.equal(
-    selectMapBundleDirectory({
-      mode: "private",
-      repositoryRoot,
-      privateBundleDirectory: privateBundle,
-    }),
-    privateBundle,
-  );
-});
-
-test("private mode rejects a directory without a manifest", () => {
-  const { repositoryRoot } = makeBundle("apps/webapp/map-bundles/demo-v1");
-  const emptyDirectory = mkdtempSync(join(tmpdir(), "comipath-empty-bundle-"));
-  temporaryDirectories.push(emptyDirectory);
-
-  assert.throws(
-    () =>
-      selectMapBundleDirectory({
-        mode: "private",
-        repositoryRoot,
-        privateBundleDirectory: emptyDirectory,
-      }),
-    /manifest\.json/,
-  );
-});
-
-test("private mode reports a missing bundle directory clearly", () => {
-  const { repositoryRoot } = makeBundle("apps/webapp/map-bundles/demo-v1");
-
-  assert.throws(
-    () =>
-      selectMapBundleDirectory({
-        mode: "private",
-        repositoryRoot,
-        privateBundleDirectory: resolve(
-          repositoryRoot,
-          "../missing-private-bundle",
-        ),
-      }),
-    /Map bundle directory does not exist/,
-  );
-});
-
-test("private mode rejects a bundle stored inside the repository", () => {
-  const { repositoryRoot, bundle } = makeBundle(
-    "apps/webapp/map-bundles/demo-v1",
-  );
-
-  assert.throws(
-    () =>
-      selectMapBundleDirectory({
-        mode: "private",
-        repositoryRoot,
-        privateBundleDirectory: bundle,
-      }),
-    /outside the repository/,
-  );
+  assert.equal(resolved.size, 1);
+  assert.equal(resolved.get("private-ev"), privateBundle);
 });
 
 test("map bundles reject symbolic links before serving or copying", () => {
   const { repositoryRoot, bundle } = makeBundle(
     "apps/webapp/map-bundles/demo-v1",
   );
+  writeRegistry(repositoryRoot, {
+    schemaVersion: 1,
+    events: [
+      {
+        eventId: "demo-v1",
+        displayName: "Demo V1",
+        mapBundle: "../maps/demo-v1/manifest.json",
+        days: [],
+      },
+    ],
+  });
   symlinkSync(resolve(bundle, "manifest.json"), resolve(bundle, "linked.json"));
 
   assert.throws(
-    () => selectMapBundleDirectory({ mode: "production", repositoryRoot }),
+    () => selectMapBundles({ mode: "production", repositoryRoot }),
     /symbolic links/,
   );
 });

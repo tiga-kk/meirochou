@@ -407,17 +407,8 @@ export class ModalManager {
 
     const space = circle.space;
     this.dataManager.addPurchased(space, circle.sheetName || "");
-    const syncResult = await this.dataManager.syncUpdate(
-      space,
-      false,
-      false,
-      circle.sheetName || "",
-    );
     if (this.uiManager) {
-      const message = syncResult.synced
-        ? `${space} 購入完了`
-        : `${space} 購入済み（同期待ち）`;
-      this.uiManager.showToast(message);
+      this.uiManager.showToast(`${space} 購入完了`);
     }
 
     // ギャラリーデータを更新（購入済みを除外）して再描画
@@ -437,14 +428,6 @@ export class ModalManager {
 
     const action = this.dataManager.undoLastAction();
     if (action) {
-      if (action.type === "purchase") {
-        await this.dataManager.syncUpdate(
-          action.space,
-          true,
-          false,
-          action.sheetName || "",
-        );
-      }
       if (this.uiManager)
         this.uiManager.showToast(`${action.space} の操作を取り消しました`);
 
