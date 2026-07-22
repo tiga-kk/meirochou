@@ -1051,7 +1051,7 @@ test("webapp documents partial offline support without claiming offline startup"
 
   assert.match(readme, /部分的なオフライン対応/);
   assert.match(readme, /LocalStorage/);
-  assert.match(readme, /Service Worker/);
+  assert.doesNotMatch(readme, /Service Worker/);
 });
 
 test("webapp documents pin previews and route comparison", () => {
@@ -1305,4 +1305,24 @@ test("webapp navigation map load listener is guarded across repeated init calls"
     mapRenderer,
     /this\.navigationMapImageLoadListenerAttached\s*=\s*true/,
   );
+});
+
+test("public data documentation matches the Phase 2 boundary", () => {
+  const readme = read("README.md");
+  const contract = read("docs/data-contracts.md");
+
+  assert.match(readme, /LocalStorage/);
+  assert.match(readme, /CSV/);
+  assert.match(readme, /GAS同期は未実装/);
+  assert.doesNotMatch(readme, /Service Worker/);
+
+  for (const required of [
+    "eventId + dayId",
+    "sourceGeneration",
+    "space,priority,isSale,account,tweet,memo",
+    "removedFromSource",
+    "previewId",
+  ]) {
+    assert.match(contract, new RegExp(required.replace(/[+]/g, "\\+")));
+  }
 });
