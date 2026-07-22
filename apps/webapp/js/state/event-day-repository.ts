@@ -1,3 +1,4 @@
+import { parseDayId, parseEventId } from "../types/boundary-parsers";
 import type { EventDayRef, LocalEventDayState } from "../types/domain";
 import { parseLocalEventDayState } from "./storage-schema";
 import type { StorageService } from "./storage-service";
@@ -16,8 +17,16 @@ export class StorageWriteError extends Error {
 const INDEX_KEY = "comipath:v1:index:event-days";
 const LAST_OPENED_KEY = "comipath:v1:last-opened";
 
+function parseEventDayRef(eventId: unknown, dayId: unknown): EventDayRef {
+  return {
+    eventId: parseEventId(eventId),
+    dayId: parseDayId(dayId),
+  };
+}
+
 function getEventDayStateKey(ref: EventDayRef): string {
-  return `comipath:v1:${ref.eventId}:${ref.dayId}:state`;
+  const parsed = parseEventDayRef(ref.eventId, ref.dayId);
+  return `comipath:v1:${parsed.eventId}:${parsed.dayId}:state`;
 }
 
 export class EventDayRepository {
@@ -39,8 +48,9 @@ export class EventDayRepository {
   save(ref: EventDayRef, state: LocalEventDayState): void {
     // 1. Validate the state before saving
     parseLocalEventDayState(state);
+    const parsedRef = parseEventDayRef(ref.eventId, ref.dayId);
 
-    const stateKey = getEventDayStateKey(ref);
+    const stateKey = getEventDayStateKey(parsedRef);
     const previousStateRaw = this.storageService.getString(stateKey, "");
     const previousIndexRaw = this.storageService.getString(INDEX_KEY, "");
 
@@ -51,10 +61,10 @@ export class EventDayRepository {
       // 3. Update index list
       const indexList = this.list();
       const exists = indexList.some(
-        (r) => r.eventId === ref.eventId && r.dayId === ref.dayId,
+        (r) => r.eventId === parsedRef.eventId && r.dayId === parsedRef.dayId,
       );
       if (!exists) {
-        const nextList = [...indexList, ref];
+        const nextList = [...indexList, parsedRef];
         this.storageService.setJson(INDEX_KEY, nextList);
       }
     } catch (error) {
@@ -91,12 +101,21 @@ export class EventDayRepository {
     if (!Array.isArray(raw)) {
       return [];
     }
-    return raw.filter((item): item is EventDayRef => {
+    return raw.flatMap((item): EventDayRef[] => {
       if (typeof item !== "object" || item === null) {
-        return false;
+        return [];
       }
       const obj = item as Record<string, unknown>;
-      return typeof obj.eventId === "string" && typeof obj.dayId === "string";
+      try {
+        return [
+          {
+            eventId: parseEventId(obj.eventId),
+            dayId: parseDayId(obj.dayId),
+          },
+        ];
+      } catch {
+        return [];
+      }
     });
   }
 
@@ -110,10 +129,7 @@ export class EventDayRepository {
         return null;
       }
       const obj = item as Record<string, unknown>;
-      if (typeof obj.eventId === "string" && typeof obj.dayId === "string") {
-        return item as EventDayRef;
-      }
-      return null;
+      return parseEventDayRef(obj.eventId, obj.dayId);
     } catch (error) {
       console.error(
         "Failed to retrieve or parse last opened event day:",
@@ -124,8 +140,9 @@ export class EventDayRepository {
   }
 
   setLastOpened(ref: EventDayRef): void {
+    const parsedRef = parseEventDayRef(ref.eventId, ref.dayId);
     try {
-      this.storageService.setJson(LAST_OPENED_KEY, ref);
+      this.storageService.setJson(LAST_OPENED_KEY, parsedRef);
     } catch (error) {
       throw new StorageWriteError(
         "Failed to save last opened event day",
@@ -135,7 +152,8 @@ export class EventDayRepository {
   }
 
   deleteState(ref: EventDayRef): void {
-    const stateKey = getEventDayStateKey(ref);
+    const parsedRef = parseEventDayRef(ref.eventId, ref.dayId);
+    const stateKey = getEventDayStateKey(parsedRef);
     const previousStateRaw = this.storageService.getString(stateKey, "");
     const previousIndexRaw = this.storageService.getString(INDEX_KEY, "");
 
@@ -144,7 +162,8 @@ export class EventDayRepository {
 
       const indexList = this.list();
       const nextList = indexList.filter(
-        (r) => !(r.eventId === ref.eventId && r.dayId === ref.dayId),
+        (r) =>
+          !(r.eventId === parsedRef.eventId && r.dayId === parsedRef.dayId),
       );
       this.storageService.setJson(INDEX_KEY, nextList);
     } catch (error) {

@@ -153,6 +153,23 @@ describe("Storage Schema Version 1", () => {
     );
   });
 
+  test("preserves a validated source sale marker across a storage parse", () => {
+    const baseState = createEmptyEventDayState(
+      validCsvSource,
+      "g-001",
+      validNow,
+    );
+    const stateWithSaleMarker = {
+      ...baseState,
+      circles: [{ space: "A-01", isSale: "x" }],
+      purchased: ["A-01"],
+    };
+
+    expect(parseLocalEventDayState(stateWithSaleMarker).circles).toEqual([
+      { space: "A-01", isSale: "x" },
+    ]);
+  });
+
   test("rejects purchased or hold referencing an invalid/empty space (not in circles)", () => {
     const baseState = createEmptyEventDayState(
       validCsvSource,

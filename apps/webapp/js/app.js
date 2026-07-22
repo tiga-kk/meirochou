@@ -38,7 +38,7 @@ function areSpacesInSameArea(spaceA, spaceB) {
 /**
  * アプリケーションのメインコントローラー
  */
-class App {
+export class App {
   constructor() {
     this.dm = new DataManager();
     this.ui = new UIManager();
@@ -57,16 +57,7 @@ class App {
   /**
    * 初期化実行
    */
-  init() {
-    // クエリパラメータからGASのURLを自動設定
-    const urlParams = new URLSearchParams(window.location.search);
-    const gasUrlParam = urlParams.get("gas_url");
-    if (gasUrlParam) {
-      this.dm.setGasUrl(gasUrlParam);
-      // クエリパラメータをクリアしてURLをすっきりさせる
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
+  async init(manifest) {
     const devDemoEnabled = isDevDemoEnabled(window.location);
     if (devDemoEnabled) {
       const demoData = createDevDemoData();
@@ -74,6 +65,47 @@ class App {
       this.dm.spreadsheetTitle = demoData.spreadsheetTitle;
       this.dm.purchasedList = demoData.purchasedList;
       this.dm.holdList = demoData.holdList;
+    } else {
+      // 初期イベント/日を開く
+      let activeRef = this.dm.repository.getLastOpened();
+      if (!activeRef) {
+        if (manifest) {
+          activeRef = {
+            eventId: manifest.eventId,
+            dayId: "day1",
+          };
+        } else {
+          activeRef = { eventId: "demo-v1", dayId: "day1" };
+        }
+      }
+
+      try {
+        await this.dm.openEventDay(activeRef);
+      } catch (error) {
+        console.error("Failed to open initial event day:", error);
+        const defaultRef = { eventId: "demo-v1", dayId: "day1" };
+
+        // Already tried to open the default and failed, or we retry
+        const isAlreadyDefault =
+          activeRef.eventId === defaultRef.eventId &&
+          activeRef.dayId === defaultRef.dayId;
+
+        if (isAlreadyDefault) {
+          renderMapBootstrapError(document, error);
+          return;
+        }
+
+        try {
+          console.warn(
+            "Attempting fallback to default event day (demo-v1/day1)",
+          );
+          await this.dm.openEventDay(defaultRef);
+        } catch (fallbackError) {
+          console.error("Failed to open fallback event day:", fallbackError);
+          renderMapBootstrapError(document, fallbackError);
+          return;
+        }
+      }
     }
 
     this.ui.init(this.dm, {
@@ -85,13 +117,6 @@ class App {
     });
     this.setupEvents();
 
-    if (gasUrlParam) {
-      this.ui.showToast("設定を自動読み込みしました！", "success");
-    }
-
-    // 未送信キューの処理を試行
-    this.dm.processQueue();
-
     if (devDemoEnabled) {
       this.ui.updateCounts(this.dm);
       this.ui.showToast("UIデモデータを表示中");
@@ -99,15 +124,14 @@ class App {
       return;
     }
 
+    this.ui.updateCounts(this.dm);
+
     // データがあれば初期表示
     if (this.dm.wantToBuy.length > 0) {
       this.ui.showToast("データ読み込み済み");
-    } else if (this.dm.getGasUrl()) {
-      // URLがあるなら自動更新トライ
-      this.refreshData();
+      this.searchNext("", false);
     } else {
-      this.ui.showSettings();
-      this.ui.showToast("GAS URLを設定してください");
+      this.ui.showToast("CSVデータ未設定。空のイベント・日程で起動しました");
     }
   }
 
@@ -302,47 +326,14 @@ class App {
     }
 
     const settings = this.ui.els.settingsArea;
-    settings.addEventListener("settings-gas-url-change", (event) => {
-      this.dm.setGasUrl(event.detail.gasUrl);
-    });
-    settings.addEventListener("settings-selection-change", (event) => {
-      this.dm.setSelectedSheets(event.detail.selectedSheets);
-    });
     settings.addEventListener("settings-fetch-sheets-request", async () => {
-      this.dm.setGasUrl(settings.gasUrl);
-      this.ui.setSettingsBusy(true);
-      this.ui.setSettingsError("");
-      this.ui.showToast("シート一覧を取得中...");
-      try {
-        const sheets = await this.dm.fetchSheetList();
-        this.ui.updateSpreadsheetTitle(this.dm.getSpreadsheetTitle());
-        const savedSelected = this.dm.getSelectedSheets();
-        const availableSelected = savedSelected.filter((sheet) =>
-          sheets.includes(sheet),
-        );
-        const selected =
-          availableSelected.length > 0 ? availableSelected : sheets;
-        this.dm.setSelectedSheets(selected);
-        this.ui.renderSheetList(sheets, selected);
-        this.ui.showToast("シート一覧を更新しました");
-      } catch (e) {
-        const message = `シート一覧取得失敗: ${e.message}`;
-        this.ui.setSettingsError(message);
-        this.ui.showToast(message);
-      } finally {
-        this.ui.setSettingsBusy(false);
-      }
+      this.ui.setSettingsError("GAS同期はPhase 2では利用できません");
+      this.ui.showToast("GAS同期はPhase 2では利用できません");
     });
 
     settings.addEventListener("settings-refresh-request", async () => {
-      this.dm.setGasUrl(settings.gasUrl);
-      this.ui.setSettingsBusy(true);
-      this.ui.setSettingsError("");
-      try {
-        await this.refreshData(true);
-      } finally {
-        this.ui.setSettingsBusy(false);
-      }
+      this.ui.setSettingsError("GAS同期はPhase 2では利用できません");
+      this.ui.showToast("GAS同期はPhase 2では利用できません");
     });
 
     // 各種ボタンアクション
@@ -365,32 +356,15 @@ class App {
         this.handleResetHold();
       });
     }
-
-    // オンライン復帰時の同期
-    window.addEventListener("online", () => {
-      this.ui.showToast("オンラインに復帰しました。同期中...");
-      this.dm.processQueue();
-    });
   }
 
   /**
    * データ更新処理
    */
   async refreshData(force = false) {
-    this.ui.showToast("データ更新中...");
-
-    // 送信待ちがあれば先に送る
-    this.dm.processQueue();
-
-    try {
-      const count = await this.dm.fetchFromSheet(force);
-      this.ui.updateSpreadsheetTitle(this.dm.getSpreadsheetTitle());
-      this.ui.updateCounts(this.dm);
-      this.ui.showToast(`${count}件 読み込みました`);
-    } catch (_e) {
-      this.ui.setSettingsError("読み込み失敗: URLを確認してください");
-      this.ui.showToast("読み込み失敗: URLを確認してください");
-    }
+    void force;
+    this.ui.setSettingsError("GAS同期はPhase 2では利用できません");
+    this.ui.showToast("GAS同期はPhase 2では利用できません");
   }
 
   async loadGridRouteAssets(area) {
@@ -550,11 +524,9 @@ class App {
 
     const space = actionTarget.space;
     const sheetName = actionTarget.sheetName || "";
-    let syncPromise = null;
-
     if (type === "purchase") {
       this.dm.addPurchased(space, sheetName);
-      syncPromise = this.dm.syncUpdate(space, false, false, sheetName);
+      this.ui.showToast(`${space} 購入！`);
     } else {
       this.dm.addHold(space, sheetName);
       this.ui.showToast(`${space} 保留`);
@@ -563,16 +535,6 @@ class App {
     this.ui.updateCounts(this.dm);
     this.ui.updateCurrentLocation(space); // 現在地を更新
     this.searchNext(space, false); // 到着地点から自動で次を検索
-
-    if (syncPromise) {
-      const result = await syncPromise;
-      if (result.synced) {
-        this.ui.showToast(`${space} 購入！`);
-      } else {
-        const reason = result.error?.message || "通信に失敗しました";
-        this.ui.showToast(`${space} 購入済み（同期待ち: ${reason}）`);
-      }
-    }
   }
 
   /**
@@ -581,14 +543,6 @@ class App {
   async handleUndo() {
     const action = this.dm.undoLastAction();
     if (action) {
-      if (action.type === "purchase") {
-        await this.dm.syncUpdate(
-          action.space,
-          true,
-          false,
-          action.sheetName || "",
-        );
-      }
       this.ui.showToast(`${action.space} の操作を取り消しました`);
       this.ui.updateCounts(this.dm);
       this.ui.updateCurrentLocation(action.space); // 現在地を元に戻す
@@ -604,14 +558,6 @@ class App {
   async handleRedo() {
     const action = this.dm.redoAction();
     if (action) {
-      if (action.type === "purchase") {
-        await this.dm.syncUpdate(
-          action.space,
-          false,
-          false,
-          action.sheetName || "",
-        );
-      }
       this.ui.showToast(`${action.space} の操作をやり直しました`);
       this.ui.updateCounts(this.dm);
       this.ui.updateCurrentLocation(action.space); // 現在地を更新
@@ -626,10 +572,7 @@ class App {
    */
   handleReset() {
     if (confirm("本当にリセットしますか？")) {
-      const backup = this.dm.resetAll();
-      if (backup.length > 0) {
-        this.dm.syncUpdate(backup, true, true); // 一括Undo (Queue経由)
-      }
+      this.dm.resetAll();
       this.ui.updateCounts(this.dm);
       this.ui.showTarget(null); // 表示クリア
       this.ui.els.targetSection.classList.add("hidden");
@@ -653,8 +596,9 @@ class App {
 
 /** Load the selected map bundle before creating any stateful app services. */
 async function bootstrapApp() {
+  let manifest;
   try {
-    const manifest = await loadMapBundleManifest();
+    manifest = await loadMapBundleManifest();
     Config.initializeAreas(manifest.areas);
   } catch (error) {
     console.error("Map bundle initialization failed.", error);
@@ -663,7 +607,7 @@ async function bootstrapApp() {
   }
 
   const app = new App();
-  app.init();
+  await app.init(manifest);
 }
 
 // アプリ起動

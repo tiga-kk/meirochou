@@ -54,11 +54,12 @@ const mapManifest = parseMapBundleManifest(
 Config.initializeAreas(mapManifest.areas);
 
 // GAS contract tests are restored for Task 4
-test("webapp sends sale actions to the GAS sale endpoint", () => {
+test("Phase 2 keeps GAS sale actions outside the local data service", () => {
   const source = read("apps/webapp/js/data-manager.ts");
   const gasSource = read("integrations/gas-spreadsheet/src/web-api.js");
 
-  assert.match(source, /action:\s*["']sale["']/);
+  assert.doesNotMatch(source, /GasApiClient|SyncQueue/);
+  assert.doesNotMatch(source, /action:\s*["']sale["']/);
   assert.match(source, /sheetName/);
   assert.match(gasSource, /requestData\.sheetName/);
   assert.match(gasSource, /getSheetByName/);
@@ -116,24 +117,24 @@ test("shared webapp and GAS names use lower camel case", () => {
   assert.doesNotMatch(sources, /\bval2\b/);
 });
 
-test("webapp GAS calls live behind GasApiClient", () => {
+test("Phase 2 keeps GAS transport outside DataManager", () => {
   const dataManagerSource = read("apps/webapp/js/data-manager.ts");
   const gasClientSource = read("apps/webapp/js/api/gas-api-client.ts");
 
-  assert.match(dataManagerSource, /new GasApiClient\(/);
+  assert.doesNotMatch(dataManagerSource, /GasApiClient/);
   assert.doesNotMatch(dataManagerSource, /\bfetch\(/);
   assert.match(gasClientSource, /async fetchSheetList/);
   assert.match(gasClientSource, /async fetchCircles/);
   assert.match(gasClientSource, /async sendSaleUpdate/);
 });
 
-test("webapp storage and sync queue are separated from DataManager", () => {
+test("Phase 2 DataManager storage is separate from the sync queue", () => {
   const dataManagerSource = read("apps/webapp/js/data-manager.ts");
   const storageSource = read("apps/webapp/js/state/storage-service.ts");
   const queueSource = read("apps/webapp/js/state/sync-queue.ts");
 
   assert.match(dataManagerSource, /new StorageService\(/);
-  assert.match(dataManagerSource, /new SyncQueue\(/);
+  assert.doesNotMatch(dataManagerSource, /SyncQueue/);
   assert.doesNotMatch(dataManagerSource, /localStorage\./);
   assert.match(storageSource, /localStorage/);
   assert.match(storageSource, /getStorage/);
@@ -1013,12 +1014,14 @@ test("webapp restarts automatic search from the exact completed space", () => {
   assert.match(appSource, /this\.searchNext\(action\.space\)/);
 });
 
-test("webapp opens settings on a first visit without cached data or GAS URL", () => {
+test("webapp opens an empty local event/day on a first visit", () => {
   const appSource = read("apps/webapp/js/app.js");
   const uiSource = read("apps/webapp/js/ui-manager.js");
 
-  assert.match(appSource, /this\.ui\.showSettings\(\)/);
-  assert.match(appSource, /GAS URLを設定してください/);
+  assert.match(appSource, /CSVデータ未設定。空のイベント・日程で起動しました/);
+  assert.doesNotMatch(appSource, /GAS URLを設定してください/);
+  assert.doesNotMatch(uiSource, /dataManager\.getGasUrl\(\)/);
+  assert.doesNotMatch(uiSource, /dataManager\.getSelectedSheets\(\)/);
   assert.match(
     uiSource,
     /showSettings\(\)[\s\S]*settingsArea\.open\s*=\s*true/,
@@ -1154,10 +1157,7 @@ test("webapp renders spreadsheet and source-sheet titles in compact labels", () 
   assert.match(html, /id="spreadsheet-title"/);
   assert.match(html, /id="target-sheet-name"/);
   assert.match(dataManagerSource, /spreadsheetTitle/);
-  assert.match(
-    dataManagerSource,
-    /wantToBuy:\s*this\.wantToBuy,[\s\S]*spreadsheetTitle:\s*this\.spreadsheetTitle/,
-  );
+  assert.match(dataManagerSource, /spreadsheetTitle/);
   assert.match(uiSource, /updateSpreadsheetTitle/);
   assert.match(uiSource, /viewModel\.sheetNameLabel/);
 });

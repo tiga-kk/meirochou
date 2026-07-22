@@ -37,6 +37,7 @@ export function diffCircleSources(
     } else {
       const isUpdated =
         cur.priority !== inc.priority ||
+        cur.isSale !== inc.isSale ||
         cur.account !== inc.account ||
         cur.tweet !== inc.tweet ||
         cur.memo !== inc.memo;

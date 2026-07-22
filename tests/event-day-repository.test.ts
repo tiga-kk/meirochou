@@ -89,6 +89,20 @@ describe("EventDayRepository", () => {
     expect(adapter.map.has("comipath:v1:C108:day2:state")).toBe(true);
   });
 
+  test("rejects event/day identifiers that would make storage keys ambiguous", () => {
+    const adapter = new MockStorageAdapter();
+    const repository = new EventDayRepository(new StorageService(adapter));
+    const state = createEmptyEventDayState(validCsvSource, "g-001", validNow);
+
+    expect(() =>
+      repository.save(
+        { eventId: "C108", dayId: "day1:alternate" } as EventDayRef,
+        state,
+      ),
+    ).toThrow(/dayId/);
+    expect(adapter.map).toHaveLength(0);
+  });
+
   test("tracks and retrieves last opened event/day", () => {
     const adapter = new MockStorageAdapter();
     const storageService = new StorageService(adapter);
@@ -232,6 +246,18 @@ describe("EventDayRepository", () => {
     adapter.setItem("comipath:v1:last-opened", "{invalid json");
 
     // getLastOpened should return null instead of throwing
+    expect(repository.getLastOpened()).toBeNull();
+  });
+
+  test("getLastOpened ignores identifiers outside the storage-key contract", () => {
+    const adapter = new MockStorageAdapter();
+    const repository = new EventDayRepository(new StorageService(adapter));
+
+    adapter.setItem(
+      "comipath:v1:last-opened",
+      JSON.stringify({ eventId: "C108", dayId: "day1:alternate" }),
+    );
+
     expect(repository.getLastOpened()).toBeNull();
   });
 

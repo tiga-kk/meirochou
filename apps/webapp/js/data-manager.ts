@@ -1,335 +1,667 @@
-import { GasApiClient } from "./api/gas-api-client";
 import { Config } from "./config.js";
+import { parseCircleCsv, serializeCircleCsv } from "./data/csv-circle-codec";
+import { loadEventRegistry } from "./data/event-registry";
+import {
+  circleRecordToCircle,
+  decodeLegacyCircles,
+  decodeLegacyHistory,
+  decodeLegacyStringList,
+  extractLegacyCircleRows,
+} from "./data/local-state-adapters";
+import { applySourceDiff, diffCircleSources } from "./data/source-diff";
+import { EventDayRepository } from "./state/event-day-repository";
+import { createEmptyEventDayState } from "./state/storage-schema";
 import { StorageService } from "./state/storage-service.js";
-import type { SyncResult } from "./state/sync-queue.js";
-import { SyncQueue } from "./state/sync-queue.js";
 import type {
   ActionHistoryEntry,
   ActionType,
-  CachedCircleData,
   Circle,
-  SaleUpdatePayload,
+  CircleRecord,
+  EventDayRef,
+  EventRegistryV1,
+  HistoryEntry,
+  LocalEventDayState,
+  SourceDiff,
 } from "./types/domain";
 
-/**
- * データ管理クラス
- * LocalStorageの読み書き、GASとの通信を担当
- */
+export interface CsvReplacementPreview {
+  readonly previewId: string;
+  readonly ref: EventDayRef;
+  readonly expectedSourceGeneration: string;
+  readonly incomingHash: string;
+  readonly fileName: string;
+  readonly diff: SourceDiff;
+  readonly expiresAt: string;
+}
+
+export interface LegacyImportPreview {
+  readonly previewId: string;
+  readonly target: EventDayRef;
+  readonly circleCount: number;
+  readonly purchasedCount: number;
+  readonly holdCount: number;
+  readonly historyCount: number;
+  readonly issues: readonly string[];
+}
+
+export interface DataManagerOptions {
+  readonly now?: () => Date;
+  readonly createSourceGeneration?: () => string;
+  readonly createPreviewId?: () => string;
+  readonly previewTtlMs?: number;
+}
+
+interface CsvPreviewRecord extends CsvReplacementPreview {
+  readonly text: string;
+  readonly circles: readonly CircleRecord[];
+}
+
+interface LegacyPreviewRecord {
+  readonly target: EventDayRef;
+  readonly circles: readonly CircleRecord[];
+  readonly purchased: readonly string[];
+  readonly hold: readonly string[];
+  readonly history: readonly HistoryEntry[];
+  readonly redo: readonly HistoryEntry[];
+  readonly issues: readonly string[];
+}
+
+export class StaleCsvPreviewError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StaleCsvPreviewError";
+  }
+}
+
+export class LegacyImportError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LegacyImportError";
+  }
+}
+
+function hashText(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function sameRef(left: EventDayRef | null, right: EventDayRef): boolean {
+  return Boolean(
+    left && left.eventId === right.eventId && left.dayId === right.dayId,
+  );
+}
+
+/** LocalStorage-backed service for the currently selected event/day. */
 export class DataManager {
   readonly storage: StorageService;
-  readonly apiClient: GasApiClient;
-  readonly syncQueue: SyncQueue<SaleUpdatePayload>;
-  wantToBuy: Circle[];
-  spreadsheetTitle: string;
-  purchasedList: string[];
-  holdList: string[];
-  actionHistory: ActionHistoryEntry[];
-  redoStack: ActionHistoryEntry[];
-  selectedSheets: string[];
+  readonly repository: EventDayRepository;
+  readonly csvPreviews = new Map<string, CsvPreviewRecord>();
 
-  constructor() {
-    this.storage = new StorageService();
-    this.apiClient = new GasApiClient();
-    this.syncQueue = new SyncQueue(
-      this.storage,
-      Config.STORAGE_KEYS.SYNC_QUEUE,
-    );
+  wantToBuy: Circle[] = [];
+  spreadsheetTitle = "";
+  purchasedList: string[] = [];
+  holdList: string[] = [];
+  actionHistory: ActionHistoryEntry[] = [];
+  redoStack: ActionHistoryEntry[] = [];
+  activeRef: EventDayRef | null = null;
+  activeState: LocalEventDayState | null = null;
+  eventRegistry: EventRegistryV1 | null = null;
 
-    // メモリ上にデータを保持
-    const savedData = this.storage.getJson<CachedCircleData | null>(
-      Config.STORAGE_KEYS.DATA,
-      null,
-    );
-    this.wantToBuy = savedData ? savedData.wantToBuy : [];
-    this.spreadsheetTitle = savedData?.spreadsheetTitle || "";
+  private readonly now: () => Date;
+  private readonly createSourceGeneration: () => string;
+  private readonly createPreviewId: () => string;
+  private readonly previewTtlMs: number;
+  private readonly legacyPreviews = new Map<string, LegacyPreviewRecord>();
 
-    this.purchasedList = this.storage.getJson(
-      Config.STORAGE_KEYS.PURCHASED,
-      [],
-    );
-    this.holdList = this.storage.getJson(Config.STORAGE_KEYS.HOLD, []);
-    this.actionHistory = this.storage.getJson(Config.STORAGE_KEYS.HISTORY, []);
-    this.redoStack = this.storage.getJson(Config.STORAGE_KEYS.REDO_STACK, []);
+  constructor(storage?: StorageService, options: DataManagerOptions = {}) {
+    this.storage = storage || new StorageService();
+    this.repository = new EventDayRepository(this.storage);
 
-    // 選択されたシートリスト
-    this.selectedSheets = this.storage.getJson(
-      Config.STORAGE_KEYS.SELECTED_SHEETS,
-      [],
-    );
+    let generationSequence = 0;
+    let previewSequence = 0;
+    this.now = options.now || (() => new Date());
+    this.createSourceGeneration =
+      options.createSourceGeneration ||
+      (() => `source-${Date.now()}-${generationSequence++}`);
+    this.createPreviewId =
+      options.createPreviewId ||
+      (() => `csv-preview-${Date.now()}-${previewSequence++}`);
+    this.previewTtlMs = options.previewTtlMs ?? 5 * 60 * 1000;
   }
 
-  /**
-   * 保存されているGASのWebアプリURLを取得
-   */
-  getGasUrl(): string {
-    return this.storage.getString(Config.STORAGE_KEYS.URL);
+  private timestamp(): string {
+    return this.now().toISOString();
   }
 
-  /**
-   * GASのWebアプリURLを保存
-   */
-  setGasUrl(url: string): void {
-    const previousUrl = this.getGasUrl();
-    this.storage.setString(Config.STORAGE_KEYS.URL, url);
-
-    if (previousUrl && previousUrl !== url) {
-      this.wantToBuy = [];
-      this.spreadsheetTitle = "";
-      this.selectedSheets = [];
-      this.storage.remove(Config.STORAGE_KEYS.DATA);
-      this.storage.remove(Config.STORAGE_KEYS.SELECTED_SHEETS);
+  private requireRegistered(ref: EventDayRef): void {
+    const event = this.eventRegistry?.events.find(
+      (candidate) => candidate.eventId === ref.eventId,
+    );
+    if (!event?.days.some((day) => day.dayId === ref.dayId)) {
+      throw new Error("Event/Day not found in registry");
     }
   }
 
-  /**
-   * 選択されているシートリストを取得
-   */
-  getSelectedSheets(): readonly string[] {
-    return this.selectedSheets;
+  private async ensureRegistry(): Promise<void> {
+    if (!this.eventRegistry) this.eventRegistry = await loadEventRegistry();
+  }
+
+  private createEmptyState(): LocalEventDayState {
+    return createEmptyEventDayState(
+      { type: "csv", fileName: "empty.csv" },
+      this.createSourceGeneration(),
+      this.timestamp(),
+    );
+  }
+
+  private applyStateToMemory(state: LocalEventDayState): void {
+    this.wantToBuy = state.circles
+      .filter((circle) => !circle.removedFromSource)
+      .map(circleRecordToCircle);
+    this.spreadsheetTitle = "";
+    this.purchasedList = [...state.purchased];
+    this.holdList = [...state.hold];
+    this.actionHistory = state.history
+      .filter(
+        (entry): entry is HistoryEntry & { type: ActionType } =>
+          entry.type === "purchase" || entry.type === "hold",
+      )
+      .map(({ type, space }) => ({ type, space }));
+    this.redoStack = state.redo
+      .filter(
+        (entry): entry is HistoryEntry & { type: ActionType } =>
+          entry.type === "purchase" || entry.type === "hold",
+      )
+      .map(({ type, space }) => ({ type, space }));
+  }
+
+  private persistState(state: LocalEventDayState): LocalEventDayState {
+    if (!this.activeRef) throw new Error("No event/day is open");
+    this.repository.save(this.activeRef, state);
+    this.activeState = state;
+    this.applyStateToMemory(state);
+    return state;
+  }
+
+  private parseCsv(text: string): readonly CircleRecord[] {
+    const result = parseCircleCsv(text);
+    if (!result.ok) {
+      throw new Error(
+        `CSV parse failed: ${result.issues.map((issue) => issue.message).join("; ")}`,
+      );
+    }
+    return result.circles;
+  }
+
+  /** Open a registry-approved event/day, creating only an empty local state when needed. */
+  async openEventDay(ref: EventDayRef): Promise<LocalEventDayState> {
+    await this.ensureRegistry();
+    this.requireRegistered(ref);
+    const existing = this.repository.load(ref);
+    const state = existing || this.createEmptyState();
+    if (!existing) this.repository.save(ref, state);
+    this.activeRef = { eventId: ref.eventId, dayId: ref.dayId };
+    this.activeState = state;
+    this.applyStateToMemory(state);
+    this.repository.setLastOpened(ref);
+    return state;
+  }
+
+  /** Create the first CSV-backed state; existing non-empty states cannot be overwritten. */
+  async importInitialCsv(
+    ref: EventDayRef,
+    fileName: string,
+    text: string,
+  ): Promise<LocalEventDayState> {
+    await this.ensureRegistry();
+    this.requireRegistered(ref);
+    const current = this.repository.load(ref);
+    if (
+      current &&
+      (current.circles.length > 0 ||
+        current.source.type !== "csv" ||
+        current.source.fileName !== "empty.csv" ||
+        current.purchased.length > 0 ||
+        current.hold.length > 0 ||
+        current.history.length > 0 ||
+        current.redo.length > 0)
+    ) {
+      throw new Error("Initial CSV import requires an empty state");
+    }
+
+    const circles = this.parseCsv(text);
+    const now = this.timestamp();
+    const purchased = circles
+      .filter((circle) => circle.isSale?.toLowerCase() === "x")
+      .map((circle) => circle.space);
+    const history: HistoryEntry[] = purchased.map((space) => ({
+      type: "purchase",
+      space,
+      timestamp: now,
+    }));
+    const state: LocalEventDayState = {
+      schemaVersion: 1,
+      source: { type: "csv", fileName },
+      sourceGeneration: this.createSourceGeneration(),
+      circles,
+      purchased,
+      hold: [],
+      history,
+      redo: [],
+      gasOutbox: [],
+      timestamps: {
+        createdAt: current?.timestamps.createdAt || now,
+        updatedAt: now,
+        sourceUpdatedAt: now,
+      },
+    };
+    this.repository.save(ref, state);
+    if (sameRef(this.activeRef, ref)) {
+      this.activeState = state;
+      this.applyStateToMemory(state);
+    }
+    return state;
+  }
+
+  /** Backward-compatible name with the new initial-import semantics. */
+  importCsv(
+    ref: EventDayRef,
+    fileName: string,
+    text: string,
+  ): Promise<LocalEventDayState> {
+    return this.importInitialCsv(ref, fileName, text);
+  }
+
+  /** Create a short-lived, source-generation-bound CSV replacement preview. */
+  async previewCsvReplacement(
+    ref: EventDayRef,
+    fileName: string,
+    text: string,
+  ): Promise<CsvReplacementPreview> {
+    await this.ensureRegistry();
+    this.requireRegistered(ref);
+    const state = this.repository.load(ref);
+    if (!state)
+      throw new Error("Open the event/day before previewing a CSV replacement");
+    const circles = this.parseCsv(text);
+    const createdAt = this.now().getTime();
+    const preview: CsvPreviewRecord = {
+      previewId: this.createPreviewId(),
+      ref: { eventId: ref.eventId, dayId: ref.dayId },
+      expectedSourceGeneration: state.sourceGeneration,
+      incomingHash: hashText(text),
+      fileName,
+      diff: diffCircleSources(state.circles, circles),
+      expiresAt: new Date(createdAt + this.previewTtlMs).toISOString(),
+      text,
+      circles,
+    };
+    this.csvPreviews.set(preview.previewId, preview);
+    return preview;
+  }
+
+  /** Apply a preview only if its source generation, hash, and expiry still match. */
+  applyCsvReplacement(previewId: string): LocalEventDayState {
+    const preview = this.csvPreviews.get(previewId);
+    if (!preview)
+      throw new StaleCsvPreviewError(
+        "CSV preview is missing or already applied",
+      );
+    if (this.now().getTime() >= Date.parse(preview.expiresAt)) {
+      throw new StaleCsvPreviewError("CSV preview has expired");
+    }
+    if (hashText(preview.text) !== preview.incomingHash) {
+      throw new StaleCsvPreviewError("CSV preview hash mismatch");
+    }
+
+    const current = this.repository.load(preview.ref);
+    if (
+      !current ||
+      current.sourceGeneration !== preview.expectedSourceGeneration
+    ) {
+      throw new StaleCsvPreviewError("CSV preview source generation is stale");
+    }
+    if (current.source.type !== "csv") {
+      throw new StaleCsvPreviewError("CSV replacement requires a CSV source");
+    }
+
+    const now = this.timestamp();
+    const merged = applySourceDiff(current, preview.circles, now);
+    const nextState: LocalEventDayState = {
+      ...merged,
+      source: { type: "csv", fileName: preview.fileName },
+      sourceGeneration: this.createSourceGeneration(),
+    };
+    this.repository.save(preview.ref, nextState);
+    this.csvPreviews.delete(previewId);
+    if (sameRef(this.activeRef, preview.ref)) {
+      this.activeState = nextState;
+      this.applyStateToMemory(nextState);
+    }
+    return nextState;
+  }
+
+  /** Export the validated local snapshot, including source rows retained for history. */
+  exportCsv(ref: EventDayRef): string {
+    const state = this.repository.load(ref);
+    if (!state) throw new Error("Event day state not found");
+    return serializeCircleCsv(state.circles, new Set(state.purchased));
+  }
+
+  private readLegacyJson(key: string, issues: string[]): unknown {
+    try {
+      return this.storage.getJson<unknown>(key, null);
+    } catch {
+      issues.push(`${key} contains invalid JSON`);
+      return null;
+    }
+  }
+
+  /** Read old storage only for an explicit, diagnostic migration preview. */
+  previewLegacyImport(target: EventDayRef): LegacyImportPreview {
+    this.requireRegistered(target);
+    const issues: string[] = [];
+    const data =
+      this.readLegacyJson(Config.STORAGE_KEYS.DATA, issues) ||
+      this.readLegacyJson("comipath:v1:circles", issues);
+    const extracted =
+      data === null ? { value: [], issues: [] } : extractLegacyCircleRows(data);
+    issues.push(...extracted.issues);
+    const circles = decodeLegacyCircles(extracted.value);
+    issues.push(...circles.issues);
+
+    const decodeList = (key: string, fallback: string): readonly string[] => {
+      const raw =
+        this.readLegacyJson(key, issues) ??
+        this.readLegacyJson(fallback, issues);
+      if (raw === null) return [];
+      const decoded = decodeLegacyStringList(raw, key);
+      issues.push(...decoded.issues);
+      return decoded.value;
+    };
+    const purchased = decodeList(
+      Config.STORAGE_KEYS.PURCHASED,
+      "comipath:v1:purchased",
+    );
+    const hold = decodeList(Config.STORAGE_KEYS.HOLD, "comipath:v1:hold");
+    const now = this.timestamp();
+    const historyRaw =
+      this.readLegacyJson(Config.STORAGE_KEYS.HISTORY, issues) ??
+      this.readLegacyJson("comipath:v1:history", issues);
+    const redoRaw =
+      this.readLegacyJson(Config.STORAGE_KEYS.REDO_STACK, issues) ??
+      this.readLegacyJson("comipath:v1:redo_stack", issues);
+    const history =
+      historyRaw === null
+        ? { value: [], issues: [] }
+        : decodeLegacyHistory(historyRaw, "history", now);
+    const redo =
+      redoRaw === null
+        ? { value: [], issues: [] }
+        : decodeLegacyHistory(redoRaw, "redo", now);
+    issues.push(...history.issues, ...redo.issues);
+
+    const circleSpaces = new Set(circles.value.map((circle) => circle.space));
+    for (const [name, list] of [
+      ["purchased", purchased],
+      ["hold", hold],
+    ] as const) {
+      list.forEach((space) => {
+        if (!circleSpaces.has(space))
+          issues.push(`${name} references missing circle ${space}`);
+      });
+    }
+    for (const [name, entries] of [
+      ["history", history.value],
+      ["redo", redo.value],
+    ] as const) {
+      entries.forEach((entry) => {
+        if (!circleSpaces.has(entry.space))
+          issues.push(`${name} references missing circle ${entry.space}`);
+      });
+    }
+
+    const previewId = `legacy-preview-${Date.now()}-${this.legacyPreviews.size}`;
+    this.legacyPreviews.set(previewId, {
+      target: { eventId: target.eventId, dayId: target.dayId },
+      circles: circles.value,
+      purchased,
+      hold,
+      history: history.value,
+      redo: redo.value,
+      issues,
+    });
+    return {
+      previewId,
+      target,
+      circleCount: circles.value.length,
+      purchasedCount: purchased.length,
+      holdCount: hold.length,
+      historyCount: history.value.length,
+      issues: [...issues],
+    };
+  }
+
+  /** Apply a valid legacy preview without deleting the source keys. */
+  applyLegacyImport(
+    target: EventDayRef,
+    previewId: string,
+  ): LocalEventDayState {
+    this.requireRegistered(target);
+    const preview = this.legacyPreviews.get(previewId);
+    if (!preview)
+      throw new LegacyImportError(
+        "Legacy preview is missing or already applied",
+      );
+    if (!sameRef(preview.target, target)) {
+      throw new LegacyImportError("Legacy preview target is stale");
+    }
+    if (preview.issues.length > 0) {
+      throw new LegacyImportError("Legacy preview contains invalid rows");
+    }
+    if (this.repository.load(target)) {
+      throw new LegacyImportError("Legacy import target already has a state");
+    }
+
+    const now = this.timestamp();
+    const state: LocalEventDayState = {
+      schemaVersion: 1,
+      source: { type: "csv", fileName: "legacy_imported.csv" },
+      sourceGeneration: this.createSourceGeneration(),
+      circles: preview.circles,
+      purchased: preview.purchased,
+      hold: preview.hold,
+      history: preview.history,
+      redo: preview.redo,
+      gasOutbox: [],
+      timestamps: { createdAt: now, updatedAt: now, sourceUpdatedAt: now },
+    };
+    this.repository.save(target, state);
+    this.legacyPreviews.delete(previewId);
+    if (sameRef(this.activeRef, target)) {
+      this.activeState = state;
+      this.applyStateToMemory(state);
+    }
+    return state;
+  }
+
+  private updateActiveState(
+    update: (state: LocalEventDayState, now: string) => LocalEventDayState,
+  ): LocalEventDayState {
+    if (!this.activeState || !this.activeRef) {
+      throw new Error("No event/day is open");
+    }
+    return this.persistState(update(this.activeState, this.timestamp()));
+  }
+
+  /** Store a local purchase without contacting GAS. */
+  addPurchased(space: string, _sheetName = ""): void {
+    if (!this.activeState || !this.activeRef) {
+      if (!this.purchasedList.includes(space)) {
+        this.purchasedList.push(space);
+        this.actionHistory.push({ type: "purchase", space });
+        this.redoStack = [];
+      }
+      return;
+    }
+    if (this.activeState.purchased.includes(space)) return;
+    this.updateActiveState((state, now) => ({
+      ...state,
+      purchased: [...state.purchased, space],
+      history: [...state.history, { type: "purchase", space, timestamp: now }],
+      redo: [],
+      timestamps: { ...state.timestamps, updatedAt: now },
+    }));
+  }
+
+  /** Store a local hold without contacting GAS. */
+  addHold(space: string, _sheetName = ""): void {
+    if (!this.activeState || !this.activeRef) {
+      if (!this.holdList.includes(space)) {
+        this.holdList.push(space);
+        this.actionHistory.push({ type: "hold", space });
+        this.redoStack = [];
+      }
+      return;
+    }
+    if (this.activeState.hold.includes(space)) return;
+    this.updateActiveState((state, now) => ({
+      ...state,
+      hold: [...state.hold, space],
+      history: [...state.history, { type: "hold", space, timestamp: now }],
+      redo: [],
+      timestamps: { ...state.timestamps, updatedAt: now },
+    }));
+  }
+
+  /** Undo one local purchase/hold while preserving the original timestamp in redo. */
+  undoLastAction(): ActionHistoryEntry | null {
+    if (!this.activeState || !this.activeRef) {
+      const last = this.actionHistory.pop();
+      if (!last) return null;
+      this.redoStack.push(last);
+      if (last.type === "purchase")
+        this.purchasedList = this.purchasedList.filter(
+          (space) => space !== last.space,
+        );
+      if (last.type === "hold")
+        this.holdList = this.holdList.filter((space) => space !== last.space);
+      return last;
+    }
+    const last = this.activeState.history.at(-1);
+    if (!last || (last.type !== "purchase" && last.type !== "hold"))
+      return null;
+    this.updateActiveState((state, now) => ({
+      ...state,
+      purchased:
+        last.type === "purchase"
+          ? state.purchased.filter((space) => space !== last.space)
+          : [...state.purchased],
+      hold:
+        last.type === "hold"
+          ? state.hold.filter((space) => space !== last.space)
+          : [...state.hold],
+      history: state.history.slice(0, -1),
+      redo: [...state.redo, last],
+      timestamps: { ...state.timestamps, updatedAt: now },
+    }));
+    return { type: last.type, space: last.space };
+  }
+
+  /** Redo one local purchase/hold while preserving its original history timestamp. */
+  redoAction(): ActionHistoryEntry | null {
+    if (!this.activeState || !this.activeRef) {
+      const last = this.redoStack.pop();
+      if (!last) return null;
+      this.actionHistory.push(last);
+      if (last.type === "purchase" && !this.purchasedList.includes(last.space))
+        this.purchasedList.push(last.space);
+      if (last.type === "hold" && !this.holdList.includes(last.space))
+        this.holdList.push(last.space);
+      return last;
+    }
+    const last = this.activeState.redo.at(-1);
+    if (!last || (last.type !== "purchase" && last.type !== "hold"))
+      return null;
+    this.updateActiveState((state, now) => ({
+      ...state,
+      purchased:
+        last.type === "purchase" && !state.purchased.includes(last.space)
+          ? [...state.purchased, last.space]
+          : [...state.purchased],
+      hold:
+        last.type === "hold" && !state.hold.includes(last.space)
+          ? [...state.hold, last.space]
+          : [...state.hold],
+      history: [...state.history, last],
+      redo: state.redo.slice(0, -1),
+      timestamps: { ...state.timestamps, updatedAt: now },
+    }));
+    return { type: last.type, space: last.space };
+  }
+
+  /** Clear local purchase and hold state while retaining the source snapshot. */
+  resetAll(): string[] {
+    const backup = [...this.purchasedList];
+    if (!this.activeState || !this.activeRef) {
+      this.purchasedList = [];
+      this.holdList = [];
+      this.actionHistory = [];
+      this.redoStack = [];
+      return backup;
+    }
+    this.updateActiveState((state, now) => ({
+      ...state,
+      purchased: [],
+      hold: [],
+      history: [],
+      redo: [],
+      timestamps: { ...state.timestamps, updatedAt: now },
+    }));
+    return backup;
+  }
+
+  /** Clear only local holds and their history entries. */
+  resetHold(): void {
+    if (!this.activeState || !this.activeRef) {
+      this.holdList = [];
+      this.actionHistory = this.actionHistory.filter(
+        (entry) => entry.type !== "hold",
+      );
+      this.redoStack = [];
+      return;
+    }
+    this.updateActiveState((state, now) => ({
+      ...state,
+      hold: [],
+      history: state.history.filter((entry) => entry.type !== "hold"),
+      redo: [],
+      timestamps: { ...state.timestamps, updatedAt: now },
+    }));
+  }
+
+  addHistory(type: ActionType, space: string, _sheetName = ""): void {
+    if (type === "purchase") this.addPurchased(space);
+    else this.addHold(space);
   }
 
   getSpreadsheetTitle(): string {
     return this.spreadsheetTitle;
   }
 
-  /**
-   * 選択されているシートリストを保存
-   */
-  setSelectedSheets(sheets: readonly string[]): void {
-    this.selectedSheets = [...sheets];
-    this.storage.setJson(
-      Config.STORAGE_KEYS.SELECTED_SHEETS,
-      this.selectedSheets,
-    );
-  }
-
-  /**
-   * GASからシート一覧を取得
-   */
-  async fetchSheetList(): Promise<string[]> {
-    const baseUrl = this.getGasUrl();
-    if (!baseUrl) throw new Error("URL未設定");
-    const result = await this.apiClient.fetchSheetList(baseUrl);
-    this.spreadsheetTitle = result.spreadsheetTitle;
-    return result.sheets;
-  }
-
-  /**
-   * スプレッドシートからデータを取得
-   * @param {boolean} forceRefresh - キャッシュを無視して強制取得するか
-   */
-  async fetchFromSheet(forceRefresh = false): Promise<number> {
-    const url = this.getGasUrl();
-    if (!url) throw new Error("URL未設定");
-
-    // 強制更新でなければLocalStorageのキャッシュを試す
-    if (!forceRefresh) {
-      const parsed = this.storage.getJson<CachedCircleData | null>(
-        Config.STORAGE_KEYS.DATA,
-        null,
-      );
-      if (parsed) {
-        this.wantToBuy = parsed.wantToBuy || [];
-        this.spreadsheetTitle = parsed.spreadsheetTitle || "";
-        return this.wantToBuy.length;
-      }
-    }
-    const result = await this.apiClient.fetchCircles(url, {
-      selectedSheets: this.selectedSheets,
-      forceRefresh,
-    });
-    this.wantToBuy = result.wantToBuy;
-    this.spreadsheetTitle = result.spreadsheetTitle;
-    // データをキャッシュ
-    this.storage.setJson(Config.STORAGE_KEYS.DATA, {
-      wantToBuy: this.wantToBuy,
-      spreadsheetTitle: this.spreadsheetTitle,
-    });
-    return this.wantToBuy.length;
-  }
-
-  /**
-   * GASへ更新情報を送信（キュー経由）
-   */
-  async syncUpdate(
-    space: string | string[],
-    isUndo = false,
-    isBatch = false,
-    sheetName = "",
-  ): Promise<SyncResult> {
-    const payload: SaleUpdatePayload = isBatch
-      ? {
-          action: "sale",
-          spaces: Array.isArray(space) ? space : [space],
-          undo: true,
-        }
-      : {
-          action: "sale",
-          space: Array.isArray(space) ? (space[0] ?? "") : space,
-          undo: isUndo,
-          ...(sheetName ? { sheetName } : {}),
-        };
-
-    this.addToQueue(payload);
-    return this.processQueue();
-  }
-
-  /**
-   * 送信キューに追加
-   */
-  addToQueue(payload: SaleUpdatePayload): void {
-    this.syncQueue.enqueue(payload);
-  }
-
-  /**
-   * キューを処理して送信
-   */
-  async processQueue(): Promise<SyncResult> {
-    return this.syncQueue.process({
-      getUrl: () => this.getGasUrl(),
-      send: (url, payload) => this.sendToGas(url, payload),
-    });
-  }
-
-  /**
-   * 実際の送信処理 (内部用)
-   */
-  async sendToGas(url: string, payload: SaleUpdatePayload): Promise<void> {
-    return this.apiClient.sendSaleUpdate(url, payload);
-  }
-
-  /**
-   * 購入リストに追加
-   */
-  addPurchased(space: string, sheetName = ""): void {
-    if (!this.purchasedList.includes(space)) {
-      this.purchasedList.push(space);
-      this.saveList(Config.STORAGE_KEYS.PURCHASED, this.purchasedList);
-      this.addHistory("purchase", space, sheetName);
-    }
-  }
-
-  /**
-   * 保留リストに追加
-   */
-  addHold(space: string, sheetName = ""): void {
-    if (!this.holdList.includes(space)) {
-      this.holdList.push(space);
-      this.saveList(Config.STORAGE_KEYS.HOLD, this.holdList);
-      this.addHistory("hold", space, sheetName);
-    }
-  }
-
-  /**
-   * 直前の操作を取り消す
-   */
-  undoLastAction(): ActionHistoryEntry | null {
-    const last = this.actionHistory.pop();
-    if (!last) return null;
-
-    this.saveList(Config.STORAGE_KEYS.HISTORY, this.actionHistory);
-
-    // Redoスタックに追加
-    this.redoStack.push(last);
-    this.saveList(Config.STORAGE_KEYS.REDO_STACK, this.redoStack);
-
-    if (last.type === "purchase") {
-      this.purchasedList = this.purchasedList.filter((s) => s !== last.space);
-      this.saveList(Config.STORAGE_KEYS.PURCHASED, this.purchasedList);
-    } else if (last.type === "hold") {
-      this.holdList = this.holdList.filter((s) => s !== last.space);
-      this.saveList(Config.STORAGE_KEYS.HOLD, this.holdList);
-    }
-    return last;
-  }
-
-  /**
-   * 取り消した操作をやり直す
-   */
-  redoAction(): ActionHistoryEntry | null {
-    const last = this.redoStack.pop();
-    if (!last) return null;
-
-    this.saveList(Config.STORAGE_KEYS.REDO_STACK, this.redoStack);
-
-    // 履歴に戻す（addHistoryを使うとredoStackが消えてしまうので手動で）
-    this.actionHistory.push(last);
-    this.saveList(Config.STORAGE_KEYS.HISTORY, this.actionHistory);
-
-    if (last.type === "purchase") {
-      if (!this.purchasedList.includes(last.space)) {
-        this.purchasedList.push(last.space);
-        this.saveList(Config.STORAGE_KEYS.PURCHASED, this.purchasedList);
-      }
-    } else if (last.type === "hold") {
-      if (!this.holdList.includes(last.space)) {
-        this.holdList.push(last.space);
-        this.saveList(Config.STORAGE_KEYS.HOLD, this.holdList);
-      }
-    }
-    return last;
-  }
-
-  /**
-   * 全データをリセット
-   */
-  resetAll(): string[] {
-    const backup = [...this.purchasedList]; // バックアップ（一括Undo用）
-    this.purchasedList = [];
-    this.holdList = [];
-    this.actionHistory = [];
-    this.redoStack = [];
-
-    this.storage.remove(Config.STORAGE_KEYS.PURCHASED);
-    this.storage.remove(Config.STORAGE_KEYS.HOLD);
-    this.storage.remove(Config.STORAGE_KEYS.HISTORY);
-    this.storage.remove(Config.STORAGE_KEYS.REDO_STACK);
-    return backup;
-  }
-
-  /**
-   * 保留リストのみリセット
-   */
-  resetHold(): void {
-    this.holdList = [];
-    this.storage.remove(Config.STORAGE_KEYS.HOLD);
-    this.actionHistory = this.actionHistory.filter((a) => a.type !== "hold");
-    this.saveList(Config.STORAGE_KEYS.HISTORY, this.actionHistory);
-    // Redoスタックも整合性が取れなくなるのでクリアする
-    this.redoStack = [];
-    this.storage.remove(Config.STORAGE_KEYS.REDO_STACK);
-  }
-
-  /**
-   * 操作履歴に追加（内部用）
-   */
-  addHistory(type: ActionType, space: string, sheetName = ""): void {
-    this.actionHistory.push({
-      type,
-      space,
-      ...(sheetName ? { sheetName } : {}),
-    });
-    this.saveList(Config.STORAGE_KEYS.HISTORY, this.actionHistory);
-    // 新しい操作が行われたらRedoスタックはクリア
-    this.redoStack = [];
-    this.storage.remove(Config.STORAGE_KEYS.REDO_STACK);
-  }
-
-  /**
-   * LocalStorageへの保存（内部用）
-   */
   saveList<T>(key: string, list: readonly T[]): void {
     this.storage.setJson(key, list);
   }
 
-  /**
-   * 未訪問（購入も保留もしていない）のリストを取得
-   */
   getUnvisited(): Circle[] {
     return this.wantToBuy.filter(
-      (c) =>
-        !this.purchasedList.includes(c.space) &&
-        !this.holdList.includes(c.space),
+      (circle) =>
+        !this.purchasedList.includes(circle.space) &&
+        !this.holdList.includes(circle.space),
     );
   }
 }

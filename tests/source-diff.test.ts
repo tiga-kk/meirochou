@@ -96,6 +96,15 @@ describe("source-diff", () => {
       expect(diff.unchanged).toEqual([]);
     });
 
+    it("should classify a source sale marker change as metadata update", () => {
+      const current = [{ ...dummyCircle1, isSale: "" }];
+      const incoming = [{ ...dummyCircle1, isSale: "x" }];
+
+      expect(diffCircleSources(current, incoming).updated).toEqual([
+        { before: current[0], after: incoming[0] },
+      ]);
+    });
+
     it("should have stable deterministic order based on incoming and current", () => {
       const current: CircleRecord[] = [
         dummyCircle3,

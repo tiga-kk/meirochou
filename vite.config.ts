@@ -203,17 +203,26 @@ function mapBundlePlugin(
             response.end("Not found");
             return;
           }
-          const eventId = decodeURIComponent(segments[0]);
+          let eventId = decodeURIComponent(segments[0]);
+          let subPath = segments
+            .slice(1)
+            .map((s) => decodeURIComponent(s))
+            .join("/");
+
+          if (segments.length === 1 && segments[0] === "manifest.json") {
+            eventId = mapBundles.keys().next().value ?? "demo-v1";
+            subPath = "manifest.json";
+          } else if (!mapBundles.has(eventId)) {
+            eventId = mapBundles.keys().next().value ?? "demo-v1";
+            subPath = segments.map((s) => decodeURIComponent(s)).join("/");
+          }
+
           bundleDirectory = mapBundles.get(eventId);
           if (!bundleDirectory) {
             response.statusCode = 404;
             response.end("Not found");
             return;
           }
-          const subPath = segments
-            .slice(1)
-            .map((s) => decodeURIComponent(s))
-            .join("/");
           requestedPath = resolve(bundleDirectory, subPath);
         } catch (error) {
           next(
@@ -265,6 +274,17 @@ function mapBundlePlugin(
             preserveTimestamps: true,
           },
         );
+      }
+      const firstEventId = mapBundles.keys().next().value;
+      if (firstEventId) {
+        const firstBundleDir = mapBundles.get(firstEventId);
+        if (firstBundleDir) {
+          cpSync(
+            resolve(firstBundleDir, "manifest.json"),
+            resolve(outputDirectory, "assets/maps/manifest.json"),
+            { force: true },
+          );
+        }
       }
       const registrySource = resolve(webappRoot, "events/manifest.json");
       if (existsSync(registrySource)) {

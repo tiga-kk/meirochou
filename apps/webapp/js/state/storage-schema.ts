@@ -201,13 +201,14 @@ export function parseLocalEventDayState(value: unknown): LocalEventDayState {
       account?: string;
       tweet?: string;
       memo?: string;
+      isSale?: string;
       removedFromSource?: boolean;
     } = { space: circleObj.space };
 
     if (circleObj.priority !== undefined) {
       if (
         typeof circleObj.priority !== "number" ||
-        Number.isNaN(circleObj.priority)
+        !Number.isFinite(circleObj.priority)
       ) {
         throw new StorageSchemaError(`circles[${i}].priority must be a number`);
       }
@@ -230,6 +231,12 @@ export function parseLocalEventDayState(value: unknown): LocalEventDayState {
         throw new StorageSchemaError(`circles[${i}].memo must be a string`);
       }
       record.memo = circleObj.memo;
+    }
+    if (circleObj.isSale !== undefined) {
+      if (typeof circleObj.isSale !== "string") {
+        throw new StorageSchemaError(`circles[${i}].isSale must be a string`);
+      }
+      record.isSale = circleObj.isSale;
     }
     if (circleObj.removedFromSource !== undefined) {
       if (typeof circleObj.removedFromSource !== "boolean") {
