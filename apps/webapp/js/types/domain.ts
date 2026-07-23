@@ -119,6 +119,13 @@ export interface CachedCircleData {
   spreadsheetTitle: string;
 }
 
+export interface GasSaleUpdate {
+  readonly action: "sale";
+  readonly sheetName: string;
+  readonly space: string;
+  readonly undo: boolean;
+}
+
 export type SaleUpdatePayload =
   | { action: "sale"; space: string; undo: boolean; sheetName?: string }
   | { action: "sale"; spaces: string[]; undo: true };

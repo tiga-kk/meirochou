@@ -268,16 +268,30 @@ export function parseGasSheetListResponse(
   input: unknown,
 ): GasSheetListResponse {
   const value = record(input, "GAS sheet-list response");
+  if (value.ok === false || value.status === "error") {
+    throw new BoundaryValidationError(
+      "GAS sheet-list response",
+      "successful response without error status",
+    );
+  }
   if (!Array.isArray(value.sheets)) {
     throw new BoundaryValidationError(
       "GAS sheet-list response.sheets",
       "an array of strings",
     );
   }
+  const sheets = value.sheets.map((sheet, index) => {
+    const s = text(sheet, `GAS sheet-list response.sheets[${index}]`);
+    if (!s.trim()) {
+      throw new BoundaryValidationError(
+        `GAS sheet-list response.sheets[${index}]`,
+        "a non-empty string",
+      );
+    }
+    return s;
+  });
   return {
-    sheets: value.sheets.map((sheet, index) =>
-      text(sheet, `GAS sheet-list response.sheets[${index}]`),
-    ),
+    sheets,
     spreadsheetTitle: text(
       value.spreadsheetTitle,
       "GAS sheet-list response.spreadsheetTitle",
@@ -288,10 +302,37 @@ export function parseGasSheetListResponse(
 
 function parseCircle(input: unknown, path: string): Circle {
   const value = record(input, path);
+  const space = text(value.space, `${path}.space`).trim();
+  if (!space) {
+    throw new BoundaryValidationError(`${path}.space`, "a non-empty string");
+  }
   const circle: Circle = {
     ...value,
-    space: text(value.space, `${path}.space`),
+    space,
   };
+  if (value.priority !== undefined && value.priority !== null) {
+    if (typeof value.priority === "number") {
+      if (!Number.isFinite(value.priority)) {
+        throw new BoundaryValidationError(
+          `${path}.priority`,
+          "a finite number",
+        );
+      }
+    } else if (typeof value.priority === "string") {
+      const num = Number(value.priority);
+      if (Number.isNaN(num) || !Number.isFinite(num)) {
+        throw new BoundaryValidationError(
+          `${path}.priority`,
+          "a finite number string",
+        );
+      }
+    } else {
+      throw new BoundaryValidationError(
+        `${path}.priority`,
+        "a number or string",
+      );
+    }
+  }
   if (value.account !== undefined)
     circle.account = text(value.account, `${path}.account`);
   if (value.tweet !== undefined)
@@ -303,16 +344,35 @@ function parseCircle(input: unknown, path: string): Circle {
 
 export function parseGasCircleResponse(input: unknown): GasCircleResponse {
   const value = record(input, "GAS circle response");
+  if (value.ok === false || value.status === "error") {
+    throw new BoundaryValidationError(
+      "GAS circle response",
+      "successful response without error status",
+    );
+  }
   if (!Array.isArray(value.wantToBuy)) {
     throw new BoundaryValidationError(
       "GAS circle response.wantToBuy",
       "an array",
     );
   }
+  const seenSpaces = new Set<string>();
+  const wantToBuy = value.wantToBuy.map((circle, index) => {
+    const parsed = parseCircle(
+      circle,
+      `GAS circle response.wantToBuy[${index}]`,
+    );
+    if (seenSpaces.has(parsed.space)) {
+      throw new BoundaryValidationError(
+        `GAS circle response.wantToBuy[${index}].space`,
+        `a unique space identifier (duplicate '${parsed.space}' found)`,
+      );
+    }
+    seenSpaces.add(parsed.space);
+    return parsed;
+  });
   return {
-    wantToBuy: value.wantToBuy.map((circle, index) =>
-      parseCircle(circle, `GAS circle response.wantToBuy[${index}]`),
-    ),
+    wantToBuy,
     spreadsheetTitle: text(
       value.spreadsheetTitle,
       "GAS circle response.spreadsheetTitle",
