@@ -1,6 +1,8 @@
+import { GasApiClient } from "./api/gas-api-client";
 import { Config } from "./config.js";
 import { parseCircleCsv, serializeCircleCsv } from "./data/csv-circle-codec";
 import { loadEventRegistry } from "./data/event-registry";
+import { GasRefreshService } from "./data/gas-refresh-service";
 import {
   circleRecordToCircle,
   decodeLegacyCircles,
@@ -10,6 +12,13 @@ import {
 } from "./data/local-state-adapters";
 import { applySourceDiff, diffCircleSources } from "./data/source-diff";
 import { EventDayRepository } from "./state/event-day-repository";
+import { GasOutboxService } from "./state/gas-outbox-service";
+import { GasSyncCoordinator } from "./state/gas-sync-coordinator";
+import { PurchaseMutationService } from "./state/purchase-mutation-service";
+import {
+  SourceSettingsService,
+  StaleSourceStateError,
+} from "./state/source-settings-service";
 import { createEmptyEventDayState } from "./state/storage-schema";
 import { StorageService } from "./state/storage-service.js";
 import type {
@@ -19,8 +28,13 @@ import type {
   CircleRecord,
   EventDayRef,
   EventRegistryV1,
+  GasDataSource,
+  GasOutboxResult,
+  GasRefreshPreview,
+  GasSyncSummary,
   HistoryEntry,
   LocalEventDayState,
+  PurchaseMutationResult,
   SourceDiff,
 } from "./types/domain";
 
@@ -49,6 +63,13 @@ export interface DataManagerOptions {
   readonly createSourceGeneration?: () => string;
   readonly createPreviewId?: () => string;
   readonly previewTtlMs?: number;
+  readonly client?: GasApiClient;
+  readonly repository?: EventDayRepository;
+  readonly sourceSettings?: SourceSettingsService;
+  readonly refreshService?: GasRefreshService;
+  readonly outboxService?: GasOutboxService;
+  readonly purchaseMutationService?: PurchaseMutationService;
+  readonly syncCoordinator?: GasSyncCoordinator;
 }
 
 interface CsvPreviewRecord extends CsvReplacementPreview {
@@ -99,6 +120,12 @@ function sameRef(left: EventDayRef | null, right: EventDayRef): boolean {
 export class DataManager {
   readonly storage: StorageService;
   readonly repository: EventDayRepository;
+  readonly sourceSettings: SourceSettingsService;
+  readonly client: GasApiClient;
+  readonly refreshService: GasRefreshService;
+  readonly outboxService: GasOutboxService;
+  readonly purchaseMutationService: PurchaseMutationService;
+  readonly syncCoordinator: GasSyncCoordinator;
   readonly csvPreviews = new Map<string, CsvPreviewRecord>();
 
   wantToBuy: Circle[] = [];
@@ -119,7 +146,11 @@ export class DataManager {
 
   constructor(storage?: StorageService, options: DataManagerOptions = {}) {
     this.storage = storage || new StorageService();
-    this.repository = new EventDayRepository(this.storage);
+    this.repository =
+      options.repository || new EventDayRepository(this.storage);
+    this.sourceSettings =
+      options.sourceSettings || new SourceSettingsService(this.repository);
+    this.client = options.client || new GasApiClient();
 
     let generationSequence = 0;
     let previewSequence = 0;
@@ -131,10 +162,42 @@ export class DataManager {
       options.createPreviewId ||
       (() => `csv-preview-${Date.now()}-${previewSequence++}`);
     this.previewTtlMs = options.previewTtlMs ?? 5 * 60 * 1000;
+
+    this.refreshService =
+      options.refreshService ||
+      new GasRefreshService(this.repository, this.client, this.sourceSettings, {
+        now: this.now,
+        createSourceGeneration: this.createSourceGeneration,
+        createPreviewId: this.createPreviewId,
+        previewTtlMs: this.previewTtlMs,
+      });
+
+    this.outboxService =
+      options.outboxService ||
+      new GasOutboxService(this.repository, this.client);
+
+    this.purchaseMutationService =
+      options.purchaseMutationService ||
+      new PurchaseMutationService(this.repository, this.outboxService);
+
+    this.syncCoordinator =
+      options.syncCoordinator ||
+      new GasSyncCoordinator(this.repository, this.outboxService);
   }
 
   private timestamp(): string {
     return this.now().toISOString();
+  }
+
+  private sourceApplyTimestamp(current: LocalEventDayState): string {
+    const candidate = this.timestamp();
+    const currentTimestamp = Math.max(
+      Date.parse(current.timestamps.updatedAt),
+      Date.parse(current.timestamps.sourceUpdatedAt),
+    );
+    const candidateTimestamp = Date.parse(candidate);
+    if (candidateTimestamp > currentTimestamp) return candidate;
+    return new Date(currentTimestamp + 1).toISOString();
   }
 
   private requireRegistered(ref: EventDayRef): void {
@@ -319,24 +382,38 @@ export class DataManager {
     }
 
     const current = this.repository.load(preview.ref);
-    if (
-      !current ||
-      current.sourceGeneration !== preview.expectedSourceGeneration
-    ) {
-      throw new StaleCsvPreviewError("CSV preview source generation is stale");
-    }
-    if (current.source.type !== "csv") {
-      throw new StaleCsvPreviewError("CSV replacement requires a CSV source");
+    if (!current) {
+      throw new StaleCsvPreviewError("CSV preview source state is missing");
     }
 
-    const now = this.timestamp();
+    const now = this.sourceApplyTimestamp(current);
     const merged = applySourceDiff(current, preview.circles, now);
-    const nextState: LocalEventDayState = {
+    const operation =
+      current.source.type === "gas" ? "source-type-change" : "csv-replacement";
+
+    const nextStateDraft: LocalEventDayState = {
       ...merged,
       source: { type: "csv", fileName: preview.fileName },
       sourceGeneration: this.createSourceGeneration(),
     };
-    this.repository.save(preview.ref, nextState);
+
+    let nextState: LocalEventDayState;
+    try {
+      nextState = this.sourceSettings.saveGuarded({
+        ref: preview.ref,
+        operation,
+        expectedSourceGeneration: preview.expectedSourceGeneration,
+        nextState: nextStateDraft,
+      });
+    } catch (err: unknown) {
+      if (err instanceof StaleSourceStateError) {
+        throw new StaleCsvPreviewError(
+          "CSV preview source generation is stale",
+        );
+      }
+      throw err;
+    }
+
     this.csvPreviews.delete(previewId);
     if (sameRef(this.activeRef, preview.ref)) {
       this.activeState = nextState;
@@ -498,6 +575,19 @@ export class DataManager {
     return this.persistState(update(this.activeState, this.timestamp()));
   }
 
+  setPurchased(space: string, purchased: boolean): PurchaseMutationResult {
+    if (!this.activeRef) throw new Error("No event/day is open");
+    const result = this.purchaseMutationService.setPurchased(
+      this.activeRef,
+      space,
+      purchased,
+      this.timestamp(),
+    );
+    this.activeState = result.state;
+    this.applyStateToMemory(result.state);
+    return result;
+  }
+
   /** Store a local purchase without contacting GAS. */
   addPurchased(space: string, _sheetName = ""): void {
     if (!this.activeState || !this.activeRef) {
@@ -508,14 +598,7 @@ export class DataManager {
       }
       return;
     }
-    if (this.activeState.purchased.includes(space)) return;
-    this.updateActiveState((state, now) => ({
-      ...state,
-      purchased: [...state.purchased, space],
-      history: [...state.history, { type: "purchase", space, timestamp: now }],
-      redo: [],
-      timestamps: { ...state.timestamps, updatedAt: now },
-    }));
+    this.setPurchased(space, true);
   }
 
   /** Store a local hold without contacting GAS. */
@@ -552,24 +635,20 @@ export class DataManager {
         this.holdList = this.holdList.filter((space) => space !== last.space);
       return last;
     }
-    const last = this.activeState.history.at(-1);
-    if (!last || (last.type !== "purchase" && last.type !== "hold"))
-      return null;
-    this.updateActiveState((state, now) => ({
-      ...state,
-      purchased:
-        last.type === "purchase"
-          ? state.purchased.filter((space) => space !== last.space)
-          : [...state.purchased],
-      hold:
-        last.type === "hold"
-          ? state.hold.filter((space) => space !== last.space)
-          : [...state.hold],
-      history: state.history.slice(0, -1),
-      redo: [...state.redo, last],
-      timestamps: { ...state.timestamps, updatedAt: now },
-    }));
-    return { type: last.type, space: last.space };
+    const result = this.purchaseMutationService.undo(
+      this.activeRef,
+      this.timestamp(),
+    );
+    if (!result) return null;
+    const popped = result.state.redo.at(-1);
+    this.activeState = result.state;
+    this.applyStateToMemory(result.state);
+    if (!popped) return null;
+    const legacyType: ActionType =
+      popped.type === "purchase" || popped.type === "unpurchase"
+        ? "purchase"
+        : "hold";
+    return { type: legacyType, space: popped.space };
   }
 
   /** Redo one local purchase/hold while preserving its original history timestamp. */
@@ -584,24 +663,20 @@ export class DataManager {
         this.holdList.push(last.space);
       return last;
     }
-    const last = this.activeState.redo.at(-1);
-    if (!last || (last.type !== "purchase" && last.type !== "hold"))
-      return null;
-    this.updateActiveState((state, now) => ({
-      ...state,
-      purchased:
-        last.type === "purchase" && !state.purchased.includes(last.space)
-          ? [...state.purchased, last.space]
-          : [...state.purchased],
-      hold:
-        last.type === "hold" && !state.hold.includes(last.space)
-          ? [...state.hold, last.space]
-          : [...state.hold],
-      history: [...state.history, last],
-      redo: state.redo.slice(0, -1),
-      timestamps: { ...state.timestamps, updatedAt: now },
-    }));
-    return { type: last.type, space: last.space };
+    const result = this.purchaseMutationService.redo(
+      this.activeRef,
+      this.timestamp(),
+    );
+    if (!result) return null;
+    const pushed = result.state.history.at(-1);
+    this.activeState = result.state;
+    this.applyStateToMemory(result.state);
+    if (!pushed) return null;
+    const legacyType: ActionType =
+      pushed.type === "purchase" || pushed.type === "unpurchase"
+        ? "purchase"
+        : "hold";
+    return { type: legacyType, space: pushed.space };
   }
 
   /** Clear local purchase and hold state while retaining the source snapshot. */
@@ -614,15 +689,20 @@ export class DataManager {
       this.redoStack = [];
       return backup;
     }
-    this.updateActiveState((state, now) => ({
-      ...state,
-      purchased: [],
-      hold: [],
-      history: [],
-      redo: [],
-      timestamps: { ...state.timestamps, updatedAt: now },
-    }));
+    const result = this.purchaseMutationService.resetActivity(
+      this.activeRef,
+      this.timestamp(),
+    );
+    this.activeState = result.state;
+    this.applyStateToMemory(result.state);
     return backup;
+  }
+
+  flushActiveOutbox(): Promise<GasOutboxResult> {
+    if (!this.activeRef) {
+      return Promise.resolve({ sent: 0, pending: 0, error: null });
+    }
+    return this.outboxService.process(this.activeRef);
   }
 
   /** Clear only local holds and their history entries. */
@@ -663,5 +743,65 @@ export class DataManager {
         !this.purchasedList.includes(circle.space) &&
         !this.holdList.includes(circle.space),
     );
+  }
+
+  /** Create an explicit preview for the first GAS import into an empty day. */
+  async previewInitialGasImport(
+    ref: EventDayRef,
+    source: GasDataSource,
+  ): Promise<GasRefreshPreview> {
+    await this.ensureRegistry();
+    this.requireRegistered(ref);
+    return this.refreshService.previewInitialImport(ref, source);
+  }
+
+  /** Create an explicit preview for replacing the configured GAS source. */
+  async previewGasSourceReplacement(
+    ref: EventDayRef,
+    source: GasDataSource,
+  ): Promise<GasRefreshPreview> {
+    await this.ensureRegistry();
+    this.requireRegistered(ref);
+    return this.refreshService.previewReplacement(ref, source);
+  }
+
+  /** Create an explicit preview for refreshing the configured GAS source. */
+  async previewGasRefresh(ref: EventDayRef): Promise<GasRefreshPreview> {
+    await this.ensureRegistry();
+    this.requireRegistered(ref);
+    return this.refreshService.previewRefresh(ref);
+  }
+
+  /** Apply a GAS preview and refresh in-memory state when its ref is active. */
+  applyGasPreview(previewId: string): LocalEventDayState {
+    const applied = this.refreshService.applyPreview(previewId);
+    if (this.activeRef) {
+      const currentActive = this.repository.load(this.activeRef);
+      if (currentActive) {
+        this.activeState = currentActive;
+        this.applyStateToMemory(currentActive);
+      }
+    }
+    return applied;
+  }
+
+  /** Cancel a GAS preview without changing persisted state. */
+  cancelGasPreview(previewId: string): void {
+    this.refreshService.cancelPreview(previewId);
+  }
+
+  /** Start listening for online events and trigger initial background processing. */
+  startSyncCoordinator(): void {
+    this.syncCoordinator.start();
+  }
+
+  /** Process every persisted outbox queue across all event/day states. */
+  retryAllPending(): Promise<GasSyncSummary> {
+    return this.syncCoordinator.processAll();
+  }
+
+  /** Remove the online event listener. */
+  disposeSyncCoordinator(): void {
+    this.syncCoordinator.dispose();
   }
 }

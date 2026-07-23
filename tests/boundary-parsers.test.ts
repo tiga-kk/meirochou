@@ -127,6 +127,8 @@ test("map areas are initialized exactly once from a validated manifest", () => {
 test("GAS sheet-list response parser accepts the documented contract", () => {
   assert.deepEqual(
     parseGasSheetListResponse({
+      ok: true,
+      status: "success",
       sheets: ["東456", "西12"],
       spreadsheetTitle: "C108",
     }),
@@ -134,12 +136,59 @@ test("GAS sheet-list response parser accepts the documented contract", () => {
   );
 });
 
+test("GAS response parsers reject missing success envelope fields", () => {
+  assert.throws(
+    () =>
+      parseGasSheetListResponse({
+        sheets: ["東456"],
+        spreadsheetTitle: "C108",
+      }),
+    /GAS sheet-list response\.ok/,
+  );
+  assert.throws(
+    () =>
+      parseGasCircleResponse({
+        ok: true,
+        circles: [{ space: "東A01a" }],
+        spreadsheetTitle: "C108",
+      }),
+    /GAS circle response\.status/,
+  );
+  assert.throws(
+    () =>
+      parseGasSheetListResponse({
+        ok: true,
+        status: "success",
+        sheets: ["東456"],
+      }),
+    /GAS sheet-list response\.spreadsheetTitle/,
+  );
+});
+
 test("GAS circle response parser rejects an invalid circle with its field path", () => {
   assert.throws(
-    () => parseGasCircleResponse({ wantToBuy: [{ priority: 10 }] }),
+    () =>
+      parseGasCircleResponse({
+        ok: true,
+        status: "success",
+        circles: [{ priority: 10 }],
+      }),
     (error) =>
       error instanceof BoundaryValidationError &&
-      error.message.includes("GAS circle response.wantToBuy[0].space"),
+      error.message.includes("GAS circle response.circles[0].space"),
+  );
+});
+
+test("GAS circle response parser rejects the legacy wantToBuy alias", () => {
+  assert.throws(
+    () =>
+      parseGasCircleResponse({
+        ok: true,
+        status: "success",
+        wantToBuy: [{ space: "東A01a" }],
+        spreadsheetTitle: "C108",
+      }),
+    /GAS circle response\.circles/,
   );
 });
 

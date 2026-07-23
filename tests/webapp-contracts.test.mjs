@@ -58,7 +58,7 @@ test("Phase 2 keeps GAS sale actions outside the local data service", () => {
   const source = read("apps/webapp/js/data-manager.ts");
   const gasSource = read("integrations/gas-spreadsheet/src/web-api.js");
 
-  assert.doesNotMatch(source, /GasApiClient|SyncQueue/);
+  assert.doesNotMatch(source, /SyncQueue/);
   assert.doesNotMatch(source, /action:\s*["']sale["']/);
   assert.match(source, /sheetName/);
   assert.match(gasSource, /requestData\.sheetName/);
@@ -80,15 +80,40 @@ test("GAS circle responses include the spreadsheet title and source sheet name",
   const source = read("integrations/gas-spreadsheet/src/web-api.js");
 
   assert.match(source, /spreadsheetTitle\s*=\s*spreadsheet\.getName\(\)/);
-  assert.match(source, /obj\.sheetName\s*=\s*sheetName/);
-  assert.match(
-    source,
-    /JSON\.stringify\(\{\s*wantToBuy:\s*combinedResult,\s*spreadsheetTitle\s*}\)/,
-  );
+  assert.match(source, /sheetName/);
+  assert.match(source, /circles/);
+  assert.doesNotMatch(source, /wantToBuy/);
+  assert.doesNotMatch(source, /imageUrl/);
 });
 
-test("public README stays empty until publication documentation is approved", () => {
-  assert.equal(read("README.md"), "");
+test("documentation describes Phase 3 GAS sync contract accurately without claiming Phase 4 UI exists", () => {
+  const publicReadme = read("README.md");
+  const dataContracts = read("guides/data-contracts.md");
+  const gasSyncContract = read("guides/gas-sync.md");
+  const gasReadme = read("integrations/gas-spreadsheet/README.md");
+
+  assert.equal(publicReadme, "");
+
+  const docsCombined = [dataContracts, gasSyncContract, gasReadme].join("\n");
+
+  assert.match(docsCombined, /explicit refresh/);
+  assert.match(docsCombined, /LocalStorage/);
+  assert.match(docsCombined, /gasOutbox/);
+  assert.match(docsCombined, /sourceGeneration/);
+  assert.match(docsCombined, /sheetName/);
+  assert.match(docsCombined, /npm run build:gas/);
+
+  assert.match(gasReadme, /`space`/);
+  assert.match(gasReadme, /`priority`/);
+  assert.match(gasReadme, /`isSale`/);
+  assert.match(gasReadme, /`account`/);
+  assert.match(gasReadme, /`tweet`/);
+  assert.match(gasReadme, /`memo`/);
+  assert.match(gasReadme, /\?sheets=/);
+  assert.doesNotMatch(gasReadme, /配置|優先度|Xアカウント/);
+
+  assert.doesNotMatch(docsCombined, /\/macros\/s\/[A-Za-z0-9_-]+\/exec/);
+  assert.doesNotMatch(docsCombined, /Phase 4 management UI is available/i);
 });
 
 test("Apps Script source exists only under integrations", () => {
@@ -113,29 +138,28 @@ test("shared webapp and GAS names use lower camel case", () => {
   assert.doesNotMatch(sources, /\bval2\b/);
 });
 
-test("Phase 2 keeps GAS transport outside DataManager", () => {
+test("Phase 3 keeps fetch inside GasApiClient and out of DataManager", () => {
   const dataManagerSource = read("apps/webapp/js/data-manager.ts");
   const gasClientSource = read("apps/webapp/js/api/gas-api-client.ts");
 
-  assert.doesNotMatch(dataManagerSource, /GasApiClient/);
   assert.doesNotMatch(dataManagerSource, /\bfetch\(/);
   assert.match(gasClientSource, /async fetchSheetList/);
   assert.match(gasClientSource, /async fetchCircles/);
   assert.match(gasClientSource, /async sendSaleUpdate/);
 });
 
-test("Phase 2 DataManager storage is separate from the sync queue", () => {
+test("Phase 2/3 DataManager storage is separate from the sync outbox", () => {
   const dataManagerSource = read("apps/webapp/js/data-manager.ts");
   const storageSource = read("apps/webapp/js/state/storage-service.ts");
-  const queueSource = read("apps/webapp/js/state/sync-queue.ts");
+  const outboxSource = read("apps/webapp/js/state/gas-outbox-service.ts");
 
   assert.match(dataManagerSource, /new StorageService\(/);
   assert.doesNotMatch(dataManagerSource, /SyncQueue/);
   assert.doesNotMatch(dataManagerSource, /localStorage\./);
   assert.match(storageSource, /localStorage/);
   assert.match(storageSource, /getStorage/);
-  assert.match(queueSource, /enqueue/);
-  assert.match(queueSource, /process/);
+  assert.match(outboxSource, /append/);
+  assert.match(outboxSource, /process/);
 });
 
 test("webapp storage falls back when localStorage is unavailable", () => {

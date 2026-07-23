@@ -332,4 +332,121 @@ describe("Phase 2 Task 7 local data service", () => {
     expect(adapter.getItem("webAppURL")).toBe("https://example.test/gas");
     fetchSpy.mockRestore();
   });
+
+  test("allows GAS to CSV source-type-change replacement via applyCsvReplacement", async () => {
+    const { manager } = createManager();
+    const ref: EventDayRef = { eventId: "C108", dayId: "day1" };
+    await manager.openEventDay(ref);
+
+    // Manually set initial state as GAS source
+    const initialGasState: LocalEventDayState = {
+      schemaVersion: 1,
+      source: {
+        type: "gas",
+        gasUrl: "https://script.google.com/macros/s/AKfycbx_test/exec",
+        sheetName: "Day1",
+      },
+      sourceGeneration: "generation-1",
+      circles: [{ space: "A-01", priority: 1 }],
+      purchased: ["A-01"],
+      hold: [],
+      history: [
+        {
+          type: "purchase",
+          space: "A-01",
+          timestamp: "2026-07-21T07:45:00.000Z",
+        },
+      ],
+      redo: [],
+      gasOutbox: [],
+      timestamps: {
+        createdAt: "2026-07-21T07:45:00.000Z",
+        updatedAt: "2026-07-21T07:45:00.000Z",
+        sourceUpdatedAt: "2026-07-21T07:45:00.000Z",
+      },
+    };
+    manager.repository.save(ref, initialGasState);
+    await manager.openEventDay(ref);
+
+    const preview = await manager.previewCsvReplacement(
+      ref,
+      "from_gas.csv",
+      csv("A-01,2,,,,\r\n"),
+    );
+
+    const applied = manager.applyCsvReplacement(preview.previewId);
+
+    expect(applied.source).toEqual({ type: "csv", fileName: "from_gas.csv" });
+    expect(applied.sourceGeneration).toBe("generation-2");
+    expect(applied.purchased).toEqual(["A-01"]);
+  });
+
+  test("blocks CSV apply when pending outbox exists, preserving preview and state", async () => {
+    const { manager } = createManager();
+    const ref: EventDayRef = { eventId: "C108", dayId: "day1" };
+    await manager.openEventDay(ref);
+
+    // Initial state with GAS source
+    const initialGasState: LocalEventDayState = {
+      schemaVersion: 1,
+      source: {
+        type: "gas",
+        gasUrl: "https://script.google.com/macros/s/AKfycbx_test/exec",
+        sheetName: "Day1",
+      },
+      sourceGeneration: "generation-1",
+      circles: [{ space: "A-01", priority: 1 }],
+      purchased: ["A-01"],
+      hold: [],
+      history: [],
+      redo: [],
+      gasOutbox: [],
+      timestamps: {
+        createdAt: "2026-07-21T07:45:00.000Z",
+        updatedAt: "2026-07-21T07:45:00.000Z",
+        sourceUpdatedAt: "2026-07-21T07:45:00.000Z",
+      },
+    };
+    manager.repository.save(ref, initialGasState);
+    await manager.openEventDay(ref);
+
+    const preview = await manager.previewCsvReplacement(
+      ref,
+      "test.csv",
+      csv("A-01,2,,,,\r\n"),
+    );
+
+    // Simulate pending outbox entry inserted after preview
+    const stateWithOutbox: LocalEventDayState = {
+      ...initialGasState,
+      gasOutbox: [
+        {
+          id: "pending-1",
+          eventId: "C108",
+          dayId: "day1",
+          sourceGeneration: "generation-1",
+          gasUrl: "https://script.google.com/macros/s/AKfycbx_test/exec",
+          sheetName: "Day1",
+          space: "A-01",
+          purchased: true,
+          createdAt: "2026-07-21T07:45:00.000Z",
+          attempts: 0,
+          lastError: null,
+        },
+      ],
+    };
+    manager.repository.save(ref, stateWithOutbox);
+
+    expect(() => manager.applyCsvReplacement(preview.previewId)).toThrow(
+      "blocked by 1 pending outbox entries",
+    );
+
+    // State is unchanged
+    expect(manager.repository.load(ref)?.source.type).toBe("gas");
+
+    // Clear outbox and confirm preview is still usable
+    manager.repository.save(ref, initialGasState);
+    const applied = manager.applyCsvReplacement(preview.previewId);
+    expect(applied.source.type).toBe("csv");
+  });
 });

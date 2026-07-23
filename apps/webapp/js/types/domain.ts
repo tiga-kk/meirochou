@@ -102,7 +102,7 @@ export interface GasSheetListResponse {
 }
 
 export interface GasCircleResponse {
-  wantToBuy: Circle[];
+  circles: Circle[];
   spreadsheetTitle: string;
 }
 
@@ -117,6 +117,13 @@ export interface ActionHistoryEntry {
 export interface CachedCircleData {
   wantToBuy: Circle[];
   spreadsheetTitle: string;
+}
+
+export interface GasSaleUpdate {
+  readonly action: "sale";
+  readonly sheetName: string;
+  readonly space: string;
+  readonly undo: boolean;
 }
 
 export type SaleUpdatePayload =
@@ -231,4 +238,67 @@ export interface SourceDiff {
   }[];
   readonly removed: readonly CircleRecord[];
   readonly unchanged: readonly CircleRecord[];
+}
+
+export interface GasOutboxResult {
+  readonly sent: number;
+  readonly pending: number;
+  readonly error: Error | null;
+}
+
+export interface AppendedOutboxState {
+  readonly state: LocalEventDayState;
+  readonly entry: GasOutboxEntry;
+}
+
+export type ProtectedSourceOperation =
+  | "csv-replacement"
+  | "gas-initial-import"
+  | "gas-refresh-apply"
+  | "gas-url-change"
+  | "sheet-name-change"
+  | "source-type-change"
+  | "circles-delete"
+  | "activity-delete"
+  | "event-day-delete";
+
+/** Memory-only metadata for an explicit GAS import or refresh preview. */
+export interface GasRefreshPreview {
+  readonly previewId: string;
+  readonly ref: EventDayRef;
+  readonly mode: "initial" | "replacement" | "refresh";
+  readonly replacementOperation:
+    | "gas-initial-import"
+    | "gas-url-change"
+    | "sheet-name-change"
+    | "source-type-change"
+    | null;
+  readonly expectedSourceGeneration: string;
+  readonly expectedSnapshotHash: string;
+  readonly source: GasDataSource;
+  readonly spreadsheetTitle: string;
+  readonly diff: SourceDiff;
+  readonly fetchedAt: string;
+  readonly expiresAt: string;
+}
+
+/** Result of a local activity mutation and its optional GAS outbox append. */
+export interface PurchaseMutationResult {
+  readonly state: LocalEventDayState;
+  readonly pendingCount: number;
+  readonly queuedEntryId: string | null;
+}
+
+/** Aggregate result for one all-event/day outbox processing run. */
+export interface GasSyncSummary {
+  readonly processedRefs: number;
+  readonly sent: number;
+  readonly pending: number;
+  readonly failures: readonly { ref: EventDayRef; category: string }[];
+}
+
+/** Minimal browser event target used to inject online lifecycle events in tests. */
+export interface OnlineEventTarget {
+  addEventListener(type: "online", listener: () => void): void;
+  removeEventListener(type: "online", listener: () => void): void;
 }

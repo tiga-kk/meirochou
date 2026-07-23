@@ -361,6 +361,7 @@ export function parseLocalEventDayState(value: unknown): LocalEventDayState {
     throw new StorageSchemaError("gasOutbox must be an array");
   }
   const parsedOutbox: GasOutboxEntry[] = [];
+  const outboxIds = new Set<string>();
   for (let i = 0; i < rawOutbox.length; i++) {
     const entry = rawOutbox[i];
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
@@ -372,6 +373,10 @@ export function parseLocalEventDayState(value: unknown): LocalEventDayState {
         `gasOutbox[${i}].id must be a non-empty string`,
       );
     }
+    if (outboxIds.has(entryObj.id)) {
+      throw new StorageSchemaError(`gasOutbox[${i}].id must be unique`);
+    }
+    outboxIds.add(entryObj.id);
     try {
       parseEventId(entryObj.eventId, `gasOutbox[${i}].eventId`);
     } catch (error) {

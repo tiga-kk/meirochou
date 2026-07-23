@@ -17,15 +17,17 @@ function successResponse(payload) {
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: global function exposed to Apps Script environment
-function errorResponse(message, payload) {
+function errorResponse(message, code, payload) {
+  const errCode = typeof code === "string" ? code : "BAD_REQUEST";
+  const extra = typeof code === "object" ? code : payload;
   return Object.assign(
     {
       ok: false,
       status: "error",
+      code: errCode,
       message,
-      error: message,
     },
-    payload || {},
+    extra || {},
   );
 }
 
@@ -37,228 +39,350 @@ function jsonResponse(obj) {
 }
 
 /**
- * WebページからのGETリクエストを処理するメイン関数。
- * アクションに応じてシート一覧取得、または指定シートのデータ取得を行う。
- *
- * パラメータ:
- * - action: 'getSheets' の場合、全シート名を返す。
- * - sheets: カンマ区切りのシート名リスト（データ取得時）。
- *
- * @param {object} e - Apps Scriptが受け取るイベントオブジェクト。
- * @returns {ContentService.TextOutput} - JSON形式のレスポンス。
+ * Helper to validate header row of a sheet.
+ * Required: space (exactly 1)
+ * Optional: priority, isSale, account, tweet, memo (at most 1 each)
  */
-// biome-ignore lint/correctness/noUnusedVariables: global function exposed to Apps Script environment
-function doGet(e) {
-  const action = e.parameter.action;
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  const spreadsheetTitle = spreadsheet.getName();
-
-  // シート一覧の取得
-  if (action === "getSheets") {
-    const allSheets = spreadsheet.getSheets();
-    const sheetNames = allSheets.map((s) => s.getName());
-    return ContentService.createTextOutput(
-      JSON.stringify({ sheets: sheetNames, spreadsheetTitle }),
-    ).setMimeType(ContentService.MimeType.JSON);
+function parseSheetHeaders(headerRow, sheetName) {
+  if (!Array.isArray(headerRow)) {
+    return { error: `Sheet "${sheetName}" header is invalid.` };
   }
 
-  // データ取得（デフォルト動作）
-  let targetSheets = [];
-  if (e.parameter.sheets) {
-    targetSheets = e.parameter.sheets.split(",").map((s) => s.trim());
-  }
+  const supportedOptional = ["priority", "isSale", "account", "tweet", "memo"];
+  const cols = {};
+  const headerCounts = new Set();
 
-  let combinedResult = []; // 複数のシートの結果を結合するための配列。
+  for (let i = 0; i < headerRow.length; i++) {
+    const rawHeader = String(headerRow[i]).trim();
+    if (!rawHeader) continue;
 
-  // 設定されたシート名でループ処理。
-  targetSheets.forEach((sheetName) => {
-    const sheet = spreadsheet.getSheetByName(sheetName);
-    // シートが見つからない場合はスキップ。
-    if (!sheet) {
-      console.warn(`Sheet "${sheetName}" not found. Skipping.`);
-      return;
+    if (headerCounts.has(rawHeader)) {
+      return {
+        error: `Duplicate header '${rawHeader}' in sheet "${sheetName}".`,
+      };
     }
+    headerCounts.add(rawHeader);
 
-    const data = sheet.getDataRange().getValues(); // シートの全データを二次元配列として取得。
-    if (data.length === 0) return;
+    if (rawHeader === "space") {
+      cols.space = i;
+    } else if (supportedOptional.indexOf(rawHeader) !== -1) {
+      cols[rawHeader] = i;
+    }
+  }
 
-    // ヘッダー行（1行目）を取得し、小文字に変換・空白削除して整形。
-    const headers = data
-      .shift()
-      .map((h) => String(h).toLowerCase().replace(/\s+/g, ""));
+  if (cols.space === undefined) {
+    return { error: `Header 'space' is missing in sheet "${sheetName}".` };
+  }
 
-    // データ行をオブジェクトの配列に変換。
-    const sheetResult = data
-      .map((row) => {
-        const obj = {};
-        headers.forEach((header, i) => {
-          obj[header] = row[i];
-        });
-        if (obj.imageurl) {
-          obj.tweet = obj.imageurl;
-        }
-        obj.sheetName = sheetName;
-        return obj;
-      })
-      .filter(
-        (row) =>
-          // スペース列に値があり、かつ購入済みステータスでない行のみをフィルタリング。
-          row[spreadsheetConfig.spaceColumnName.toLowerCase()] &&
-          row[spreadsheetConfig.saleStatusColumnName.toLowerCase()] !==
-            spreadsheetConfig.purchasedStatusText,
-      );
-
-    // 現在のシートの結果を全体の結果に結合。
-    combinedResult = combinedResult.concat(sheetResult);
-  });
-
-  // 最終的な結果をJSON形式で返す。
-  return ContentService.createTextOutput(
-    JSON.stringify({ wantToBuy: combinedResult, spreadsheetTitle }),
-  ).setMimeType(ContentService.MimeType.JSON);
+  return { cols, error: null };
 }
 
 /**
- * WebページからのPOSTリクエストを処理するメイン関数。
- * 指定されたスペースの購入ステータスを更新（または元に戻す）。
- *
- * @param {object} e - Apps Scriptが受け取るイベントオブジェクト（POSTデータを含む）。
- * @returns {ContentService.TextOutput} - JSON形式の処理結果レスポンス。
+ * Validate and extract circle rows from a sheet.
+ */
+function parseSheetDataRows(data, sheetName) {
+  if (!Array.isArray(data) || data.length === 0) {
+    return {
+      circles: null,
+      error: `Sheet "${sheetName}" header is invalid.`,
+    };
+  }
+
+  const headerParsed = parseSheetHeaders(data[0], sheetName);
+  if (headerParsed.error) {
+    return { circles: null, error: headerParsed.error };
+  }
+
+  const cols = headerParsed.cols;
+  const circles = [];
+  const seenSpaces = new Set();
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const isRowEmpty = row.every(
+      (cell) =>
+        cell === undefined || cell === null || String(cell).trim() === "",
+    );
+    if (isRowEmpty) continue;
+
+    const rowNum = i + 1;
+    const rawSpace =
+      cols.space !== undefined &&
+      row[cols.space] !== undefined &&
+      row[cols.space] !== null
+        ? String(row[cols.space]).trim()
+        : "";
+
+    if (!rawSpace) {
+      return {
+        circles: null,
+        error: `Row ${rowNum} in sheet "${sheetName}" is missing required 'space'.`,
+      };
+    }
+
+    if (seenSpaces.has(rawSpace)) {
+      return {
+        circles: null,
+        error: `Duplicate space at row ${rowNum} in sheet "${sheetName}".`,
+      };
+    }
+    seenSpaces.add(rawSpace);
+
+    const circle = { space: rawSpace, sheetName: sheetName };
+
+    if (
+      cols.priority !== undefined &&
+      row[cols.priority] !== undefined &&
+      row[cols.priority] !== null
+    ) {
+      const pStr = String(row[cols.priority]).trim();
+      if (pStr !== "") {
+        const num = Number(pStr);
+        if (Number.isNaN(num) || !Number.isFinite(num)) {
+          return {
+            circles: null,
+            error: `Invalid priority at row ${rowNum} in sheet "${sheetName}".`,
+          };
+        }
+        circle.priority = num;
+      }
+    }
+
+    if (
+      cols.isSale !== undefined &&
+      row[cols.isSale] !== undefined &&
+      row[cols.isSale] !== null
+    ) {
+      const sStr = String(row[cols.isSale]).trim();
+      if (sStr !== "") circle.isSale = sStr;
+    }
+
+    if (
+      cols.account !== undefined &&
+      row[cols.account] !== undefined &&
+      row[cols.account] !== null
+    ) {
+      const aStr = String(row[cols.account]).trim();
+      if (aStr !== "") circle.account = aStr;
+    }
+
+    if (
+      cols.tweet !== undefined &&
+      row[cols.tweet] !== undefined &&
+      row[cols.tweet] !== null
+    ) {
+      const tStr = String(row[cols.tweet]).trim();
+      if (tStr !== "") circle.tweet = tStr;
+    }
+
+    if (
+      cols.memo !== undefined &&
+      row[cols.memo] !== undefined &&
+      row[cols.memo] !== null
+    ) {
+      const mStr = String(row[cols.memo]).trim();
+      if (mStr !== "") circle.memo = mStr;
+    }
+
+    circles.push(circle);
+  }
+
+  return { circles: circles, error: null };
+}
+
+/**
+ * Webpage GET handler.
+ */
+// biome-ignore lint/correctness/noUnusedVariables: global function exposed to Apps Script environment
+function doGet(e) {
+  try {
+    const action = e?.parameter ? e.parameter.action : undefined;
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const spreadsheetTitle = spreadsheet.getName();
+
+    if (action === "getSheets") {
+      const allSheets = spreadsheet.getSheets();
+      const sheetNames = allSheets.map((s) => s.getName());
+      return jsonResponse(
+        successResponse({
+          sheets: sheetNames,
+          spreadsheetTitle: spreadsheetTitle,
+        }),
+      );
+    }
+
+    const sheetsParam = e?.parameter ? e.parameter.sheets : undefined;
+    if (typeof sheetsParam !== "string" || !sheetsParam.trim()) {
+      return jsonResponse(
+        errorResponse("Parameter 'sheets' is required.", "MISSING_PARAMETER"),
+      );
+    }
+
+    const targetSheetName = sheetsParam.trim();
+    const sheet = spreadsheet.getSheetByName(targetSheetName);
+    if (!sheet) {
+      return jsonResponse(
+        errorResponse(
+          `Sheet "${targetSheetName}" not found.`,
+          "SHEET_NOT_FOUND",
+        ),
+      );
+    }
+
+    const data = sheet.getDataRange().getValues();
+    const parsed = parseSheetDataRows(data, targetSheetName);
+    if (parsed.error) {
+      return jsonResponse(errorResponse(parsed.error, "INVALID_SHEET_DATA"));
+    }
+
+    return jsonResponse(
+      successResponse({
+        circles: parsed.circles,
+        spreadsheetTitle: spreadsheetTitle,
+      }),
+    );
+  } catch {
+    return jsonResponse(
+      errorResponse("Unexpected server error.", "SERVER_ERROR"),
+    );
+  }
+}
+
+/**
+ * Webpage POST handler for sale state updates.
  */
 // biome-ignore lint/correctness/noUnusedVariables: global function exposed to Apps Script environment
 function doPostSale(requestData) {
   try {
-    const undo = requestData.undo || false; // undoフラグ（購入取り消しかどうか）。なければfalseになる。
-
-    // 通常の購入・Undoは取得元シートを優先し、同じスペース番号を持つ別シートの
-    // 行を誤更新しない。古いキャッシュなどsheetNameを持たないpayloadと一括Undoは,
-    // 後方互換のため全シートを探索する。
-
-    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const requestedSheetName =
-      typeof requestData.sheetName === "string"
-        ? requestData.sheetName.trim()
-        : "";
-    let targetSheets;
-    if (requestedSheetName) {
-      const requestedSheet = spreadsheet.getSheetByName(requestedSheetName);
-      if (!requestedSheet) {
-        return jsonResponse(
-          errorResponse(`Sheet "${requestedSheetName}" not found.`),
-        );
-      }
-      targetSheets = [requestedSheet];
-    } else {
-      targetSheets = spreadsheet.getSheets();
-    }
-
-    // --- バッチリセット処理 ---
-    // requestDataに 'spaces' というキーで配列が渡され、かつ undo=true の場合に動作。
-    if (requestData.spaces && Array.isArray(requestData.spaces) && undo) {
-      const spacesToReset = requestData.spaces;
-      let resetCount = 0;
-
-      // 各シートを順番に検索。
-      for (const sheet of targetSheets) {
-        const data = sheet.getDataRange().getValues();
-        if (data.length === 0) continue;
-
-        const headers = data[0];
-        const spaceColumnIndex = headers.indexOf(
-          spreadsheetConfig.spaceColumnName,
-        );
-        const statusColumnIndex = headers.indexOf(
-          spreadsheetConfig.saleStatusColumnName,
-        );
-
-        if (spaceColumnIndex === -1 || statusColumnIndex === -1) continue; // 必要な列がなければスキップ。
-
-        // データ行をループして、リセット対象のスペースを探す。
-        for (let i = 1; i < data.length; i++) {
-          // リセット対象のスペース配列に、現在の行のスペースが含まれているかチェック。
-          if (spacesToReset.includes(data[i][spaceColumnIndex])) {
-            // 含まれていれば、ステータス列のセルを空にする。
-            sheet.getRange(i + 1, statusColumnIndex + 1).setValue("");
-            resetCount++;
-          }
-        }
-      }
-      // 処理結果を返す。
+    if (!requestData || typeof requestData !== "object") {
       return jsonResponse(
-        successResponse({
-          message: `Batch reset successful for ${resetCount} items.`,
-          resetCount,
-        }),
+        errorResponse("Invalid request body.", "INVALID_INPUT"),
       );
     }
-    // --- バッチリセット処理ここまで ---
 
-    // --- 既存の単一更新処理 ---
-    const spaceToUpdate = requestData.space;
-    // スペース番号が提供されていない場合はエラーを返す。
-    if (!spaceToUpdate) {
-      return jsonResponse(errorResponse("No space provided"));
-    }
-
-    let foundAndUpdated = false;
-    // 各シートを順番に検索。
-    for (const sheet of targetSheets) {
-      const data = sheet.getDataRange().getValues();
-      if (data.length === 0) continue;
-
-      const headers = data[0];
-      // ヘッダー名から「space」列と「isSale」列のインデックス番号を取得。
-      const spaceColumnIndex = headers.indexOf(
-        spreadsheetConfig.spaceColumnName,
-      );
-      const statusColumnIndex = headers.indexOf(
-        spreadsheetConfig.saleStatusColumnName,
-      );
-
-      // 必要な列が見つからない場合は、このシートをスキップして次のシートへ。
-      if (spaceColumnIndex === -1 || statusColumnIndex === -1) {
-        continue;
-      }
-
-      // データ行をループして、一致するスペースを探す。
-      for (let i = 1; i < data.length; i++) {
-        // biome-ignore lint/suspicious/noDoubleEquals: spreadsheet cell values can be numeric or string
-        if (data[i][spaceColumnIndex] == spaceToUpdate) {
-          // undoがtrueならステータスを空に、falseなら購入済みの印を書き込む。
-          if (undo) {
-            sheet.getRange(i + 1, statusColumnIndex + 1).setValue("");
-          } else {
-            sheet
-              .getRange(i + 1, statusColumnIndex + 1)
-              .setValue(spreadsheetConfig.purchasedStatusText);
-          }
-          foundAndUpdated = true;
-          break; // 見つかったらループを抜ける (単一更新のため)
-        }
-      }
-      if (foundAndUpdated) break; // シートが見つかったらシートのループも抜ける
-    }
-
-    if (foundAndUpdated) {
-      // 成功レスポンスを返して処理を終了。
-      return jsonResponse(
-        successResponse({
-          message: `Updated ${spaceToUpdate}, undo: ${undo}`,
-          space: spaceToUpdate,
-          undo,
-        }),
-      );
-    } else {
-      // 全てのシートを検索してもスペースが見つからなかった場合。
+    if (
+      typeof requestData.sheetName !== "string" ||
+      !requestData.sheetName.trim()
+    ) {
       return jsonResponse(
         errorResponse(
-          `Space "${spaceToUpdate}" not found in any of the specified sheets.`,
+          "Sheet name must be a non-empty string.",
+          "INVALID_INPUT",
         ),
       );
     }
-  } catch (error) {
-    // その他の予期せぬエラーが発生した場合。
-    return jsonResponse(errorResponse(error.message));
+
+    if (typeof requestData.space !== "string" || !requestData.space.trim()) {
+      return jsonResponse(
+        errorResponse("Space must be a non-empty string.", "INVALID_INPUT"),
+      );
+    }
+
+    if (typeof requestData.undo !== "boolean") {
+      return jsonResponse(
+        errorResponse("Undo must be a boolean.", "INVALID_INPUT"),
+      );
+    }
+
+    const requestedSheetName = requestData.sheetName.trim();
+    const spaceToUpdate = requestData.space.trim();
+    const undo = requestData.undo;
+
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName(requestedSheetName);
+    if (!sheet) {
+      return jsonResponse(
+        errorResponse(
+          `Sheet "${requestedSheetName}" not found.`,
+          "SHEET_NOT_FOUND",
+        ),
+      );
+    }
+
+    const data = sheet.getDataRange().getValues();
+    const headerParsed = parseSheetHeaders(data[0], requestedSheetName);
+    if (headerParsed.error) {
+      return jsonResponse(
+        errorResponse(headerParsed.error, "INVALID_SHEET_DATA"),
+      );
+    }
+
+    const cols = headerParsed.cols;
+    if (cols.isSale === undefined) {
+      return jsonResponse(
+        errorResponse(
+          `Header 'isSale' is missing in sheet "${requestedSheetName}".`,
+          "INVALID_SHEET_DATA",
+        ),
+      );
+    }
+
+    let targetRowIndex = -1;
+    const seenSpaces = new Set();
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const isRowEmpty = row.every(
+        (cell) =>
+          cell === undefined || cell === null || String(cell).trim() === "",
+      );
+      if (isRowEmpty) continue;
+
+      const rowNum = i + 1;
+      const rawSpace =
+        row[cols.space] !== undefined && row[cols.space] !== null
+          ? String(row[cols.space]).trim()
+          : "";
+
+      if (!rawSpace) {
+        return jsonResponse(
+          errorResponse(
+            `Row ${rowNum} in sheet "${requestedSheetName}" is missing required 'space'.`,
+            "INVALID_SHEET_DATA",
+          ),
+        );
+      }
+
+      if (seenSpaces.has(rawSpace)) {
+        return jsonResponse(
+          errorResponse(
+            `Duplicate space at row ${rowNum} in sheet "${requestedSheetName}".`,
+            "INVALID_SHEET_DATA",
+          ),
+        );
+      }
+      seenSpaces.add(rawSpace);
+
+      if (rawSpace === spaceToUpdate) {
+        targetRowIndex = i;
+      }
+    }
+
+    if (targetRowIndex === -1) {
+      return jsonResponse(
+        errorResponse(
+          `Space was not found in sheet "${requestedSheetName}".`,
+          "SPACE_NOT_FOUND",
+        ),
+      );
+    }
+
+    const targetRowNumber = targetRowIndex + 1;
+    const statusColumnNumber = cols.isSale + 1;
+
+    if (undo) {
+      sheet.getRange(targetRowNumber, statusColumnNumber).setValue("");
+    } else {
+      sheet
+        .getRange(targetRowNumber, statusColumnNumber)
+        .setValue(spreadsheetConfig.purchasedStatusText);
+    }
+
+    return jsonResponse(successResponse());
+  } catch {
+    return jsonResponse(
+      errorResponse("Unexpected server error.", "SERVER_ERROR"),
+    );
   }
 }
 
@@ -266,14 +390,22 @@ function doPostSale(requestData) {
 function doPost(e) {
   let data;
   try {
-    data = JSON.parse(e.postData.contents);
-  } catch (error) {
-    return jsonResponse(errorResponse(`Invalid JSON: ${error.message}`));
+    const contents = e?.postData ? e.postData.contents : undefined;
+    if (typeof contents !== "string") throw new Error("invalid body");
+    data = JSON.parse(contents);
+  } catch {
+    return jsonResponse(errorResponse("Invalid JSON.", "INVALID_JSON"));
+  }
+
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return jsonResponse(
+      errorResponse("Invalid request body.", "INVALID_INPUT"),
+    );
   }
 
   if (data.action === "sale") {
     return doPostSale(data);
   }
 
-  return jsonResponse(errorResponse(`Unknown action: ${data.action}`));
+  return jsonResponse(errorResponse("Unknown action.", "UNKNOWN_ACTION"));
 }
