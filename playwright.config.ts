@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const isCi = Boolean(process.env.CI);
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
@@ -21,7 +23,7 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "mobile-chromium",
+      name: isCi ? "mobile-chromium-ci" : "mobile-chromium",
       use: { ...devices["Pixel 5"] },
     },
   ],
