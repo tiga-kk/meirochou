@@ -102,7 +102,7 @@ export interface GasSheetListResponse {
 }
 
 export interface GasCircleResponse {
-  wantToBuy: Circle[];
+  circles: Circle[];
   spreadsheetTitle: string;
 }
 

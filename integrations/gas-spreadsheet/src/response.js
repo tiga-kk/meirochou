@@ -10,15 +10,17 @@ function successResponse(payload) {
 }
 
 // biome-ignore lint/correctness/noUnusedVariables: global function exposed to Apps Script environment
-function errorResponse(message, payload) {
+function errorResponse(message, code, payload) {
+  const errCode = typeof code === "string" ? code : "BAD_REQUEST";
+  const extra = typeof code === "object" ? code : payload;
   return Object.assign(
     {
       ok: false,
       status: "error",
+      code: errCode,
       message,
-      error: message,
     },
-    payload || {},
+    extra || {},
   );
 }
 

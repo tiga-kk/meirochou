@@ -149,7 +149,7 @@ test("GAS response parsers reject missing success envelope fields", () => {
     () =>
       parseGasCircleResponse({
         ok: true,
-        wantToBuy: [{ space: "東A01a" }],
+        circles: [{ space: "東A01a" }],
         spreadsheetTitle: "C108",
       }),
     /GAS circle response\.status/,
@@ -171,11 +171,24 @@ test("GAS circle response parser rejects an invalid circle with its field path",
       parseGasCircleResponse({
         ok: true,
         status: "success",
-        wantToBuy: [{ priority: 10 }],
+        circles: [{ priority: 10 }],
       }),
     (error) =>
       error instanceof BoundaryValidationError &&
-      error.message.includes("GAS circle response.wantToBuy[0].space"),
+      error.message.includes("GAS circle response.circles[0].space"),
+  );
+});
+
+test("GAS circle response parser rejects the legacy wantToBuy alias", () => {
+  assert.throws(
+    () =>
+      parseGasCircleResponse({
+        ok: true,
+        status: "success",
+        wantToBuy: [{ space: "東A01a" }],
+        spreadsheetTitle: "C108",
+      }),
+    /GAS circle response\.circles/,
   );
 });
 

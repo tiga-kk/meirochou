@@ -122,28 +122,25 @@ test("doGet with action=getSheets returns all sheet names and spreadsheet title"
   vm.createContext(context);
   vm.runInContext(code, context);
 
-  // Invoke doGet
   const response = context.doGet({
     parameter: { action: "getSheets" },
   });
 
   const payload = JSON.parse(response.getContent());
+  assert.equal(payload.ok, true);
+  assert.equal(payload.status, "success");
   assert.deepEqual(payload.sheets, ["Sheet1", "Sheet2"]);
   assert.equal(payload.spreadsheetTitle, "C108 Book");
 });
 
-test("doGet with sheets parameters returns filtered wantToBuy list", () => {
+test("doGet with sheets parameter returns validated circles list including purchased rows", () => {
   const code = readFileSync(codePath, "utf8");
   const gas = setupGasContext(
     {
       Sheet1: [
-        ["space", "isSale", "priority", "imageUrl"],
+        ["space", "isSale", "priority", "tweet"],
         ["東A01a", "", "10", "http://example.com/1.png"],
-        ["東A01b", "x", "5", "http://example.com/2.png"], // purchased (should be excluded)
-      ],
-      Sheet2: [
-        ["space", "isSale", "priority", "imageUrl"],
-        ["西B02b", "", "8", ""],
+        ["東A01b", "x", "5", "http://example.com/2.png"], // purchased (must be included)
       ],
     },
     "C108 Book",
@@ -158,33 +155,205 @@ test("doGet with sheets parameters returns filtered wantToBuy list", () => {
   vm.createContext(context);
   vm.runInContext(code, context);
 
-  // 1. Invoke doGet without sheets parameter -> returns empty wantToBuy
+  // 1. Invoke doGet without sheets parameter -> returns error
   const resEmpty = context.doGet({
     parameter: {},
   });
   const payloadEmpty = JSON.parse(resEmpty.getContent());
-  assert.deepEqual(payloadEmpty.wantToBuy, []);
+  assert.equal(payloadEmpty.ok, false);
+  assert.equal(payloadEmpty.status, "error");
 
-  // 2. Invoke doGet with sheets=Sheet1,Sheet2
+  // 2. Invoke doGet with sheets=Sheet1
   const resData = context.doGet({
-    parameter: { sheets: "Sheet1, Sheet2" },
+    parameter: { sheets: "Sheet1" },
   });
   const payloadData = JSON.parse(resData.getContent());
+  assert.equal(payloadData.ok, true);
+  assert.equal(payloadData.status, "success");
   assert.equal(payloadData.spreadsheetTitle, "C108 Book");
-  assert.equal(payloadData.wantToBuy.length, 2);
+  assert.equal(payloadData.circles.length, 2);
 
-  const item1 = payloadData.wantToBuy.find((item) => item.space === "東A01a");
+  const item1 = payloadData.circles.find((item) => item.space === "東A01a");
   assert.ok(item1);
-  assert.equal(item1.priority, "10");
-  assert.equal(item1.tweet, "http://example.com/1.png"); // imageUrl is mapped to tweet
+  assert.equal(item1.priority, 10);
+  assert.equal(item1.tweet, "http://example.com/1.png");
   assert.equal(item1.sheetName, "Sheet1");
 
-  const item2 = payloadData.wantToBuy.find((item) => item.space === "西B02b");
+  const item2 = payloadData.circles.find((item) => item.space === "東A01b");
   assert.ok(item2);
-  assert.equal(item2.sheetName, "Sheet2");
+  assert.equal(item2.isSale, "x");
+  assert.equal(item2.priority, 5);
+  assert.equal(item2.tweet, "http://example.com/2.png");
 });
 
-test("doPost updates specific space status on specified sheet", () => {
+test("doGet returns error when sheet has missing required space header", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["priority", "tweet"],
+      ["10", "http://example.com/1.png"],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doGet({ parameter: { sheets: "Sheet1" } });
+  const payload = JSON.parse(response.getContent());
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, "error");
+  assert.ok(payload.message.includes("Sheet1"));
+});
+
+test("doGet returns error when the selected sheet has no header row", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({ Sheet1: [] });
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doGet({ parameter: { sheets: "Sheet1" } });
+  const payload = JSON.parse(response.getContent());
+  assert.equal(payload.ok, false);
+  assert.equal(payload.code, "INVALID_SHEET_DATA");
+});
+
+test("doGet converts unexpected spreadsheet failures to a safe error", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [["space"], ["東A01a"]],
+  });
+  gas.SpreadsheetApp.getActiveSpreadsheet = () => {
+    throw new Error("internal spreadsheet secret");
+  };
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doGet({ parameter: { sheets: "Sheet1" } });
+  const payload = JSON.parse(response.getContent());
+  assert.equal(payload.ok, false);
+  assert.equal(payload.code, "SERVER_ERROR");
+  assert.equal(payload.message, "Unexpected server error.");
+  assert.doesNotMatch(payload.message, /secret/);
+});
+
+test("doGet returns error when sheet has duplicate space header", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "space", "tweet"],
+      ["東A01a", "東A01a", "http://example.com/1.png"],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doGet({ parameter: { sheets: "Sheet1" } });
+  const payload = JSON.parse(response.getContent());
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, "error");
+});
+
+test("doGet returns error when sheet has duplicate optional header", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "priority", "priority"],
+      ["東A01a", "10", "5"],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doGet({ parameter: { sheets: "Sheet1" } });
+  const payload = JSON.parse(response.getContent());
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, "error");
+});
+
+test("doGet returns error when duplicate space row exists in sheet", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "isSale"],
+      ["東A01a", ""],
+      ["東A01a", "x"],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doGet({ parameter: { sheets: "Sheet1" } });
+  const payload = JSON.parse(response.getContent());
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, "error");
+  assert.ok(payload.message.includes("Sheet1"));
+  assert.ok(payload.message.includes("3")); // row 3
+});
+
+test("doGet returns error when row has invalid non-numeric priority", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "priority"],
+      ["東A01a", "not-a-number"],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doGet({ parameter: { sheets: "Sheet1" } });
+  const payload = JSON.parse(response.getContent());
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, "error");
+});
+
+test("doGet returns error when requesting unknown sheet", () => {
   const code = readFileSync(codePath, "utf8");
   const gas = setupGasContext({
     Sheet1: [
@@ -202,8 +371,83 @@ test("doPost updates specific space status on specified sheet", () => {
   vm.createContext(context);
   vm.runInContext(code, context);
 
-  // doPost sale
-  const e = {
+  const response = context.doGet({ parameter: { sheets: "NonExistentSheet" } });
+  const payload = JSON.parse(response.getContent());
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, "error");
+});
+
+test("doGet returns error when non-empty row has missing space", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "priority"],
+      ["", "10"],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doGet({ parameter: { sheets: "Sheet1" } });
+  const payload = JSON.parse(response.getContent());
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, "error");
+});
+
+test("doGet parses optional empty fields without error", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "priority", "memo", "tweet", "account", "isSale"],
+      ["東A01a", "", "", "", "", ""],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doGet({ parameter: { sheets: "Sheet1" } });
+  const payload = JSON.parse(response.getContent());
+  assert.equal(payload.ok, true);
+  assert.equal(payload.status, "success");
+  assert.equal(payload.circles.length, 1);
+  assert.equal(payload.circles[0].space, "東A01a");
+  assert.equal(payload.circles[0].priority, undefined);
+  assert.equal(payload.circles[0].memo, undefined);
+});
+
+test("doPost sale updates specific space status on specified sheet", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "isSale"],
+      ["東A01a", ""],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doPost({
     postData: {
       contents: JSON.stringify({
         action: "sale",
@@ -212,9 +456,7 @@ test("doPost updates specific space status on specified sheet", () => {
         undo: false,
       }),
     },
-  };
-
-  const response = context.doPost(e);
+  });
   const payload = JSON.parse(response.getContent());
 
   assert.equal(payload.ok, true);
@@ -222,7 +464,370 @@ test("doPost updates specific space status on specified sheet", () => {
 
   // Verify sheet was updated
   const sheetData = gas.spreadsheet.sheets[0].data;
-  assert.equal(sheetData[1][1], "x"); // space=東A01a, isSale=x
+  assert.equal(sheetData[1][1], "x");
+});
+
+test("doPost returns error when sheetName is missing or invalid", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "isSale"],
+      ["東A01a", ""],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doPost({
+    postData: {
+      contents: JSON.stringify({
+        action: "sale",
+        space: "東A01a",
+        undo: false,
+      }),
+    },
+  });
+  const payload = JSON.parse(response.getContent());
+
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, "error");
+});
+
+test("doPost returns error when sheetName is unknown", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "isSale"],
+      ["東A01a", ""],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doPost({
+    postData: {
+      contents: JSON.stringify({
+        action: "sale",
+        sheetName: "UnknownSheet",
+        space: "東A01a",
+        undo: false,
+      }),
+    },
+  });
+  const payload = JSON.parse(response.getContent());
+
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, "error");
+});
+
+test("doPost returns error when space is missing or empty", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "isSale"],
+      ["東A01a", ""],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doPost({
+    postData: {
+      contents: JSON.stringify({
+        action: "sale",
+        sheetName: "Sheet1",
+        space: "",
+        undo: false,
+      }),
+    },
+  });
+  const payload = JSON.parse(response.getContent());
+
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, "error");
+});
+
+test("doPost returns error when undo is non-boolean", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "isSale"],
+      ["東A01a", ""],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doPost({
+    postData: {
+      contents: JSON.stringify({
+        action: "sale",
+        sheetName: "Sheet1",
+        space: "東A01a",
+        undo: "false",
+      }),
+    },
+  });
+  const payload = JSON.parse(response.getContent());
+
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, "error");
+});
+
+test("doPost returns error when sheet lacks required space or isSale column", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [["space"], ["東A01a"]],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doPost({
+    postData: {
+      contents: JSON.stringify({
+        action: "sale",
+        sheetName: "Sheet1",
+        space: "東A01a",
+        undo: false,
+      }),
+    },
+  });
+  const payload = JSON.parse(response.getContent());
+
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, "error");
+});
+
+test("doPost returns error when sheet has duplicate headers", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "isSale", "isSale"],
+      ["東A01a", "", ""],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doPost({
+    postData: {
+      contents: JSON.stringify({
+        action: "sale",
+        sheetName: "Sheet1",
+        space: "東A01a",
+        undo: false,
+      }),
+    },
+  });
+  const payload = JSON.parse(response.getContent());
+
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, "error");
+});
+
+test("doPost returns error when sheet has duplicate space rows", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "isSale"],
+      ["東A01a", ""],
+      ["東A01a", ""],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doPost({
+    postData: {
+      contents: JSON.stringify({
+        action: "sale",
+        sheetName: "Sheet1",
+        space: "東A01a",
+        undo: false,
+      }),
+    },
+  });
+  const payload = JSON.parse(response.getContent());
+
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, "error");
+});
+
+test("doPost updates exact target sheet without modifying second sheet with same space", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "isSale"],
+      ["東A01a", ""],
+    ],
+    Sheet2: [
+      ["space", "isSale"],
+      ["東A01a", ""],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doPost({
+    postData: {
+      contents: JSON.stringify({
+        action: "sale",
+        sheetName: "Sheet1",
+        space: "東A01a",
+        undo: false,
+      }),
+    },
+  });
+  const payload = JSON.parse(response.getContent());
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.status, "success");
+
+  assert.equal(gas.spreadsheet.sheets[0].data[1][1], "x");
+  assert.equal(gas.spreadsheet.sheets[1].data[1][1], "");
+});
+
+test("doPost is idempotent on repeated purchase and repeat cancel", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "isSale"],
+      ["東A01a", ""],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const post = (undo) =>
+    JSON.parse(
+      context
+        .doPost({
+          postData: {
+            contents: JSON.stringify({
+              action: "sale",
+              sheetName: "Sheet1",
+              space: "東A01a",
+              undo,
+            }),
+          },
+        })
+        .getContent(),
+    );
+
+  // 1st purchase
+  let payload = post(false);
+  assert.equal(payload.ok, true);
+  assert.equal(gas.spreadsheet.sheets[0].data[1][1], "x");
+
+  // 2nd purchase (idempotent)
+  payload = post(false);
+  assert.equal(payload.ok, true);
+  assert.equal(gas.spreadsheet.sheets[0].data[1][1], "x");
+
+  // 1st cancel
+  payload = post(true);
+  assert.equal(payload.ok, true);
+  assert.equal(gas.spreadsheet.sheets[0].data[1][1], "");
+
+  // 2nd cancel (idempotent)
+  payload = post(true);
+  assert.equal(payload.ok, true);
+  assert.equal(gas.spreadsheet.sheets[0].data[1][1], "");
+});
+
+test("doPost ignores legacy batch reset payload and returns error", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({
+    Sheet1: [
+      ["space", "isSale"],
+      ["東A01a", "x"],
+    ],
+  });
+
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  const response = context.doPost({
+    postData: {
+      contents: JSON.stringify({
+        action: "sale",
+        spaces: ["東A01a"],
+        undo: true,
+      }),
+    },
+  });
+  const payload = JSON.parse(response.getContent());
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, "error");
 });
 
 test("doPost with unknown action returns error response", () => {
@@ -256,4 +861,35 @@ test("doPost with unknown action returns error response", () => {
 
   assert.equal(payload.ok, false);
   assert.equal(payload.status, "error");
+  assert.equal(payload.code, "UNKNOWN_ACTION");
+  assert.equal(payload.message, "Unknown action.");
+});
+
+test("doPost returns a stable safe error for invalid or missing JSON", () => {
+  const code = readFileSync(codePath, "utf8");
+  const gas = setupGasContext({});
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+
+  vm.createContext(context);
+  vm.runInContext(code, context);
+
+  for (const event of [{ postData: { contents: "not-json" } }, {}]) {
+    const response = context.doPost(event);
+    const payload = JSON.parse(response.getContent());
+    assert.equal(payload.ok, false);
+    assert.equal(payload.code, "INVALID_JSON");
+    assert.equal(payload.message, "Invalid JSON.");
+  }
+
+  for (const contents of ["null", "[]", '"sale"']) {
+    const response = context.doPost({ postData: { contents } });
+    const payload = JSON.parse(response.getContent());
+    assert.equal(payload.ok, false);
+    assert.equal(payload.code, "INVALID_INPUT");
+    assert.equal(payload.message, "Invalid request body.");
+  }
 });

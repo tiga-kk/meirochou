@@ -175,7 +175,7 @@ export class GasRefreshService {
       previewSource.gasUrl,
       previewSource.sheetName,
     );
-    const fetchedCircles = fetched.wantToBuy.map(gasCircleToRecord);
+    const fetchedCircles = fetched.circles.map(gasCircleToRecord);
     const diff = diffCircleSources(state.circles, fetchedCircles);
 
     const nowMs = this.now().getTime();
@@ -227,7 +227,7 @@ export class GasRefreshService {
       previewSource.gasUrl,
       previewSource.sheetName,
     );
-    const fetchedCircles = fetched.wantToBuy.map(gasCircleToRecord);
+    const fetchedCircles = fetched.circles.map(gasCircleToRecord);
     const diff = diffCircleSources(state.circles, fetchedCircles);
 
     const nowMs = this.now().getTime();
@@ -268,7 +268,7 @@ export class GasRefreshService {
       source.gasUrl,
       source.sheetName,
     );
-    const fetchedCircles = fetched.wantToBuy.map(gasCircleToRecord);
+    const fetchedCircles = fetched.circles.map(gasCircleToRecord);
     const diff = diffCircleSources(state.circles, fetchedCircles);
 
     const nowMs = this.now().getTime();

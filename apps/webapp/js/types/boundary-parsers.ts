@@ -353,21 +353,18 @@ function parseCircle(input: unknown, path: string): Circle {
 
 export function parseGasCircleResponse(input: unknown): GasCircleResponse {
   const value = gasSuccessEnvelope(input, "GAS circle response");
-  if (!Array.isArray(value.wantToBuy)) {
+  if (!Array.isArray(value.circles)) {
     throw new BoundaryValidationError(
-      "GAS circle response.wantToBuy",
+      "GAS circle response.circles",
       "an array",
     );
   }
   const seenSpaces = new Set<string>();
-  const wantToBuy = value.wantToBuy.map((circle, index) => {
-    const parsed = parseCircle(
-      circle,
-      `GAS circle response.wantToBuy[${index}]`,
-    );
+  const parsedCircles = value.circles.map((circle, index) => {
+    const parsed = parseCircle(circle, `GAS circle response.circles[${index}]`);
     if (seenSpaces.has(parsed.space)) {
       throw new BoundaryValidationError(
-        `GAS circle response.wantToBuy[${index}].space`,
+        `GAS circle response.circles[${index}].space`,
         `a unique space identifier (duplicate '${parsed.space}' found)`,
       );
     }
@@ -375,7 +372,7 @@ export function parseGasCircleResponse(input: unknown): GasCircleResponse {
     return parsed;
   });
   return {
-    wantToBuy,
+    circles: parsedCircles,
     spreadsheetTitle: nonEmptyText(
       value.spreadsheetTitle,
       "GAS circle response.spreadsheetTitle",

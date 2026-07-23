@@ -80,11 +80,10 @@ test("GAS circle responses include the spreadsheet title and source sheet name",
   const source = read("integrations/gas-spreadsheet/src/web-api.js");
 
   assert.match(source, /spreadsheetTitle\s*=\s*spreadsheet\.getName\(\)/);
-  assert.match(source, /obj\.sheetName\s*=\s*sheetName/);
-  assert.match(
-    source,
-    /JSON\.stringify\(\{\s*wantToBuy:\s*combinedResult,\s*spreadsheetTitle\s*}\)/,
-  );
+  assert.match(source, /sheetName/);
+  assert.match(source, /circles/);
+  assert.doesNotMatch(source, /wantToBuy/);
+  assert.doesNotMatch(source, /imageUrl/);
 });
 
 test("public README stays empty until publication documentation is approved", () => {

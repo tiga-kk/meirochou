@@ -163,7 +163,7 @@ describe("Phase 3 Task 4: GasRefreshService and DataManager integration", () => 
     };
 
     vi.spyOn(client, "fetchCircles").mockResolvedValueOnce({
-      wantToBuy: [
+      circles: [
         { space: "A-01", priority: 1, isSale: "x" },
         { space: "B-02", priority: 2 },
       ],
@@ -269,7 +269,7 @@ describe("Phase 3 Task 4: GasRefreshService and DataManager integration", () => 
     await manager.openEventDay(ref);
 
     vi.spyOn(client, "fetchCircles").mockResolvedValueOnce({
-      wantToBuy: [
+      circles: [
         { space: "A-01", priority: 5 }, // updated
         { space: "C-01", priority: 1, isSale: "x" }, // added with isSale
       ],
@@ -334,7 +334,7 @@ describe("Phase 3 Task 4: GasRefreshService and DataManager integration", () => 
     };
 
     vi.spyOn(client, "fetchCircles").mockResolvedValueOnce({
-      wantToBuy: [{ space: "A-01", priority: 1 }],
+      circles: [{ space: "A-01", priority: 1 }],
       spreadsheetTitle: "New List",
     });
 
@@ -377,7 +377,7 @@ describe("Phase 3 Task 4: GasRefreshService and DataManager integration", () => 
     await manager.openEventDay(ref);
 
     vi.spyOn(client, "fetchCircles").mockResolvedValue({
-      wantToBuy: [{ space: "A-01", priority: 2 }],
+      circles: [{ space: "A-01", priority: 2 }],
       spreadsheetTitle: "List",
     });
 
@@ -467,7 +467,7 @@ describe("Phase 3 Task 4: GasRefreshService and DataManager integration", () => 
     });
 
     vi.spyOn(client, "fetchCircles").mockResolvedValueOnce({
-      wantToBuy: [{ space: "A-01", priority: 1 }],
+      circles: [{ space: "A-01", priority: 1 }],
       spreadsheetTitle: "Title",
     });
 
@@ -491,7 +491,7 @@ describe("Phase 3 Task 4: GasRefreshService and DataManager integration", () => 
     await manager.openEventDay(ref);
     const before = repository.load(ref);
     vi.spyOn(client, "fetchCircles").mockResolvedValueOnce({
-      wantToBuy: [{ space: "A-01", priority: 1 }],
+      circles: [{ space: "A-01", priority: 1 }],
       spreadsheetTitle: "Title",
     });
 

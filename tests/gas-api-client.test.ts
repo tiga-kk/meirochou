@@ -73,7 +73,7 @@ describe("GasApiClient request shape", () => {
         JSON.stringify({
           ok: true,
           status: "success",
-          wantToBuy: [{ space: "東A01a", priority: 1 }],
+          circles: [{ space: "東A01a", priority: 1 }],
           spreadsheetTitle: "Demo",
         }),
       ),
@@ -91,7 +91,7 @@ describe("GasApiClient request shape", () => {
         headers: { Accept: "application/json" },
       }),
     );
-    expect(result.wantToBuy[0].space).toBe("東A01a");
+    expect(result.circles[0].space).toBe("東A01a");
   });
 
   it("sends sale update via POST text/plain with JSON body", async () => {
@@ -227,7 +227,7 @@ describe("GasApiClient failure classification", () => {
         JSON.stringify({
           ok: true,
           status: "success",
-          wantToBuy: [{ space: "東A01a", priority: "not-a-number" }],
+          circles: [{ space: "東A01a", priority: "not-a-number" }],
         }),
         { status: 200 },
       ),
@@ -252,7 +252,7 @@ describe("GasApiClient strict success parser", () => {
         JSON.stringify({
           ok: true,
           status: "success",
-          wantToBuy: [
+          circles: [
             { space: "東A01a", priority: 1 },
             { space: "東A01a", priority: 2 },
           ],
