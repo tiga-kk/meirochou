@@ -38,10 +38,6 @@ export class EventDayRepository {
     if (raw === null) {
       return null;
     }
-    // parseLocalEventDayState will throw StorageSchemaError if validation fails.
-    // In-memory format parsing may throw SyntaxError if not proper JSON, but
-    // storageService.getJson already handles JSON parsing. If it's malformed JSON string,
-    // getJson might throw, which is fine and will propagate.
     return parseLocalEventDayState(raw);
   }
 
@@ -93,6 +89,74 @@ export class EventDayRepository {
         throw error;
       }
       throw new StorageWriteError("Failed to save event day state", error);
+    }
+  }
+
+  /** Save state, index, and last-opened as one rollback-protected operation. */
+  saveWithLastOpened(ref: EventDayRef, state: LocalEventDayState): void {
+    parseLocalEventDayState(state);
+    const parsedRef = parseEventDayRef(ref.eventId, ref.dayId);
+
+    const stateKey = getEventDayStateKey(parsedRef);
+    const previousStateRaw = this.storageService.getString(stateKey, "");
+    const previousIndexRaw = this.storageService.getString(INDEX_KEY, "");
+    const previousLastOpenedRaw = this.storageService.getString(
+      LAST_OPENED_KEY,
+      "",
+    );
+
+    try {
+      this.storageService.setJson(stateKey, state);
+
+      const indexList = this.list();
+      const exists = indexList.some(
+        (r) => r.eventId === parsedRef.eventId && r.dayId === parsedRef.dayId,
+      );
+      if (!exists) {
+        const nextList = [...indexList, parsedRef];
+        this.storageService.setJson(INDEX_KEY, nextList);
+      }
+
+      this.storageService.setJson(LAST_OPENED_KEY, parsedRef);
+    } catch (error) {
+      // Rollback all three keys on failure
+      try {
+        if (previousStateRaw === "") {
+          this.storageService.remove(stateKey);
+        } else {
+          this.storageService.setString(stateKey, previousStateRaw);
+        }
+      } catch {
+        // Suppress
+      }
+
+      try {
+        if (previousIndexRaw === "") {
+          this.storageService.remove(INDEX_KEY);
+        } else {
+          this.storageService.setString(INDEX_KEY, previousIndexRaw);
+        }
+      } catch {
+        // Suppress
+      }
+
+      try {
+        if (previousLastOpenedRaw === "") {
+          this.storageService.remove(LAST_OPENED_KEY);
+        } else {
+          this.storageService.setString(LAST_OPENED_KEY, previousLastOpenedRaw);
+        }
+      } catch {
+        // Suppress
+      }
+
+      if (error instanceof StorageWriteError) {
+        throw error;
+      }
+      throw new StorageWriteError(
+        "Failed to save state and last opened event day",
+        error,
+      );
     }
   }
 

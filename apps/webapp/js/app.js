@@ -1,12 +1,16 @@
 import "./components/comipath-settings";
 import { Config } from "./config.js";
+import { loadEventRegistryWithUrl } from "./data/event-registry";
 import { DataManager } from "./data-manager.js";
 import { createDevDemoData, isDevDemoEnabled } from "./dev-demo-data.js";
 import {
-  loadMapBundleManifest,
+  loadMapBundleManifestFromUrl,
   renderMapBootstrapError,
+  resolveEventMapManifestUrl,
 } from "./map-manifest-loader";
 import { planRoute, rankCandidatesByGridDistance } from "./route-planner";
+import { EventDayRepository } from "./state/event-day-repository";
+import { StorageService } from "./state/storage-service";
 import { TspSolver } from "./tsp-solver.js";
 import { parseGridMeta, parsePointsPayload } from "./types/boundary-parsers";
 import { buildSpaceFromLocation } from "./ui/navigation-view-model";
@@ -52,12 +56,20 @@ export class App {
     this.selectionMessage = "";
     this.selectionToken = 0;
     this.routeAssetsCache = new Map();
+    this.currentManifest = null;
   }
 
   /**
    * 初期化実行
    */
-  async init(manifest) {
+  async init(manifest, initialRef = null, loadedRegistry = null) {
+    if (loadedRegistry) {
+      this.dm.eventRegistry = loadedRegistry.registry;
+      this.dm.eventRegistryUrl = loadedRegistry.registryUrl;
+    } else {
+      await this.dm.loadEventRegistry();
+    }
+
     const devDemoEnabled = isDevDemoEnabled(window.location);
     if (devDemoEnabled) {
       const demoData = createDevDemoData();
@@ -66,45 +78,38 @@ export class App {
       this.dm.purchasedList = demoData.purchasedList;
       this.dm.holdList = demoData.holdList;
     } else {
-      // 初期イベント/日を開く
-      let activeRef = this.dm.repository.getLastOpened();
-      if (!activeRef) {
-        if (manifest) {
-          activeRef = {
-            eventId: manifest.eventId,
-            dayId: "day1",
-          };
-        } else {
-          activeRef = { eventId: "demo-v1", dayId: "day1" };
+      const isRegisteredRef = (ref) => {
+        const event = this.dm.eventRegistry?.events.find(
+          (candidate) => candidate.eventId === ref?.eventId,
+        );
+        return Boolean(event?.days.some((day) => day.dayId === ref?.dayId));
+      };
+      let activeRef = initialRef || this.dm.repository.getLastOpened();
+      if (!activeRef || !isRegisteredRef(activeRef)) {
+        const defaultEvent = this.dm.eventRegistry?.events[0];
+        if (!defaultEvent || defaultEvent.days.length === 0) {
+          renderMapBootstrapError(
+            document,
+            new Error("Event registry has no selectable event/day"),
+          );
+          return;
         }
+        activeRef = {
+          eventId: defaultEvent.eventId,
+          dayId: defaultEvent.days[0].dayId,
+        };
       }
 
       try {
-        await this.dm.openEventDay(activeRef);
+        const transitionService = this.dm.getTransitionService(manifest);
+        const prepared = await transitionService.prepare(activeRef);
+        const state = transitionService.commit(prepared);
+        this.dm.activateCommittedState(prepared.ref, state);
+        this.currentManifest = prepared.manifest;
       } catch (error) {
         console.error("Failed to open initial event day:", error);
-        const defaultRef = { eventId: "demo-v1", dayId: "day1" };
-
-        // Already tried to open the default and failed, or we retry
-        const isAlreadyDefault =
-          activeRef.eventId === defaultRef.eventId &&
-          activeRef.dayId === defaultRef.dayId;
-
-        if (isAlreadyDefault) {
-          renderMapBootstrapError(document, error);
-          return;
-        }
-
-        try {
-          console.warn(
-            "Attempting fallback to default event day (demo-v1/day1)",
-          );
-          await this.dm.openEventDay(defaultRef);
-        } catch (fallbackError) {
-          console.error("Failed to open fallback event day:", fallbackError);
-          renderMapBootstrapError(document, fallbackError);
-          return;
-        }
+        renderMapBootstrapError(document, error);
+        return;
       }
     }
 
@@ -665,11 +670,38 @@ export class App {
   }
 }
 
-/** Load the selected map bundle before creating any stateful app services. */
+/** Load the selected map bundle via event registry before creating application controllers. */
 async function bootstrapApp() {
   let manifest;
+  let registry;
+  let registryUrl;
+  let targetRef;
   try {
-    manifest = await loadMapBundleManifest();
+    ({ registry, registryUrl } = await loadEventRegistryWithUrl());
+    const tempStorage = new StorageService();
+    const tempRepo = new EventDayRepository(tempStorage);
+    targetRef = tempRepo.getLastOpened();
+
+    const isValidRef =
+      targetRef &&
+      registry.events.some(
+        (e) =>
+          e.eventId === targetRef.eventId &&
+          e.days.some((d) => d.dayId === targetRef.dayId),
+      );
+
+    if (!isValidRef) {
+      const defaultEvent = registry.events[0];
+      targetRef = {
+        eventId: defaultEvent.eventId,
+        dayId: defaultEvent.days[0].dayId,
+      };
+    }
+
+    const event = registry.events.find((e) => e.eventId === targetRef.eventId);
+    if (!event) throw new Error("Last-opened event is not in registry");
+    const manifestUrl = resolveEventMapManifestUrl(registryUrl, event);
+    manifest = await loadMapBundleManifestFromUrl(manifestUrl);
     Config.initializeAreas(manifest.areas);
   } catch (error) {
     console.error("Map bundle initialization failed.", error);
@@ -678,7 +710,7 @@ async function bootstrapApp() {
   }
 
   const app = new App();
-  await app.init(manifest);
+  await app.init(manifest, targetRef, { registry, registryUrl });
 }
 
 // アプリ起動

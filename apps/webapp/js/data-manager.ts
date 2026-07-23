@@ -1,7 +1,10 @@
 import { GasApiClient } from "./api/gas-api-client";
 import { Config } from "./config.js";
 import { parseCircleCsv, serializeCircleCsv } from "./data/csv-circle-codec";
-import { loadEventRegistry } from "./data/event-registry";
+import {
+  type LoadedEventRegistry,
+  loadEventRegistryWithUrl,
+} from "./data/event-registry";
 import { GasRefreshService } from "./data/gas-refresh-service";
 import {
   circleRecordToCircle,
@@ -12,6 +15,7 @@ import {
 } from "./data/local-state-adapters";
 import { applySourceDiff, diffCircleSources } from "./data/source-diff";
 import { EventDayRepository } from "./state/event-day-repository";
+import { EventDayTransitionService } from "./state/event-day-transition-service";
 import { GasOutboxService } from "./state/gas-outbox-service";
 import { GasSyncCoordinator } from "./state/gas-sync-coordinator";
 import { PurchaseMutationService } from "./state/purchase-mutation-service";
@@ -34,6 +38,7 @@ import type {
   GasSyncSummary,
   HistoryEntry,
   LocalEventDayState,
+  MapBundleManifestV1,
   PurchaseMutationResult,
   SourceDiff,
 } from "./types/domain";
@@ -209,8 +214,64 @@ export class DataManager {
     }
   }
 
-  private async ensureRegistry(): Promise<void> {
-    if (!this.eventRegistry) this.eventRegistry = await loadEventRegistry();
+  eventRegistryUrl: string | null = null;
+  transitionService: EventDayTransitionService | null = null;
+
+  private async ensureRegistry(): Promise<LoadedEventRegistry> {
+    if (this.eventRegistry && this.eventRegistryUrl) {
+      return {
+        registry: this.eventRegistry,
+        registryUrl: this.eventRegistryUrl,
+      };
+    }
+    if (this.eventRegistry && !this.eventRegistryUrl) {
+      this.eventRegistryUrl =
+        typeof document !== "undefined" && document.baseURI
+          ? new URL("/assets/events/manifest.json", document.baseURI).href
+          : "/assets/events/manifest.json";
+      return {
+        registry: this.eventRegistry,
+        registryUrl: this.eventRegistryUrl,
+      };
+    }
+    const loaded = await loadEventRegistryWithUrl();
+    this.eventRegistry = loaded.registry;
+    this.eventRegistryUrl = loaded.registryUrl;
+    return loaded;
+  }
+
+  /** Load and cache the registry together with the URL used to resolve bundles. */
+  async loadEventRegistry(): Promise<LoadedEventRegistry> {
+    return this.ensureRegistry();
+  }
+
+  /** Create the event-scoped transition service after registry loading. */
+  getTransitionService(
+    currentManifest?: MapBundleManifestV1 | null,
+  ): EventDayTransitionService {
+    if (!this.eventRegistry || !this.eventRegistryUrl) {
+      throw new Error(
+        "Registry must be loaded before accessing transition service",
+      );
+    }
+    this.transitionService = new EventDayTransitionService(
+      this.repository,
+      this.eventRegistryUrl,
+      this.eventRegistry,
+      { currentManifest },
+    );
+    return this.transitionService;
+  }
+
+  /** Activate a state after a transition service has durably committed it. */
+  activateCommittedState(
+    ref: EventDayRef,
+    state: LocalEventDayState,
+  ): LocalEventDayState {
+    this.activeRef = { eventId: ref.eventId, dayId: ref.dayId };
+    this.activeState = state;
+    this.applyStateToMemory(state);
+    return state;
   }
 
   private createEmptyState(): LocalEventDayState {
@@ -266,12 +327,12 @@ export class DataManager {
     this.requireRegistered(ref);
     const existing = this.repository.load(ref);
     const state = existing || this.createEmptyState();
-    if (!existing) this.repository.save(ref, state);
-    this.activeRef = { eventId: ref.eventId, dayId: ref.dayId };
-    this.activeState = state;
-    this.applyStateToMemory(state);
-    this.repository.setLastOpened(ref);
-    return state;
+    if (!existing) {
+      this.repository.saveWithLastOpened(ref, state);
+    } else {
+      this.repository.setLastOpened(ref);
+    }
+    return this.activateCommittedState(ref, state);
   }
 
   /** Create the first CSV-backed state; existing non-empty states cannot be overwritten. */

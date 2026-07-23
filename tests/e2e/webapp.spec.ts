@@ -263,7 +263,7 @@ test("連続してピンを押した時は最後に選んだ候補だけを表�
 });
 
 test("候補経路を探索できない時は現在経路を維持する", async ({ page }) => {
-  await page.route("**/assets/maps/demo-east/points.json", async (route) => {
+  await page.route("**/assets/maps/**/points.json", async (route) => {
     const response = await route.fetch();
     const payload = await response.json();
     payload.points = payload.points.map((point: Record<string, unknown>) =>
@@ -313,7 +313,7 @@ test("マニフェストの2エリアから現在地候補を切り替える", a
 test("地図マニフェスト取得失敗時はAppを起動せず診断画面を表示する", async ({
   page,
 }) => {
-  await page.route("**/assets/maps/manifest.json", (route) =>
+  await page.route("**/assets/maps/**/manifest.json", (route) =>
     route.fulfill({ status: 503, body: "unavailable" }),
   );
 
@@ -327,7 +327,7 @@ test("地図マニフェスト取得失敗時はAppを起動せず診断画面�
 });
 
 test("地点JSON取得失敗時は推測位置のピンを表示しない", async ({ page }) => {
-  await page.route("**/assets/maps/demo-east/points.json", (route) =>
+  await page.route("**/assets/maps/**/points.json", (route) =>
     route.fulfill({ status: 503, body: "unavailable" }),
   );
 
