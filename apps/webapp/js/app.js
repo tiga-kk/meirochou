@@ -126,6 +126,9 @@ export class App {
 
     this.ui.updateCounts(this.dm);
 
+    // スタートアップ時に非同期でバックグラウンド同期コーディネーターを起動
+    this.dm.startSyncCoordinator();
+
     // データがあれば初期表示
     if (this.dm.wantToBuy.length > 0) {
       this.ui.showToast("データ読み込み済み");
@@ -133,6 +136,11 @@ export class App {
     } else {
       this.ui.showToast("CSVデータ未設定。空のイベント・日程で起動しました");
     }
+  }
+
+  /** Cleanup event listeners and coordinator timers. */
+  dispose() {
+    this.dm.disposeSyncCoordinator();
   }
 
   /** Build the complete render contract shared by the sheet and map. */

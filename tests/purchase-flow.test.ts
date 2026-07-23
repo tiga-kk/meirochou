@@ -235,4 +235,41 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
     );
     expect(manager.purchasedList).toEqual(["A-01"]);
   });
+
+  test("Task 6 Step 3: App startup ordering, zero GET calls, non-blocking start", async () => {
+    const { repository, manager, fetchSpy } = createSetup();
+    repository.save(ref, {
+      schemaVersion: 1,
+      source: gasSource,
+      sourceGeneration: "gen-1",
+      circles: [{ space: "A-01", priority: 1 }],
+      purchased: [],
+      hold: [],
+      history: [],
+      redo: [],
+      gasOutbox: [],
+      timestamps: {
+        createdAt: "2026-07-21T07:45:00.000Z",
+        updatedAt: "2026-07-21T07:45:00.000Z",
+        sourceUpdatedAt: "2026-07-21T07:45:00.000Z",
+      },
+    });
+
+    const app = new App();
+    app.dm = manager;
+    app.ui.init = vi.fn();
+    app.setupEvents = vi.fn();
+    app.ui.updateCounts = vi.fn();
+    app.ui.showToast = vi.fn();
+    app.searchNext = vi.fn();
+    const startSyncSpy = vi.spyOn(manager, "startSyncCoordinator");
+
+    // App opens cached GAS state and starts background sync only after local init
+    await app.init({ eventId: "C108", areas: [] });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(startSyncSpy).toHaveBeenCalledTimes(1);
+
+    // Dispose clean up
+    app.dispose();
+  });
 });

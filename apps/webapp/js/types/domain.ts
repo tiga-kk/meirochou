@@ -288,3 +288,17 @@ export interface PurchaseMutationResult {
   readonly pendingCount: number;
   readonly queuedEntryId: string | null;
 }
+
+/** Aggregate result for one all-event/day outbox processing run. */
+export interface GasSyncSummary {
+  readonly processedRefs: number;
+  readonly sent: number;
+  readonly pending: number;
+  readonly failures: readonly { ref: EventDayRef; category: string }[];
+}
+
+/** Minimal browser event target used to inject online lifecycle events in tests. */
+export interface OnlineEventTarget {
+  addEventListener(type: "online", listener: () => void): void;
+  removeEventListener(type: "online", listener: () => void): void;
+}

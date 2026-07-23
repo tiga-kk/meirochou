@@ -13,6 +13,7 @@ import {
 import { applySourceDiff, diffCircleSources } from "./data/source-diff";
 import { EventDayRepository } from "./state/event-day-repository";
 import { GasOutboxService } from "./state/gas-outbox-service";
+import { GasSyncCoordinator } from "./state/gas-sync-coordinator";
 import { PurchaseMutationService } from "./state/purchase-mutation-service";
 import {
   SourceSettingsService,
@@ -30,6 +31,7 @@ import type {
   GasDataSource,
   GasOutboxResult,
   GasRefreshPreview,
+  GasSyncSummary,
   HistoryEntry,
   LocalEventDayState,
   PurchaseMutationResult,
@@ -67,6 +69,7 @@ export interface DataManagerOptions {
   readonly refreshService?: GasRefreshService;
   readonly outboxService?: GasOutboxService;
   readonly purchaseMutationService?: PurchaseMutationService;
+  readonly syncCoordinator?: GasSyncCoordinator;
 }
 
 interface CsvPreviewRecord extends CsvReplacementPreview {
@@ -122,6 +125,7 @@ export class DataManager {
   readonly refreshService: GasRefreshService;
   readonly outboxService: GasOutboxService;
   readonly purchaseMutationService: PurchaseMutationService;
+  readonly syncCoordinator: GasSyncCoordinator;
   readonly csvPreviews = new Map<string, CsvPreviewRecord>();
 
   wantToBuy: Circle[] = [];
@@ -175,6 +179,10 @@ export class DataManager {
     this.purchaseMutationService =
       options.purchaseMutationService ||
       new PurchaseMutationService(this.repository, this.outboxService);
+
+    this.syncCoordinator =
+      options.syncCoordinator ||
+      new GasSyncCoordinator(this.repository, this.outboxService);
   }
 
   private timestamp(): string {
@@ -780,5 +788,20 @@ export class DataManager {
   /** Cancel a GAS preview without changing persisted state. */
   cancelGasPreview(previewId: string): void {
     this.refreshService.cancelPreview(previewId);
+  }
+
+  /** Start listening for online events and trigger initial background processing. */
+  startSyncCoordinator(): void {
+    this.syncCoordinator.start();
+  }
+
+  /** Process every persisted outbox queue across all event/day states. */
+  retryAllPending(): Promise<GasSyncSummary> {
+    return this.syncCoordinator.processAll();
+  }
+
+  /** Remove the online event listener. */
+  disposeSyncCoordinator(): void {
+    this.syncCoordinator.dispose();
   }
 }
