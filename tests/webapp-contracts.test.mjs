@@ -217,7 +217,12 @@ test("webapp CI runs clean install, full verification, and mobile E2E", () => {
   assert.match(packageJson.scripts["verify:webapp"], /build:webapp/);
   assert.match(packageJson.scripts["verify:webapp"], /verify:webapp:build/);
   assert.match(workflow, /run:\s*npm ci/);
-  assert.match(workflow, /playwright install --with-deps chromium/);
+  assert.match(workflow, /runs-on:\s*ubuntu-24\.04/);
+  assert.match(
+    workflow,
+    /image:\s*mcr\.microsoft\.com\/playwright:v1\.61\.1-noble/,
+  );
+  assert.doesNotMatch(workflow, /playwright install --with-deps chromium/);
   assert.match(workflow, /run:\s*npm run verify:webapp/);
   assert.match(workflow, /run:\s*npm run test:e2e/);
   assert.match(workflow, /if:\s*failure\(\)/);
