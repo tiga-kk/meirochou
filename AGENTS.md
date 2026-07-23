@@ -16,7 +16,7 @@
 
 - Phase 1は完了済み。Phase 2はTask 1–8まで完了し、Task 8は `335f04f` としてコミット済みである。
 - Phase 2のexit gateは完了した。次はPhase 3の承認済みTask計画を確認してから着手し、Phase 3のexit gate完了前にPhase 4を開始しない。
-- Phase 3はTask 1–8の実装・レビューを完了した。Task 8ではキャッシュ済みGAS stateの無通信起動、購入のLocalStorage先行保存、失敗POST後のreload再送、onlineイベントのcoalescingを実ブラウザで検証し、Native fetchのbind漏れも修正した。Task 8の検証（focused/Webapp/GAS/E2E）は完了し、次はTask 9のdocumentation and exit gateである。
+- Phase 3はTask 1–9の実装・レビューを完了した。Task 9では公開README、GAS同期契約、正確な列名・GET/POST形状、ローカルデータ契約を実装に合わせて文書化し、公開ツリー・credential・fresh-install・Webapp/GAS/E2E検証を完了した。Phase 3 exit gateは通過済みであり、次はユーザー承認後のPhase 4である。
 - Phase 3/4は概要計画のTask表から `docs/plans/phase-03/` / `docs/plans/phase-04/` の指定Task文書を開き、1 Taskずつ実装・レビュー・承認する。前Phaseのentry gateを満たしていない場合、次Phaseの開始や完了を宣言しない。
 
 ## 3. Task実行プロトコル

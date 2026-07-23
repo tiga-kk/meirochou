@@ -86,8 +86,31 @@ test("GAS circle responses include the spreadsheet title and source sheet name",
   assert.doesNotMatch(source, /imageUrl/);
 });
 
-test("public README stays empty until publication documentation is approved", () => {
-  assert.equal(read("README.md"), "");
+test("documentation describes Phase 3 GAS sync contract accurately without claiming Phase 4 UI exists", () => {
+  const publicReadme = read("README.md");
+  const gasSyncContract = read("docs/gas-sync-contract.md");
+  const gasReadme = read("integrations/gas-spreadsheet/README.md");
+
+  const docsCombined = [publicReadme, gasSyncContract, gasReadme].join("\n");
+
+  assert.match(docsCombined, /explicit refresh/);
+  assert.match(docsCombined, /LocalStorage/);
+  assert.match(docsCombined, /gasOutbox/);
+  assert.match(docsCombined, /sourceGeneration/);
+  assert.match(docsCombined, /sheetName/);
+  assert.match(docsCombined, /npm run build:gas/);
+
+  assert.match(gasReadme, /`space`/);
+  assert.match(gasReadme, /`priority`/);
+  assert.match(gasReadme, /`isSale`/);
+  assert.match(gasReadme, /`account`/);
+  assert.match(gasReadme, /`tweet`/);
+  assert.match(gasReadme, /`memo`/);
+  assert.match(gasReadme, /\?sheets=/);
+  assert.doesNotMatch(gasReadme, /配置|優先度|Xアカウント/);
+
+  assert.doesNotMatch(docsCombined, /\/macros\/s\/[A-Za-z0-9_-]+\/exec/);
+  assert.doesNotMatch(docsCombined, /Phase 4 management UI is available/i);
 });
 
 test("Apps Script source exists only under integrations", () => {
