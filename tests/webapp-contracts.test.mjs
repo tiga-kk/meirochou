@@ -128,18 +128,18 @@ test("Phase 2 keeps GAS transport outside DataManager", () => {
   assert.match(gasClientSource, /async sendSaleUpdate/);
 });
 
-test("Phase 2 DataManager storage is separate from the sync queue", () => {
+test("Phase 2/3 DataManager storage is separate from the sync outbox", () => {
   const dataManagerSource = read("apps/webapp/js/data-manager.ts");
   const storageSource = read("apps/webapp/js/state/storage-service.ts");
-  const queueSource = read("apps/webapp/js/state/sync-queue.ts");
+  const outboxSource = read("apps/webapp/js/state/gas-outbox-service.ts");
 
   assert.match(dataManagerSource, /new StorageService\(/);
   assert.doesNotMatch(dataManagerSource, /SyncQueue/);
   assert.doesNotMatch(dataManagerSource, /localStorage\./);
   assert.match(storageSource, /localStorage/);
   assert.match(storageSource, /getStorage/);
-  assert.match(queueSource, /enqueue/);
-  assert.match(queueSource, /process/);
+  assert.match(outboxSource, /append/);
+  assert.match(outboxSource, /process/);
 });
 
 test("webapp storage falls back when localStorage is unavailable", () => {

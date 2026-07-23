@@ -239,3 +239,14 @@ export interface SourceDiff {
   readonly removed: readonly CircleRecord[];
   readonly unchanged: readonly CircleRecord[];
 }
+
+export interface GasOutboxResult {
+  readonly sent: number;
+  readonly pending: number;
+  readonly error: Error | null;
+}
+
+export interface AppendedOutboxState {
+  readonly state: LocalEventDayState;
+  readonly entry: GasOutboxEntry;
+}

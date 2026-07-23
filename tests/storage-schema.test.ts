@@ -368,5 +368,13 @@ describe("Storage Schema Version 1", () => {
     expect(() => parseLocalEventDayState(mismatchedGeneration)).toThrow(
       StorageSchemaError,
     );
+
+    const duplicateIds = {
+      ...validOutbox,
+      gasOutbox: [validOutboxEntry, { ...validOutboxEntry, space: "A-02" }],
+    };
+    expect(() => parseLocalEventDayState(duplicateIds)).toThrow(
+      StorageSchemaError,
+    );
   });
 });
