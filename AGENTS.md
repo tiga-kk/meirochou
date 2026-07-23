@@ -16,7 +16,7 @@
 
 - Phase 1は完了済み。Phase 2はTask 1–8まで完了し、Task 8は `335f04f` としてコミット済みである。
 - Phase 2のexit gateは完了した。次はPhase 3の承認済みTask計画を確認してから着手し、Phase 3のexit gate完了前にPhase 4を開始しない。
-- Phase 3はTask 1–4の実装・レビューを完了した。Task 4では明示GAS GETのmemory-only preview、source snapshot、初回import／source replacement／refreshのguarded applyを実装し、Task 5の開始前に本Taskのコミットと検証結果を確認する。
+- Phase 3はTask 1–5の実装・レビューを完了した。Task 5では購入・取消・Undo/Redo/ResetをLocalStorage先行で確定し、GAS sourceだけdesired stateを同一repository save内でoutboxへ追加、保存後に非同期送信する。Task 5の検証（focused/Webapp/GAS/E2E）は完了し、次はTask 6のretry lifecycleである。
 - Phase 3/4は概要計画のTask表から `docs/plans/phase-03/` / `docs/plans/phase-04/` の指定Task文書を開き、1 Taskずつ実装・レビュー・承認する。前Phaseのentry gateを満たしていない場合、次Phaseの開始や完了を宣言しない。
 
 ## 3. Task実行プロトコル

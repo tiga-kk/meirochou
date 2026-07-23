@@ -12,6 +12,8 @@ import {
 } from "./data/local-state-adapters";
 import { applySourceDiff, diffCircleSources } from "./data/source-diff";
 import { EventDayRepository } from "./state/event-day-repository";
+import { GasOutboxService } from "./state/gas-outbox-service";
+import { PurchaseMutationService } from "./state/purchase-mutation-service";
 import {
   SourceSettingsService,
   StaleSourceStateError,
@@ -26,9 +28,11 @@ import type {
   EventDayRef,
   EventRegistryV1,
   GasDataSource,
+  GasOutboxResult,
   GasRefreshPreview,
   HistoryEntry,
   LocalEventDayState,
+  PurchaseMutationResult,
   SourceDiff,
 } from "./types/domain";
 
@@ -61,6 +65,8 @@ export interface DataManagerOptions {
   readonly repository?: EventDayRepository;
   readonly sourceSettings?: SourceSettingsService;
   readonly refreshService?: GasRefreshService;
+  readonly outboxService?: GasOutboxService;
+  readonly purchaseMutationService?: PurchaseMutationService;
 }
 
 interface CsvPreviewRecord extends CsvReplacementPreview {
@@ -114,6 +120,8 @@ export class DataManager {
   readonly sourceSettings: SourceSettingsService;
   readonly client: GasApiClient;
   readonly refreshService: GasRefreshService;
+  readonly outboxService: GasOutboxService;
+  readonly purchaseMutationService: PurchaseMutationService;
   readonly csvPreviews = new Map<string, CsvPreviewRecord>();
 
   wantToBuy: Circle[] = [];
@@ -159,6 +167,14 @@ export class DataManager {
         createPreviewId: this.createPreviewId,
         previewTtlMs: this.previewTtlMs,
       });
+
+    this.outboxService =
+      options.outboxService ||
+      new GasOutboxService(this.repository, this.client);
+
+    this.purchaseMutationService =
+      options.purchaseMutationService ||
+      new PurchaseMutationService(this.repository, this.outboxService);
   }
 
   private timestamp(): string {
@@ -551,6 +567,19 @@ export class DataManager {
     return this.persistState(update(this.activeState, this.timestamp()));
   }
 
+  setPurchased(space: string, purchased: boolean): PurchaseMutationResult {
+    if (!this.activeRef) throw new Error("No event/day is open");
+    const result = this.purchaseMutationService.setPurchased(
+      this.activeRef,
+      space,
+      purchased,
+      this.timestamp(),
+    );
+    this.activeState = result.state;
+    this.applyStateToMemory(result.state);
+    return result;
+  }
+
   /** Store a local purchase without contacting GAS. */
   addPurchased(space: string, _sheetName = ""): void {
     if (!this.activeState || !this.activeRef) {
@@ -561,14 +590,7 @@ export class DataManager {
       }
       return;
     }
-    if (this.activeState.purchased.includes(space)) return;
-    this.updateActiveState((state, now) => ({
-      ...state,
-      purchased: [...state.purchased, space],
-      history: [...state.history, { type: "purchase", space, timestamp: now }],
-      redo: [],
-      timestamps: { ...state.timestamps, updatedAt: now },
-    }));
+    this.setPurchased(space, true);
   }
 
   /** Store a local hold without contacting GAS. */
@@ -605,24 +627,20 @@ export class DataManager {
         this.holdList = this.holdList.filter((space) => space !== last.space);
       return last;
     }
-    const last = this.activeState.history.at(-1);
-    if (!last || (last.type !== "purchase" && last.type !== "hold"))
-      return null;
-    this.updateActiveState((state, now) => ({
-      ...state,
-      purchased:
-        last.type === "purchase"
-          ? state.purchased.filter((space) => space !== last.space)
-          : [...state.purchased],
-      hold:
-        last.type === "hold"
-          ? state.hold.filter((space) => space !== last.space)
-          : [...state.hold],
-      history: state.history.slice(0, -1),
-      redo: [...state.redo, last],
-      timestamps: { ...state.timestamps, updatedAt: now },
-    }));
-    return { type: last.type, space: last.space };
+    const result = this.purchaseMutationService.undo(
+      this.activeRef,
+      this.timestamp(),
+    );
+    if (!result) return null;
+    const popped = result.state.redo.at(-1);
+    this.activeState = result.state;
+    this.applyStateToMemory(result.state);
+    if (!popped) return null;
+    const legacyType: ActionType =
+      popped.type === "purchase" || popped.type === "unpurchase"
+        ? "purchase"
+        : "hold";
+    return { type: legacyType, space: popped.space };
   }
 
   /** Redo one local purchase/hold while preserving its original history timestamp. */
@@ -637,24 +655,20 @@ export class DataManager {
         this.holdList.push(last.space);
       return last;
     }
-    const last = this.activeState.redo.at(-1);
-    if (!last || (last.type !== "purchase" && last.type !== "hold"))
-      return null;
-    this.updateActiveState((state, now) => ({
-      ...state,
-      purchased:
-        last.type === "purchase" && !state.purchased.includes(last.space)
-          ? [...state.purchased, last.space]
-          : [...state.purchased],
-      hold:
-        last.type === "hold" && !state.hold.includes(last.space)
-          ? [...state.hold, last.space]
-          : [...state.hold],
-      history: [...state.history, last],
-      redo: state.redo.slice(0, -1),
-      timestamps: { ...state.timestamps, updatedAt: now },
-    }));
-    return { type: last.type, space: last.space };
+    const result = this.purchaseMutationService.redo(
+      this.activeRef,
+      this.timestamp(),
+    );
+    if (!result) return null;
+    const pushed = result.state.history.at(-1);
+    this.activeState = result.state;
+    this.applyStateToMemory(result.state);
+    if (!pushed) return null;
+    const legacyType: ActionType =
+      pushed.type === "purchase" || pushed.type === "unpurchase"
+        ? "purchase"
+        : "hold";
+    return { type: legacyType, space: pushed.space };
   }
 
   /** Clear local purchase and hold state while retaining the source snapshot. */
@@ -667,15 +681,20 @@ export class DataManager {
       this.redoStack = [];
       return backup;
     }
-    this.updateActiveState((state, now) => ({
-      ...state,
-      purchased: [],
-      hold: [],
-      history: [],
-      redo: [],
-      timestamps: { ...state.timestamps, updatedAt: now },
-    }));
+    const result = this.purchaseMutationService.resetActivity(
+      this.activeRef,
+      this.timestamp(),
+    );
+    this.activeState = result.state;
+    this.applyStateToMemory(result.state);
     return backup;
+  }
+
+  flushActiveOutbox(): Promise<GasOutboxResult> {
+    if (!this.activeRef) {
+      return Promise.resolve({ sent: 0, pending: 0, error: null });
+    }
+    return this.outboxService.process(this.activeRef);
   }
 
   /** Clear only local holds and their history entries. */

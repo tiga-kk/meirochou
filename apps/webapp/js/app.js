@@ -524,12 +524,21 @@ export class App {
 
     const space = actionTarget.space;
     const sheetName = actionTarget.sheetName || "";
-    if (type === "purchase") {
-      this.dm.addPurchased(space, sheetName);
-      this.ui.showToast(`${space} 購入！`);
-    } else {
-      this.dm.addHold(space, sheetName);
-      this.ui.showToast(`${space} 保留`);
+    try {
+      if (type === "purchase") {
+        this.dm.addPurchased(space, sheetName);
+        this.ui.showToast(`${space} 購入！`);
+      } else {
+        this.dm.addHold(space, sheetName);
+        this.ui.showToast(`${space} 保留`);
+      }
+    } catch (error) {
+      this.reportLocalMutationFailure(error);
+      return;
+    }
+
+    if (this.dm.activeState?.source.type === "gas") {
+      this.flushOutboxWithDiagnostic();
     }
 
     this.ui.updateCounts(this.dm);
@@ -541,8 +550,17 @@ export class App {
    * 取り消し処理
    */
   async handleUndo() {
-    const action = this.dm.undoLastAction();
+    let action;
+    try {
+      action = this.dm.undoLastAction();
+    } catch (error) {
+      this.reportLocalMutationFailure(error);
+      return;
+    }
     if (action) {
+      if (this.dm.activeState?.source.type === "gas") {
+        this.flushOutboxWithDiagnostic();
+      }
       this.ui.showToast(`${action.space} の操作を取り消しました`);
       this.ui.updateCounts(this.dm);
       this.ui.updateCurrentLocation(action.space); // 現在地を元に戻す
@@ -556,8 +574,17 @@ export class App {
    * やり直し処理 (Redo)
    */
   async handleRedo() {
-    const action = this.dm.redoAction();
+    let action;
+    try {
+      action = this.dm.redoAction();
+    } catch (error) {
+      this.reportLocalMutationFailure(error);
+      return;
+    }
     if (action) {
+      if (this.dm.activeState?.source.type === "gas") {
+        this.flushOutboxWithDiagnostic();
+      }
       this.ui.showToast(`${action.space} の操作をやり直しました`);
       this.ui.updateCounts(this.dm);
       this.ui.updateCurrentLocation(action.space); // 現在地を更新
@@ -572,12 +599,48 @@ export class App {
    */
   handleReset() {
     if (confirm("本当にリセットしますか？")) {
-      this.dm.resetAll();
+      try {
+        this.dm.resetAll();
+      } catch (error) {
+        this.reportLocalMutationFailure(error);
+        return;
+      }
+      if (this.dm.activeState?.source.type === "gas") {
+        this.flushOutboxWithDiagnostic();
+      }
       this.ui.updateCounts(this.dm);
       this.ui.showTarget(null); // 表示クリア
       this.ui.els.targetSection.classList.add("hidden");
       this.ui.els.targetEmpty.classList.remove("hidden");
       this.ui.showToast("リセットしました");
+    }
+  }
+
+  /** Show a recoverable diagnostic when the local mutation could not be saved. */
+  reportLocalMutationFailure(error) {
+    console.error("Failed to save local purchase state:", error);
+    this.ui.showToast(
+      "端末への保存に失敗しました。操作は反映されていません。",
+      "error",
+    );
+  }
+
+  /** Process GAS after local success and report failures without rolling back. */
+  async flushOutboxWithDiagnostic() {
+    try {
+      const result = await this.dm.flushActiveOutbox();
+      if (result.error) {
+        this.ui.showToast(
+          "GAS同期に失敗しました。未送信データは端末に保持されています。",
+          "warning",
+        );
+      }
+    } catch (error) {
+      console.error("Failed to process GAS outbox:", error);
+      this.ui.showToast(
+        "GAS同期に失敗しました。未送信データは端末に保持されています。",
+        "warning",
+      );
     }
   }
 

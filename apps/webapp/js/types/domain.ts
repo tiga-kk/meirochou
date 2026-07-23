@@ -281,3 +281,10 @@ export interface GasRefreshPreview {
   readonly fetchedAt: string;
   readonly expiresAt: string;
 }
+
+/** Result of a local activity mutation and its optional GAS outbox append. */
+export interface PurchaseMutationResult {
+  readonly state: LocalEventDayState;
+  readonly pendingCount: number;
+  readonly queuedEntryId: string | null;
+}
