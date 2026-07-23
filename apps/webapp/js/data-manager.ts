@@ -10,6 +10,10 @@ import {
 } from "./data/local-state-adapters";
 import { applySourceDiff, diffCircleSources } from "./data/source-diff";
 import { EventDayRepository } from "./state/event-day-repository";
+import {
+  SourceSettingsService,
+  StaleSourceStateError,
+} from "./state/source-settings-service";
 import { createEmptyEventDayState } from "./state/storage-schema";
 import { StorageService } from "./state/storage-service.js";
 import type {
@@ -99,6 +103,7 @@ function sameRef(left: EventDayRef | null, right: EventDayRef): boolean {
 export class DataManager {
   readonly storage: StorageService;
   readonly repository: EventDayRepository;
+  readonly sourceSettings: SourceSettingsService;
   readonly csvPreviews = new Map<string, CsvPreviewRecord>();
 
   wantToBuy: Circle[] = [];
@@ -120,6 +125,7 @@ export class DataManager {
   constructor(storage?: StorageService, options: DataManagerOptions = {}) {
     this.storage = storage || new StorageService();
     this.repository = new EventDayRepository(this.storage);
+    this.sourceSettings = new SourceSettingsService(this.repository);
 
     let generationSequence = 0;
     let previewSequence = 0;
@@ -135,6 +141,17 @@ export class DataManager {
 
   private timestamp(): string {
     return this.now().toISOString();
+  }
+
+  private sourceApplyTimestamp(current: LocalEventDayState): string {
+    const candidate = this.timestamp();
+    const currentTimestamp = Math.max(
+      Date.parse(current.timestamps.updatedAt),
+      Date.parse(current.timestamps.sourceUpdatedAt),
+    );
+    const candidateTimestamp = Date.parse(candidate);
+    if (candidateTimestamp > currentTimestamp) return candidate;
+    return new Date(currentTimestamp + 1).toISOString();
   }
 
   private requireRegistered(ref: EventDayRef): void {
@@ -319,24 +336,38 @@ export class DataManager {
     }
 
     const current = this.repository.load(preview.ref);
-    if (
-      !current ||
-      current.sourceGeneration !== preview.expectedSourceGeneration
-    ) {
-      throw new StaleCsvPreviewError("CSV preview source generation is stale");
-    }
-    if (current.source.type !== "csv") {
-      throw new StaleCsvPreviewError("CSV replacement requires a CSV source");
+    if (!current) {
+      throw new StaleCsvPreviewError("CSV preview source state is missing");
     }
 
-    const now = this.timestamp();
+    const now = this.sourceApplyTimestamp(current);
     const merged = applySourceDiff(current, preview.circles, now);
-    const nextState: LocalEventDayState = {
+    const operation =
+      current.source.type === "gas" ? "source-type-change" : "csv-replacement";
+
+    const nextStateDraft: LocalEventDayState = {
       ...merged,
       source: { type: "csv", fileName: preview.fileName },
       sourceGeneration: this.createSourceGeneration(),
     };
-    this.repository.save(preview.ref, nextState);
+
+    let nextState: LocalEventDayState;
+    try {
+      nextState = this.sourceSettings.saveGuarded({
+        ref: preview.ref,
+        operation,
+        expectedSourceGeneration: preview.expectedSourceGeneration,
+        nextState: nextStateDraft,
+      });
+    } catch (err: unknown) {
+      if (err instanceof StaleSourceStateError) {
+        throw new StaleCsvPreviewError(
+          "CSV preview source generation is stale",
+        );
+      }
+      throw err;
+    }
+
     this.csvPreviews.delete(previewId);
     if (sameRef(this.activeRef, preview.ref)) {
       this.activeState = nextState;

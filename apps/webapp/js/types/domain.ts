@@ -250,3 +250,14 @@ export interface AppendedOutboxState {
   readonly state: LocalEventDayState;
   readonly entry: GasOutboxEntry;
 }
+
+export type ProtectedSourceOperation =
+  | "csv-replacement"
+  | "gas-initial-import"
+  | "gas-refresh-apply"
+  | "gas-url-change"
+  | "sheet-name-change"
+  | "source-type-change"
+  | "circles-delete"
+  | "activity-delete"
+  | "event-day-delete";
