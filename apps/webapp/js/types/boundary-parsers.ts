@@ -14,9 +14,11 @@ import type {
 } from "./domain";
 
 export class BoundaryValidationError extends Error {
+  readonly path: string;
   constructor(path: string, expectation: string) {
     super(`${path}: expected ${expectation}`);
     this.name = "BoundaryValidationError";
+    this.path = path;
   }
 }
 
@@ -264,16 +266,24 @@ function nonNegativeNumber(value: unknown, path: string): number {
   return value;
 }
 
+function gasSuccessEnvelope(
+  input: unknown,
+  path: string,
+): Record<string, unknown> {
+  const value = record(input, path);
+  if (value.ok !== true) {
+    throw new BoundaryValidationError(`${path}.ok`, "the boolean true");
+  }
+  if (value.status !== "success") {
+    throw new BoundaryValidationError(`${path}.status`, 'the string "success"');
+  }
+  return value;
+}
+
 export function parseGasSheetListResponse(
   input: unknown,
 ): GasSheetListResponse {
-  const value = record(input, "GAS sheet-list response");
-  if (value.ok === false || value.status === "error") {
-    throw new BoundaryValidationError(
-      "GAS sheet-list response",
-      "successful response without error status",
-    );
-  }
+  const value = gasSuccessEnvelope(input, "GAS sheet-list response");
   if (!Array.isArray(value.sheets)) {
     throw new BoundaryValidationError(
       "GAS sheet-list response.sheets",
@@ -292,10 +302,9 @@ export function parseGasSheetListResponse(
   });
   return {
     sheets,
-    spreadsheetTitle: text(
+    spreadsheetTitle: nonEmptyText(
       value.spreadsheetTitle,
       "GAS sheet-list response.spreadsheetTitle",
-      "",
     ),
   };
 }
@@ -343,13 +352,7 @@ function parseCircle(input: unknown, path: string): Circle {
 }
 
 export function parseGasCircleResponse(input: unknown): GasCircleResponse {
-  const value = record(input, "GAS circle response");
-  if (value.ok === false || value.status === "error") {
-    throw new BoundaryValidationError(
-      "GAS circle response",
-      "successful response without error status",
-    );
-  }
+  const value = gasSuccessEnvelope(input, "GAS circle response");
   if (!Array.isArray(value.wantToBuy)) {
     throw new BoundaryValidationError(
       "GAS circle response.wantToBuy",
@@ -373,12 +376,16 @@ export function parseGasCircleResponse(input: unknown): GasCircleResponse {
   });
   return {
     wantToBuy,
-    spreadsheetTitle: text(
+    spreadsheetTitle: nonEmptyText(
       value.spreadsheetTitle,
       "GAS circle response.spreadsheetTitle",
-      "",
     ),
   };
+}
+
+/** Validate the success envelope returned by a GAS sale update. */
+export function parseGasSaleResponse(input: unknown): void {
+  gasSuccessEnvelope(input, "GAS sale response");
 }
 
 function parsePortal(input: unknown, path: string): OcrPortal {

@@ -1,6 +1,7 @@
 import {
   BoundaryValidationError,
   parseGasCircleResponse,
+  parseGasSaleResponse,
   parseGasSheetListResponse,
 } from "../types/boundary-parsers";
 import type {
@@ -91,9 +92,11 @@ export class GasApiClient {
 
     const controller = new AbortController();
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
 
     if (this.timeoutMs > 0) {
       timeoutId = setTimeout(() => {
+        timedOut = true;
         controller.abort(new Error("Timeout"));
       }, this.timeoutMs);
     }
@@ -110,25 +113,101 @@ export class GasApiClient {
       }
     }
 
-    let response: Response;
     try {
-      response = await this.fetcher(targetUrl, {
-        ...init,
-        signal: controller.signal,
-      });
-    } catch (err: unknown) {
-      if (callerSignal?.aborted) {
-        throw new GasTransportError("Request aborted by caller", {
-          retryable: false,
+      let response: Response;
+      try {
+        response = await this.fetcher(targetUrl, {
+          ...init,
+          signal: controller.signal,
+        });
+      } catch (err: unknown) {
+        if (timedOut) {
+          throw new GasTransportError("Request timed out", {
+            retryable: true,
+            status: null,
+            cause: err,
+          });
+        }
+        if (callerSignal?.aborted) {
+          throw new GasTransportError("Request aborted by caller", {
+            retryable: false,
+            status: null,
+            cause: err,
+          });
+        }
+        throw new GasTransportError("Network error or request failure", {
+          retryable: true,
           status: null,
           cause: err,
         });
       }
-      throw new GasTransportError("Network error or request timeout", {
-        retryable: true,
-        status: null,
-        cause: err,
-      });
+
+      if (timedOut) {
+        throw new GasTransportError("Request timed out", {
+          retryable: true,
+          status: null,
+        });
+      }
+      if (callerSignal?.aborted) {
+        throw new GasTransportError("Request aborted by caller", {
+          retryable: false,
+          status: null,
+        });
+      }
+
+      if (!response.ok) {
+        const status = response.status;
+        const retryable =
+          status === 408 || status === 425 || status === 429 || status >= 500;
+        throw new GasTransportError(`HTTP error status ${status}`, {
+          retryable,
+          status,
+        });
+      }
+
+      let rawJson: unknown;
+      try {
+        rawJson = await response.json();
+      } catch (err: unknown) {
+        if (timedOut) {
+          throw new GasTransportError("Request timed out", {
+            retryable: true,
+            status: null,
+            cause: err,
+          });
+        }
+        if (callerSignal?.aborted) {
+          throw new GasTransportError("Request aborted by caller", {
+            retryable: false,
+            status: null,
+            cause: err,
+          });
+        }
+        throw new GasResponseError("Failed to parse response JSON", null);
+      }
+
+      if (
+        rawJson &&
+        typeof rawJson === "object" &&
+        !Array.isArray(rawJson) &&
+        (("ok" in rawJson && (rawJson as { ok: unknown }).ok === false) ||
+          ("status" in rawJson &&
+            (rawJson as { status: unknown }).status === "error"))
+      ) {
+        throw new GasResponseError("GAS returned error status", null);
+      }
+
+      try {
+        return parser(rawJson);
+      } catch (err: unknown) {
+        if (err instanceof BoundaryValidationError) {
+          throw new GasResponseError(err.message, err.path);
+        }
+        if (err instanceof GasResponseError) {
+          throw err;
+        }
+        throw new GasResponseError("Malformed response payload", null);
+      }
     } finally {
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId);
@@ -136,49 +215,6 @@ export class GasApiClient {
       if (callerSignal) {
         callerSignal.removeEventListener("abort", onCallerAbort);
       }
-    }
-
-    if (!response.ok) {
-      const status = response.status;
-      const retryable =
-        status === 408 || status === 425 || status === 429 || status >= 500;
-      throw new GasTransportError(`HTTP error status ${status}`, {
-        retryable,
-        status,
-      });
-    }
-
-    let rawJson: unknown;
-    try {
-      rawJson = await response.json();
-    } catch (_err: unknown) {
-      throw new GasResponseError("Failed to parse response JSON", null);
-    }
-
-    if (
-      rawJson &&
-      typeof rawJson === "object" &&
-      !Array.isArray(rawJson) &&
-      (("ok" in rawJson && (rawJson as { ok: unknown }).ok === false) ||
-        ("status" in rawJson &&
-          (rawJson as { status: unknown }).status === "error"))
-    ) {
-      throw new GasResponseError("GAS returned error status", null);
-    }
-
-    try {
-      return parser(rawJson);
-    } catch (err: unknown) {
-      if (err instanceof BoundaryValidationError) {
-        throw new GasResponseError(
-          err.message,
-          err.message.split(":")[0] ?? null,
-        );
-      }
-      if (err instanceof GasResponseError) {
-        throw err;
-      }
-      throw new GasResponseError("Malformed response payload", null);
     }
   }
 
@@ -245,15 +281,7 @@ export class GasApiClient {
           undo: payload.undo,
         }),
       },
-      (data) => {
-        if (data && typeof data === "object") {
-          const res = data as { ok?: boolean; status?: string };
-          if (res.ok === true || res.status === "success") {
-            return;
-          }
-        }
-        throw new GasResponseError("GAS sale update rejected", null);
-      },
+      parseGasSaleResponse,
       signal,
     );
   }

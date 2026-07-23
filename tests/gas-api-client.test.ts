@@ -266,3 +266,136 @@ describe("GasApiClient strict success parser", () => {
     );
   });
 });
+
+describe("GasApiClient abort and timeout", () => {
+  const baseUrl =
+    "https://script.google.com/macros/s/AKfycbx_example-id_123/exec";
+
+  it("classifies caller abort as non-retryable GasTransportError", async () => {
+    const controller = new AbortController();
+    const fetcher = vi.fn<typeof fetch>().mockImplementation((_url, init) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("Aborted", "AbortError"));
+        });
+      });
+    });
+
+    const client = new GasApiClient({ fetcher });
+    const promise = client.fetchSheetList(baseUrl, controller.signal);
+    controller.abort();
+
+    await expect(promise).rejects.toSatisfy((err: unknown) => {
+      return (
+        err instanceof GasTransportError &&
+        err.retryable === false &&
+        err.status === null
+      );
+    });
+  });
+
+  it("classifies client timeout as retryable GasTransportError", async () => {
+    vi.useFakeTimers();
+    const fetcher = vi.fn<typeof fetch>().mockImplementation((_url, init) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("Timeout", "AbortError"));
+        });
+      });
+    });
+
+    const client = new GasApiClient({ fetcher, timeoutMs: 1000 });
+    const promise = client.fetchSheetList(baseUrl);
+
+    vi.advanceTimersByTime(1001);
+
+    await expect(promise).rejects.toSatisfy((err: unknown) => {
+      return (
+        err instanceof GasTransportError &&
+        err.retryable === true &&
+        err.status === null
+      );
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("classifies sendSaleUpdate failure as GasResponseError", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: false,
+          status: "error",
+          message: "Write failed",
+        }),
+      ),
+    );
+    const client = new GasApiClient({ fetcher });
+
+    await expect(
+      client.sendSaleUpdate(baseUrl, {
+        action: "sale",
+        sheetName: "1日目",
+        space: "東A01a",
+        undo: false,
+      }),
+    ).rejects.toBeInstanceOf(GasResponseError);
+  });
+
+  it("rejects a POST response with only one success marker", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(JSON.stringify({ ok: true })));
+    const client = new GasApiClient({ fetcher });
+
+    await expect(
+      client.sendSaleUpdate(baseUrl, {
+        action: "sale",
+        sheetName: "1日目",
+        space: "東A01a",
+        undo: false,
+      }),
+    ).rejects.toBeInstanceOf(GasResponseError);
+  });
+
+  it("times out while reading a response body", async () => {
+    vi.useFakeTimers();
+    const fetcher = vi.fn<typeof fetch>().mockImplementation((_url, init) => {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          new Promise<unknown>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              reject(new DOMException("Timeout", "AbortError"));
+            });
+          }),
+      } as Response);
+    });
+
+    const client = new GasApiClient({ fetcher, timeoutMs: 1000 });
+    const request = client.fetchSheetList(baseUrl);
+    const outcome = Promise.race([
+      request.then(
+        () => "resolved" as const,
+        (error: unknown) => error,
+      ),
+      new Promise<"hung">((resolve) => {
+        setTimeout(() => resolve("hung"), 1100);
+      }),
+    ]);
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(1100);
+    const result = await outcome;
+
+    expect(result).toSatisfy((value: unknown) => {
+      return (
+        value instanceof GasTransportError &&
+        value.retryable === true &&
+        value.status === null
+      );
+    });
+    vi.useRealTimers();
+  });
+});
