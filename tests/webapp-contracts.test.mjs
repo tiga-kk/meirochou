@@ -58,7 +58,7 @@ test("Phase 2 keeps GAS sale actions outside the local data service", () => {
   const source = read("apps/webapp/js/data-manager.ts");
   const gasSource = read("integrations/gas-spreadsheet/src/web-api.js");
 
-  assert.doesNotMatch(source, /GasApiClient|SyncQueue/);
+  assert.doesNotMatch(source, /SyncQueue/);
   assert.doesNotMatch(source, /action:\s*["']sale["']/);
   assert.match(source, /sheetName/);
   assert.match(gasSource, /requestData\.sheetName/);
@@ -113,11 +113,10 @@ test("shared webapp and GAS names use lower camel case", () => {
   assert.doesNotMatch(sources, /\bval2\b/);
 });
 
-test("Phase 2 keeps GAS transport outside DataManager", () => {
+test("Phase 3 keeps fetch inside GasApiClient and out of DataManager", () => {
   const dataManagerSource = read("apps/webapp/js/data-manager.ts");
   const gasClientSource = read("apps/webapp/js/api/gas-api-client.ts");
 
-  assert.doesNotMatch(dataManagerSource, /GasApiClient/);
   assert.doesNotMatch(dataManagerSource, /\bfetch\(/);
   assert.match(gasClientSource, /async fetchSheetList/);
   assert.match(gasClientSource, /async fetchCircles/);

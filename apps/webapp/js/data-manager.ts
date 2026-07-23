@@ -1,6 +1,8 @@
+import { GasApiClient } from "./api/gas-api-client";
 import { Config } from "./config.js";
 import { parseCircleCsv, serializeCircleCsv } from "./data/csv-circle-codec";
 import { loadEventRegistry } from "./data/event-registry";
+import { GasRefreshService } from "./data/gas-refresh-service";
 import {
   circleRecordToCircle,
   decodeLegacyCircles,
@@ -23,6 +25,8 @@ import type {
   CircleRecord,
   EventDayRef,
   EventRegistryV1,
+  GasDataSource,
+  GasRefreshPreview,
   HistoryEntry,
   LocalEventDayState,
   SourceDiff,
@@ -53,6 +57,10 @@ export interface DataManagerOptions {
   readonly createSourceGeneration?: () => string;
   readonly createPreviewId?: () => string;
   readonly previewTtlMs?: number;
+  readonly client?: GasApiClient;
+  readonly repository?: EventDayRepository;
+  readonly sourceSettings?: SourceSettingsService;
+  readonly refreshService?: GasRefreshService;
 }
 
 interface CsvPreviewRecord extends CsvReplacementPreview {
@@ -104,6 +112,8 @@ export class DataManager {
   readonly storage: StorageService;
   readonly repository: EventDayRepository;
   readonly sourceSettings: SourceSettingsService;
+  readonly client: GasApiClient;
+  readonly refreshService: GasRefreshService;
   readonly csvPreviews = new Map<string, CsvPreviewRecord>();
 
   wantToBuy: Circle[] = [];
@@ -124,8 +134,11 @@ export class DataManager {
 
   constructor(storage?: StorageService, options: DataManagerOptions = {}) {
     this.storage = storage || new StorageService();
-    this.repository = new EventDayRepository(this.storage);
-    this.sourceSettings = new SourceSettingsService(this.repository);
+    this.repository =
+      options.repository || new EventDayRepository(this.storage);
+    this.sourceSettings =
+      options.sourceSettings || new SourceSettingsService(this.repository);
+    this.client = options.client || new GasApiClient();
 
     let generationSequence = 0;
     let previewSequence = 0;
@@ -137,6 +150,15 @@ export class DataManager {
       options.createPreviewId ||
       (() => `csv-preview-${Date.now()}-${previewSequence++}`);
     this.previewTtlMs = options.previewTtlMs ?? 5 * 60 * 1000;
+
+    this.refreshService =
+      options.refreshService ||
+      new GasRefreshService(this.repository, this.client, this.sourceSettings, {
+        now: this.now,
+        createSourceGeneration: this.createSourceGeneration,
+        createPreviewId: this.createPreviewId,
+        previewTtlMs: this.previewTtlMs,
+      });
   }
 
   private timestamp(): string {
@@ -694,5 +716,50 @@ export class DataManager {
         !this.purchasedList.includes(circle.space) &&
         !this.holdList.includes(circle.space),
     );
+  }
+
+  /** Create an explicit preview for the first GAS import into an empty day. */
+  async previewInitialGasImport(
+    ref: EventDayRef,
+    source: GasDataSource,
+  ): Promise<GasRefreshPreview> {
+    await this.ensureRegistry();
+    this.requireRegistered(ref);
+    return this.refreshService.previewInitialImport(ref, source);
+  }
+
+  /** Create an explicit preview for replacing the configured GAS source. */
+  async previewGasSourceReplacement(
+    ref: EventDayRef,
+    source: GasDataSource,
+  ): Promise<GasRefreshPreview> {
+    await this.ensureRegistry();
+    this.requireRegistered(ref);
+    return this.refreshService.previewReplacement(ref, source);
+  }
+
+  /** Create an explicit preview for refreshing the configured GAS source. */
+  async previewGasRefresh(ref: EventDayRef): Promise<GasRefreshPreview> {
+    await this.ensureRegistry();
+    this.requireRegistered(ref);
+    return this.refreshService.previewRefresh(ref);
+  }
+
+  /** Apply a GAS preview and refresh in-memory state when its ref is active. */
+  applyGasPreview(previewId: string): LocalEventDayState {
+    const applied = this.refreshService.applyPreview(previewId);
+    if (this.activeRef) {
+      const currentActive = this.repository.load(this.activeRef);
+      if (currentActive) {
+        this.activeState = currentActive;
+        this.applyStateToMemory(currentActive);
+      }
+    }
+    return applied;
+  }
+
+  /** Cancel a GAS preview without changing persisted state. */
+  cancelGasPreview(previewId: string): void {
+    this.refreshService.cancelPreview(previewId);
   }
 }

@@ -90,6 +90,19 @@ function assertNewSourceApplyTimestamps(
   }
 }
 
+function isEmptyGasImportSentinel(state: LocalEventDayState): boolean {
+  return (
+    state.source.type === "csv" &&
+    state.source.fileName === "empty.csv" &&
+    state.circles.length === 0 &&
+    state.purchased.length === 0 &&
+    state.hold.length === 0 &&
+    state.history.length === 0 &&
+    state.redo.length === 0 &&
+    state.gasOutbox.length === 0
+  );
+}
+
 export class SourceSettingsService {
   constructor(private readonly repository: EventDayRepository) {}
 
@@ -139,6 +152,10 @@ export class SourceSettingsService {
     this.assertNoPending(current, update.operation);
 
     const isReplacement = isReplacementOperation(update.operation);
+    const isInitialImport = update.operation === "gas-initial-import";
+    if (isInitialImport && !isEmptyGasImportSentinel(current)) {
+      throw new Error("Initial GAS import requires an empty sentinel state");
+    }
     if (
       update.operation === "gas-refresh-apply" &&
       current.source.type !== "gas"
@@ -179,12 +196,16 @@ export class SourceSettingsService {
     let finalNextState: LocalEventDayState;
 
     if (isReplacement) {
-      // Source replacement preserves local activity and starts with empty outbox
+      // Source replacement preserves local activity and starts with empty outbox.
+      // The empty GAS sentinel is the one replacement that may derive initial
+      // purchase/history entries from the fetched source in the same save.
       finalNextState = {
         ...update.nextState,
-        purchased: current.purchased,
+        purchased: isInitialImport
+          ? update.nextState.purchased
+          : current.purchased,
         hold: current.hold,
-        history: current.history,
+        history: isInitialImport ? update.nextState.history : current.history,
         redo: current.redo,
         gasOutbox: [],
         timestamps: {

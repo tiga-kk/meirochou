@@ -261,3 +261,23 @@ export type ProtectedSourceOperation =
   | "circles-delete"
   | "activity-delete"
   | "event-day-delete";
+
+/** Memory-only metadata for an explicit GAS import or refresh preview. */
+export interface GasRefreshPreview {
+  readonly previewId: string;
+  readonly ref: EventDayRef;
+  readonly mode: "initial" | "replacement" | "refresh";
+  readonly replacementOperation:
+    | "gas-initial-import"
+    | "gas-url-change"
+    | "sheet-name-change"
+    | "source-type-change"
+    | null;
+  readonly expectedSourceGeneration: string;
+  readonly expectedSnapshotHash: string;
+  readonly source: GasDataSource;
+  readonly spreadsheetTitle: string;
+  readonly diff: SourceDiff;
+  readonly fetchedAt: string;
+  readonly expiresAt: string;
+}
