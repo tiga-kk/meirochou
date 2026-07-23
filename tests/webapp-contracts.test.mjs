@@ -87,12 +87,8 @@ test("GAS circle responses include the spreadsheet title and source sheet name",
   );
 });
 
-test("spreadsheet column documentation follows the spreadsheet source of truth", () => {
-  const readme = read("README.md");
-
-  assert.match(readme, /`isSale`/);
-  assert.doesNotMatch(readme, /`soldout`/);
-  assert.doesNotMatch(readme, /apps_script_code\.js/);
+test("public README stays empty until publication documentation is approved", () => {
+  assert.equal(read("README.md"), "");
 });
 
 test("Apps Script source exists only under integrations", () => {
@@ -217,7 +213,12 @@ test("webapp CI runs clean install, full verification, and mobile E2E", () => {
   assert.match(packageJson.scripts["verify:webapp"], /build:webapp/);
   assert.match(packageJson.scripts["verify:webapp"], /verify:webapp:build/);
   assert.match(workflow, /run:\s*npm ci/);
-  assert.match(workflow, /playwright install --with-deps chromium/);
+  assert.match(workflow, /runs-on:\s*ubuntu-24\.04/);
+  assert.match(
+    workflow,
+    /image:\s*mcr\.microsoft\.com\/playwright:v1\.61\.1-noble/,
+  );
+  assert.doesNotMatch(workflow, /playwright install --with-deps chromium/);
   assert.match(workflow, /run:\s*npm run verify:webapp/);
   assert.match(workflow, /run:\s*npm run test:e2e/);
   assert.match(workflow, /if:\s*failure\(\)/);
@@ -1046,22 +1047,6 @@ test("webapp brings manually opened settings into view", () => {
   );
 });
 
-test("webapp documents partial offline support without claiming offline startup", () => {
-  const readme = read("README.md");
-
-  assert.match(readme, /部分的なオフライン対応/);
-  assert.match(readme, /LocalStorage/);
-  assert.doesNotMatch(readme, /Service Worker/);
-});
-
-test("webapp documents pin previews and route comparison", () => {
-  const readme = read("README.md");
-
-  assert.match(readme, /地図ピン/);
-  assert.match(readme, /経路変更/);
-  assert.match(readme, /現在の経路と候補経路/);
-});
-
 test("webapp route overlay SVG follows image pixel coordinates without handling pointer events", () => {
   const overlay = buildRouteOverlaySvg({
     image: { width: 40, height: 30 },
@@ -1305,24 +1290,4 @@ test("webapp navigation map load listener is guarded across repeated init calls"
     mapRenderer,
     /this\.navigationMapImageLoadListenerAttached\s*=\s*true/,
   );
-});
-
-test("public data documentation matches the Phase 2 boundary", () => {
-  const readme = read("README.md");
-  const contract = read("docs/data-contracts.md");
-
-  assert.match(readme, /LocalStorage/);
-  assert.match(readme, /CSV/);
-  assert.match(readme, /GAS同期は未実装/);
-  assert.doesNotMatch(readme, /Service Worker/);
-
-  for (const required of [
-    "eventId + dayId",
-    "sourceGeneration",
-    "space,priority,isSale,account,tweet,memo",
-    "removedFromSource",
-    "previewId",
-  ]) {
-    assert.match(contract, new RegExp(required.replace(/[+]/g, "\\+")));
-  }
 });
