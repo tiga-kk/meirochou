@@ -88,10 +88,13 @@ test("GAS circle responses include the spreadsheet title and source sheet name",
 
 test("documentation describes Phase 3 GAS sync contract accurately without claiming Phase 4 UI exists", () => {
   const publicReadme = read("README.md");
-  const gasSyncContract = read("docs/gas-sync-contract.md");
+  const dataContracts = read("guides/data-contracts.md");
+  const gasSyncContract = read("guides/gas-sync.md");
   const gasReadme = read("integrations/gas-spreadsheet/README.md");
 
-  const docsCombined = [publicReadme, gasSyncContract, gasReadme].join("\n");
+  assert.equal(publicReadme, "");
+
+  const docsCombined = [dataContracts, gasSyncContract, gasReadme].join("\n");
 
   assert.match(docsCombined, /explicit refresh/);
   assert.match(docsCombined, /LocalStorage/);
