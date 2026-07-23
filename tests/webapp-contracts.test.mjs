@@ -224,6 +224,14 @@ test("webapp CI runs clean install, full verification, and mobile E2E", () => {
   assert.match(workflow, /if:\s*failure\(\)/);
 });
 
+test("webapp CI runs for main integration and explicit manual dispatch", () => {
+  const workflow = read(".github/workflows/webapp-ci.yml");
+
+  assert.match(workflow, /push:\s*\n\s+branches:\s*\n\s+- main/);
+  assert.match(workflow, /pull_request:\s*\n\s+branches:\s*\n\s+- main/);
+  assert.match(workflow, /workflow_dispatch:/);
+});
+
 test("webapp navigation view model marks selected, purchased, and hold pins", () => {
   const circles = [
     { space: "東A23a", priority: 10, tweet: "https://example.com/a.jpg" },
