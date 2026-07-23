@@ -76,7 +76,7 @@ export class GasApiClient {
   private readonly timeoutMs: number;
 
   constructor(options?: GasApiClientOptions) {
-    this.fetcher = options?.fetcher ?? globalThis.fetch;
+    this.fetcher = options?.fetcher ?? globalThis.fetch.bind(globalThis);
     this.timeoutMs = options?.timeoutMs ?? 30000;
   }
 

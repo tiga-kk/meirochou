@@ -37,6 +37,44 @@ describe("parseGasWebAppUrl", () => {
 });
 
 describe("GasApiClient request shape", () => {
+  it("binds the default fetch function to its global owner", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetcher = function (
+      this: typeof globalThis,
+      _input: RequestInfo | URL,
+      _init?: RequestInit,
+    ) {
+      if (this !== globalThis) {
+        throw new TypeError("Illegal invocation");
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            status: "success",
+            sheets: ["1日目"],
+            spreadsheetTitle: "Demo",
+          }),
+        ),
+      );
+    } as typeof fetch;
+    globalThis.fetch = fetcher;
+
+    try {
+      const client = new GasApiClient();
+      await expect(
+        client.fetchSheetList(
+          "https://script.google.com/macros/s/AKfycbx_example-id_123/exec",
+        ),
+      ).resolves.toEqual({
+        sheets: ["1日目"],
+        spreadsheetTitle: "Demo",
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("fetches sheet list with correct query parameter and Accept header", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
