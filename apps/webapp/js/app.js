@@ -13,6 +13,7 @@ import { EventDayRepository } from "./state/event-day-repository";
 import { StorageService } from "./state/storage-service";
 import { TspSolver } from "./tsp-solver.js";
 import { parseGridMeta, parsePointsPayload } from "./types/boundary-parsers";
+import { buildEventDayOptions } from "./ui/management-view-model";
 import { buildSpaceFromLocation } from "./ui/navigation-view-model";
 import { UIManager } from "./ui-manager.js";
 
@@ -57,6 +58,115 @@ export class App {
     this.selectionToken = 0;
     this.routeAssetsCache = new Map();
     this.currentManifest = null;
+    this.transitionToken = 0;
+    this.isTransitioning = false;
+  }
+
+  /** Rebuild the management selector from the registry and local state. */
+  updateManagementModels() {
+    if (!this.dm.eventRegistry) return;
+    const states = this.dm.repository
+      .list()
+      .map((ref) => ({
+        ref,
+        state: this.dm.repository.load(ref),
+      }))
+      .filter((item) => item.state !== null);
+
+    const options = buildEventDayOptions(
+      this.dm.eventRegistry,
+      states,
+      this.dm.activeRef,
+    );
+
+    this.ui.updateSettingsState({
+      eventDayOptions: options,
+      selectedEventId: this.dm.activeRef?.eventId || "",
+      selectedDayId: this.dm.activeRef?.dayId || "",
+    });
+  }
+
+  /** Prepare and atomically commit a registry-approved event/day transition. */
+  async handleEventDaySelect(ref) {
+    if (
+      !ref ||
+      typeof ref !== "object" ||
+      typeof ref.eventId !== "string" ||
+      typeof ref.dayId !== "string"
+    ) {
+      return;
+    }
+
+    const event = this.dm.eventRegistry?.events.find(
+      (candidate) => candidate.eventId === ref.eventId,
+    );
+    if (!event?.days.some((day) => day.dayId === ref.dayId)) return;
+
+    const focusTarget = document.activeElement;
+    if (
+      this.isTransitioning ||
+      (this.dm.activeRef &&
+        this.dm.activeRef.eventId === ref.eventId &&
+        this.dm.activeRef.dayId === ref.dayId)
+    ) {
+      return;
+    }
+
+    const token = ++this.transitionToken;
+    this.isTransitioning = true;
+    this.ui.setSettingsBusy(true);
+    this.ui.setSettingsError("");
+
+    try {
+      const transitionService = this.dm.getTransitionService(
+        this.currentManifest,
+      );
+      const prepared = await transitionService.prepare(ref);
+      if (token !== this.transitionToken) return;
+
+      const committedState = transitionService.commit(prepared);
+      this.currentManifest = prepared.manifest;
+      Config.initializeAreas(prepared.manifest.areas);
+
+      this.dm.activateCommittedState(prepared.ref, committedState);
+
+      this.currentTarget = null;
+      this.currentRoute = null;
+      this.selectedTarget = null;
+      this.selectedRoute = null;
+      this.nextTarget = null;
+      this.selectionState = "idle";
+      this.selectionMessage = "";
+      this.routeAssetsCache.clear();
+
+      this.ui.updateAreaHeader();
+      this.ui.updateCounts(this.dm);
+      this.updateManagementModels();
+
+      if (this.dm.wantToBuy.length > 0) {
+        this.searchNext("", false);
+      } else {
+        this.ui.showTarget(null);
+      }
+
+      this.ui.showToast(
+        `${prepared.event.displayName} ${prepared.ref.dayId} へ切り替えました`,
+      );
+    } catch (error) {
+      if (token !== this.transitionToken) return;
+      console.error("Event/Day transition failed:", error);
+      this.updateManagementModels();
+      this.ui.setSettingsError(
+        "イベント・日程の切り替えに失敗しました。以前の表示を維持しています。",
+      );
+      this.ui.showToast("切り替えに失敗しました", "error");
+    } finally {
+      if (token === this.transitionToken) {
+        this.isTransitioning = false;
+        this.ui.setSettingsBusy(false);
+        if (focusTarget instanceof HTMLElement) focusTarget.focus();
+      }
+    }
   }
 
   /**
@@ -101,11 +211,8 @@ export class App {
       }
 
       try {
-        const transitionService = this.dm.getTransitionService(manifest);
-        const prepared = await transitionService.prepare(activeRef);
-        const state = transitionService.commit(prepared);
-        this.dm.activateCommittedState(prepared.ref, state);
-        this.currentManifest = prepared.manifest;
+        await this.dm.openEventDay(activeRef);
+        this.currentManifest = manifest;
       } catch (error) {
         console.error("Failed to open initial event day:", error);
         renderMapBootstrapError(document, error);
@@ -130,6 +237,7 @@ export class App {
     }
 
     this.ui.updateCounts(this.dm);
+    this.updateManagementModels();
 
     // スタートアップ時に非同期でバックグラウンド同期コーディネーターを起動
     this.dm.startSyncCoordinator();
@@ -339,6 +447,10 @@ export class App {
     }
 
     const settings = this.ui.els.settingsArea;
+    settings.addEventListener("event-day-select", (e) => {
+      this.handleEventDaySelect(e.detail);
+    });
+
     settings.addEventListener("settings-fetch-sheets-request", async () => {
       this.ui.setSettingsError("GAS同期はPhase 2では利用できません");
       this.ui.showToast("GAS同期はPhase 2では利用できません");

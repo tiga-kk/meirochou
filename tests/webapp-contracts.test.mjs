@@ -1277,7 +1277,10 @@ test("webapp navigation map renders the configured map image", () => {
 test("webapp validates the map manifest before constructing App", () => {
   const appSource = read("apps/webapp/js/app.js");
   const loadIndex = appSource.indexOf("await loadMapBundleManifest");
-  const initializeIndex = appSource.indexOf("Config.initializeAreas");
+  const initializeIndex = appSource.indexOf(
+    "Config.initializeAreas",
+    loadIndex,
+  );
   const constructIndex = appSource.indexOf("new App()", initializeIndex);
 
   assert.ok(loadIndex >= 0);

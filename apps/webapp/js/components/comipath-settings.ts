@@ -1,4 +1,6 @@
 import { html, LitElement, nothing, type PropertyValues } from "lit";
+import type { EventDayOption } from "../ui/management-view-model";
+import "./event-day-selector";
 
 export interface SettingsGasUrlChangeDetail {
   gasUrl: string;
@@ -19,6 +21,9 @@ export class ComipathSettings extends LitElement {
     selectedSheets: { attribute: false },
     busy: { type: Boolean },
     errorMessage: { type: String },
+    eventDayOptions: { attribute: false },
+    selectedEventId: { type: String },
+    selectedDayId: { type: String },
   };
 
   declare open: boolean;
@@ -27,6 +32,9 @@ export class ComipathSettings extends LitElement {
   declare selectedSheets: readonly string[];
   declare busy: boolean;
   declare errorMessage: string;
+  declare eventDayOptions: readonly EventDayOption[];
+  declare selectedEventId: string;
+  declare selectedDayId: string;
 
   constructor() {
     super();
@@ -36,6 +44,9 @@ export class ComipathSettings extends LitElement {
     this.selectedSheets = [];
     this.busy = false;
     this.errorMessage = "";
+    this.eventDayOptions = [];
+    this.selectedEventId = "";
+    this.selectedDayId = "";
   }
 
   /** Light DOMを使い、既存のフォームCSSとアクセシビリティIDを維持する。 */
@@ -81,7 +92,15 @@ export class ComipathSettings extends LitElement {
   protected render() {
     return html`
       <h2>設定</h2>
-      <div class="input-group">
+      <event-day-selector
+        .options=${this.eventDayOptions}
+        .selectedEventId=${this.selectedEventId}
+        .selectedDayId=${this.selectedDayId}
+        ?busy=${this.busy}
+        .errorMessage=${this.errorMessage}
+      ></event-day-selector>
+
+      <div class="input-group" style="margin-top: 1rem">
         <label for="gas-url">GAS Web App URL</label>
         <div class="input-row">
           <input
@@ -141,11 +160,6 @@ export class ComipathSettings extends LitElement {
           }
         </div>
       </div>
-      ${
-        this.errorMessage
-          ? html`<p class="settings-error" role="alert">${this.errorMessage}</p>`
-          : nothing
-      }
     `;
   }
 }

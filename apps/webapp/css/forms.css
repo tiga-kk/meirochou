@@ -145,6 +145,41 @@ input[type="text"] {
   font-weight: bold;
 }
 
+.settings-error {
+  color: #c0392b;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
+.event-day-select-row {
+  display: flex;
+  gap: 8px;
+}
+
+.event-day-select-row select {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: #fff;
+  color: var(--text-main);
+  font-size: 0.92rem;
+  font-family: inherit;
+}
+
+.event-day-field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.event-day-selector-label {
+  font-weight: bold;
+}
+
 .input-row {
   display: flex;
   gap: 6px;
