@@ -8,6 +8,8 @@ import type {
 } from "../types/domain";
 import type { DeleteScope } from "./management-events";
 
+export type { DeleteScope };
+
 /** A registry-defined event/day entry suitable for selector rendering. */
 export interface EventDayOption {
   readonly eventId: string;
@@ -73,7 +75,8 @@ export interface DeleteOptionInput {
   readonly eventDayCount: number;
   readonly activeCircleCount: number;
   readonly activityCount: number;
-  readonly pendingCount: number;
+  readonly selectedPendingCount: number;
+  readonly totalPendingCount: number;
 }
 
 /** A destructive option with its current pending-outbox lock state. */
@@ -380,8 +383,13 @@ function makeDeleteOption(
 export function buildDeleteOptions(
   input: DeleteOptionInput,
 ): readonly DeleteOptionViewModel[] {
-  const blocked = input.pendingCount > 0;
-  const blockedReason = blocked
+  const selectedBlocked = input.selectedPendingCount > 0;
+  const selectedBlockedReason = selectedBlocked
+    ? "送信待ちのGAS同期があるため削除できません。同期を完了するか廃棄してください。"
+    : null;
+
+  const totalBlocked = input.totalPendingCount > 0;
+  const totalBlockedReason = totalBlocked
     ? "送信待ちのGAS同期があるため削除できません。同期を完了するか廃棄してください。"
     : null;
 
@@ -390,29 +398,29 @@ export function buildDeleteOptions(
       { type: "circles", ref: input.selected },
       `サークルリストの削除（${input.activeCircleCount}件）`,
       "サークル配置情報を削除し、空のリストにします。購入・チェックの活動履歴は保持されます。",
-      blocked,
-      blockedReason,
+      selectedBlocked,
+      selectedBlockedReason,
     ),
     makeDeleteOption(
       { type: "activity", ref: input.selected },
       `購入・チェック履歴の削除（${input.activityCount}件）`,
       "この日の購入済み・チェック状態・操作履歴をすべて消去します。サークル情報は保持されます。",
-      blocked,
-      blockedReason,
+      selectedBlocked,
+      selectedBlockedReason,
     ),
     makeDeleteOption(
       { type: "event-day", ref: input.selected },
       "この日（データ）の削除",
       "この日程のサークル情報および履歴をすべて削除します。",
-      blocked,
-      blockedReason,
+      selectedBlocked,
+      selectedBlockedReason,
     ),
     makeDeleteOption(
       { type: "all-events" },
       `全日程データの削除（${input.eventDayCount}日程）`,
       "登録されている全日程のサークル情報・履歴・設定を消去し、初期状態に戻します。",
-      blocked,
-      blockedReason,
+      totalBlocked,
+      totalBlockedReason,
     ),
   ];
 

@@ -247,3 +247,98 @@ source-diff-dialog.hidden {
   gap: 12px;
   margin-top: 8px;
 }
+
+/* Storage Delete Dialog Styles */
+storage-delete-dialog {
+  display: block;
+}
+
+.delete-modal-content {
+  background: var(--panel, #ffffff);
+  border: 2px solid var(--ink, #111827);
+  box-shadow: var(--card-shadow, 4px 4px 0px #111827);
+  max-width: 520px;
+  width: 100%;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.delete-target-info {
+  font-size: 0.95rem;
+  margin: 0;
+  color: var(--ink, #111827);
+}
+
+.delete-consequence {
+  font-size: 0.9rem;
+  color: #4b5563;
+  background: #f9fafb;
+  border-left: 3px solid var(--ink, #111827);
+  padding: 8px 12px;
+  margin: 0;
+}
+
+.consent-group {
+  margin-top: 4px;
+}
+
+.consent-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.confirm-phrase-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.delete-confirm-input {
+  padding: 8px 12px;
+  border: 1px solid var(--ink, #111827);
+  font-size: 0.95rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.delete-confirm-input:disabled {
+  background: #f3f4f6;
+}
+
+.storage-delete-options {
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.storage-delete-options h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.storage-delete-option {
+  border-top: 1px solid #e2e8f0;
+  padding: 0.75rem 0;
+}
+
+.storage-delete-option button {
+  min-height: 44px;
+  width: 100%;
+  text-align: left;
+}
+
+.storage-delete-consequence,
+.storage-delete-blocked {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+}
+
+.storage-delete-blocked {
+  color: #92400e;
+}

@@ -11,6 +11,7 @@ GEMINI.md
 # Node.js and generated output
 node_modules/
 dist/
+/maps/
 playwright-report/
 test-results/
 blob-report/

@@ -12,11 +12,13 @@ import {
 } from "./map-manifest-loader";
 import { planRoute, rankCandidatesByGridDistance } from "./route-planner";
 import { EventDayRepository } from "./state/event-day-repository";
+import { StorageDeletionService } from "./state/storage-deletion-service";
 import { StorageService } from "./state/storage-service";
 import { TspSolver } from "./tsp-solver.js";
 import { parseGridMeta, parsePointsPayload } from "./types/boundary-parsers";
 import { ManagementSession } from "./ui/management-session";
 import {
+  buildDeleteOptions,
   buildEventDayOptions,
   buildOutboxPanelModel,
   formatSourceDiff,
@@ -49,6 +51,26 @@ function isEventDayRef(value) {
       value.eventId.length > 0 &&
       typeof value.dayId === "string" &&
       value.dayId.length > 0,
+  );
+}
+
+function isDeleteScope(value) {
+  if (!value || typeof value !== "object") return false;
+  if (value.type === "all-events") return true;
+  return (
+    (value.type === "circles" ||
+      value.type === "activity" ||
+      value.type === "event-day") &&
+    isEventDayRef(value.ref)
+  );
+}
+
+function sameEventDayRef(left, right) {
+  return Boolean(
+    left &&
+      right &&
+      left.eventId === right.eventId &&
+      left.dayId === right.dayId,
   );
 }
 
@@ -139,6 +161,20 @@ export class App {
     this.sourceErrorMessage = "";
     this.outboxResultMessage = "";
     this.outboxErrorMessage = "";
+
+    this.activeDeleteScope = null;
+    this.deleteErrorMessage = "";
+  }
+
+  get storageDeletionService() {
+    return new StorageDeletionService(
+      this.dm.repository,
+      this.dm.sourceSettings,
+      () =>
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `gen-${Date.now()}`,
+    );
   }
 
   /** Rebuild the management selector and source manager models from registry and local state. */
@@ -211,12 +247,51 @@ export class App {
       },
     );
 
+    const selectedPendingCount = activeState ? activeState.gasOutbox.length : 0;
+    const totalPendingCount = states.reduce(
+      (sum, item) => sum + (item.state ? item.state.gasOutbox.length : 0),
+      0,
+    );
+    const deleteOptions = activeRef
+      ? buildDeleteOptions({
+          selected: activeRef,
+          eventDayCount: this.dm.repository.list().length,
+          activeCircleCount: activeState ? activeState.circles.length : 0,
+          activityCount: activeState
+            ? activeState.purchased.length + activeState.hold.length
+            : 0,
+          selectedPendingCount,
+          totalPendingCount,
+        })
+      : [];
+
+    const activeOption = this.activeDeleteScope
+      ? deleteOptions.find(
+          (opt) =>
+            opt.scope.type === this.activeDeleteScope.type &&
+            (opt.scope.type === "all-events" ||
+              (opt.scope.ref.eventId === this.activeDeleteScope.ref?.eventId &&
+                opt.scope.ref.dayId === this.activeDeleteScope.ref?.dayId)),
+        ) || null
+      : null;
+
+    const deleteDialogModel = {
+      open: Boolean(this.activeDeleteScope),
+      scope: this.activeDeleteScope,
+      option: activeOption,
+      eventDayLabel: activeRefLabel,
+      busy: this.session.isBusy("storage-delete"),
+      errorMessage: this.deleteErrorMessage || "",
+    };
+
     this.ui.updateSettingsState({
       eventDayOptions: options,
       selectedEventId: this.dm.activeRef?.eventId || "",
       selectedDayId: this.dm.activeRef?.dayId || "",
       sourceManagerModel,
       outboxPanelModel,
+      deleteOptions,
+      deleteDialogModel,
     });
   }
 
@@ -595,6 +670,105 @@ export class App {
         this.updateManagementModels();
         this.ui.updateCounts(this.dm);
       }
+    }
+  }
+
+  /** Opens the delete dialog for a chosen deletion scope. */
+  handleDeleteOptionSelect(scope) {
+    if (!isDeleteScope(scope)) return;
+    const options = this.ui.els.settingsArea?.deleteOptions || [];
+    const option = options.find((candidate) => {
+      if (candidate.scope.type !== scope.type) return false;
+      if (scope.type === "all-events") return true;
+      return sameEventDayRef(candidate.scope.ref, scope.ref);
+    });
+    if (!option || option.blocked) return;
+
+    this.activeDeleteScope = option.scope;
+    this.deleteErrorMessage = "";
+    this.updateManagementModels();
+  }
+
+  /** Closes the delete dialog without changing local data. */
+  handleDeleteDialogCancel() {
+    this.activeDeleteScope = null;
+    this.deleteErrorMessage = "";
+    this.updateManagementModels();
+  }
+
+  /** Verifies scope & confirmation and performs safe local data deletion. */
+  async handleStorageDeleteRequest(detail) {
+    if (!detail || typeof detail !== "object" || !isDeleteScope(detail.scope)) {
+      return;
+    }
+    const { scope, confirmation } = detail;
+    if (scope.type === "all-events" && confirmation !== "全イベントを削除") {
+      return;
+    }
+
+    const token = this.session.nextRequestToken();
+    const activeRefBeforeDelete = this.dm.activeRef
+      ? { ...this.dm.activeRef }
+      : null;
+    this.session.setBusy("storage-delete", true);
+    this.deleteErrorMessage = "";
+    this.updateManagementModels();
+
+    const now = new Date().toISOString();
+    try {
+      const result = this.storageDeletionService.delete(scope, now);
+      if (!this.session.isLatestRequestToken(token)) return;
+
+      this.session.setBusy("storage-delete", false);
+      this.activeDeleteScope = null;
+
+      const activeRefDeleted =
+        scope.type === "all-events"
+          ? activeRefBeforeDelete !== null
+          : result.deletedRefs.some((ref) =>
+              sameEventDayRef(ref, activeRefBeforeDelete),
+            );
+
+      if (activeRefDeleted) {
+        this.dm.activeRef = null;
+        this.dm.activeState = null;
+
+        const remainingList = this.dm.repository.list();
+        if (remainingList.length > 0) {
+          await this.handleEventDaySelect(remainingList[0]);
+        } else {
+          const defaultRef = {
+            eventId: this.dm.eventRegistry.events[0].eventId,
+            dayId: this.dm.eventRegistry.events[0].days[0].dayId,
+          };
+          await this.handleEventDaySelect(defaultRef);
+        }
+
+        if (!this.dm.activeRef) {
+          renderMapBootstrapError(
+            document,
+            new Error("No active event/day remains after deletion"),
+          );
+          return;
+        }
+      } else {
+        this.updateManagementModels();
+        this.ui.updateCounts(this.dm);
+      }
+      this.ui.showToast("データを削除しました");
+    } catch (_error) {
+      if (!this.session.isLatestRequestToken(token)) return;
+      this.session.setBusy("storage-delete", false);
+      if (activeRefBeforeDelete && !this.dm.activeRef) {
+        renderMapBootstrapError(
+          document,
+          new Error("No active event/day remains after deletion"),
+        );
+        return;
+      }
+      this.deleteErrorMessage = "データの削除に失敗しました。";
+      this.updateManagementModels();
+      this.ui.showToast("削除エラー", "error");
     }
   }
 
@@ -1034,6 +1208,18 @@ export class App {
 
     settings.addEventListener("gas-discard-request", (e) => {
       this.handleGasDiscardRequest(e.detail);
+    });
+
+    settings.addEventListener("delete-option-select", (e) => {
+      this.handleDeleteOptionSelect(e.detail.scope);
+    });
+
+    settings.addEventListener("storage-delete-request", (e) => {
+      this.handleStorageDeleteRequest(e.detail);
+    });
+
+    settings.addEventListener("storage-delete-cancel", () => {
+      this.handleDeleteDialogCancel();
     });
 
     const diffDialog = document.getElementById("source-diff-dialog");

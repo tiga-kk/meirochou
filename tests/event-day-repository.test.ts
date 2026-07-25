@@ -340,4 +340,69 @@ describe("EventDayRepository", () => {
     const firstSetCallIndex = calls.indexOf(`set:${INDEX_KEY}`);
     expect(firstSetCallIndex).not.toBe(lastSetCallIndex);
   });
+
+  test("listForDeletionStrict throws on corrupt index, duplicate refs, missing state, or invalid schema", () => {
+    const adapter = new MockStorageAdapter();
+    const repository = new EventDayRepository(new StorageService(adapter));
+
+    // 1. Corrupt index (not array)
+    adapter.setItem(INDEX_KEY, "invalid json");
+    expect(() => repository.listForDeletionStrict()).toThrow();
+
+    // 2. Duplicate refs in index
+    adapter.map.clear();
+    const ref: EventDayRef = { eventId: "c104", dayId: "day1" };
+    repository.save(
+      ref,
+      createEmptyEventDayState(validCsvSource, "g-001", validNow),
+    );
+    adapter.setItem(
+      INDEX_KEY,
+      JSON.stringify([
+        { eventId: "c104", dayId: "day1" },
+        { eventId: "c104", dayId: "day1" },
+      ]),
+    );
+    expect(() => repository.listForDeletionStrict()).toThrow(/duplicate/i);
+
+    // 3. Missing state for indexed ref
+    adapter.map.clear();
+    adapter.setItem(
+      INDEX_KEY,
+      JSON.stringify([{ eventId: "c104", dayId: "day1" }]),
+    );
+    expect(() => repository.listForDeletionStrict()).toThrow(/missing state/i);
+  });
+
+  test("deleteAllFailureSafe preflights generations and rolls back all keys on failure", () => {
+    const adapter = new MockStorageAdapter();
+    const repository = new EventDayRepository(new StorageService(adapter));
+    const ref1: EventDayRef = { eventId: "c104", dayId: "day1" };
+    const ref2: EventDayRef = { eventId: "c104", dayId: "day2" };
+
+    const state1 = createEmptyEventDayState(validCsvSource, "g-001", validNow);
+    const state2 = createEmptyEventDayState(validCsvSource, "g-002", validNow);
+
+    repository.saveWithLastOpened(ref1, state1);
+    repository.save(ref2, state2);
+
+    // Mismatched generation preflight failure
+    expect(() =>
+      repository.deleteAllFailureSafe([
+        { ref: ref1, sourceGeneration: "g-001" },
+        { ref: ref2, sourceGeneration: "g-changed" },
+      ]),
+    ).toThrow(/generation/i);
+
+    // Safe deletion success
+    repository.deleteAllFailureSafe([
+      { ref: ref1, sourceGeneration: "g-001" },
+      { ref: ref2, sourceGeneration: "g-002" },
+    ]);
+
+    expect(repository.list()).toEqual([]);
+    expect(repository.load(ref1)).toBeNull();
+    expect(repository.load(ref2)).toBeNull();
+    expect(repository.getLastOpened()).toBeNull();
+  });
 });

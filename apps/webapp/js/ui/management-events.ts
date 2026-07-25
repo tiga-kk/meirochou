@@ -28,11 +28,13 @@ export interface ManagementEventDetailMap {
   "source-preview-apply": { previewId: string };
   "source-preview-cancel": Record<string, never>;
   "gas-retry-request": { ref: EventDayRef | null };
+  "delete-option-select": { scope: DeleteScope };
   "gas-discard-request": {
     ref: EventDayRef;
     ids: readonly string[];
     confirmation: string;
   };
+  "storage-delete-cancel": Record<string, never>;
   "storage-delete-request": { scope: DeleteScope; confirmation: string };
   "csv-export-request": { ref: EventDayRef };
 }

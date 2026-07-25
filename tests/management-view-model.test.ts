@@ -364,7 +364,8 @@ describe("buildDeleteOptions", () => {
       eventDayCount: 2,
       activeCircleCount: 15,
       activityCount: 3,
-      pendingCount: 0,
+      selectedPendingCount: 0,
+      totalPendingCount: 0,
     });
 
     expect(options).toHaveLength(4);
@@ -404,13 +405,14 @@ describe("buildDeleteOptions", () => {
     });
   });
 
-  it("blocks all delete options when pendingCount > 0", () => {
+  it("blocks selected delete options when selectedPendingCount > 0 and all-events when totalPendingCount > 0", () => {
     const options = buildDeleteOptions({
       selected: { eventId: "c104", dayId: "day1" },
       eventDayCount: 2,
       activeCircleCount: 15,
       activityCount: 3,
-      pendingCount: 2,
+      selectedPendingCount: 2,
+      totalPendingCount: 2,
     });
 
     expect(options).toHaveLength(4);
@@ -429,7 +431,8 @@ describe("buildDeleteOptions", () => {
       eventDayCount: 1,
       activeCircleCount: 0,
       activityCount: 0,
-      pendingCount: 0,
+      selectedPendingCount: 0,
+      totalPendingCount: 0,
     });
 
     const circlesScope = options[0].scope;

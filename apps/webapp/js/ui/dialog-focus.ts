@@ -8,6 +8,7 @@ export class DialogFocusController {
   private backgroundTargets: HTMLElement[] = [];
   private backgroundInertState = new Map<HTMLElement, boolean>();
   private onEscapeCallback: (() => void) | null = null;
+  private readonly backgroundSelector: string | null;
 
   constructor(
     dialog: HTMLElement,
@@ -18,15 +19,23 @@ export class DialogFocusController {
   ) {
     this.targetDialog = dialog;
     this.onEscapeCallback = options.onEscape || null;
+    this.backgroundSelector = options.backgroundSelector || null;
 
-    if (options.backgroundSelector) {
+    if (this.backgroundSelector) {
       this.backgroundTargets = Array.from(
-        document.querySelectorAll<HTMLElement>(options.backgroundSelector),
+        document.querySelectorAll<HTMLElement>(this.backgroundSelector),
       );
     }
   }
 
   private refreshBackgroundTargets(): void {
+    if (this.backgroundSelector) {
+      this.backgroundTargets = Array.from(
+        document.querySelectorAll<HTMLElement>(this.backgroundSelector),
+      );
+      if (this.backgroundTargets.length > 0) return;
+    }
+
     if (this.backgroundTargets.length === 0) {
       const container = document.getElementById("main-container");
       if (container) {
