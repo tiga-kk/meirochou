@@ -144,6 +144,23 @@ test("rejects a second published event", () => {
   );
 });
 
+test("rejects a missing referenced event map manifest", () => {
+  rewriteRegistries({
+    ...registry,
+    events: [
+      {
+        ...registry.events[0],
+        mapBundle: "../maps/demo-v1/missing.json",
+      },
+    ],
+  });
+
+  assert.throws(
+    () => verifyWebappBuild({ repositoryRoot: fixtureRoot }),
+    /source map manifest for event demo-v1 is missing/,
+  );
+});
+
 test("rejects a missing referenced built asset", () => {
   unlinkSync(
     join(
@@ -197,6 +214,18 @@ test("rejects a Cloudflare credential assignment in built text", () => {
   appendFileSync(
     join(fixtureRoot, "dist/webapp/assets/app.js"),
     "CLOUDFLARE_API_TOKEN=abcdefghijklmnopqrstuvwxyz123456\n",
+  );
+
+  assert.throws(
+    () => verifyWebappBuild({ repositoryRoot: fixtureRoot }),
+    /Cloudflare credential assignment/,
+  );
+});
+
+test("rejects a colon-style Cloudflare credential assignment in built text", () => {
+  appendFileSync(
+    join(fixtureRoot, "dist/webapp/assets/app.js"),
+    '\n{ "CF_ACCOUNT_ID": "0123456789abcdef0123456789abcdef" }\n',
   );
 
   assert.throws(
