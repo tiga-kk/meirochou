@@ -34,7 +34,7 @@ const cloudflareCredentialNames = [
   "CLOUDFLARE_ZONE_ID",
 ];
 const cloudflareCredentialAssignmentPattern = new RegExp(
-  `(?:${cloudflareCredentialNames.join("|")})\\s*(?:=|:)\\s*(?:"[^"]+"|'[^']+'|[^\\s,;'"{}\\[\\]]+)`,
+  `(?:${cloudflareCredentialNames.join("|")})["']?\\s*(?:=|:)\\s*(?:"[^"]+"|'[^']+'|[^\\s,;'"{}\\[\\]]+)`,
   "i",
 );
 
@@ -182,15 +182,21 @@ export function verifyWebappBuild({
     registeredEventIds.add(eventId);
 
     const remaining = mapBundle.slice("../maps/".length);
-    const sourceAssets = resolve(webappRoot, "map-bundles", dirname(remaining));
-    const outputAssets = resolve(outputMapsDir, eventId);
-    const sourceManifestPath = resolve(sourceAssets, "manifest.json");
-    const outputManifestPath = resolve(outputAssets, "manifest.json");
+    const sourceBundlesRoot = resolve(webappRoot, "map-bundles");
+    const sourceManifestPath = resolve(sourceBundlesRoot, remaining);
+    const sourceAssets = dirname(sourceManifestPath);
+    const outputManifestPath = resolve(dirname(outputRegistryFile), mapBundle);
+    const outputAssets = dirname(outputManifestPath);
 
     assertInside(
-      resolve(webappRoot, "map-bundles"),
-      sourceAssets,
-      `source bundle ${eventId}`,
+      sourceBundlesRoot,
+      sourceManifestPath,
+      `source map manifest ${eventId}`,
+    );
+    assertInside(
+      outputMapsDir,
+      outputManifestPath,
+      `built map manifest ${eventId}`,
     );
     assert.ok(
       existsSync(sourceManifestPath),
