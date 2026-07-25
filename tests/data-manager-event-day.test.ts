@@ -449,4 +449,25 @@ describe("Phase 2 Task 7 local data service", () => {
     const applied = manager.applyCsvReplacement(preview.previewId);
     expect(applied.source.type).toBe("csv");
   });
+
+  test("cancels a CSV preview without changing state", async () => {
+    const { manager } = createManager();
+    const ref: EventDayRef = { eventId: "C108", dayId: "day1" };
+    await manager.openEventDay(ref);
+
+    const preview = await manager.previewCsvReplacement(
+      ref,
+      "test.csv",
+      csv("A-01,2,,,,\r\n"),
+    );
+
+    expect(manager.csvPreviews.has(preview.previewId)).toBe(true);
+
+    manager.cancelCsvPreview(preview.previewId);
+
+    expect(manager.csvPreviews.has(preview.previewId)).toBe(false);
+    expect(() => manager.applyCsvReplacement(preview.previewId)).toThrow(
+      "CSV preview is missing or already applied",
+    );
+  });
 });

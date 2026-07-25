@@ -495,6 +495,11 @@ export class DataManager {
     return nextState;
   }
 
+  /** Cancel a CSV preview without changing persisted state. */
+  cancelCsvPreview(previewId: string): void {
+    this.csvPreviews.delete(previewId);
+  }
+
   /** Export the validated local snapshot, including source rows retained for history. */
   exportCsv(ref: EventDayRef): string {
     const state = this.repository.load(ref);

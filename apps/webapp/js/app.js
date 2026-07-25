@@ -1,4 +1,5 @@
 import "./components/comipath-settings";
+import "./components/source-diff-dialog";
 import { parseGasWebAppUrl } from "./api/gas-api-client";
 import { Config } from "./config.js";
 import { loadEventRegistryWithUrl } from "./data/event-registry";
@@ -17,10 +18,26 @@ import { parseGridMeta, parsePointsPayload } from "./types/boundary-parsers";
 import { ManagementSession } from "./ui/management-session";
 import {
   buildEventDayOptions,
+  formatSourceDiff,
   formatSourceSummary,
 } from "./ui/management-view-model";
 import { buildSpaceFromLocation } from "./ui/navigation-view-model";
 import { UIManager } from "./ui-manager.js";
+
+function formatSourceApplyError(error) {
+  switch (error?.name) {
+    case "StaleCsvPreviewError":
+    case "StaleGasPreviewError":
+    case "StaleSourceStateError":
+      return "プレビューが古くなっています。最新のソースを読み込んで再試行してください。";
+    case "PendingOutboxError":
+      return "未送信の操作があるため適用できません。同期完了後に再試行してください。";
+    case "StorageWriteError":
+      return "保存に失敗しました。空き容量やブラウザ設定を確認して再試行してください。";
+    default:
+      return "ソースデータの適用に失敗しました。最新のプレビューを取得して再試行してください。";
+  }
+}
 
 function findAreaForSpace(space) {
   if (!space || typeof space !== "string") return null;
@@ -177,6 +194,98 @@ export class App {
     });
   }
 
+  openSourceDiffDialog(sourceLabel, diffViewModel, errorMessage = "") {
+    const dialog = document.getElementById("source-diff-dialog");
+    const activePreview = this.session.getActivePreview();
+    if (!dialog || !activePreview) return;
+
+    dialog.model = {
+      open: true,
+      previewId: activePreview.previewId,
+      sourceLabel,
+      diff: diffViewModel,
+      busy: this.session.isBusy("preview-apply"),
+      errorMessage,
+    };
+  }
+
+  closeSourceDiffDialog() {
+    const dialog = document.getElementById("source-diff-dialog");
+    if (!dialog) return;
+    if (dialog.model) {
+      dialog.model = {
+        ...dialog.model,
+        open: false,
+        busy: false,
+        errorMessage: "",
+      };
+    }
+  }
+
+  clearActivePreviewIfAny() {
+    const activePreview = this.session.getActivePreview();
+    if (activePreview) {
+      if (activePreview.kind === "csv") {
+        this.dm.cancelCsvPreview(activePreview.previewId);
+      } else {
+        this.dm.cancelGasPreview(activePreview.previewId);
+      }
+    }
+    this.closeSourceDiffDialog();
+  }
+
+  async handleSourcePreviewApply(previewId) {
+    const activePreview = this.session.getActivePreview();
+    if (!activePreview || activePreview.previewId !== previewId) return;
+
+    if (
+      !this.dm.activeRef ||
+      this.dm.activeRef.eventId !== activePreview.ref.eventId ||
+      this.dm.activeRef.dayId !== activePreview.ref.dayId
+    ) {
+      this.handleSourcePreviewCancel();
+      return;
+    }
+
+    this.session.setBusy("preview-apply", true);
+    const dialog = document.getElementById("source-diff-dialog");
+    if (dialog?.model) {
+      dialog.model = { ...dialog.model, busy: true, errorMessage: "" };
+    }
+
+    try {
+      if (activePreview.kind === "csv") {
+        this.dm.applyCsvReplacement(previewId);
+      } else {
+        this.dm.applyGasPreview(previewId);
+      }
+
+      this.session.clearPreview();
+      this.session.setBusy("preview-apply", false);
+      this.closeSourceDiffDialog();
+      this.updateManagementModels();
+      this.ui.updateCounts(this.dm);
+      if (this.dm.wantToBuy.length > 0) {
+        this.searchNext("", false);
+      } else {
+        this.ui.showTarget(null);
+      }
+      this.ui.showToast("ソースデータを適用しました");
+    } catch (err) {
+      this.session.setBusy("preview-apply", false);
+      const errorMessage = formatSourceApplyError(err);
+      if (dialog?.model) {
+        dialog.model = { ...dialog.model, busy: false, errorMessage };
+      }
+    }
+  }
+
+  handleSourcePreviewCancel() {
+    this.clearActivePreviewIfAny();
+    this.session.clearPreview();
+    this.updateManagementModels();
+  }
+
   /** Handle CSV file preview request without saving or applying. */
   async handleCsvPreviewRequest(file) {
     if (
@@ -239,6 +348,7 @@ export class App {
       });
       this.sourceErrorMessage = "";
       this.updateManagementModels();
+      this.openSourceDiffDialog(file.name, formatSourceDiff(preview.diff));
     } catch (err) {
       if (!this.session.isLatestRequestToken(token)) return;
       if (err instanceof CsvValidationError) {
@@ -397,6 +507,10 @@ export class App {
         expectedSourceGeneration: expectedGeneration,
       });
       this.sourceErrorMessage = "";
+      this.openSourceDiffDialog(
+        normalizedSource.sheetName,
+        formatSourceDiff(preview.diff),
+      );
     } catch (_err) {
       if (!this.session.isLatestRequestToken(token)) return;
       this.sourceErrorMessage = "GASプレビューの取得に失敗しました。";
@@ -435,6 +549,7 @@ export class App {
       return;
     }
 
+    this.clearActivePreviewIfAny();
     this.session.onEventDayChange();
     this.draftGasUrl = "";
     this.selectedSheetName = "";
@@ -769,6 +884,7 @@ export class App {
     document.getElementById("toggle-settings").onclick = () => {
       const isOpen = !this.ui.els.settingsArea.open;
       if (!isOpen) {
+        this.clearActivePreviewIfAny();
         this.session.onSettingsClose();
         this.draftGasUrl = "";
         this.selectedSheetName = "";
@@ -805,6 +921,16 @@ export class App {
     settings.addEventListener("gas-preview-request", (e) => {
       this.handleGasPreviewRequest(e.detail.source, e.detail.mode);
     });
+
+    const diffDialog = document.getElementById("source-diff-dialog");
+    if (diffDialog) {
+      diffDialog.addEventListener("source-preview-apply", (e) => {
+        this.handleSourcePreviewApply(e.detail.previewId);
+      });
+      diffDialog.addEventListener("source-preview-cancel", () => {
+        this.handleSourcePreviewCancel();
+      });
+    }
 
     // 各種ボタンアクション
     document.getElementById("btn-search").onclick = () => this.searchNext();
