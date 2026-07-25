@@ -786,6 +786,20 @@ export class DataManager {
     return this.outboxService.process(this.activeRef);
   }
 
+  /** Discard selected outbox entries and keep the active in-memory state in sync. */
+  discardOutboxEntries(
+    ref: EventDayRef,
+    ids: readonly string[],
+    now: string,
+  ): LocalEventDayState {
+    const state = this.outboxService.discard(ref, ids, now);
+    if (sameRef(this.activeRef, ref)) {
+      this.activeState = state;
+      this.applyStateToMemory(state);
+    }
+    return state;
+  }
+
   /** Clear only local holds and their history entries. */
   resetHold(): void {
     if (!this.activeState || !this.activeRef) {

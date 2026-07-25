@@ -832,7 +832,7 @@ export class App {
     }
 
     try {
-      this.dm.outboxService.discard(
+      this.dm.discardOutboxEntries(
         detail.ref,
         detail.ids,
         new Date().toISOString(),
@@ -897,7 +897,7 @@ export class App {
 
       const committedState = transitionService.commit(prepared);
       this.currentManifest = prepared.manifest;
-      Config.initializeAreas(prepared.manifest.areas);
+      Config.replaceAreas(prepared.manifest.areas);
 
       this.dm.activateCommittedState(prepared.ref, committedState);
 
@@ -915,7 +915,7 @@ export class App {
       this.updateManagementModels();
 
       if (this.dm.wantToBuy.length > 0) {
-        this.searchNext("", false);
+        await this.searchNext("", false);
       } else {
         this.ui.showTarget(null);
       }
@@ -1417,50 +1417,73 @@ export class App {
   searchNext(startSpace = "", notifyComplete = true) {
     if (this.dm.wantToBuy.length === 0) {
       this.ui.showToast("データがありません");
-      return;
+      return Promise.resolve();
     }
 
     const currentSpace = startSpace || this.readCurrentSpace();
-    if (!currentSpace) return;
+    if (!currentSpace) return Promise.resolve();
 
     this.selectionToken += 1;
     this.ui.showLoading();
 
     // UI描画をブロックしないように非同期実行
-    setTimeout(async () => {
-      const candidates = this.dm.getUnvisited();
-      if (candidates.length === 0) {
-        this.currentTarget = null;
-        this.currentRoute = null;
-        this.selectedTarget = null;
-        this.selectedRoute = null;
-        this.ui.showTarget(null);
-        if (notifyComplete) this.ui.showToast("全てのサークルを回りました！");
-        return;
-      }
+    return new Promise((resolve) =>
+      setTimeout(async () => {
+        const candidates = this.dm.getUnvisited();
+        if (candidates.length === 0) {
+          this.currentTarget = null;
+          this.currentRoute = null;
+          this.selectedTarget = null;
+          this.selectedRoute = null;
+          this.ui.showTarget(null);
+          if (notifyComplete) this.ui.showToast("全てのサークルを回りました！");
+          resolve();
+          return;
+        }
 
-      const gridRanked = await this.rankCandidatesByGrid(
-        currentSpace,
-        candidates,
-      );
-      const path = gridRanked
-        ? [{ space: currentSpace, isStart: true }, ...gridRanked]
-        : TspSolver.solve(currentSpace, candidates);
+        let gridRanked = null;
+        try {
+          gridRanked = await this.rankCandidatesByGrid(
+            currentSpace,
+            candidates,
+          );
+        } catch (error) {
+          console.warn("Grid candidate ranking failed; using fallback.", error);
+        }
+        let path;
+        try {
+          path = gridRanked
+            ? [{ space: currentSpace, isStart: true }, ...gridRanked]
+            : TspSolver.solve(currentSpace, candidates);
+        } catch (error) {
+          console.warn("Candidate ordering failed; using source order.", error);
+          path = [{ space: currentSpace, isStart: true }, ...candidates];
+        }
 
-      // path[0]は現在地、path[1]が次の目的地
-      if (path.length > 1) {
-        const route = await this.planGridRoute(currentSpace, path[1].space);
-        this.currentStartSpace = currentSpace;
-        this.currentRoute = route;
-        this.currentTarget = this.targetWithRoute(path[1], route);
-        this.nextTarget = path.length > 2 ? path[2] : null;
-        this.selectedTarget = this.currentTarget;
-        this.selectedRoute = route;
-        this.selectionState = "idle";
-        this.selectionMessage = "";
-        this.ui.showNavigation(this.getNavigationContext("current"));
-      }
-    }, 50);
+        // path[0]は現在地、path[1]が次の目的地
+        if (path.length > 1) {
+          let route = null;
+          try {
+            route = await this.planGridRoute(currentSpace, path[1].space);
+          } catch (error) {
+            console.warn(
+              "Grid route planning failed; showing target without route.",
+              error,
+            );
+          }
+          this.currentStartSpace = currentSpace;
+          this.currentRoute = route;
+          this.currentTarget = this.targetWithRoute(path[1], route);
+          this.nextTarget = path.length > 2 ? path[2] : null;
+          this.selectedTarget = this.currentTarget;
+          this.selectedRoute = route;
+          this.selectionState = "idle";
+          this.selectionMessage = "";
+          this.ui.showNavigation(this.getNavigationContext("current"));
+        }
+        resolve();
+      }, 50),
+    );
   }
 
   /**
@@ -1491,6 +1514,7 @@ export class App {
     }
 
     this.ui.updateCounts(this.dm);
+    this.updateManagementModels();
     this.ui.updateCurrentLocation(space); // 現在地を更新
     this.searchNext(space, false); // 到着地点から自動で次を検索
   }

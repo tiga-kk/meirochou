@@ -22,9 +22,14 @@ export const Config = {
   /** Install validated map areas once before any application controller is created. */
   initializeAreas(areas: readonly AreaDefinition[]): void {
     if (areasInitialized) throw new Error("Map areas are already initialized");
+    Config.replaceAreas(areas);
+    areasInitialized = true;
+  },
+
+  /** Replace validated map areas when the active event map changes. */
+  replaceAreas(areas: readonly AreaDefinition[]): void {
     if (areas.length === 0) throw new Error("Map areas must not be empty");
     areaDefinitions = Object.freeze(areas.map(freezeArea));
-    areasInitialized = true;
   },
 
   STORAGE_KEYS: {

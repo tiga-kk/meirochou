@@ -189,7 +189,10 @@ export class SourceManager extends LitElement {
     if (!this.model) return html``;
 
     const disabled = this.model.pendingCount > 0 || this.model.busy;
-    const exportDisabled = !this.model.canExportCsv || this.model.busy;
+    const exportDisabled =
+      !this.model.canExportCsv ||
+      this.model.pendingCount > 0 ||
+      this.model.busy;
     const displayError = this.localError || this.model.errorMessage;
     const availableSheetNames =
       this.localGasUrl === this.model.gasUrlInput ? this.model.sheetNames : [];
