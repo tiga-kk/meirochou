@@ -1,5 +1,6 @@
 import { html, LitElement, type PropertyValues } from "lit";
 import type { EventDayRef } from "../types/domain";
+import { DialogFocusController } from "../ui/dialog-focus";
 import { dispatchManagementEvent } from "../ui/management-events";
 import type {
   OutboxEntryViewModel,
@@ -28,6 +29,9 @@ export class OutboxPanel extends LitElement {
   declare confirmText: string;
   declare discarding: boolean;
 
+  private focusController: DialogFocusController | null = null;
+  private modalWasOpen = false;
+
   constructor() {
     super();
     this.model = null;
@@ -41,6 +45,25 @@ export class OutboxPanel extends LitElement {
   /** Light DOM for CSS styling and accessibility consistency. */
   protected createRenderRoot(): HTMLElement | DocumentFragment {
     return this;
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this.focusController = new DialogFocusController(this, {
+      onEscape: () => {
+        if (!this.discarding) this.handleCloseDiscard();
+      },
+      backgroundSelector:
+        ".container > *:not(#settings-area), #settings-area > *:not(outbox-panel)",
+    });
+  }
+
+  disconnectedCallback(): void {
+    if (this.modalWasOpen) {
+      this.focusController?.deactivate();
+      this.modalWasOpen = false;
+    }
+    super.disconnectedCallback();
   }
 
   private handleToggleEntry(
@@ -114,6 +137,17 @@ export class OutboxPanel extends LitElement {
   }
 
   protected updated(changedProperties: PropertyValues<this>): void {
+    const modalIsOpen = this.showDiscardModal;
+    if (modalIsOpen !== this.modalWasOpen) {
+      const wasOpen = this.modalWasOpen;
+      this.modalWasOpen = modalIsOpen;
+      if (modalIsOpen) {
+        this.focusController?.activate();
+      } else if (wasOpen) {
+        this.focusController?.deactivate();
+      }
+    }
+
     if (!changedProperties.has("model") || !this.selectedRefKey) return;
 
     const group = this.model?.groups.find(
@@ -266,10 +300,16 @@ export class OutboxPanel extends LitElement {
     const isValid = this.confirmText === "未送信を破棄";
 
     return html`
-      <div class="discard-modal-overlay" role="dialog" aria-modal="true">
+      <div
+        class="discard-modal-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="outbox-discard-title"
+        aria-describedby="outbox-discard-desc"
+      >
         <div class="discard-modal-content">
-          <h4>未送信データの破棄</h4>
-          <p class="discard-warning">
+          <h4 id="outbox-discard-title">未送信データの破棄</h4>
+          <p id="outbox-discard-desc" class="discard-warning">
             選択した${this.selectedEntryIds.size}件の未送信GAS同期エントリを破棄します。<br />
             <strong>※破棄しても端末の購入・チェック状態は変更されません。GAS側のスプレッドシートと表示が異なる状態になります。</strong>
           </p>

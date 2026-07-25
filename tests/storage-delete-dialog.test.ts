@@ -38,6 +38,16 @@ describe("StorageDeleteDialog Component (Lit)", () => {
     };
     await el.updateComplete;
 
+    const dialog = el.querySelector<HTMLElement>('[role="dialog"]');
+    expect(dialog?.getAttribute("aria-labelledby")).toBe(
+      "storage-delete-dialog-title",
+    );
+    expect(el.querySelector("#storage-delete-dialog-title")).not.toBeNull();
+    expect(dialog?.getAttribute("aria-describedby")).toBe(
+      "storage-delete-dialog-desc",
+    );
+    expect(el.querySelector("#storage-delete-dialog-desc")).not.toBeNull();
+
     const text = el.textContent || "";
     expect(text).toContain("サークルリストの削除");
     expect(text).toContain("コミックマーケット104 1日目");

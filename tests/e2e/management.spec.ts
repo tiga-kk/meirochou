@@ -14,6 +14,7 @@ type SeedState = {
 function createState(
   options: {
     source?: Record<string, unknown>;
+    sourceGeneration?: string;
     circles?: Array<Record<string, unknown>>;
     purchased?: string[];
     hold?: string[];
@@ -25,7 +26,7 @@ function createState(
   return {
     schemaVersion: 1,
     source: options.source ?? { type: "csv", fileName: "empty.csv" },
-    sourceGeneration: "gen-e2e-01",
+    sourceGeneration: options.sourceGeneration ?? "gen-e2e-01",
     circles: options.circles ?? [],
     purchased: options.purchased ?? [],
     hold: options.hold ?? [],
@@ -758,5 +759,116 @@ test.describe("Mobile Management Flows", () => {
     await expect(
       page.locator('source-manager button[data-action="csv-export"]'),
     ).toBeDisabled();
+  });
+
+  test("Task 10: 管理画面が機密値をDOMとconsoleへ漏らさない", async ({
+    page,
+  }) => {
+    const sensitive = {
+      deploymentId: "AKfycbx_E2E_TEST_DEPLOYMENT",
+      queryToken: "TASK10_SECRET_QUERY_TOKEN",
+      csvBody: "space,priority,memo\n東ア01a,1,TASK10_RAW_CSV_BODY",
+      responseBody: "TASK10_RAW_RESPONSE_BODY",
+      stack: "Error: TASK10_PRIVATE_STACK at line 42",
+      memo: "TASK10_PRIVATE_MEMO",
+      tweet: "https://x.com/TASK10_PRIVATE_TWEET",
+    };
+    const consoleMessages: string[] = [];
+    page.on("console", (message) => consoleMessages.push(message.text()));
+
+    await routeGas(page, async (route) => {
+      if (route.request().method() === "POST") {
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({
+            ok: false,
+            status: "error",
+            message: sensitive.responseBody,
+            stack: sensitive.stack,
+            csv: sensitive.csvBody,
+            token: sensitive.queryToken,
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          status: "success",
+          sheets: ["day1"],
+          circles: [
+            {
+              space: "東ア01a",
+              priority: 1,
+              memo: sensitive.memo,
+              tweet: sensitive.tweet,
+            },
+          ],
+        }),
+      });
+    });
+
+    await seedStates(page, [
+      {
+        ref: { eventId: "demo-v1", dayId: "day1" },
+        state: createState({
+          source: {
+            type: "gas",
+            gasUrl: GAS_URL,
+            sheetName: "day1",
+          },
+          sourceGeneration: "gen-e2e-task10",
+          circles: [
+            {
+              space: "東ア01a",
+              priority: 1,
+              memo: sensitive.memo,
+              tweet: sensitive.tweet,
+            },
+          ],
+          gasOutbox: [
+            {
+              id: "entry-task10-sensitive",
+              eventId: "demo-v1",
+              dayId: "day1",
+              sourceGeneration: "gen-e2e-task10",
+              gasUrl: GAS_URL,
+              sheetName: "day1",
+              space: "東ア01a",
+              purchased: true,
+              createdAt: "2026-07-25T00:00:00.000Z",
+              attempts: 1,
+              lastError: sensitive.stack,
+            },
+          ],
+        }),
+      },
+    ]);
+
+    await page.goto("/");
+    await openSettings(page);
+
+    const rendered = await page.evaluate(() => ({
+      text: document.body.innerText,
+      nonInputAttributes: Array.from(document.querySelectorAll("*"))
+        .filter((element) => element.tagName !== "INPUT")
+        .flatMap((element) =>
+          Array.from(element.attributes).map(
+            (attribute) => `${attribute.name}=${attribute.value}`,
+          ),
+        )
+        .join("\n"),
+    }));
+    for (const value of Object.values(sensitive)) {
+      expect(rendered.text).not.toContain(value);
+      expect(rendered.nonInputAttributes).not.toContain(value);
+      expect(consoleMessages.join("\n")).not.toContain(value);
+    }
+
+    const gasInput = page.locator("#gas-url-input");
+    await expect(gasInput).toHaveValue(GAS_URL);
   });
 });

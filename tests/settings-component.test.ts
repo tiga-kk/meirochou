@@ -88,3 +88,44 @@ test("settings shell renders enabled delete options and emits only their scope",
   expect(events).toHaveLength(1);
   expect(events[0].detail).toEqual({ scope: deleteOption.scope });
 });
+
+test("settings shell renders an h2 heading for the screen reader landmark", async () => {
+  const element = new ComipathSettings();
+  element.open = true;
+  document.body.appendChild(element);
+  await element.updateComplete;
+
+  const heading = element.querySelector("h2");
+  expect(heading).not.toBeNull();
+  expect(heading?.textContent?.trim()).toContain("設定");
+  document.body.removeChild(element);
+});
+
+test("blocked delete option exposes reason text with role=status for screen readers", async () => {
+  const element = new ComipathSettings();
+  const blockedOption: DeleteOptionViewModel = {
+    scope: { type: "activity", ref: { eventId: "c104", dayId: "day1" } },
+    label: "購入・チェック履歴の削除（2件）",
+    consequence: "活動履歴を削除します。",
+    blocked: true,
+    blockedReason: "2件の送信待ちがあります。",
+  };
+  element.deleteOptions = [blockedOption];
+
+  document.body.appendChild(element);
+  await element.updateComplete;
+
+  const blockedMsg = element.querySelector<HTMLElement>(
+    ".storage-delete-blocked",
+  );
+  expect(blockedMsg).not.toBeNull();
+  expect(blockedMsg?.getAttribute("role")).toBe("status");
+  expect(blockedMsg?.textContent).toContain("送信待ち");
+
+  const btn = element.querySelector<HTMLButtonElement>(
+    ".storage-delete-option button",
+  );
+  expect(btn?.disabled).toBe(true);
+
+  document.body.removeChild(element);
+});

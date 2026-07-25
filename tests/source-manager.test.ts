@@ -246,4 +246,45 @@ describe("SourceManager Component", () => {
     expect(exportButton).not.toBeNull();
     expect(exportButton?.disabled).toBe(true);
   });
+
+  it("tab buttons have role=tab and aria-selected for screen readers", async () => {
+    await element.updateComplete;
+
+    const tablist = element.querySelector('[role="tablist"]');
+    expect(tablist).not.toBeNull();
+
+    const tabs = element.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    expect(tabs.length).toBe(2);
+    // At least one tab should be marked selected
+    const selectedTabs = Array.from(tabs).filter(
+      (t) => t.getAttribute("aria-selected") === "true",
+    );
+    expect(selectedTabs.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does not render deployed GAS URL in non-input DOM when model contains it", async () => {
+    const secretUrl =
+      "https://script.google.com/macros/s/AKfycbSECRET_FIXTURE/exec";
+    element.model = {
+      ...defaultModel,
+      sourceType: "gas",
+      gasUrlInput: secretUrl,
+      source: {
+        typeLabel: "Googleスプレッドシート",
+        detail: "シート1",
+        endpointSummary: "script.google.com",
+        pendingCount: 0,
+      },
+    };
+    await element.updateComplete;
+
+    // The endpoint summary (host only) may appear; the full path must not appear
+    // except inside the URL input itself
+    const urlInput = element.querySelector<HTMLInputElement>("#gas-url-input");
+    const allText = Array.from(element.querySelectorAll("*"))
+      .filter((n) => n !== urlInput && n.childNodes.length > 0)
+      .map((n) => n.textContent || "")
+      .join("");
+    expect(allText).not.toContain("AKfycbSECRET_FIXTURE");
+  });
 });

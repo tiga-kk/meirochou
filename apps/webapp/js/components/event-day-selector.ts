@@ -161,6 +161,11 @@ export class EventDaySelector extends LitElement {
           </div>
         </div>
         ${
+          this.busy
+            ? html`<p class="event-day-status" role="status">切替中…</p>`
+            : nothing
+        }
+        ${
           this.errorMessage
             ? html`<p class="settings-error" role="alert">${this.errorMessage}</p>`
             : nothing

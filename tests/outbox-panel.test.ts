@@ -299,4 +299,42 @@ describe("OutboxPanel Component (Lit)", () => {
     expect(el.querySelector(".btn-open-discard")).toBeNull();
     document.body.removeChild(el);
   });
+
+  it("discard modal has aria-modal and aria-labelledby pointing to heading", async () => {
+    const el = document.createElement("outbox-panel") as OutboxPanel;
+    document.body.appendChild(el);
+    el.model = createSampleModel();
+    await el.updateComplete;
+
+    el.querySelector<HTMLInputElement>(
+      'input[type="checkbox"].entry-select',
+    )?.click();
+    await el.updateComplete;
+    el.querySelector<HTMLButtonElement>(".btn-open-discard")?.click();
+    await el.updateComplete;
+
+    const modal = el.querySelector<HTMLElement>('[role="dialog"]');
+    expect(modal).not.toBeNull();
+    expect(modal?.getAttribute("aria-modal")).toBe("true");
+
+    const labelId = modal?.getAttribute("aria-labelledby");
+    expect(labelId).toBe("outbox-discard-title");
+    expect(el.querySelector(`#${labelId}`)).not.toBeNull();
+    expect(modal?.getAttribute("aria-describedby")).toBe("outbox-discard-desc");
+    expect(el.querySelector("#outbox-discard-desc")).not.toBeNull();
+
+    document.body.removeChild(el);
+  });
+
+  it("does not expose GAS URL or CSV content in rendered outbox entries", async () => {
+    const el = document.createElement("outbox-panel") as OutboxPanel;
+    document.body.appendChild(el);
+    el.model = createSampleModel();
+    await el.updateComplete;
+
+    expect(el.innerHTML).not.toContain("script.google.com/macros/s/");
+    expect(el.innerHTML).not.toContain("AKfycb");
+
+    document.body.removeChild(el);
+  });
 });

@@ -189,4 +189,46 @@ describe("EventDaySelector Component", () => {
       "切替に失敗しました。以前の状態を維持しています。",
     );
   });
+
+  it("associates label and select by for/id for screen readers", async () => {
+    element.options = sampleOptions;
+    element.selectedEventId = "c104";
+    element.selectedDayId = "day1";
+    await element.updateComplete;
+
+    const eventLabel = element.querySelector<HTMLLabelElement>(
+      "label[for='event-select']",
+    );
+    const dayLabel = element.querySelector<HTMLLabelElement>(
+      "label[for='day-select']",
+    );
+    const eventSelect =
+      element.querySelector<HTMLSelectElement>("#event-select");
+    const daySelect = element.querySelector<HTMLSelectElement>("#day-select");
+
+    expect(eventLabel).not.toBeNull();
+    expect(dayLabel).not.toBeNull();
+    expect(eventSelect).not.toBeNull();
+    expect(daySelect).not.toBeNull();
+    expect(eventLabel?.htmlFor).toBe("event-select");
+    expect(dayLabel?.htmlFor).toBe("day-select");
+  });
+
+  it("renders busy status as text alongside aria-busy to avoid color-only conveyance", async () => {
+    element.options = sampleOptions;
+    element.selectedEventId = "c104";
+    element.selectedDayId = "day1";
+    element.busy = true;
+    await element.updateComplete;
+
+    const container = element.querySelector(".event-day-selector-container");
+    expect(container?.getAttribute("aria-busy")).toBe("true");
+    expect(element.querySelector('[role="status"]')?.textContent).toContain(
+      "切替中",
+    );
+    const selects = element.querySelectorAll<HTMLSelectElement>("select");
+    for (const s of selects) {
+      expect(s.disabled).toBe(true);
+    }
+  });
 });

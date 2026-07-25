@@ -135,13 +135,15 @@ export class StorageDeleteDialog extends LitElement {
         class="modal-overlay modal-backdrop"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="storage-delete-dialog-title"
+        aria-describedby="storage-delete-dialog-desc"
         @click=${(e: Event) => {
           if (e.target === e.currentTarget) this.handleClose();
         }}
       >
         <div class="modal-content delete-modal-content">
-          <h3>データ削除の確認</h3>
-          <p class="delete-target-info">
+          <h3 id="storage-delete-dialog-title">データ削除の確認</h3>
+          <p id="storage-delete-dialog-desc" class="delete-target-info">
             <strong>対象:</strong> ${this.model.option.label} (${this.model.eventDayLabel})
           </p>
 
