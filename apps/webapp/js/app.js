@@ -1004,6 +1004,7 @@ export class App {
 
     if (devDemoEnabled) {
       this.ui.updateCounts(this.dm);
+      this.updateManagementModels();
       this.ui.showToast("UIデモデータを表示中");
       this.searchNext();
       return;
