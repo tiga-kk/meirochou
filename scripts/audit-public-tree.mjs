@@ -29,7 +29,8 @@ const FORBIDDEN_PATHS = [
 ];
 
 // Content scanning:
-// Runtime scan rejects deployed GAS URLs, catalogSpreadsheetId, and non-empty scriptId values.
+// Runtime scan rejects deployed GAS URLs, catalogSpreadsheetId, non-empty scriptId values,
+// and non-empty Cloudflare credential assignments.
 // Exclude tests, plan documents, and the auditor's own pattern definitions.
 // Deployed GAS URL pattern matches script.google.com/macros/s/<id>
 const GAS_URL_PATTERN = /script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+/i;
@@ -37,6 +38,8 @@ const CATALOG_SSID_PATTERN = /catalogSpreadsheetId/i;
 // Match non-empty scriptId (i.e. not empty string)
 const SCRIPT_ID_PATTERN = /"scriptId"\s*:\s*"[^"]+"/i;
 const SCRIPT_ID_JS_PATTERN = /scriptId\s*:\s*"[^"]+"/i;
+const CLOUDFLARE_ASSIGNMENT_PATTERN =
+  /\b(CLOUDFLARE_API_TOKEN|CF_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|CF_ACCOUNT_ID|CLOUDFLARE_ZONE_ID)\b["']?\s*[:=]\s*["']?[A-Za-z0-9_-]{16,}/i;
 
 export function auditPublicTree(rootUrl) {
   const rootPath = resolve(fileURLToPath(rootUrl));
@@ -98,6 +101,11 @@ export function auditPublicTree(rootUrl) {
                 `Credential leak: Non-empty scriptId found in ${relPath}`,
               );
             }
+          }
+          if (CLOUDFLARE_ASSIGNMENT_PATTERN.test(content)) {
+            throw new Error(
+              `Cloudflare credential assignment found in ${relPath}`,
+            );
           }
         }
       }

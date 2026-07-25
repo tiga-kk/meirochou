@@ -23,6 +23,7 @@
 - [データ契約](guides/data-contracts.md) — LocalStorage スキーマ、ソースプレビュー、CSV境界
 - [GAS同期](guides/gas-sync.md) — GASネットワーク動作、outboxリトライ
 - [GASデプロイ手順](integrations/gas-spreadsheet/README.md) — スプレッドシート構造、デプロイ手順
+- [Cloudflare Pages公開・運用](guides/cloudflare-pages-deployment.md) — 本番、PRプレビュー、Access、ロールバック
 
 ## セットアップ
 
