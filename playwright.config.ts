@@ -23,7 +23,7 @@ export default defineConfig({
   },
   projects: [
     {
-      name: isCi ? "mobile-chromium-ci" : "mobile-chromium",
+      name: "mobile-chromium",
       use: { ...devices["Pixel 5"] },
     },
   ],
