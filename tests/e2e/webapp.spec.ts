@@ -389,20 +389,18 @@ test("切替前の画像エラーで現在の次地点画像を消さない", as
   ).toHaveCount(0);
 });
 
-test("Phase 2では設定欄からGAS通信を実行しない", async ({ page }) => {
+test("設定画面の開閉やソース閲覧時に明示的な取得なしにGAS GETを実行しない", async ({
+  page,
+}) => {
   let requestCount = 0;
-  await page.route("https://example.test/gas**", async (route) => {
+  await page.route("https://script.google.com/**", async (route) => {
     requestCount += 1;
     await route.abort();
   });
   await page.goto("/");
 
   await page.locator("#toggle-settings").click();
-  await page.locator("#gas-url").fill("https://example.test/gas");
-  await page.locator("#btn-fetch-sheets").click();
-  await expect(page.locator("#toast")).toContainText(
-    "GAS同期はPhase 2では利用できません",
-  );
+  await expect(page.locator("source-manager")).toBeVisible();
   expect(requestCount).toBe(0);
 });
 

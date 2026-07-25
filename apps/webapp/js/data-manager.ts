@@ -30,6 +30,7 @@ import type {
   ActionType,
   Circle,
   CircleRecord,
+  CsvIssue,
   EventDayRef,
   EventRegistryV1,
   GasDataSource,
@@ -90,6 +91,19 @@ interface LegacyPreviewRecord {
   readonly history: readonly HistoryEntry[];
   readonly redo: readonly HistoryEntry[];
   readonly issues: readonly string[];
+}
+
+/** Preserves structured CSV diagnostics without collapsing them at the service boundary. */
+export class CsvValidationError extends Error {
+  readonly issues: readonly CsvIssue[];
+
+  constructor(issues: readonly CsvIssue[]) {
+    const summary = issues.map((i) => i.message).join("; ");
+    super(`CSV validation error: ${summary}`);
+    this.name = "CsvValidationError";
+    this.issues = Object.freeze([...issues]);
+    Object.setPrototypeOf(this, CsvValidationError.prototype);
+  }
 }
 
 export class StaleCsvPreviewError extends Error {
@@ -314,9 +328,7 @@ export class DataManager {
   private parseCsv(text: string): readonly CircleRecord[] {
     const result = parseCircleCsv(text);
     if (!result.ok) {
-      throw new Error(
-        `CSV parse failed: ${result.issues.map((issue) => issue.message).join("; ")}`,
-      );
+      throw new CsvValidationError(result.issues);
     }
     return result.circles;
   }

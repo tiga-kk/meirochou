@@ -1,7 +1,8 @@
 import "./components/comipath-settings";
+import { parseGasWebAppUrl } from "./api/gas-api-client";
 import { Config } from "./config.js";
 import { loadEventRegistryWithUrl } from "./data/event-registry";
-import { DataManager } from "./data-manager.js";
+import { CsvValidationError, DataManager } from "./data-manager.js";
 import { createDevDemoData, isDevDemoEnabled } from "./dev-demo-data.js";
 import {
   loadMapBundleManifestFromUrl,
@@ -13,7 +14,11 @@ import { EventDayRepository } from "./state/event-day-repository";
 import { StorageService } from "./state/storage-service";
 import { TspSolver } from "./tsp-solver.js";
 import { parseGridMeta, parsePointsPayload } from "./types/boundary-parsers";
-import { buildEventDayOptions } from "./ui/management-view-model";
+import { ManagementSession } from "./ui/management-session";
+import {
+  buildEventDayOptions,
+  formatSourceSummary,
+} from "./ui/management-view-model";
 import { buildSpaceFromLocation } from "./ui/navigation-view-model";
 import { UIManager } from "./ui-manager.js";
 
@@ -40,6 +45,42 @@ function areSpacesInSameArea(spaceA, spaceB) {
   return Boolean(areaA && areaB && areaA.id === areaB.id);
 }
 
+/** Accepts only a validated GAS source shape at the App/component boundary. */
+function safeGasSource(value) {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    value.type !== "gas" ||
+    typeof value.gasUrl !== "string" ||
+    typeof value.sheetName !== "string" ||
+    value.sheetName.trim() === ""
+  ) {
+    return null;
+  }
+
+  try {
+    return {
+      type: "gas",
+      gasUrl: parseGasWebAppUrl(value.gasUrl),
+      sheetName: value.sheetName,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Redacts CSV cell-bearing parser messages before showing them in the UI. */
+function formatCsvIssue(message) {
+  if (message === "Missing required field: space") return message;
+  if (message === "Invalid priority value: must be a number") return message;
+  if (message.startsWith("Missing required header column")) {
+    return "Missing required header column";
+  }
+  if (message.startsWith("Duplicate space:")) return "Duplicate space";
+  if (message.startsWith("Syntax error:")) return "CSV syntax error";
+  return "Invalid CSV data";
+}
+
 /**
  * アプリケーションのメインコントローラー
  */
@@ -47,6 +88,7 @@ export class App {
   constructor() {
     this.dm = new DataManager();
     this.ui = new UIManager();
+    this.session = new ManagementSession();
     this.currentTarget = null;
     this.currentRoute = null;
     this.currentStartSpace = "";
@@ -60,9 +102,14 @@ export class App {
     this.currentManifest = null;
     this.transitionToken = 0;
     this.isTransitioning = false;
+
+    this.draftGasUrl = "";
+    this.selectedSheetName = "";
+    this.fetchedSheetNames = [];
+    this.sourceErrorMessage = "";
   }
 
-  /** Rebuild the management selector from the registry and local state. */
+  /** Rebuild the management selector and source manager models from registry and local state. */
   updateManagementModels() {
     if (!this.dm.eventRegistry) return;
     const states = this.dm.repository
@@ -79,11 +126,287 @@ export class App {
       this.dm.activeRef,
     );
 
+    const activeState = this.dm.activeState;
+    const activeRef = this.dm.activeRef;
+    const eventObj = activeRef
+      ? this.dm.eventRegistry.events.find(
+          (e) => e.eventId === activeRef.eventId,
+        )
+      : null;
+    const activeRefLabel = activeRef
+      ? `${eventObj?.displayName || activeRef.eventId} ${activeRef.dayId}`
+      : "";
+
+    const sourceSummary = activeState
+      ? formatSourceSummary(activeState)
+      : {
+          typeLabel: "CSV",
+          detail: "empty.csv",
+          endpointSummary: null,
+          pendingCount: 0,
+        };
+
+    const pendingCount = activeState ? activeState.gasOutbox.length : 0;
+    const sourceType = activeState?.source.type === "gas" ? "gas" : "csv";
+
+    const sourceManagerModel = {
+      activeRefLabel,
+      source: sourceSummary,
+      sourceType,
+      gasUrlInput:
+        this.draftGasUrl ||
+        (activeState?.source.type === "gas" ? activeState.source.gasUrl : ""),
+      selectedSheetName:
+        this.selectedSheetName ||
+        (activeState?.source.type === "gas"
+          ? activeState.source.sheetName
+          : ""),
+      sheetNames: this.fetchedSheetNames || [],
+      pendingCount,
+      busy:
+        this.session.isBusy("source-request") ||
+        this.session.isBusy("transition"),
+      errorMessage: this.sourceErrorMessage || "",
+    };
+
     this.ui.updateSettingsState({
       eventDayOptions: options,
       selectedEventId: this.dm.activeRef?.eventId || "",
       selectedDayId: this.dm.activeRef?.dayId || "",
+      sourceManagerModel,
     });
+  }
+
+  /** Handle CSV file preview request without saving or applying. */
+  async handleCsvPreviewRequest(file) {
+    if (
+      !file ||
+      typeof file.name !== "string" ||
+      !/\.csv$/i.test(file.name) ||
+      typeof file.size !== "number" ||
+      file.size < 0 ||
+      !this.dm.activeRef ||
+      !this.dm.activeState
+    ) {
+      this.sourceErrorMessage = "拡張子が .csv のファイルを選択してください。";
+      this.updateManagementModels();
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      this.sourceErrorMessage = "ファイルサイズは5MB以下にしてください。";
+      this.updateManagementModels();
+      return;
+    }
+
+    const token = this.session.beginSourceRequest();
+    const activeRef = { ...this.dm.activeRef };
+    const expectedGeneration = this.dm.activeState.sourceGeneration;
+
+    try {
+      const text = await file.text();
+      if (
+        !this.session.isLatestRequestToken(token) ||
+        !this.dm.activeRef ||
+        this.dm.activeRef.eventId !== activeRef.eventId ||
+        this.dm.activeRef.dayId !== activeRef.dayId ||
+        this.dm.activeState?.sourceGeneration !== expectedGeneration
+      ) {
+        return;
+      }
+
+      const preview = await this.dm.previewCsvReplacement(
+        activeRef,
+        file.name,
+        text,
+      );
+
+      if (
+        !this.session.isLatestRequestToken(token) ||
+        !this.dm.activeRef ||
+        this.dm.activeRef.eventId !== activeRef.eventId ||
+        this.dm.activeRef.dayId !== activeRef.dayId ||
+        this.dm.activeState?.sourceGeneration !== expectedGeneration
+      ) {
+        return;
+      }
+
+      this.session.setActivePreview({
+        kind: "csv",
+        ref: activeRef,
+        previewId: preview.previewId,
+        expectedSourceGeneration: expectedGeneration,
+      });
+      this.sourceErrorMessage = "";
+      this.updateManagementModels();
+    } catch (err) {
+      if (!this.session.isLatestRequestToken(token)) return;
+      if (err instanceof CsvValidationError) {
+        const issuesSummary = err.issues
+          .map(
+            (i) => `[${i.row}行目 ${i.column}列] ${formatCsvIssue(i.message)}`,
+          )
+          .join("; ");
+        this.sourceErrorMessage = `CSVデータの検証エラー: ${issuesSummary}`;
+      } else {
+        this.sourceErrorMessage = "CSVプレビューの生成に失敗しました。";
+      }
+      this.updateManagementModels();
+    } finally {
+      if (this.session.isLatestRequestToken(token)) {
+        this.session.setBusy("source-request", false);
+        this.session.setGasAbortController(null);
+        this.updateManagementModels();
+      }
+    }
+  }
+
+  /** Fetch sheet names for a given GAS Web App URL without persisting the URL. */
+  async handleGasSheetsRequest(gasUrl) {
+    if (!gasUrl || !this.dm.activeRef || !this.dm.activeState) return;
+
+    let normalizedUrl;
+    try {
+      normalizedUrl = parseGasWebAppUrl(gasUrl);
+    } catch {
+      this.sourceErrorMessage =
+        "有効なGoogle Apps ScriptのWebApp URLを入力してください。";
+      this.updateManagementModels();
+      return;
+    }
+
+    const token = this.session.beginSourceRequest();
+    const activeRef = { ...this.dm.activeRef };
+    const expectedGeneration = this.dm.activeState.sourceGeneration;
+    const controller = new AbortController();
+
+    this.session.setGasAbortController(controller);
+    this.draftGasUrl = normalizedUrl;
+    this.sourceErrorMessage = "";
+    this.updateManagementModels();
+
+    try {
+      const res = await this.dm.client.fetchSheetList(
+        normalizedUrl,
+        controller.signal,
+      );
+      if (
+        !this.session.isLatestRequestToken(token) ||
+        !this.dm.activeRef ||
+        this.dm.activeRef.eventId !== activeRef.eventId ||
+        this.dm.activeRef.dayId !== activeRef.dayId ||
+        this.dm.activeState?.sourceGeneration !== expectedGeneration
+      ) {
+        return;
+      }
+
+      this.fetchedSheetNames = res.sheets || [];
+      this.selectedSheetName = this.fetchedSheetNames[0] || "";
+      this.sourceErrorMessage = "";
+    } catch (_err) {
+      if (!this.session.isLatestRequestToken(token)) return;
+      this.fetchedSheetNames = [];
+      this.selectedSheetName = "";
+      this.sourceErrorMessage =
+        "スプレッドシート一覧の取得に失敗しました。URLを確認してください。";
+    } finally {
+      if (this.session.isLatestRequestToken(token)) {
+        this.session.setBusy("source-request", false);
+        this.session.setGasAbortController(null);
+        this.updateManagementModels();
+      }
+    }
+  }
+
+  /** Stage a GAS preview for initial import, replacement, or refresh. */
+  async handleGasPreviewRequest(source, requestedMode) {
+    void requestedMode;
+    const normalizedSource = safeGasSource(source);
+    if (!normalizedSource || !this.dm.activeRef || !this.dm.activeState) {
+      this.sourceErrorMessage =
+        "有効なWebApp URLとシート名を指定してください。";
+      this.updateManagementModels();
+      return;
+    }
+
+    const activeState = this.dm.activeState;
+    const activeRef = { ...this.dm.activeRef };
+    const expectedGeneration = activeState.sourceGeneration;
+
+    // Validate mode against persisted source
+    let validatedMode = "replacement";
+    if (
+      activeState.source.type === "csv" &&
+      activeState.source.fileName === "empty.csv" &&
+      activeState.circles.length === 0
+    ) {
+      validatedMode = "initial";
+    } else if (
+      activeState.source.type === "gas" &&
+      activeState.source.gasUrl === normalizedSource.gasUrl &&
+      activeState.source.sheetName === normalizedSource.sheetName
+    ) {
+      validatedMode = "refresh";
+    } else {
+      validatedMode = "replacement";
+    }
+
+    const token = this.session.beginSourceRequest();
+    const controller = new AbortController();
+
+    this.session.setGasAbortController(controller);
+    this.sourceErrorMessage = "";
+    this.updateManagementModels();
+
+    try {
+      let preview;
+      if (validatedMode === "initial") {
+        preview = await this.dm.refreshService.previewInitialImport(
+          activeRef,
+          normalizedSource,
+          controller.signal,
+        );
+      } else if (validatedMode === "replacement") {
+        preview = await this.dm.refreshService.previewReplacement(
+          activeRef,
+          normalizedSource,
+          controller.signal,
+        );
+      } else {
+        preview = await this.dm.refreshService.previewRefresh(
+          activeRef,
+          controller.signal,
+        );
+      }
+
+      if (
+        !this.session.isLatestRequestToken(token) ||
+        !this.dm.activeRef ||
+        this.dm.activeRef.eventId !== activeRef.eventId ||
+        this.dm.activeRef.dayId !== activeRef.dayId ||
+        this.dm.activeState?.sourceGeneration !== expectedGeneration
+      ) {
+        return;
+      }
+
+      this.session.setActivePreview({
+        kind: "gas",
+        ref: activeRef,
+        previewId: preview.previewId,
+        mode: validatedMode,
+        expectedSourceGeneration: expectedGeneration,
+      });
+      this.sourceErrorMessage = "";
+    } catch (_err) {
+      if (!this.session.isLatestRequestToken(token)) return;
+      this.sourceErrorMessage = "GASプレビューの取得に失敗しました。";
+    } finally {
+      if (this.session.isLatestRequestToken(token)) {
+        this.session.setBusy("source-request", false);
+        this.session.setGasAbortController(null);
+        this.updateManagementModels();
+      }
+    }
   }
 
   /** Prepare and atomically commit a registry-approved event/day transition. */
@@ -112,8 +435,15 @@ export class App {
       return;
     }
 
+    this.session.onEventDayChange();
+    this.draftGasUrl = "";
+    this.selectedSheetName = "";
+    this.fetchedSheetNames = [];
+    this.sourceErrorMessage = "";
+
     const token = ++this.transitionToken;
     this.isTransitioning = true;
+    this.session.setBusy("transition", true);
     this.ui.setSettingsBusy(true);
     this.ui.setSettingsError("");
 
@@ -163,7 +493,9 @@ export class App {
     } finally {
       if (token === this.transitionToken) {
         this.isTransitioning = false;
+        this.session.setBusy("transition", false);
         this.ui.setSettingsBusy(false);
+        this.updateManagementModels();
         if (focusTarget instanceof HTMLElement) focusTarget.focus();
       }
     }
@@ -434,8 +766,19 @@ export class App {
    */
   setupEvents() {
     // 設定ボタン
-    document.getElementById("toggle-settings").onclick = () =>
+    document.getElementById("toggle-settings").onclick = () => {
+      const isOpen = !this.ui.els.settingsArea.open;
+      if (!isOpen) {
+        this.session.onSettingsClose();
+        this.draftGasUrl = "";
+        this.selectedSheetName = "";
+        this.fetchedSheetNames = [];
+        this.sourceErrorMessage = "";
+        this.ui.setSettingsError("");
+        this.updateManagementModels();
+      }
       this.ui.toggleSettings(document.getElementById("toggle-settings"));
+    };
 
     const btnOpenGallery = document.getElementById("btn-open-gallery");
     if (btnOpenGallery) {
@@ -451,14 +794,16 @@ export class App {
       this.handleEventDaySelect(e.detail);
     });
 
-    settings.addEventListener("settings-fetch-sheets-request", async () => {
-      this.ui.setSettingsError("GAS同期はPhase 2では利用できません");
-      this.ui.showToast("GAS同期はPhase 2では利用できません");
+    settings.addEventListener("csv-preview-request", (e) => {
+      this.handleCsvPreviewRequest(e.detail.file);
     });
 
-    settings.addEventListener("settings-refresh-request", async () => {
-      this.ui.setSettingsError("GAS同期はPhase 2では利用できません");
-      this.ui.showToast("GAS同期はPhase 2では利用できません");
+    settings.addEventListener("gas-sheets-request", (e) => {
+      this.handleGasSheetsRequest(e.detail.gasUrl);
+    });
+
+    settings.addEventListener("gas-preview-request", (e) => {
+      this.handleGasPreviewRequest(e.detail.source, e.detail.mode);
     });
 
     // 各種ボタンアクション

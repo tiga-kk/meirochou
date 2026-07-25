@@ -132,13 +132,21 @@ export function buildEventDayOptions(
         selected.eventId === event.eventId &&
         selected.dayId === day.dayId;
 
+      const isConfigured =
+        state !== undefined &&
+        !(
+          state.source.type === "csv" &&
+          state.source.fileName === "empty.csv" &&
+          state.circles.length === 0
+        );
+
       options.push(
         Object.freeze({
           eventId: event.eventId,
           eventLabel: event.displayName,
           dayId: day.dayId,
           dayLabel: day.displayName,
-          configured: state !== undefined,
+          configured: isConfigured,
           selected: isSelected,
           pendingCount: state ? state.gasOutbox.length : 0,
         }),

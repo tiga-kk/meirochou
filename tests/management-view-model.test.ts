@@ -188,6 +188,23 @@ describe("buildEventDayOptions", () => {
       ),
     ).toBe(true);
   });
+
+  it("marks empty.csv sentinel with 0 circles as unconfigured (configured=false)", () => {
+    const emptySentinelState: LocalEventDayState = {
+      ...sampleCsvState,
+      source: { type: "csv", fileName: "empty.csv" },
+      circles: [],
+      purchased: ["東A-01a"], // retained activity
+    };
+
+    const options = buildEventDayOptions(
+      sampleRegistry,
+      [{ ref: { eventId: "c104", dayId: "day1" }, state: emptySentinelState }],
+      { eventId: "c104", dayId: "day1" },
+    );
+
+    expect(options[0].configured).toBe(false);
+  });
 });
 
 describe("formatSourceSummary", () => {

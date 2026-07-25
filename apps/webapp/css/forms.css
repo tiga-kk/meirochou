@@ -180,6 +180,109 @@ input[type="text"] {
   font-weight: bold;
 }
 
+.source-manager-panel {
+  margin-top: 1rem;
+}
+
+.source-summary-card {
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+  padding: 0.75rem 0;
+}
+
+.source-summary-card h3,
+.source-summary-card p {
+  margin: 0;
+}
+
+.source-summary-card h3 {
+  font-size: 0.95rem;
+}
+
+.source-summary-card .source-detail,
+.source-summary-card .endpoint-summary {
+  color: var(--text-sub);
+  font-size: 0.85rem;
+  margin-top: 0.35rem;
+}
+
+.pending-warning-box,
+.form-error-message {
+  color: #8a2f20;
+  font-size: 0.85rem;
+  margin-top: 0.75rem;
+  padding: 0.6rem;
+  border: 1px solid #c0392b;
+}
+
+.source-type-tabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 0.75rem;
+}
+
+.source-type-tabs button,
+.source-manager-panel button,
+.source-manager-panel select,
+.source-manager-panel input[type="file"] {
+  min-height: 44px;
+}
+
+.source-type-tabs button {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: #fff;
+  color: var(--text-main);
+  font-family: inherit;
+}
+
+.source-type-tabs button[aria-selected="true"] {
+  background: var(--ink);
+  color: #fff;
+}
+
+.csv-source-form,
+.gas-source-form {
+  margin-top: 0.75rem;
+}
+
+.gas-source-form .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 0.75rem;
+}
+
+.source-manager-panel input[type="text"],
+.source-manager-panel select {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: #fff;
+  color: var(--text-main);
+  font: inherit;
+}
+
+.source-manager-panel button {
+  padding: 8px 12px;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: #fff;
+  color: var(--text-main);
+  font-family: inherit;
+}
+
+.source-manager-panel button:disabled,
+.source-manager-panel input:disabled,
+.source-manager-panel select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .input-row {
   display: flex;
   gap: 6px;

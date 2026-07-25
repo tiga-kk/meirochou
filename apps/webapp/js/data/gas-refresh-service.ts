@@ -154,6 +154,7 @@ export class GasRefreshService {
   async previewInitialImport(
     ref: EventDayRef,
     source: GasDataSource,
+    signal?: AbortSignal,
   ): Promise<GasRefreshPreview> {
     const state = this.requireState(ref);
     const previewSource = cloneGasSource(source);
@@ -174,6 +175,7 @@ export class GasRefreshService {
     const fetched = await this.client.fetchCircles(
       previewSource.gasUrl,
       previewSource.sheetName,
+      signal,
     );
     const fetchedCircles = fetched.circles.map(gasCircleToRecord);
     const diff = diffCircleSources(state.circles, fetchedCircles);
@@ -202,6 +204,7 @@ export class GasRefreshService {
   async previewReplacement(
     ref: EventDayRef,
     source: GasDataSource,
+    signal?: AbortSignal,
   ): Promise<GasRefreshPreview> {
     const state = this.requireState(ref);
     const previewSource = cloneGasSource(source);
@@ -226,6 +229,7 @@ export class GasRefreshService {
     const fetched = await this.client.fetchCircles(
       previewSource.gasUrl,
       previewSource.sheetName,
+      signal,
     );
     const fetchedCircles = fetched.circles.map(gasCircleToRecord);
     const diff = diffCircleSources(state.circles, fetchedCircles);
@@ -257,7 +261,10 @@ export class GasRefreshService {
   }
 
   /** Fetch and stage a preview for the configured GAS source. */
-  async previewRefresh(ref: EventDayRef): Promise<GasRefreshPreview> {
+  async previewRefresh(
+    ref: EventDayRef,
+    signal?: AbortSignal,
+  ): Promise<GasRefreshPreview> {
     const state = this.requireState(ref);
     if (state.source.type !== "gas") {
       throw new Error("Refresh requires a GAS source");
@@ -267,6 +274,7 @@ export class GasRefreshService {
     const fetched = await this.client.fetchCircles(
       source.gasUrl,
       source.sheetName,
+      signal,
     );
     const fetchedCircles = fetched.circles.map(gasCircleToRecord);
     const diff = diffCircleSources(state.circles, fetchedCircles);
