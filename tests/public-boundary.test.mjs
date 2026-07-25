@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   existsSync,
+  readFileSync,
   mkdirSync,
   mkdtempSync,
   rmSync,
@@ -88,4 +89,28 @@ test("allows a harmless Cloudflare variable-name mention", () => {
   );
 
   assert.ok(result.files.includes("apps/webapp/config.js"));
+});
+
+test("Cloudflare Pages runbook documents the minimal deployment contract", () => {
+  const guide = readFileSync(
+    new URL("../guides/cloudflare-pages-deployment.md", import.meta.url),
+    "utf8",
+  );
+  const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
+
+  assert.match(guide, /Git integration/);
+  assert.match(guide, /`meirochou`/);
+  assert.match(guide, /`main`/);
+  assert.match(guide, /`npm run build:webapp`/);
+  assert.match(guide, /`dist\/webapp`/);
+  assert.match(guide, /`NODE_VERSION=22\.14\.0`/);
+  assert.match(guide, /`meirochou\.tiga\.moe`/);
+  assert.match(guide, /preview.*Access|Access.*preview/i);
+  assert.match(guide, /X-Robots-Tag.*noindex/i);
+  assert.match(guide, /Rollback/);
+
+  assert.doesNotMatch(guide, /wrangler\s+(pages\s+)?deploy/i);
+  assert.doesNotMatch(guide, /Pages Functions|KV|R2|D1|Web Analytics.*有効/i);
+  assert.doesNotMatch(guide, /CLOUDFLARE_API_TOKEN\s*=/);
+  assert.match(readme, /guides\/cloudflare-pages-deployment\.md/);
 });
