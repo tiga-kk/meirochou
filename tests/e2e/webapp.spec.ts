@@ -263,7 +263,7 @@ test("連続してピンを押した時は最後に選んだ候補だけを表�
 });
 
 test("候補経路を探索できない時は現在経路を維持する", async ({ page }) => {
-  await page.route("**/assets/maps/demo-east/points.json", async (route) => {
+  await page.route("**/assets/maps/**/points.json", async (route) => {
     const response = await route.fetch();
     const payload = await response.json();
     payload.points = payload.points.map((point: Record<string, unknown>) =>
@@ -313,7 +313,7 @@ test("マニフェストの2エリアから現在地候補を切り替える", a
 test("地図マニフェスト取得失敗時はAppを起動せず診断画面を表示する", async ({
   page,
 }) => {
-  await page.route("**/assets/maps/manifest.json", (route) =>
+  await page.route("**/assets/maps/**/manifest.json", (route) =>
     route.fulfill({ status: 503, body: "unavailable" }),
   );
 
@@ -327,7 +327,7 @@ test("地図マニフェスト取得失敗時はAppを起動せず診断画面�
 });
 
 test("地点JSON取得失敗時は推測位置のピンを表示しない", async ({ page }) => {
-  await page.route("**/assets/maps/demo-east/points.json", (route) =>
+  await page.route("**/assets/maps/**/points.json", (route) =>
     route.fulfill({ status: 503, body: "unavailable" }),
   );
 
@@ -389,20 +389,18 @@ test("切替前の画像エラーで現在の次地点画像を消さない", as
   ).toHaveCount(0);
 });
 
-test("Phase 2では設定欄からGAS通信を実行しない", async ({ page }) => {
+test("設定画面の開閉やソース閲覧時に明示的な取得なしにGAS GETを実行しない", async ({
+  page,
+}) => {
   let requestCount = 0;
-  await page.route("https://example.test/gas**", async (route) => {
+  await page.route("https://script.google.com/**", async (route) => {
     requestCount += 1;
     await route.abort();
   });
   await page.goto("/");
 
   await page.locator("#toggle-settings").click();
-  await page.locator("#gas-url").fill("https://example.test/gas");
-  await page.locator("#btn-fetch-sheets").click();
-  await expect(page.locator("#toast")).toContainText(
-    "GAS同期はPhase 2では利用できません",
-  );
+  await expect(page.locator("source-manager")).toBeVisible();
   expect(requestCount).toBe(0);
 });
 

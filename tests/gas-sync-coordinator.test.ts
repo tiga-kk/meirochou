@@ -214,4 +214,39 @@ describe("Phase 3 Task 6: GasSyncCoordinator", () => {
     expect(summary.pending).toBe(1);
     expect(summary.failures).toEqual([{ ref, category: "unknown" }]);
   });
+
+  test("retry(null) delegates to processAll and retry(ref) processes single ref", async () => {
+    const { repository, coordinator, fetchSpy } = createSetup();
+
+    const ref1: EventDayRef = { eventId: "c108", dayId: "day1" };
+    const ref2: EventDayRef = { eventId: "c108", dayId: "day2" };
+
+    repository.save(ref1, createGasState(ref1, ["A-01"]));
+    repository.save(ref2, createGasState(ref2, ["B-01"]));
+
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "Content-Type": "application/json" }),
+      json: async () => ({
+        ok: true,
+        status: "success",
+        sheetName: "day1",
+        space: "A-01",
+        updated: true,
+      }),
+    });
+
+    // Test retry single ref
+    const singleSummary = await coordinator.retry(ref1);
+    expect(singleSummary.processedRefs).toBe(1);
+    expect(singleSummary.sent).toBe(1);
+    expect(singleSummary.pending).toBe(0);
+
+    // Test retry null (all refs)
+    const allSummary = await coordinator.retry(null);
+    expect(allSummary.processedRefs).toBe(1); // ref2 (1 pending) processed, ref1 was already empty
+    expect(allSummary.sent).toBe(1); // ref2 sent
+    expect(allSummary.pending).toBe(0);
+  });
 });

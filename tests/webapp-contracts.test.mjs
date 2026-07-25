@@ -92,8 +92,6 @@ test("documentation describes Phase 3 GAS sync contract accurately without claim
   const gasSyncContract = read("guides/gas-sync.md");
   const gasReadme = read("integrations/gas-spreadsheet/README.md");
 
-  assert.equal(publicReadme, "");
-
   const docsCombined = [dataContracts, gasSyncContract, gasReadme].join("\n");
 
   assert.match(docsCombined, /explicit refresh/);
@@ -114,6 +112,67 @@ test("documentation describes Phase 3 GAS sync contract accurately without claim
 
   assert.doesNotMatch(docsCombined, /\/macros\/s\/[A-Za-z0-9_-]+\/exec/);
   assert.doesNotMatch(docsCombined, /Phase 4 management UI is available/i);
+
+  // README should now contain a support matrix with links, not be empty
+  assert.match(publicReadme, /guides\//);
+  assert.doesNotMatch(
+    publicReadme,
+    /Service Worker.*available|offline.*asset.*available/i,
+  );
+  assert.doesNotMatch(publicReadme, /\/macros\/s\/[A-Za-z0-9_-]+\/exec/);
+});
+
+test("Phase 4 user-data-management guide covers required workflows", () => {
+  const guide = read("guides/user-data-management.md");
+
+  // event/day selection and map switch failure
+  assert.match(guide, /イベント.*日程/);
+  assert.match(guide, /切替|切り替え/);
+
+  // CSV import and replacement
+  assert.match(guide, /CSV/);
+  assert.match(guide, /インポート|import/i);
+
+  // GAS workflows
+  assert.match(guide, /スプレッドシート|GAS/);
+  assert.match(guide, /デプロイ|deploy/i);
+  assert.match(guide, /シート.*選択|選択.*シート/);
+
+  // local-first purchase
+  assert.match(guide, /購入/);
+  assert.match(guide, /保留/);
+
+  // retry vs discard consequences
+  assert.match(guide, /再送|retry/i);
+  assert.match(guide, /破棄|discard/i);
+
+  // deletion scopes (four)
+  assert.match(guide, /サークルリスト/);
+  assert.match(guide, /履歴/);
+  assert.match(guide, /日程データ/);
+  assert.match(guide, /全イベント/);
+
+  // CSV export
+  assert.match(guide, /エクスポート/);
+
+  // single-device limit
+  assert.match(guide, /単一端末|1台|LocalStorage/);
+
+  // formula-like CSV values warning
+  assert.match(guide, /数式に見える文字列/);
+  assert.match(guide, /外部ソースとして扱ってください/);
+
+  // safe recovery
+  assert.match(guide, /エラー|失敗/);
+
+  // no Service Worker guarantee
+  assert.doesNotMatch(
+    guide,
+    /(?:Service Worker|PWA).*(?:利用可能|対応|有効|オフライン)/i,
+  );
+
+  // no deployed URL pattern
+  assert.doesNotMatch(guide, /\/macros\/s\/[A-Za-z0-9_-]+\/exec/);
 });
 
 test("Apps Script source exists only under integrations", () => {
@@ -1277,7 +1336,10 @@ test("webapp navigation map renders the configured map image", () => {
 test("webapp validates the map manifest before constructing App", () => {
   const appSource = read("apps/webapp/js/app.js");
   const loadIndex = appSource.indexOf("await loadMapBundleManifest");
-  const initializeIndex = appSource.indexOf("Config.initializeAreas");
+  const initializeIndex = appSource.indexOf(
+    "Config.initializeAreas",
+    loadIndex,
+  );
   const constructIndex = appSource.indexOf("new App()", initializeIndex);
 
   assert.ok(loadIndex >= 0);

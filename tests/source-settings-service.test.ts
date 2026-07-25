@@ -213,6 +213,16 @@ describe("SourceSettingsService generation & guarded save invariants", () => {
       }),
     ).toThrow();
 
+    // circles-delete with same generation => throw
+    expect(() =>
+      service.saveGuarded({
+        ref,
+        operation: "circles-delete",
+        expectedSourceGeneration: "gen1",
+        nextState: sameGenState,
+      }),
+    ).toThrow();
+
     // Refresh with changed generation => throw
     const newGenState: LocalEventDayState = {
       ...state,

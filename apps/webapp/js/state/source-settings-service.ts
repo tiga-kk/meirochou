@@ -48,6 +48,7 @@ const REPLACEMENT_OPERATIONS: readonly ProtectedSourceOperation[] = [
   "gas-url-change",
   "sheet-name-change",
   "source-type-change",
+  "circles-delete",
 ];
 
 function isReplacementOperation(operation: ProtectedSourceOperation): boolean {

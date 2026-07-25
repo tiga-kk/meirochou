@@ -249,6 +249,9 @@ export function parseLocalEventDayState(value: unknown): LocalEventDayState {
     parsedCircles.push(Object.freeze(record));
   }
 
+  const isCsvEmptySentinel =
+    source.type === "csv" && source.fileName === "empty.csv";
+
   // 5. purchased
   const rawPurchased = raw.purchased;
   if (!Array.isArray(rawPurchased)) {
@@ -265,7 +268,7 @@ export function parseLocalEventDayState(value: unknown): LocalEventDayState {
     if (purchasedSpaces.has(p)) {
       throw new StorageSchemaError(`Duplicate purchased space detected: ${p}`);
     }
-    if (!circleSpaces.has(p)) {
+    if (!isCsvEmptySentinel && !circleSpaces.has(p)) {
       throw new StorageSchemaError(
         `purchased[${i}] references space not in circle list: ${p}`,
       );
@@ -287,7 +290,7 @@ export function parseLocalEventDayState(value: unknown): LocalEventDayState {
     if (holdSpaces.has(h)) {
       throw new StorageSchemaError(`Duplicate hold space detected: ${h}`);
     }
-    if (!circleSpaces.has(h)) {
+    if (!isCsvEmptySentinel && !circleSpaces.has(h)) {
       throw new StorageSchemaError(
         `hold[${i}] references space not in circle list: ${h}`,
       );
@@ -320,7 +323,7 @@ export function parseLocalEventDayState(value: unknown): LocalEventDayState {
         `${arrayName}[${index}].space must be a non-empty string`,
       );
     }
-    if (!circleSpaces.has(entryObj.space)) {
+    if (!isCsvEmptySentinel && !circleSpaces.has(entryObj.space)) {
       throw new StorageSchemaError(
         `${arrayName}[${index}].space references space not in circle list: ${entryObj.space}`,
       );

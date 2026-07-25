@@ -50,5 +50,15 @@ network operation fails, local truth remains and the queued entry is retained.
 ## CSV boundary
 
 CSV import validates the public circle fields before applying a preview. CSV
-export and management controls are described only when their user-facing
-implementation is available.
+export emits the exact public header with CRLF line endings and derives
+`isSale` from the current LocalStorage purchase set. Rows retained only for
+source history (`removedFromSource: true`) are omitted, so re-importing an
+export cannot silently restore removed source rows. Export is read-only and
+does not change the source generation, activity, history, redo stack, or
+outbox.
+
+ComiPath preserves formula-like values beginning with `=`, `+`, `-`, or `@`
+without executing or rewriting them. Treat CSV files from external sources as
+untrusted when opening them in spreadsheet software. Neutralizing such values
+would change the round-trip contract and requires a separately approved
+migration.

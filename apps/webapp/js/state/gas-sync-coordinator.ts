@@ -68,6 +68,69 @@ export class GasSyncCoordinator {
     return this.inFlightProcess;
   }
 
+  /** Manually retries one event/day queue or every indexed queue. */
+  async retry(ref: EventDayRef | null): Promise<GasSyncSummary> {
+    if (ref === null) {
+      return this.processAll();
+    }
+
+    let state: ReturnType<EventDayRepository["load"]>;
+    try {
+      state = this.repository.load(ref);
+    } catch (error: unknown) {
+      return {
+        processedRefs: 1,
+        sent: 0,
+        pending: 0,
+        failures: [{ ref, category: safeFailureCategory(error) }],
+      };
+    }
+
+    if (state?.source.type !== "gas" || state.gasOutbox.length === 0) {
+      return {
+        processedRefs: 1,
+        sent: 0,
+        pending: 0,
+        failures: [],
+      };
+    }
+
+    try {
+      const result = await this.outbox.process(ref);
+      const failures: Array<{ ref: EventDayRef; category: string }> = [];
+      if (result.error) {
+        failures.push({
+          ref: { eventId: ref.eventId, dayId: ref.dayId },
+          category: safeFailureCategory(result.error),
+        });
+      }
+      return {
+        processedRefs: 1,
+        sent: result.sent,
+        pending: result.pending,
+        failures,
+      };
+    } catch (err: unknown) {
+      let latestState: ReturnType<EventDayRepository["load"]> = null;
+      try {
+        latestState = this.repository.load(ref);
+      } catch {
+        // Keep original
+      }
+      return {
+        processedRefs: 1,
+        sent: 0,
+        pending: latestState?.gasOutbox.length ?? 0,
+        failures: [
+          {
+            ref: { eventId: ref.eventId, dayId: ref.dayId },
+            category: safeFailureCategory(err),
+          },
+        ],
+      };
+    }
+  }
+
   private async executeProcessAll(): Promise<GasSyncSummary> {
     let processedRefs = 0;
     let sent = 0;

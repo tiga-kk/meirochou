@@ -1,84 +1,131 @@
 // @vitest-environment happy-dom
 import assert from "node:assert/strict";
-import { afterEach, test } from "vitest";
-import {
-  ComipathSettings,
-  type SettingsGasUrlChangeDetail,
-  type SettingsSelectionChangeDetail,
-} from "../apps/webapp/js/components/comipath-settings";
+import { afterEach, expect, test } from "vitest";
+import { ComipathSettings } from "../apps/webapp/js/components/comipath-settings";
+import type { SourceManagerModel } from "../apps/webapp/js/components/source-manager";
+import type {
+  DeleteOptionViewModel,
+  EventDayOption,
+} from "../apps/webapp/js/ui/management-view-model";
 
 afterEach(() => {
   document.body.innerHTML = "";
 });
 
-test("settings component renders reactive properties in light DOM", async () => {
+test("settings shell renders event-day-selector and source-manager child components", async () => {
   const element = new ComipathSettings();
   element.open = true;
-  element.gasUrl = "https://example.test/gas";
-  element.sheets = ["東456", "西12"];
-  element.selectedSheets = ["西12"];
-  element.busy = true;
-  element.errorMessage = "通信に失敗しました";
+
+  const sampleOptions: readonly EventDayOption[] = [
+    {
+      eventId: "c104",
+      eventLabel: "コミックマーケット104",
+      dayId: "day1",
+      dayLabel: "1日目 (日)",
+      configured: true,
+      selected: true,
+      pendingCount: 0,
+    },
+  ];
+
+  const sampleSourceModel: SourceManagerModel = {
+    activeRef: { eventId: "c104", dayId: "day1" },
+    activeRefLabel: "C104 1日目",
+    source: {
+      typeLabel: "CSV",
+      detail: "circles.csv",
+      endpointSummary: null,
+      pendingCount: 0,
+    },
+    sourceType: "csv",
+    gasUrlInput: "",
+    selectedSheetName: "",
+    sheetNames: [],
+    pendingCount: 0,
+    busy: false,
+    errorMessage: "",
+  };
+
+  element.eventDayOptions = sampleOptions;
+  element.selectedEventId = "c104";
+  element.selectedDayId = "day1";
+  element.sourceManagerModel = sampleSourceModel;
+
   document.body.appendChild(element);
   await element.updateComplete;
 
   assert.equal(element.classList.contains("show"), true);
-  assert.equal(
-    element.querySelector<HTMLInputElement>("#gas-url")?.value,
-    element.gasUrl,
-  );
-  assert.equal(
-    element.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').length,
-    2,
-  );
-  assert.equal(
-    element.querySelector<HTMLInputElement>('input[value="西12"]')?.checked,
-    true,
-  );
-  assert.equal(
-    element.querySelector<HTMLButtonElement>("#btn-refresh")?.disabled,
-    true,
-  );
-  assert.match(element.textContent || "", /通信に失敗しました/);
+  assert.ok(element.querySelector("event-day-selector"));
+  assert.ok(element.querySelector("source-manager"));
+  assert.match(element.textContent || "", /コミックマーケット104/);
+  assert.match(element.textContent || "", /circles\.csv/);
 });
 
-test("settings component emits typed events for every user operation", async () => {
+test("settings shell renders enabled delete options and emits only their scope", async () => {
   const element = new ComipathSettings();
-  element.sheets = ["東456", "西12"];
-  element.selectedSheets = ["東456"];
+  const deleteOption: DeleteOptionViewModel = {
+    scope: { type: "activity", ref: { eventId: "c104", dayId: "day1" } },
+    label: "購入・チェック履歴の削除（2件）",
+    consequence: "活動履歴を削除します。",
+    blocked: false,
+    blockedReason: null,
+  };
+  const events: CustomEvent[] = [];
+  element.addEventListener("delete-option-select", (event) => {
+    events.push(event as CustomEvent);
+  });
+  element.deleteOptions = [deleteOption];
+
   document.body.appendChild(element);
   await element.updateComplete;
 
-  let gasDetail: SettingsGasUrlChangeDetail | null = null;
-  let selectionDetail: SettingsSelectionChangeDetail | null = null;
-  let refreshRequests = 0;
-  let fetchRequests = 0;
-  element.addEventListener("settings-gas-url-change", (event) => {
-    gasDetail = (event as CustomEvent<SettingsGasUrlChangeDetail>).detail;
-  });
-  element.addEventListener("settings-selection-change", (event) => {
-    selectionDetail = (event as CustomEvent<SettingsSelectionChangeDetail>)
-      .detail;
-  });
-  element.addEventListener(
-    "settings-refresh-request",
-    () => (refreshRequests += 1),
+  const button = element.querySelector<HTMLButtonElement>(
+    ".storage-delete-option button",
   );
-  element.addEventListener(
-    "settings-fetch-sheets-request",
-    () => (fetchRequests += 1),
+  expect(button?.textContent).toContain("購入・チェック履歴の削除");
+  button?.click();
+
+  expect(events).toHaveLength(1);
+  expect(events[0].detail).toEqual({ scope: deleteOption.scope });
+});
+
+test("settings shell renders an h2 heading for the screen reader landmark", async () => {
+  const element = new ComipathSettings();
+  element.open = true;
+  document.body.appendChild(element);
+  await element.updateComplete;
+
+  const heading = element.querySelector("h2");
+  expect(heading).not.toBeNull();
+  expect(heading?.textContent?.trim()).toContain("設定");
+  document.body.removeChild(element);
+});
+
+test("blocked delete option exposes reason text with role=status for screen readers", async () => {
+  const element = new ComipathSettings();
+  const blockedOption: DeleteOptionViewModel = {
+    scope: { type: "activity", ref: { eventId: "c104", dayId: "day1" } },
+    label: "購入・チェック履歴の削除（2件）",
+    consequence: "活動履歴を削除します。",
+    blocked: true,
+    blockedReason: "2件の送信待ちがあります。",
+  };
+  element.deleteOptions = [blockedOption];
+
+  document.body.appendChild(element);
+  await element.updateComplete;
+
+  const blockedMsg = element.querySelector<HTMLElement>(
+    ".storage-delete-blocked",
   );
+  expect(blockedMsg).not.toBeNull();
+  expect(blockedMsg?.getAttribute("role")).toBe("status");
+  expect(blockedMsg?.textContent).toContain("送信待ち");
 
-  const gasInput = element.querySelector<HTMLInputElement>("#gas-url");
-  assert.ok(gasInput);
-  gasInput.value = "https://example.test/new";
-  gasInput.dispatchEvent(new Event("input", { bubbles: true }));
-  element.querySelector<HTMLButtonElement>("#btn-refresh")?.click();
-  element.querySelector<HTMLButtonElement>("#btn-fetch-sheets")?.click();
-  element.querySelector<HTMLInputElement>('input[value="西12"]')?.click();
+  const btn = element.querySelector<HTMLButtonElement>(
+    ".storage-delete-option button",
+  );
+  expect(btn?.disabled).toBe(true);
 
-  assert.deepEqual(gasDetail, { gasUrl: "https://example.test/new" });
-  assert.equal(refreshRequests, 1);
-  assert.equal(fetchRequests, 1);
-  assert.deepEqual(selectionDetail, { selectedSheets: ["東456", "西12"] });
+  document.body.removeChild(element);
 });

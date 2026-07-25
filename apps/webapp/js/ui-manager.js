@@ -439,6 +439,7 @@ export class UIManager {
    * 通知トーストの表示
    */
   showToast(msg, type = "info") {
+    if (!this.els?.toast) return;
     this.els.toast.textContent = msg;
     this.els.toast.className = `show ${type}`;
 
