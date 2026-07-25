@@ -18,6 +18,7 @@ import { parseGridMeta, parsePointsPayload } from "./types/boundary-parsers";
 import { ManagementSession } from "./ui/management-session";
 import {
   buildEventDayOptions,
+  buildOutboxPanelModel,
   formatSourceDiff,
   formatSourceSummary,
 } from "./ui/management-view-model";
@@ -37,6 +38,18 @@ function formatSourceApplyError(error) {
     default:
       return "ソースデータの適用に失敗しました。最新のプレビューを取得して再試行してください。";
   }
+}
+
+/** Validates an event/day reference at the App's DOM event boundary. */
+function isEventDayRef(value) {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      typeof value.eventId === "string" &&
+      value.eventId.length > 0 &&
+      typeof value.dayId === "string" &&
+      value.dayId.length > 0,
+  );
 }
 
 function findAreaForSpace(space) {
@@ -124,6 +137,8 @@ export class App {
     this.selectedSheetName = "";
     this.fetchedSheetNames = [];
     this.sourceErrorMessage = "";
+    this.outboxResultMessage = "";
+    this.outboxErrorMessage = "";
   }
 
   /** Rebuild the management selector and source manager models from registry and local state. */
@@ -186,11 +201,22 @@ export class App {
       errorMessage: this.sourceErrorMessage || "",
     };
 
+    const outboxPanelModel = buildOutboxPanelModel(
+      this.dm.eventRegistry,
+      states,
+      {
+        processing: this.session.isBusy("outbox-retry"),
+        resultMessage: this.outboxResultMessage || "",
+        errorMessage: this.outboxErrorMessage || "",
+      },
+    );
+
     this.ui.updateSettingsState({
       eventDayOptions: options,
       selectedEventId: this.dm.activeRef?.eventId || "",
       selectedDayId: this.dm.activeRef?.dayId || "",
       sourceManagerModel,
+      outboxPanelModel,
     });
   }
 
@@ -520,6 +546,84 @@ export class App {
         this.session.setGasAbortController(null);
         this.updateManagementModels();
       }
+    }
+  }
+
+  /** Delegates outbox retry requests to the GasSyncCoordinator. */
+  async handleGasRetryRequest(detail) {
+    if (
+      !detail ||
+      (detail.ref !== null &&
+        detail.ref !== undefined &&
+        !isEventDayRef(detail.ref))
+    ) {
+      return;
+    }
+    const ref = detail.ref || null;
+    const requestToken = this.session.nextRequestToken();
+    this.session.setBusy("outbox-retry", true);
+    this.outboxResultMessage = "";
+    this.outboxErrorMessage = "";
+    this.updateManagementModels();
+
+    try {
+      const summary = await this.dm.syncCoordinator.retry(ref);
+      if (!this.session.isLatestRequestToken(requestToken)) return;
+      this.session.setBusy("outbox-retry", false);
+
+      if (summary.sent > 0 && summary.pending === 0) {
+        this.ui.showToast(`GAS同期完了 (${summary.sent}件送信)`);
+        this.outboxResultMessage = `送信完了 (${summary.sent}件)`;
+      } else if (summary.sent > 0 && summary.pending > 0) {
+        this.ui.showToast(
+          `一部送信完了 (${summary.sent}件送信 / 残り${summary.pending}件)`,
+          "warning",
+        );
+        this.outboxResultMessage = `一部送信完了 (${summary.sent}件送信 / 残り${summary.pending}件)`;
+      } else if (summary.failures.length > 0) {
+        this.ui.showToast("GAS同期に失敗しました", "error");
+        this.outboxErrorMessage =
+          "再送に失敗しました。時間をおいて再試行してください。";
+      }
+    } catch (_error) {
+      if (!this.session.isLatestRequestToken(requestToken)) return;
+      this.session.setBusy("outbox-retry", false);
+      this.outboxErrorMessage = "再送処理中にエラーが発生しました。";
+      this.ui.showToast("再送エラー", "error");
+    } finally {
+      if (this.session.isLatestRequestToken(requestToken)) {
+        this.updateManagementModels();
+        this.ui.updateCounts(this.dm);
+      }
+    }
+  }
+
+  /** Verifies exact confirmation text and discards selected outbox entries. */
+  async handleGasDiscardRequest(detail) {
+    if (
+      !isEventDayRef(detail?.ref) ||
+      !Array.isArray(detail.ids) ||
+      !detail.ids.every((id) => typeof id === "string" && id.length > 0) ||
+      detail.confirmation !== "未送信を破棄"
+    ) {
+      return;
+    }
+
+    try {
+      this.dm.outboxService.discard(
+        detail.ref,
+        detail.ids,
+        new Date().toISOString(),
+      );
+      this.outboxResultMessage = "選択した未送信データを破棄しました";
+      this.outboxErrorMessage = "";
+      this.ui.showToast("未送信データを破棄しました");
+    } catch (_error) {
+      this.outboxErrorMessage = "未送信データの破棄に失敗しました";
+      this.ui.showToast("破棄エラー", "error");
+    } finally {
+      this.updateManagementModels();
+      this.ui.updateCounts(this.dm);
     }
   }
 
@@ -890,6 +994,8 @@ export class App {
         this.selectedSheetName = "";
         this.fetchedSheetNames = [];
         this.sourceErrorMessage = "";
+        this.outboxResultMessage = "";
+        this.outboxErrorMessage = "";
         this.ui.setSettingsError("");
         this.updateManagementModels();
       }
@@ -920,6 +1026,14 @@ export class App {
 
     settings.addEventListener("gas-preview-request", (e) => {
       this.handleGasPreviewRequest(e.detail.source, e.detail.mode);
+    });
+
+    settings.addEventListener("gas-retry-request", (e) => {
+      this.handleGasRetryRequest(e.detail);
+    });
+
+    settings.addEventListener("gas-discard-request", (e) => {
+      this.handleGasDiscardRequest(e.detail);
     });
 
     const diffDialog = document.getElementById("source-diff-dialog");

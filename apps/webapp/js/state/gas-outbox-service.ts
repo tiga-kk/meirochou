@@ -293,6 +293,14 @@ export class GasOutboxService {
       return state;
     }
 
+    const key = makeRefKey(ref);
+    const processingId = this.processingEntryIds.get(key);
+    if (processingId && ids.includes(processingId)) {
+      throw new Error(
+        `Cannot discard outbox entry '${processingId}' currently being processed`,
+      );
+    }
+
     const state = this.repository.load(ref);
     if (!state) {
       throw new Error("No state found for ref");

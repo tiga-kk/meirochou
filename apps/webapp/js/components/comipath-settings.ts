@@ -1,12 +1,16 @@
 import { html, LitElement, type PropertyValues } from "lit";
-import type { EventDayOption } from "../ui/management-view-model";
+import type {
+  EventDayOption,
+  OutboxPanelModel,
+} from "../ui/management-view-model";
 import type { SourceManagerModel } from "./source-manager";
 import "./event-day-selector";
 import "./source-manager";
+import "./outbox-panel";
 
 /**
  * Shell container for management settings, hosting the event/day selector,
- * source manager, and future panels.
+ * source manager, outbox panel, and future panels.
  */
 export class ComipathSettings extends LitElement {
   static properties = {
@@ -15,6 +19,7 @@ export class ComipathSettings extends LitElement {
     selectedEventId: { type: String },
     selectedDayId: { type: String },
     sourceManagerModel: { attribute: false },
+    outboxPanelModel: { attribute: false },
     busy: { type: Boolean },
     errorMessage: { type: String },
   };
@@ -24,6 +29,7 @@ export class ComipathSettings extends LitElement {
   declare selectedEventId: string;
   declare selectedDayId: string;
   declare sourceManagerModel: SourceManagerModel | null;
+  declare outboxPanelModel: OutboxPanelModel | null;
   declare busy: boolean;
   declare errorMessage: string;
 
@@ -34,6 +40,7 @@ export class ComipathSettings extends LitElement {
     this.selectedEventId = "";
     this.selectedDayId = "";
     this.sourceManagerModel = null;
+    this.outboxPanelModel = null;
     this.busy = false;
     this.errorMessage = "";
   }
@@ -58,6 +65,7 @@ export class ComipathSettings extends LitElement {
         .errorMessage=${this.errorMessage}
       ></event-day-selector>
       <source-manager .model=${this.sourceManagerModel}></source-manager>
+      <outbox-panel .model=${this.outboxPanelModel}></outbox-panel>
     `;
   }
 }

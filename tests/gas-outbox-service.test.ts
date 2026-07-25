@@ -753,4 +753,121 @@ describe("GasOutboxService discard", () => {
       service.discard(ref, ["entry-1", "entry-1"], "2026-07-23T02:00:00.000Z"),
     ).toThrow();
   });
+
+  it("rejects discard of an entry that is currently being POSTed", async () => {
+    const storage = createMockStorageService();
+    const repo = new EventDayRepository(storage);
+    const ref = { eventId: "c104", dayId: "day1" };
+    const state = createSampleGasState("c104", "day1");
+    repo.save(ref, {
+      ...state,
+      gasOutbox: [
+        {
+          id: "entry-1",
+          eventId: "c104",
+          dayId: "day1",
+          sourceGeneration: "gen1",
+          gasUrl: state.source.gasUrl,
+          sheetName: state.source.sheetName,
+          space: "東A01a",
+          purchased: true,
+          createdAt: "2026-07-23T01:00:00.000Z",
+          attempts: 0,
+          lastError: null,
+        },
+      ],
+    });
+
+    let resolveSend: () => void = () => undefined;
+    const sendSaleUpdate = vi.fn().mockImplementation(() => {
+      return new Promise<void>((resolve) => {
+        resolveSend = resolve;
+      });
+    });
+
+    const service = new GasOutboxService(repo, {
+      sendSaleUpdate,
+    } as unknown as GasApiClient);
+
+    const processPromise = service.process(ref);
+    await vi.waitFor(() => expect(sendSaleUpdate).toHaveBeenCalledTimes(1));
+
+    expect(() =>
+      service.discard(ref, ["entry-1"], "2026-07-23T02:00:00.000Z"),
+    ).toThrow();
+
+    resolveSend();
+    await processPromise;
+  });
+
+  it("allows discarding a non-processing entry while another entry is in flight without losing entries", async () => {
+    const storage = createMockStorageService();
+    const repo = new EventDayRepository(storage);
+    const ref = { eventId: "c104", dayId: "day1" };
+    const state = createSampleGasState("c104", "day1");
+    repo.save(ref, {
+      ...state,
+      gasOutbox: [
+        {
+          id: "entry-1",
+          eventId: "c104",
+          dayId: "day1",
+          sourceGeneration: "gen1",
+          gasUrl: state.source.gasUrl,
+          sheetName: state.source.sheetName,
+          space: "東A01a",
+          purchased: true,
+          createdAt: "2026-07-23T01:00:00.000Z",
+          attempts: 0,
+          lastError: null,
+        },
+        {
+          id: "entry-2",
+          eventId: "c104",
+          dayId: "day1",
+          sourceGeneration: "gen1",
+          gasUrl: state.source.gasUrl,
+          sheetName: state.source.sheetName,
+          space: "東A02b",
+          purchased: true,
+          createdAt: "2026-07-23T01:01:00.000Z",
+          attempts: 0,
+          lastError: null,
+        },
+      ],
+    });
+
+    let resolveFirstSend: () => void = () => undefined;
+    let sendCount = 0;
+    const sendSaleUpdate = vi.fn().mockImplementation(() => {
+      sendCount++;
+      if (sendCount === 1) {
+        return new Promise<void>((resolve) => {
+          resolveFirstSend = resolve;
+        });
+      }
+      return Promise.resolve();
+    });
+
+    const service = new GasOutboxService(repo, {
+      sendSaleUpdate,
+    } as unknown as GasApiClient);
+
+    const processPromise = service.process(ref);
+    await vi.waitFor(() => expect(sendSaleUpdate).toHaveBeenCalledTimes(1));
+
+    // Discard entry-2 while entry-1 is being sent
+    const nextState = service.discard(
+      ref,
+      ["entry-2"],
+      "2026-07-23T02:00:00.000Z",
+    );
+    expect(nextState.gasOutbox.some((e) => e.id === "entry-2")).toBe(false);
+
+    resolveFirstSend();
+    const result = await processPromise;
+
+    expect(result.sent).toBe(1);
+    expect(repo.load(ref)?.gasOutbox).toHaveLength(0);
+  });
 });

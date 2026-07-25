@@ -52,6 +52,21 @@ export interface OutboxEntryViewModel {
   readonly errorLabel: string | null;
 }
 
+/** Complete render model for the outbox recovery panel. */
+export interface OutboxPanelGroupViewModel {
+  readonly ref: EventDayRef;
+  readonly label: string;
+  readonly entries: readonly OutboxEntryViewModel[];
+}
+
+export interface OutboxPanelModel {
+  readonly groups: readonly OutboxPanelGroupViewModel[];
+  readonly totalPending: number;
+  readonly processing: boolean;
+  readonly resultMessage: string;
+  readonly errorMessage: string;
+}
+
 /** Counts used to describe and guard each destructive storage option. */
 export interface DeleteOptionInput {
   readonly selected: EventDayRef;
@@ -298,6 +313,50 @@ export function formatOutbox(
   });
 
   return Object.freeze(result);
+}
+
+/** Builds the complete outbox recovery panel view model from registry and local states. */
+export function buildOutboxPanelModel(
+  registry: EventRegistryV1,
+  states: readonly { ref: EventDayRef; state: LocalEventDayState }[],
+  options?: {
+    processing?: boolean;
+    resultMessage?: string;
+    errorMessage?: string;
+  },
+): OutboxPanelModel {
+  const groups: OutboxPanelGroupViewModel[] = [];
+  let totalPending = 0;
+
+  for (const event of registry.events) {
+    for (const day of event.days) {
+      const ref = { eventId: event.eventId, dayId: day.dayId };
+      const item = states.find(
+        (s) => s.ref.eventId === event.eventId && s.ref.dayId === day.dayId,
+      );
+      if (!item?.state || item.state.gasOutbox.length === 0) {
+        continue;
+      }
+
+      const entries = formatOutbox(item.state.gasOutbox, registry);
+      totalPending += entries.length;
+      groups.push(
+        Object.freeze({
+          ref: Object.freeze(ref),
+          label: `${event.displayName} ${day.displayName}`,
+          entries,
+        }),
+      );
+    }
+  }
+
+  return Object.freeze({
+    groups: Object.freeze(groups),
+    totalPending,
+    processing: options?.processing ?? false,
+    resultMessage: options?.resultMessage ?? "",
+    errorMessage: options?.errorMessage ?? "",
+  });
 }
 
 /** Creates one frozen delete option from a copied scope and safe text. */
