@@ -29,6 +29,7 @@ test("settings shell renders event-day-selector and source-manager child compone
   ];
 
   const sampleSourceModel: SourceManagerModel = {
+    activeRef: { eventId: "c104", dayId: "day1" },
     activeRefLabel: "C104 1日目",
     source: {
       typeLabel: "CSV",

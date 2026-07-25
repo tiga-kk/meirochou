@@ -470,4 +470,70 @@ describe("Phase 2 Task 7 local data service", () => {
       "CSV preview is missing or already applied",
     );
   });
+
+  test("exportCsv exports active circles only, derives isSale from purchased truth, preserves formula text, and causes no state mutation", async () => {
+    const { manager } = createManager();
+    const ref: EventDayRef = { eventId: "C108", dayId: "day1" };
+    await manager.openEventDay(ref);
+
+    const initialGasState: LocalEventDayState = {
+      schemaVersion: 1,
+      source: {
+        type: "gas",
+        gasUrl: "https://script.google.com/macros/s/AKfycbx_test/exec",
+        sheetName: "Day1",
+      },
+      sourceGeneration: "generation-1",
+      circles: [
+        {
+          space: "東A-01a",
+          priority: 1,
+          account: "@admin",
+          memo: "=SUM(A1)",
+        },
+        {
+          space: "東A-02b",
+          priority: 2,
+          memo: "+123",
+        },
+        {
+          space: "東A-03c",
+          priority: 3,
+          removedFromSource: true,
+        },
+      ],
+      purchased: ["東A-01a"],
+      hold: ["東A-02b"],
+      history: [],
+      redo: [],
+      gasOutbox: [],
+      timestamps: {
+        createdAt: "2026-07-21T07:45:00.000Z",
+        updatedAt: "2026-07-21T07:45:00.000Z",
+        sourceUpdatedAt: "2026-07-21T07:45:00.000Z",
+      },
+    };
+    manager.repository.save(ref, initialGasState);
+    await manager.openEventDay(ref);
+
+    const exported = manager.exportCsv(ref);
+
+    // Removed circle (東A-03c) is omitted from export
+    expect(exported).not.toContain("東A-03c");
+
+    // 東A-01a is purchased, so isSale should be x
+    expect(exported).toContain("東A-01a,1,x,@admin,,=SUM(A1)");
+
+    // 東A-02b is not purchased, so isSale should be empty
+    expect(exported).toContain("東A-02b,2,,,," + "+123");
+
+    // CRLF line endings
+    expect(exported).toContain("\r\n");
+
+    // In-memory state and repository remain unchanged
+    const afterState = manager.repository.load(ref);
+    expect(afterState?.sourceGeneration).toBe("generation-1");
+    expect(afterState?.circles).toEqual(initialGasState.circles);
+    expect(afterState?.timestamps).toEqual(initialGasState.timestamps);
+  });
 });

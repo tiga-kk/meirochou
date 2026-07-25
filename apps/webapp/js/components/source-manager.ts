@@ -1,9 +1,11 @@
 import { html, LitElement, type PropertyValues } from "lit";
+import type { EventDayRef } from "../types/domain";
 import { dispatchManagementEvent } from "../ui/management-events";
 import type { SourceSummaryViewModel } from "../ui/management-view-model";
 
 /** Safe, render-only source-management state supplied by App. */
 export interface SourceManagerModel {
+  readonly activeRef: EventDayRef | null;
   readonly activeRefLabel: string;
   readonly source: SourceSummaryViewModel;
   readonly sourceType: "csv" | "gas";
@@ -11,6 +13,7 @@ export interface SourceManagerModel {
   readonly selectedSheetName: string;
   readonly sheetNames: readonly string[];
   readonly pendingCount: number;
+  readonly canExportCsv?: boolean;
   readonly busy: boolean;
   readonly errorMessage: string;
 }
@@ -173,10 +176,20 @@ export class SourceManager extends LitElement {
     this.requestUpdate();
   }
 
+  private handleCsvExportRequest(): void {
+    if (!this.model?.canExportCsv || this.model.busy || !this.model.activeRef) {
+      return;
+    }
+    dispatchManagementEvent(this, "csv-export-request", {
+      ref: { ...this.model.activeRef },
+    });
+  }
+
   protected render() {
     if (!this.model) return html``;
 
     const disabled = this.model.pendingCount > 0 || this.model.busy;
+    const exportDisabled = !this.model.canExportCsv || this.model.busy;
     const displayError = this.localError || this.model.errorMessage;
     const availableSheetNames =
       this.localGasUrl === this.model.gasUrlInput ? this.model.sheetNames : [];
@@ -196,6 +209,17 @@ export class SourceManager extends LitElement {
               </p>`
               : ""
           }
+          <div class="source-actions">
+            <button
+              type="button"
+              class="btn-csv-export"
+              data-action="csv-export"
+              ?disabled="${exportDisabled}"
+              @click="${this.handleCsvExportRequest}"
+            >
+              CSVエクスポート
+            </button>
+          </div>
         </div>
 
         ${

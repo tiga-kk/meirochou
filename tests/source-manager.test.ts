@@ -18,6 +18,7 @@ describe("SourceManager Component", () => {
   };
 
   const defaultModel: SourceManagerModel = {
+    activeRef: { eventId: "c104", dayId: "day1" },
     activeRefLabel: "C104 1日目",
     source: sampleCsvSource,
     sourceType: "csv",
@@ -25,6 +26,7 @@ describe("SourceManager Component", () => {
     selectedSheetName: "",
     sheetNames: [],
     pendingCount: 0,
+    canExportCsv: true,
     busy: false,
     errorMessage: "",
   };
@@ -205,5 +207,43 @@ describe("SourceManager Component", () => {
       element.querySelector<HTMLInputElement>('input[type="file"]');
     expect(fileInput?.disabled).toBe(true);
     expect(element.textContent).toContain("送信待ち");
+  });
+
+  it("renders CSV export button enabled when canExportCsv is true and dispatches csv-export-request on click", async () => {
+    element.model = {
+      ...defaultModel,
+      canExportCsv: true,
+    };
+    await element.updateComplete;
+
+    const listener = vi.fn();
+    element.addEventListener("csv-export-request", listener);
+
+    const exportButton = element.querySelector<HTMLButtonElement>(
+      'button[data-action="csv-export"]',
+    );
+    expect(exportButton).not.toBeNull();
+    expect(exportButton?.disabled).toBe(false);
+
+    exportButton?.click();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect((listener.mock.calls[0][0] as CustomEvent).detail).toEqual({
+      ref: { eventId: "c104", dayId: "day1" },
+    });
+  });
+
+  it("disables CSV export button when canExportCsv is false", async () => {
+    element.model = {
+      ...defaultModel,
+      canExportCsv: false,
+    };
+    await element.updateComplete;
+
+    const exportButton = element.querySelector<HTMLButtonElement>(
+      'button[data-action="csv-export"]',
+    );
+    expect(exportButton).not.toBeNull();
+    expect(exportButton?.disabled).toBe(true);
   });
 });

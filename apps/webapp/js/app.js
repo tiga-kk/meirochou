@@ -16,6 +16,7 @@ import { StorageDeletionService } from "./state/storage-deletion-service";
 import { StorageService } from "./state/storage-service";
 import { TspSolver } from "./tsp-solver.js";
 import { parseGridMeta, parsePointsPayload } from "./types/boundary-parsers";
+import { downloadCsv, formatCsvExportFilename } from "./ui/csv-download";
 import { ManagementSession } from "./ui/management-session";
 import {
   buildDeleteOptions,
@@ -164,6 +165,20 @@ export class App {
 
     this.activeDeleteScope = null;
     this.deleteErrorMessage = "";
+
+    this.downloadAdapter = {
+      createObjectURL: (blob) => URL.createObjectURL(blob),
+      revokeObjectURL: (url) => URL.revokeObjectURL(url),
+      click: (url, filename) => {
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = filename;
+        anchor.style.display = "none";
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+      },
+    };
   }
 
   get storageDeletionService() {
@@ -216,8 +231,13 @@ export class App {
 
     const pendingCount = activeState ? activeState.gasOutbox.length : 0;
     const sourceType = activeState?.source.type === "gas" ? "gas" : "csv";
+    const activeCircleCount = activeState
+      ? activeState.circles.filter((circle) => !circle.removedFromSource).length
+      : 0;
+    const canExportCsv = activeCircleCount > 0;
 
     const sourceManagerModel = {
+      activeRef: activeRef ? { ...activeRef } : null,
       activeRefLabel,
       source: sourceSummary,
       sourceType,
@@ -231,6 +251,7 @@ export class App {
           : ""),
       sheetNames: this.fetchedSheetNames || [],
       pendingCount,
+      canExportCsv,
       busy:
         this.session.isBusy("source-request") ||
         this.session.isBusy("transition"),
@@ -469,6 +490,33 @@ export class App {
         this.session.setGasAbortController(null);
         this.updateManagementModels();
       }
+    }
+  }
+
+  /** Export active event/day state as a downloadable CSV. */
+  handleCsvExportRequest(ref) {
+    if (
+      !isEventDayRef(ref) ||
+      !this.dm.activeRef ||
+      !sameEventDayRef(ref, this.dm.activeRef) ||
+      !this.dm.activeState
+    ) {
+      return;
+    }
+    const activeCirclesCount = this.dm.activeState.circles.filter(
+      (circle) => !circle.removedFromSource,
+    ).length;
+    if (activeCirclesCount === 0) return;
+
+    try {
+      const csv = this.dm.exportCsv(this.dm.activeRef);
+      const filename = formatCsvExportFilename(this.dm.activeRef, new Date());
+      downloadCsv(csv, filename, this.downloadAdapter);
+      this.ui.showToast("CSVをダウンロードしました");
+    } catch (_err) {
+      this.sourceErrorMessage = "CSVのエクスポートに失敗しました。";
+      this.updateManagementModels();
+      this.ui.showToast("CSVエクスポートエラー", "error");
     }
   }
 
@@ -1192,6 +1240,10 @@ export class App {
 
     settings.addEventListener("csv-preview-request", (e) => {
       this.handleCsvPreviewRequest(e.detail.file);
+    });
+
+    settings.addEventListener("csv-export-request", (e) => {
+      this.handleCsvExportRequest(e.detail.ref);
     });
 
     settings.addEventListener("gas-sheets-request", (e) => {

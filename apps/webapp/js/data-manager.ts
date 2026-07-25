@@ -500,11 +500,14 @@ export class DataManager {
     this.csvPreviews.delete(previewId);
   }
 
-  /** Export the validated local snapshot, including source rows retained for history. */
+  /** Export the validated local snapshot, excluding source rows removed from source. */
   exportCsv(ref: EventDayRef): string {
     const state = this.repository.load(ref);
     if (!state) throw new Error("Event day state not found");
-    return serializeCircleCsv(state.circles, new Set(state.purchased));
+    const activeCircles = state.circles.filter(
+      (circle) => !circle.removedFromSource,
+    );
+    return serializeCircleCsv(activeCircles, new Set(state.purchased));
   }
 
   private readLegacyJson(key: string, issues: string[]): unknown {
