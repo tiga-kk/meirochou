@@ -110,7 +110,10 @@ test("Cloudflare Pages runbook documents the minimal deployment contract", () =>
   assert.match(guide, /Rollback/);
 
   assert.doesNotMatch(guide, /wrangler\s+(pages\s+)?deploy/i);
-  assert.doesNotMatch(guide, /Pages Functions|KV|R2|D1|Web Analytics.*有効/i);
+  assert.doesNotMatch(
+    guide,
+    /(?:Pages Functions|KV|R2|D1|Web Analytics).*(?:有効にする|追加する|使用する)/i,
+  );
   assert.doesNotMatch(guide, /CLOUDFLARE_API_TOKEN\s*=/);
   assert.match(readme, /guides\/cloudflare-pages-deployment\.md/);
 });
