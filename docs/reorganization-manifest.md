@@ -118,3 +118,16 @@ Phase 5B以降のTask文書には必ず次を含める。
 5. Phase 5B計画とTask文書を作る。
 6. Phase 5C計画とTask文書を作る。
 7. 全リンク、重複Task番号、未解決placeholderを検査する。
+
+## 実施記録 (Phase 5B Task 1)
+
+- `docs/plans/phase-01-baseline.md` -> `docs/archive/phase-01/phase-01-baseline.md`
+- `docs/plans/phase-02-*` -> `docs/archive/phase-02/`
+- `docs/plans/phase-03-*`, `docs/plans/phase-03/` -> `docs/archive/phase-03/`
+- `docs/gas-sync-contract.md`, `docs/data-contracts.md` -> `docs/archive/phase-03/`
+- `docs/plans/phase-04-*`, `docs/plans/phase-04/` -> `docs/archive/phase-04/`
+- `docs/reviews/2026-07-22-phase-02-review.md` -> `docs/archive/phase-02/`
+- `docs/reviews/2026-07-23-phase-04-task-04-10-plan-review.md` -> `docs/archive/phase-04/`
+- `docs/superpowers/plans/*` -> `docs/archive/superpowers/plans/`
+- `docs/workflows/*` -> `docs/archive/workflows/`
+- 横断アーキテクチャ契約を `docs/architecture/` に維持。

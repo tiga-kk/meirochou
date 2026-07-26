@@ -381,7 +381,7 @@ function buildRoutePoints(
   return { cells, points };
 }
 
-function buildDistanceMap(
+export function buildDistanceMap(
   pointsPayload: PointsPayload,
   gridMeta: Partial<GridMeta>,
   gridBytes: Uint8Array,

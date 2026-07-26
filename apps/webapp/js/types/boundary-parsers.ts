@@ -1,11 +1,14 @@
 import type {
   Circle,
   EventDay,
+  EventMapAreaManifest,
+  EventMapBundleManifest,
   EventRegistryEntryV1,
   EventRegistryV1,
   GasCircleResponse,
   GasSheetListResponse,
   GridMeta,
+  MapAssetPaths,
   MapBundleAreaV1,
   MapBundleManifestV1,
   OcrPoint,
@@ -39,6 +42,17 @@ function text(value: unknown, path: string, fallback?: string): string {
 function nonEmptyText(value: unknown, path: string): string {
   const parsed = text(value, path).trim();
   if (!parsed) throw new BoundaryValidationError(path, "a non-empty string");
+  return parsed;
+}
+
+function nonEmptyExactText(value: unknown, path: string): string {
+  const parsed = text(value, path);
+  if (!parsed || parsed.trim() !== parsed) {
+    throw new BoundaryValidationError(
+      path,
+      "a non-empty string without surrounding whitespace",
+    );
+  }
   return parsed;
 }
 
@@ -586,5 +600,141 @@ export function parseEventRegistry(input: unknown): EventRegistryV1 {
   return Object.freeze({
     schemaVersion: 1,
     events: Object.freeze(events),
+  });
+}
+
+function parseBundleAssetPath(
+  value: unknown,
+  path: string,
+  expectedAreaId: string,
+  expectedFileName: string,
+): string {
+  const relativePath = nonEmptyExactText(value, path);
+  if (
+    !relativePath.startsWith("./") ||
+    relativePath.startsWith("/") ||
+    relativePath.includes("\\") ||
+    relativePath.includes("?") ||
+    relativePath.includes("#") ||
+    /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(relativePath)
+  ) {
+    throw new BoundaryValidationError(
+      path,
+      `a safe relative asset path: ${expectedFileName}`,
+    );
+  }
+
+  const normalized = relativePath.slice(2);
+
+  const segments = normalized.split("/");
+  if (
+    segments.length !== 2 ||
+    segments[0] !== expectedAreaId ||
+    segments[1] !== expectedFileName
+  ) {
+    throw new BoundaryValidationError(
+      path,
+      `a path matching ./${expectedAreaId}/${expectedFileName}`,
+    );
+  }
+
+  return relativePath;
+}
+
+/** Validate the strict four-area manifest used by the C108 map bundle. */
+export function parseEventMapBundleManifest(
+  input: unknown,
+): EventMapBundleManifest {
+  const value = record(input, "map bundle manifest");
+  if (value.schemaVersion !== 1) {
+    throw new BoundaryValidationError(
+      "map bundle manifest.schemaVersion",
+      "the number 1",
+    );
+  }
+
+  const eventId = parseEventId(value.eventId, "map bundle manifest.eventId");
+  const bundleVersion = nonEmptyText(
+    value.bundleVersion,
+    "map bundle manifest.bundleVersion",
+  );
+
+  if (!Array.isArray(value.areas) || value.areas.length !== 4) {
+    throw new BoundaryValidationError(
+      "map bundle manifest.areas",
+      "an array containing exactly four entries",
+    );
+  }
+
+  const seenAreaIds = new Set<string>();
+  const areas: EventMapAreaManifest[] = [];
+
+  for (let i = 0; i < value.areas.length; i++) {
+    const areaPath = `map bundle manifest.areas[${i}]`;
+    const areaObj = record(value.areas[i], areaPath);
+
+    const areaId = nonEmptyExactText(areaObj.areaId, `${areaPath}.areaId`);
+    if (!/^[a-z0-9-]+$/.test(areaId)) {
+      throw new BoundaryValidationError(
+        `${areaPath}.areaId`,
+        "a valid areaId (lowercase ASCII alphanumeric and hyphens)",
+      );
+    }
+
+    if (seenAreaIds.has(areaId)) {
+      throw new BoundaryValidationError(
+        `${areaPath}.areaId`,
+        `a unique areaId (duplicate '${areaId}')`,
+      );
+    }
+    seenAreaIds.add(areaId);
+
+    const displayName = nonEmptyText(
+      areaObj.displayName,
+      `${areaPath}.displayName`,
+    );
+    const assetsObj = record(areaObj.assets, `${areaPath}.assets`);
+
+    const assets: MapAssetPaths = Object.freeze({
+      svg: parseBundleAssetPath(
+        assetsObj.svg,
+        `${areaPath}.assets.svg`,
+        areaId,
+        "map.svg",
+      ),
+      points: parseBundleAssetPath(
+        assetsObj.points,
+        `${areaPath}.assets.points`,
+        areaId,
+        "points.json",
+      ),
+      gridMeta: parseBundleAssetPath(
+        assetsObj.gridMeta,
+        `${areaPath}.assets.gridMeta`,
+        areaId,
+        "grid-meta.json",
+      ),
+      grid: parseBundleAssetPath(
+        assetsObj.grid,
+        `${areaPath}.assets.grid`,
+        areaId,
+        "grid.bin",
+      ),
+    });
+
+    areas.push(
+      Object.freeze({
+        areaId,
+        displayName,
+        assets,
+      }),
+    );
+  }
+
+  return Object.freeze({
+    schemaVersion: 1,
+    eventId,
+    bundleVersion,
+    areas: Object.freeze(areas),
   });
 }

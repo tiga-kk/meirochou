@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "map_id": "image4",
+  "width": 1848,
+  "height": 1982,
+  "cell_size": 8,
+  "cols": 231,
+  "rows": 248,
+  "cell_values": {
+    "blocked": 0,
+    "normal": 1,
+    "crowded": 2
+  },
+  "byte_order": "unsigned_uint8",
+  "layout": "row-major",
+  "grid_file": "grid.bin",
+  "source": "reconstructed_from_corrected_points_and_map02_image_masks",
+  "postprocess": {
+    "cardinally_enclosed_fill_passes": 1
+  }
+}

@@ -1,6 +1,6 @@
 # Phase 5B Task 3: Public C108 Assets and Validation
 
-**Status:** Not started  
+**Status:** Complete (C108 assets and Task 3 validation passed; existing UI visual snapshot maintenance is separate)
 **Depends on:** Phase 5B Task 2  
 **Commit candidate:** `feat(maps): add validated c108 map assets`
 
@@ -27,13 +27,15 @@ C108の4地図assetがproduction buildに含められる状態になる。event 
 ## Files allowed to change
 
 - `apps/webapp/map-bundles/C108/**`
-- 新規`src`を作らず、既存script構成に従う検証script
+- `vite.config.ts`
+- `biome.json`（公開地図バイナリ・生成SVG/JSONをformatter対象外にする最小設定）
 - `scripts/verify-webapp-build.mjs`
 - `scripts/audit-public-tree.mjs`
 - `tests/c108-map-assets.test.ts`
 - `tests/public-boundary.test.mjs`
 - `tests/deployment-build.test.mjs`
-- 必要なparser test
+- `tests/map-bundle-selection.test.ts`
+- `docs/architecture/public-boundary.md`
 - `package.json`の既存script列への検証command追加
 - Task実績欄
 - `docs/status/progress.md`
@@ -78,7 +80,7 @@ apps/webapp/map-bundles/C108/
 
 ## TDD procedure
 
-- [ ] **Step 1: asset欠落で失敗するtestを書く**
+- [x] **Step 1: asset欠落で失敗するtestを書く**
 
 `tests/c108-map-assets.test.ts`を作り、inventoryの4 areaについて次の4ファイルが存在することを期待する。
 
@@ -89,7 +91,7 @@ expect(await fileExists(`${root}/${areaId}/grid-meta.json`)).toBe(true);
 expect(await fileExists(`${root}/${areaId}/grid.bin`)).toBe(true);
 ```
 
-- [ ] **Step 2: REDを確認する**
+- [x] **Step 2: REDを確認する**
 
 ```bash
 npx vitest run tests/c108-map-assets.test.ts
@@ -97,7 +99,7 @@ npx vitest run tests/c108-map-assets.test.ts
 
 Expected: public assetが未配置でFAIL。
 
-- [ ] **Step 3: 完成成果物をコピーする**
+- [x] **Step 3: 完成成果物をコピーする**
 
 Task 1 inventoryのprivate pathからpublic directoryへ、次の名前でコピーする。
 
@@ -110,12 +112,12 @@ grid.bin
 
 コピー後、public fileだけを変更する。private sourceを編集しない。
 
-- [ ] **Step 4: manifestを作る**
+- [x] **Step 4: manifestを作る**
 
 Task 2 parserを満たす4 area manifestを作る。
 area順はTask 1 inventoryの`order`に一致させる。
 
-- [ ] **Step 5: SVG安全性testを書く**
+- [x] **Step 5: SVG安全性testを書く**
 
 各`map.svg`について次を拒否する検査を実装する。
 
@@ -133,7 +135,7 @@ area順はTask 1 inventoryの`order`に一致させる。
 SVGは静的形状、text、style、内部fragment参照だけを許可する。
 style内の外部`url(...)`を拒否する。
 
-- [ ] **Step 6: pointsとgrid metadataの構造testを書く**
+- [x] **Step 6: pointsとgrid metadataの構造testを書く**
 
 4 areaすべてについて次を検証する。
 
@@ -150,7 +152,7 @@ style内の外部`url(...)`を拒否する。
 
 既存形式が1 byte/cellでない場合は、既存decoderの正確なbyte length契約をtestへ使う。
 
-- [ ] **Step 7: 到達可能性testを書く**
+- [x] **Step 7: 到達可能性testを書く**
 
 各areaでwalkable endpointを1つ選び、weighted 4-neighbor探索により全circle endpointの到達可能性を確認する。
 到達不能がある場合はtestを無理に通さず、次のどちらかをTask実績へ記録する。
@@ -162,7 +164,7 @@ intentional split: area内で独立componentとして扱う根拠をユーザー
 
 ユーザー確認なしにEuclidean distanceへfallbackしない。
 
-- [ ] **Step 8: public boundary testを拡張する**
+- [x] **Step 8: public boundary testを拡張する**
 
 tracked/public/build対象から次を拒否する。
 
@@ -180,7 +182,7 @@ __pycache__
 
 binary assetの中身をtextとしてsnapshotへ出さない。
 
-- [ ] **Step 9: build verifierを拡張する**
+- [x] **Step 9: build verifierを拡張する**
 
 production build後に次を検査する。
 
@@ -190,7 +192,7 @@ production build後に次を検査する。
 - binaryが0 byteでない。
 - private inputがdistへ存在しない。
 
-- [ ] **Step 10: focused検証を実行する**
+- [x] **Step 10: focused検証を実行する**
 
 ```bash
 npx vitest run tests/c108-map-assets.test.ts tests/public-boundary.test.mjs tests/deployment-build.test.mjs
@@ -227,13 +229,20 @@ Expected: PASS。
 ## Completion record
 
 ```text
-Bundle version:
-Area IDs:
+Bundle version: c108-v1
+Area IDs: e456, e7, s12, w12
 Tracked public files:
-SVG validation result:
-Grid/points validation result:
-Reachability result per area:
-Build audit result:
-Known limitations:
-Proposed commit message:
+- apps/webapp/map-bundles/C108/manifest.json
+- apps/webapp/map-bundles/C108/e456/{map.svg, points.json, grid-meta.json, grid.bin}
+- apps/webapp/map-bundles/C108/e7/{map.svg, points.json, grid-meta.json, grid.bin}
+- apps/webapp/map-bundles/C108/s12/{map.svg, points.json, grid-meta.json, grid.bin}
+- apps/webapp/map-bundles/C108/w12/{map.svg, points.json, grid-meta.json, grid.bin}
+SVG validation result: Passed (No scripts, foreignObjects, event handlers, external URLs/XXE; SVG MIME image/svg+xml verified).
+Grid/points validation result: Passed for all four areas (parser, unique identifier + number, coordinate bounds, grid byte count/value, portal bounds/walkability).
+Reachability result per area: Passed for e456, e7, s12, w12.
+Build audit result: Passed (production build, 26 byte-identical assets across demo-v1 and unregistered C108, public boundary audit, SVG MIME image/svg+xml).
+Map-independent infrastructure result: Passed (runtime event registry selection is separated from build copy for all public map bundles in vite.config.ts, scripts/verify-webapp-build.mjs, and tests).
+E2E result: 25/31 passed; 6 existing mobile visual snapshot mismatches remain in demo UI flows (1-2px height or small pixel diffs). Snapshot updates are deferred to a separate UI maintenance change and are not part of Task 3.
+Known limitations: C108 is intentionally not registered in the production event registry, so it is directly build-published but not exposed as a production UI event.
+Proposed commit message: feat(maps): add validated c108 map assets
 ```

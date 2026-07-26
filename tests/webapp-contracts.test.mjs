@@ -1335,7 +1335,9 @@ test("webapp navigation map renders the configured map image", () => {
 
 test("webapp validates the map manifest before constructing App", () => {
   const appSource = read("apps/webapp/js/app.js");
-  const loadIndex = appSource.indexOf("await loadMapBundleManifest");
+  const loadIndex = appSource.indexOf(
+    "await loadRuntimeMapBundleManifestFromUrl",
+  );
   const initializeIndex = appSource.indexOf(
     "Config.initializeAreas",
     loadIndex,

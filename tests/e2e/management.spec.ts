@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { expect, type Page, test } from "@playwright/test";
+import { routeDemoEventRegistry } from "./fixture-registry";
 
 const GAS_URL =
   "https://script.google.com/macros/s/AKfycbx_E2E_TEST_DEPLOYMENT/exec";
@@ -131,7 +132,7 @@ async function confirmDelete(page: Page, phrase?: string): Promise<void> {
   await expect(dialog.locator(".modal-overlay")).not.toBeVisible();
 }
 
-test.beforeEach(async ({ context }) => {
+test.beforeEach(async ({ context, page }) => {
   await context.route("**/*", async (route) => {
     const url = route.request().url();
     if (
@@ -147,6 +148,7 @@ test.beforeEach(async ({ context }) => {
       await route.abort();
     }
   });
+  await routeDemoEventRegistry(page);
 });
 
 test.describe("Mobile Management Flows", () => {

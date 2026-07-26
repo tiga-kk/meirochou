@@ -1,7 +1,7 @@
 # Phase 5B Task 5: Browser Smoke Test and Dijkstra Benchmark
 
-**Status:** Not started  
-**Depends on:** Phase 5B Task 4  
+**Status:** Completed
+**Depends on:** Phase 5B Task 4
 **Commit candidate:** `test(maps): verify c108 routing performance`
 
 ## Goal
@@ -101,11 +101,11 @@ mobile-equivalent environment
 
 ## Procedure
 
-- [ ] **Step 1: fictional smoke testを先に追加する**
+- [x] **Step 1: fictional smoke testを先に追加する**
 
 既存fixtureでmarkerとroute overlayの座標契約をtestし、実地図testが手動確認だけにならないようにする。
 
-- [ ] **Step 2: C108 browser smoke testを書く**
+- [x] **Step 2: C108 browser smoke testを書く**
 
 実地図testは明示的な環境変数またはtest projectでのみ実行できるようにし、通常CIで著作物のvisual snapshotを生成しない。
 
@@ -117,7 +117,7 @@ RUN_C108_SMOKE=1 npm run test:e2e -- tests/c108-map-browser-smoke.spec.ts
 
 skip時は成功偽装ではなく、C108 smokeが未実行であることをreportする。
 
-- [ ] **Step 3: route smokeを実行する**
+- [x] **Step 3: route smokeを実行する**
 
 ```bash
 RUN_C108_SMOKE=1 npx playwright test tests/c108-map-browser-smoke.spec.ts --project=chromium
@@ -126,12 +126,12 @@ RUN_C108_SMOKE=1 npx playwright test tests/c108-map-browser-smoke.spec.ts --proj
 
 4 areaすべてを確認する。
 
-- [ ] **Step 4: benchmark scriptを書く**
+- [x] **Step 4: benchmark scriptを書く**
 
 Task 3で検証済みのpoints/gridを読み込み、既存Dijkstra kernelを直接呼ぶ。
 kernelをimportできない場合、benchmarkのためにアルゴリズムを複製せず、既存moduleからpure functionをexportする最小refactorをtest付きで行う。
 
-- [ ] **Step 5: benchmarkを実行する**
+- [x] **Step 5: benchmarkを実行する**
 
 ```bash
 npm run benchmark:c108-routing
@@ -141,7 +141,7 @@ desktop結果を取得する。
 mobile-equivalent結果はPlaywright browser context内または実Android browser devtoolsで同一処理を実行する。
 環境差を明記する。
 
-- [ ] **Step 6: benchmark文書を作る**
+- [x] **Step 6: benchmark文書を作る**
 
 `docs/reviews/phase-05b-c108-benchmark.md`へ4 areaの表と次を記録する。
 
@@ -155,7 +155,7 @@ mobile-equivalent結果はPlaywright browser context内または実Android brows
 
 確認dialogの時間閾値や新しい仕様をここで決めない。
 
-- [ ] **Step 7: regressionを実行する**
+- [x] **Step 7: regressionを実行する**
 
 ```bash
 npm run test:webapp
@@ -190,15 +190,16 @@ git diff --check
 ## Completion record
 
 ```text
-Browser smoke environments:
-Areas tested:
-Route smoke result:
-Benchmark command:
-Benchmark document:
-Slowest median:
-Slowest p95:
-Largest estimated matrix time:
-Largest storage estimate:
-Known limitations:
-Proposed commit message:
+Browser smoke environments: Playwright Chromium (Desktop) & Mobile Chromium (Pixel 5)
+Areas tested: e456, e7, s12, w12 (4 areas)
+Route smoke result: 8/8 tests passed in Playwright (both projects)
+E2E regression: 25 passed, 6 existing visual snapshot mismatches, 8 C108 smoke tests skipped without RUN_C108_SMOKE=1; snapshots were not updated
+Benchmark command: npm run benchmark:c108-routing
+Benchmark document: docs/reviews/phase-05b-c108-benchmark.md
+Slowest desktop median/p95: w12 (51.05 ms / 66.88 ms 1-source)
+Slowest mobile-equivalent p95: w12 (71.48 ms 1-source)
+Largest estimated matrix time: w12 desktop (76.58 s median, 100.32 s p95); e456 mobile-equivalent p95 (163.66 s)
+Largest storage estimate: e456 (43.84 MB Float64, 26.89 MB JSON estimate)
+Known limitations: Full distance matrix exceeds LocalStorage limits (~5-10MB). Worker + IndexedDB or on-demand matrix generation is required in Phase 5C.
+Proposed commit message: test(maps): verify c108 routing performance
 ```

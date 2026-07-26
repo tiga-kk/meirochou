@@ -1,7 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
-  testDir: "./tests/e2e",
+  testDir: "./tests",
+  testMatch: ["**/*.spec.ts"],
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
@@ -20,6 +21,11 @@ export default defineConfig({
     },
   },
   projects: [
+    {
+      name: "chromium",
+      testMatch: ["**/c108-map-browser-smoke.spec.ts"],
+      use: { ...devices["Desktop Chrome"] },
+    },
     {
       name: "mobile-chromium",
       use: { ...devices["Pixel 5"] },

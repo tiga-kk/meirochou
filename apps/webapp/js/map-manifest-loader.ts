@@ -1,5 +1,12 @@
-import { parseMapBundleManifest } from "./types/boundary-parsers";
-import type { EventRegistryEntryV1, MapBundleManifestV1 } from "./types/domain";
+import {
+  parseEventMapBundleManifest,
+  parseMapBundleManifest,
+} from "./types/boundary-parsers";
+import type {
+  EventMapBundleManifest,
+  EventRegistryEntryV1,
+  MapBundleManifestV1,
+} from "./types/domain";
 
 const MAP_MANIFEST_PATH = "./assets/maps/manifest.json";
 
@@ -11,6 +18,65 @@ interface LoadMapBundleManifestOptions {
 
 function errorDetail(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+const C108_AREA_METADATA = {
+  e456: {
+    prefixes: ["東"],
+    labels: [
+      ..."アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン",
+    ],
+  },
+  e7: {
+    prefixes: ["東"],
+    labels: [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"],
+  },
+  s12: {
+    prefixes: ["南"],
+    labels: [..."abcdefghijklmnopqrstuvwxyz"],
+  },
+  w12: {
+    prefixes: ["西"],
+    labels: [
+      ..."あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん",
+    ],
+  },
+} as const;
+
+/** Adapt the strict C108 bundle contract to the legacy renderer area shape. */
+export function toRuntimeMapBundleManifest(
+  eventManifest: EventMapBundleManifest,
+  manifestUrl: string,
+): MapBundleManifestV1 {
+  if (eventManifest.eventId !== "C108") {
+    throw new Error(`Unsupported event map manifest: ${eventManifest.eventId}`);
+  }
+
+  const bundleBase = new URL(".", manifestUrl);
+
+  return {
+    schemaVersion: 1,
+    eventId: eventManifest.eventId,
+    displayName: "C108",
+    areas: eventManifest.areas.map((area) => {
+      const metadata =
+        C108_AREA_METADATA[area.areaId as keyof typeof C108_AREA_METADATA];
+      if (!metadata) {
+        throw new Error(`Unsupported C108 area: ${area.areaId}`);
+      }
+      return {
+        id: area.areaId,
+        mapId: area.areaId,
+        name: area.displayName,
+        prefixes: metadata.prefixes,
+        labels: metadata.labels,
+        mapFile: new URL(area.assets.svg, bundleBase).href,
+        pointsFile: new URL(area.assets.points, bundleBase).href,
+        gridMetaFile: new URL(area.assets.gridMeta, bundleBase).href,
+        gridFile: new URL(area.assets.grid, bundleBase).href,
+      };
+    }),
+  };
 }
 
 /** Resolve an event's map bundle manifest URL relative to the event registry URL. */
@@ -66,6 +132,61 @@ export function resolveEventMapManifestUrl(
   }
 
   return resolved.href;
+}
+
+/** Fetch and validate a C108 event map bundle manifest from an explicit URL. */
+export async function loadEventMapBundleManifestFromUrl(
+  manifestUrl: string,
+  options: LoadMapBundleManifestOptions = {},
+): Promise<EventMapBundleManifest> {
+  const fetcher =
+    options.fetcher ??
+    (globalThis.fetch ? globalThis.fetch.bind(globalThis) : undefined);
+  if (!fetcher) {
+    throw new Error("Map manifest request failed: fetch is unavailable");
+  }
+  let response: Response;
+  try {
+    response = await fetcher(manifestUrl, {
+      headers: { Accept: "application/json" },
+      signal: options.signal,
+    });
+  } catch (error) {
+    throw new Error(`Map manifest request failed: ${errorDetail(error)}`, {
+      cause: error,
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error(`Map manifest request failed with HTTP ${response.status}`);
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    throw new Error(
+      `Map manifest JSON could not be parsed: ${errorDetail(error)}`,
+      { cause: error },
+    );
+  }
+  return parseEventMapBundleManifest(payload);
+}
+
+/** Load either the C108 contract or a legacy fictional fixture for runtime use. */
+export async function loadRuntimeMapBundleManifestFromUrl(
+  manifestUrl: string,
+  eventId: string,
+  options: LoadMapBundleManifestOptions = {},
+): Promise<MapBundleManifestV1> {
+  if (eventId === "C108") {
+    const eventManifest = await loadEventMapBundleManifestFromUrl(
+      manifestUrl,
+      options,
+    );
+    return toRuntimeMapBundleManifest(eventManifest, manifestUrl);
+  }
+  return loadMapBundleManifestFromUrl(manifestUrl, options);
 }
 
 /** Fetch and validate a map bundle manifest from an explicit URL. */
