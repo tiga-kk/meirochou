@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { test } from "vitest";
 import { resolveBundleAssetUrl } from "../apps/webapp/js/demos/w12-dijkstra/asset-url";
 import {
@@ -8,6 +10,7 @@ import {
   revealCountAtTime,
   runDijkstraTrace,
 } from "../apps/webapp/js/demos/w12-dijkstra/core";
+import { normalizeZoomPercent } from "../apps/webapp/js/demos/w12-dijkstra/view-controls";
 import type { GridMeta } from "../apps/webapp/js/types/domain";
 
 const META: GridMeta = {
@@ -18,6 +21,11 @@ const META: GridMeta = {
   rows: 2,
 };
 
+const DEMO_HTML = readFileSync(
+  resolve("apps/webapp/demos/w12-dijkstra/index.html"),
+  "utf8",
+);
+
 test("W12 visualizer resolves relative bundle assets from the Vite page URL", () => {
   assert.equal(
     resolveBundleAssetUrl(
@@ -27,6 +35,19 @@ test("W12 visualizer resolves relative bundle assets from the Vite page URL", ()
     ),
     "http://127.0.0.1:5173/assets/maps/C108/w12/map.svg",
   );
+});
+
+test("W12 visualizer exposes slow playback choices", () => {
+  assert.match(DEMO_HTML, /value="10000"/);
+  assert.match(DEMO_HTML, /value="20000"/);
+  assert.match(DEMO_HTML, /value="30000"/);
+});
+
+test("W12 visualizer constrains zoom to 100 through 300 percent", () => {
+  assert.equal(normalizeZoomPercent(50), 100);
+  assert.equal(normalizeZoomPercent(175), 175);
+  assert.equal(normalizeZoomPercent(400), 300);
+  assert.equal(normalizeZoomPercent(Number.NaN), 100);
 });
 
 test("W12 visualizer applies the same normal and crowded edge weights as routing", () => {
