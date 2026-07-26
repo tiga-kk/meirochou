@@ -1,4 +1,5 @@
 import { expect, type Page, type Route, test } from "@playwright/test";
+import { routeDemoEventRegistry } from "./fixture-registry";
 
 const GAS_URL =
   "https://script.google.com/macros/s/example-e2e-deployment/exec";
@@ -14,13 +15,14 @@ type GasStateSnapshot = {
   }>;
 };
 
-test.beforeEach(async ({ context }) => {
+test.beforeEach(async ({ context, page }) => {
   await context.route(
     /(?:cdnjs\.cloudflare\.com|platform\.twitter\.com)/,
     async (route) => {
       await route.abort();
     },
   );
+  await routeDemoEventRegistry(page);
 });
 
 async function seedGasState(

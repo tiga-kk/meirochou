@@ -1,8 +1,8 @@
 # Current Progress
 
 **更新日:** 2026-07-26
-**現在の段階:** Phase 5B Task 3完了 (C108 public assets, build copy, boundary verification)
-**コード実装:** Task 3実装・検証完了。C108はproduction distへ含まれるがevent registry未登録のためUIには公開しない。
+**現在の段階:** Phase 5B Task 4完了 (C108 event registry & runtime loading)
+**コード実装:** Task 4実装・検証完了。C108 (day1/day2) がproduction event registryへ登録され、両日程で同じC108 map manifestを参照する。demo-v1はproduction選択肢から除外され、E2E fixture registryへ分離された。
 
 ## 統合済み
 
@@ -22,13 +22,13 @@
 - Phase 5B Task 1 (文書整備・入力棚卸し): 完了。
 - Phase 5B Task 2 (C108 bundle contract): 完了。
 - Phase 5B Task 3 (C108 public assets & validation): 完了。4 area × 4 assets、manifest、SVG安全性、points/grid、到達可能性、production build、public boundaryを検証済み。
+- Phase 5B Task 4 (C108 event registry & runtime loading): 完了。productionにC108 (day1/day2) のみを登録、demo-v1を除外、day共通manifest参照、C108 runtime adapter、E2E fixture分離を検証済み。focused 33件、webapp 396件、E2Eは25件成功・既存visual snapshot 6件差分。
 - Phase 5B実装branch: `feature/phase-05b` 作成済み。
 
 ## 次の操作
 
-1. Task 3のコミット内容を確認する。
-2. モバイルvisual snapshot 6件は既存demo UIの別保守課題として、UI変更時に個別レビューして更新する。
-3. Task 4の着手は別途ユーザー指示を受けてから行う。
+1. Task 4のコミット承認・提示を行う。
+2. Task 5の着手は別途ユーザー指示を受けてから行う。
 
 ## 人手入力
 

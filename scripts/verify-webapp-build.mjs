@@ -1,14 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
-import {
-  dirname,
-  extname,
-  isAbsolute,
-  join,
-  relative,
-  resolve,
-  sep,
-} from "node:path";
+import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const defaultRepositoryRoot = resolve(
@@ -200,8 +192,8 @@ export function verifyWebappBuild({
   const registryEventIds = sourceRegistry.events.map((event) => event?.eventId);
   assert.deepEqual(
     registryEventIds,
-    ["demo-v1"],
-    "Phase 5B event registry must contain only demo-v1",
+    ["C108"],
+    "Phase 5B event registry must contain only C108",
   );
 
   for (const event of sourceRegistry.events) {
@@ -215,7 +207,7 @@ export function verifyWebappBuild({
 
     const remaining = mapBundle.slice("../maps/".length);
     const sourceManifestPath = resolve(sourceBundlesRoot, remaining);
-    const outputManifestPath = resolve(dirname(outputRegistryFile), mapBundle);
+    const outputManifestPath = resolve(outputMapsDir, remaining);
 
     assertInside(
       sourceBundlesRoot,

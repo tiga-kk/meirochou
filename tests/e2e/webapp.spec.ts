@@ -1,10 +1,12 @@
 import { expect, test } from "@playwright/test";
+import { routeDemoEventRegistry } from "./fixture-registry";
 
-test.beforeEach(async ({ context }) => {
+test.beforeEach(async ({ context, page }) => {
   await context.route(
     /(?:cdnjs\.cloudflare\.com|platform\.twitter\.com)/,
     (route) => route.abort(),
   );
+  await routeDemoEventRegistry(page);
 });
 
 test("初回訪問では空のローカルイベント・日程で起動する", async ({ page }) => {

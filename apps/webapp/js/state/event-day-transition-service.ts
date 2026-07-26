@@ -1,5 +1,5 @@
 import {
-  loadMapBundleManifestFromUrl,
+  loadRuntimeMapBundleManifestFromUrl,
   resolveEventMapManifestUrl,
 } from "../map-manifest-loader";
 import type {
@@ -96,10 +96,14 @@ export class EventDayTransitionService {
       manifest = this.currentManifest;
     } else {
       const manifestUrl = resolveEventMapManifestUrl(this.registryUrl, event);
-      manifest = await loadMapBundleManifestFromUrl(manifestUrl, {
-        fetcher: this.fetcher,
-        signal,
-      });
+      manifest = await loadRuntimeMapBundleManifestFromUrl(
+        manifestUrl,
+        ref.eventId,
+        {
+          fetcher: this.fetcher,
+          signal,
+        },
+      );
       if (prepareSequence !== this.activePrepareSequence) {
         throw new Error("Transition preparation was superseded");
       }

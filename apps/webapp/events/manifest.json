@@ -2,10 +2,13 @@
   "schemaVersion": 1,
   "events": [
     {
-      "eventId": "demo-v1",
-      "displayName": "ComiPath Demo",
-      "mapBundle": "../maps/demo-v1/manifest.json",
-      "days": [{ "dayId": "day1", "displayName": "デモ1日目" }]
+      "eventId": "C108",
+      "displayName": "C108",
+      "mapBundle": "../maps/C108/manifest.json",
+      "days": [
+        { "dayId": "day1", "displayName": "1日目" },
+        { "dayId": "day2", "displayName": "2日目" }
+      ]
     }
   ]
 }

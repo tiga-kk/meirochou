@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
-import { test, vi } from "vitest";
+import { expect, test, vi } from "vitest";
+import productionRegistryJson from "../apps/webapp/events/manifest.json";
 import { loadEventRegistry } from "../apps/webapp/js/data/event-registry";
+import {
+  loadRuntimeMapBundleManifestFromUrl,
+  resolveEventMapManifestUrl,
+} from "../apps/webapp/js/map-manifest-loader";
 import { parseEventRegistry } from "../apps/webapp/js/types/boundary-parsers";
 
 const validRegistry = {
@@ -154,4 +159,151 @@ test("loadEventRegistry throws on fetch error", async () => {
   );
 
   vi.unstubAllGlobals();
+});
+
+test("production registry contains only C108 with day1 and day2", () => {
+  const registry = parseEventRegistry(productionRegistryJson);
+  expect(registry.events.map((event) => event.eventId)).toEqual(["C108"]);
+  expect(registry.events[0]?.days.map((day) => day.dayId)).toEqual([
+    "day1",
+    "day2",
+  ]);
+});
+
+test("production registry excludes demo-v1", () => {
+  const registry = parseEventRegistry(productionRegistryJson);
+  expect(registry.events.some((event) => event.eventId === "demo-v1")).toBe(
+    false,
+  );
+});
+
+test("day1 and day2 resolve to the same C108 map manifest path", () => {
+  const registry = parseEventRegistry(productionRegistryJson);
+  const c108Event = registry.events.find((e) => e.eventId === "C108");
+  assert.ok(c108Event);
+
+  const registryUrl = "http://example.test/assets/events/manifest.json";
+  const manifestUrl1 = resolveEventMapManifestUrl(registryUrl, c108Event);
+  const manifestUrl2 = resolveEventMapManifestUrl(registryUrl, c108Event);
+
+  expect(manifestUrl1).toBe(
+    "http://example.test/assets/maps/C108/manifest.json",
+  );
+  expect(manifestUrl2).toBe(
+    "http://example.test/assets/maps/C108/manifest.json",
+  );
+});
+
+test("runtime loader adapts C108 assets to absolute runtime paths", async () => {
+  const registry = parseEventRegistry(productionRegistryJson);
+  const c108Event = registry.events.find((e) => e.eventId === "C108");
+  assert.ok(c108Event);
+
+  const registryUrl = "http://example.test/assets/events/manifest.json";
+  const manifestUrl = resolveEventMapManifestUrl(registryUrl, c108Event);
+
+  const mockC108Manifest = {
+    schemaVersion: 1,
+    eventId: "C108",
+    bundleVersion: "fixture-v1",
+    areas: [
+      {
+        areaId: "e456",
+        displayName: "東456ホール",
+        assets: {
+          svg: "./e456/map.svg",
+          points: "./e456/points.json",
+          gridMeta: "./e456/grid-meta.json",
+          grid: "./e456/grid.bin",
+        },
+      },
+      {
+        areaId: "e7",
+        displayName: "東7ホール",
+        assets: {
+          svg: "./e7/map.svg",
+          points: "./e7/points.json",
+          gridMeta: "./e7/grid-meta.json",
+          grid: "./e7/grid.bin",
+        },
+      },
+      {
+        areaId: "s12",
+        displayName: "南12ホール",
+        assets: {
+          svg: "./s12/map.svg",
+          points: "./s12/points.json",
+          gridMeta: "./s12/grid-meta.json",
+          grid: "./s12/grid.bin",
+        },
+      },
+      {
+        areaId: "w12",
+        displayName: "西12ホール",
+        assets: {
+          svg: "./w12/map.svg",
+          points: "./w12/points.json",
+          gridMeta: "./w12/grid-meta.json",
+          grid: "./w12/grid.bin",
+        },
+      },
+    ],
+  };
+
+  const manifest = await loadRuntimeMapBundleManifestFromUrl(
+    manifestUrl,
+    "C108",
+    {
+      fetcher: vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockC108Manifest,
+      }),
+    },
+  );
+
+  expect(manifest.eventId).toBe("C108");
+  expect(manifest.areas).toHaveLength(4);
+  expect(manifest.areas.map((a) => a.id)).toEqual(["e456", "e7", "s12", "w12"]);
+  expect(manifest.areas[0]).toMatchObject({
+    mapFile: "http://example.test/assets/maps/C108/e456/map.svg",
+    pointsFile: "http://example.test/assets/maps/C108/e456/points.json",
+    gridMetaFile: "http://example.test/assets/maps/C108/e456/grid-meta.json",
+    gridFile: "http://example.test/assets/maps/C108/e456/grid.bin",
+  });
+});
+
+test("runtime loader keeps legacy demo fixtures on the legacy contract", async () => {
+  const fetcher = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      schemaVersion: 1,
+      eventId: "demo-v1",
+      displayName: "ComiPath Demo",
+      areas: [
+        {
+          id: "demo-east",
+          mapId: "demo-east",
+          name: "デモ東",
+          prefixes: ["東"],
+          labels: ["ア"],
+          mapFile: "./map.png",
+          pointsFile: "./points.json",
+          gridMetaFile: "./grid.json",
+          gridFile: "./grid.bin",
+        },
+      ],
+    }),
+  });
+
+  const manifest = await loadRuntimeMapBundleManifestFromUrl(
+    "http://example.test/assets/maps/demo-v1/manifest.json",
+    "demo-v1",
+    { fetcher },
+  );
+
+  expect(manifest.areas[0]).toMatchObject({
+    id: "demo-east",
+    mapFile: "http://example.test/assets/maps/demo-v1/map.png",
+    pointsFile: "http://example.test/assets/maps/demo-v1/points.json",
+  });
 });

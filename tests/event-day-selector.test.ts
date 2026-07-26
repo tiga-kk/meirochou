@@ -231,4 +231,44 @@ describe("EventDaySelector Component", () => {
       expect(s.disabled).toBe(true);
     }
   });
+
+  it("renders 1日目 and 2日目 options when C108 event is selected", async () => {
+    const c108Options: readonly EventDayOption[] = [
+      {
+        eventId: "C108",
+        eventLabel: "C108",
+        dayId: "day1",
+        dayLabel: "1日目",
+        configured: true,
+        selected: true,
+        pendingCount: 0,
+      },
+      {
+        eventId: "C108",
+        eventLabel: "C108",
+        dayId: "day2",
+        dayLabel: "2日目",
+        configured: false,
+        selected: false,
+        pendingCount: 0,
+      },
+    ];
+
+    element.options = c108Options;
+    element.selectedEventId = "C108";
+    element.selectedDayId = "day1";
+    await element.updateComplete;
+
+    const eventSelect =
+      element.querySelector<HTMLSelectElement>("#event-select");
+    const daySelect = element.querySelector<HTMLSelectElement>("#day-select");
+
+    expect(eventSelect?.value).toBe("C108");
+    expect(daySelect?.value).toBe("day1");
+
+    const dayOptions = daySelect?.querySelectorAll("option");
+    expect(dayOptions).toHaveLength(2);
+    expect(dayOptions?.[0].textContent).toBe("1日目");
+    expect(dayOptions?.[1].textContent).toBe("2日目 (未設定)");
+  });
 });

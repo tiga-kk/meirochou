@@ -6,7 +6,7 @@ import { loadEventRegistryWithUrl } from "./data/event-registry";
 import { CsvValidationError, DataManager } from "./data-manager.js";
 import { createDevDemoData, isDevDemoEnabled } from "./dev-demo-data.js";
 import {
-  loadMapBundleManifestFromUrl,
+  loadRuntimeMapBundleManifestFromUrl,
   renderMapBootstrapError,
   resolveEventMapManifestUrl,
 } from "./map-manifest-loader";
@@ -1661,7 +1661,10 @@ async function bootstrapApp() {
     const event = registry.events.find((e) => e.eventId === targetRef.eventId);
     if (!event) throw new Error("Last-opened event is not in registry");
     const manifestUrl = resolveEventMapManifestUrl(registryUrl, event);
-    manifest = await loadMapBundleManifestFromUrl(manifestUrl);
+    manifest = await loadRuntimeMapBundleManifestFromUrl(
+      manifestUrl,
+      event.eventId,
+    );
     Config.initializeAreas(manifest.areas);
   } catch (error) {
     console.error("Map bundle initialization failed.", error);

@@ -18,9 +18,9 @@ const registry = {
   schemaVersion: 1,
   events: [
     {
-      eventId: "demo-v1",
+      eventId: "C108",
       displayName: "Deployment fixture",
-      mapBundle: "../maps/demo-v1/manifest.json",
+      mapBundle: "../maps/C108/manifest.json",
       days: [{ dayId: "day1", displayName: "Day 1" }],
     },
   ],
@@ -28,21 +28,18 @@ const registry = {
 
 const mapManifest = {
   schemaVersion: 1,
-  eventId: "demo-v1",
+  eventId: "C108",
   displayName: "Deployment fixture",
-  areas: [
-    {
-      id: "demo-east",
-      mapId: "demo-east",
-      name: "Demo East",
-      labels: ["ア"],
-      prefixes: ["東"],
-      mapFile: "./demo-east/source.png",
-      pointsFile: "./demo-east/points.json",
-      gridMetaFile: "./demo-east/grid-meta.json",
-      gridFile: "./demo-east/grid.bin",
+  areas: ["e456", "e7", "s12", "w12"].map((areaId) => ({
+    areaId,
+    displayName: `${areaId} ホール`,
+    assets: {
+      svg: `./${areaId}/map.svg`,
+      points: `./${areaId}/points.json`,
+      gridMeta: `./${areaId}/grid-meta.json`,
+      grid: `./${areaId}/grid.bin`,
     },
-  ],
+  })),
 };
 
 let fixtureRoot;
@@ -54,53 +51,57 @@ function writeJson(path, value) {
 function createFixture() {
   const root = mkdtempSync(join(tmpdir(), "comipath-deploy-audit-"));
   const sourceEvents = join(root, "apps/webapp/events");
-  const sourceBundle = join(root, "apps/webapp/map-bundles/demo-v1");
-  const sourceArea = join(sourceBundle, "demo-east");
+  const sourceBundle = join(root, "apps/webapp/map-bundles/C108");
   const publicBundle = join(root, "apps/webapp/map-bundles/public-v1");
   const publicArea = join(publicBundle, "public-east");
   const outputRoot = join(root, "dist/webapp");
   const outputEvents = join(outputRoot, "assets/events");
-  const outputBundle = join(outputRoot, "assets/maps/demo-v1");
+  const outputBundle = join(outputRoot, "assets/maps/C108");
   const outputPublicBundle = join(outputRoot, "assets/maps/public-v1");
   const outputAssets = join(outputRoot, "assets");
 
   mkdirSync(sourceEvents, { recursive: true });
-  mkdirSync(sourceArea, { recursive: true });
+  mkdirSync(sourceBundle, { recursive: true });
   mkdirSync(publicArea, { recursive: true });
   mkdirSync(outputEvents, { recursive: true });
   mkdirSync(outputAssets, { recursive: true });
 
   writeJson(join(sourceEvents, "manifest.json"), registry);
   writeJson(join(sourceBundle, "manifest.json"), mapManifest);
-  writeFileSync(join(sourceArea, "source.png"), Buffer.from([1, 2, 3]));
-  writeJson(join(sourceArea, "points.json"), { points: [] });
-  writeJson(join(sourceArea, "grid-meta.json"), {
-    width: 1,
-    height: 1,
-    cell_size: 1,
-    cols: 1,
-    rows: 1,
-  });
-  writeFileSync(join(sourceArea, "grid.bin"), Buffer.from([1]));
+
+  for (const areaId of ["e456", "e7", "s12", "w12"]) {
+    const sourceArea = join(sourceBundle, areaId);
+    mkdirSync(sourceArea, { recursive: true });
+    writeFileSync(join(sourceArea, "map.svg"), "<svg></svg>");
+    writeJson(join(sourceArea, "points.json"), { points: [] });
+    writeJson(join(sourceArea, "grid-meta.json"), {
+      width: 1,
+      height: 1,
+      cell_size: 1,
+      cols: 1,
+      rows: 1,
+    });
+    writeFileSync(join(sourceArea, "grid.bin"), Buffer.from([1]));
+  }
 
   writeJson(join(publicBundle, "manifest.json"), {
-    ...mapManifest,
+    schemaVersion: 1,
     eventId: "public-v1",
     displayName: "Unregistered public fixture",
     areas: [
       {
-        ...mapManifest.areas[0],
-        id: "public-east",
-        mapId: "public-east",
-        name: "Public East",
-        mapFile: "./public-east/source.png",
-        pointsFile: "./public-east/points.json",
-        gridMetaFile: "./public-east/grid-meta.json",
-        gridFile: "./public-east/grid.bin",
+        areaId: "public-east",
+        displayName: "Public East",
+        assets: {
+          svg: "./public-east/map.svg",
+          points: "./public-east/points.json",
+          gridMeta: "./public-east/grid-meta.json",
+          grid: "./public-east/grid.bin",
+        },
       },
     ],
   });
-  writeFileSync(join(publicArea, "source.png"), Buffer.from([4, 5, 6]));
+  writeFileSync(join(publicArea, "map.svg"), "<svg></svg>");
   writeJson(join(publicArea, "points.json"), { points: [] });
   writeJson(join(publicArea, "grid-meta.json"), {
     width: 1,
@@ -133,11 +134,11 @@ function rewriteRegistries(value) {
 
 function rewriteMapManifest(value) {
   writeJson(
-    join(fixtureRoot, "apps/webapp/map-bundles/demo-v1/manifest.json"),
+    join(fixtureRoot, "apps/webapp/map-bundles/C108/manifest.json"),
     value,
   );
   writeJson(
-    join(fixtureRoot, "dist/webapp/assets/maps/demo-v1/manifest.json"),
+    join(fixtureRoot, "dist/webapp/assets/maps/C108/manifest.json"),
     value,
   );
 }
@@ -153,8 +154,8 @@ afterEach(() => {
 test("accepts registered and unregistered public static artifacts", () => {
   const result = verifyWebappBuild({ repositoryRoot: fixtureRoot });
 
-  assert.deepEqual(result.eventIds, ["demo-v1", "public-v1"]);
-  assert.equal(result.verifiedFiles, 10);
+  assert.deepEqual(result.eventIds, ["C108", "public-v1"]);
+  assert.equal(result.verifiedFiles, 22);
 });
 
 test("rejects a second published event", () => {
@@ -172,7 +173,7 @@ test("rejects a second published event", () => {
 
   assert.throws(
     () => verifyWebappBuild({ repositoryRoot: fixtureRoot }),
-    /Phase 5B event registry must contain only demo-v1/,
+    /Phase 5B event registry must contain only C108/,
   );
 });
 
@@ -182,20 +183,20 @@ test("rejects a missing referenced event map manifest", () => {
     events: [
       {
         ...registry.events[0],
-        mapBundle: "../maps/demo-v1/missing.json",
+        mapBundle: "../maps/C108/missing.json",
       },
     ],
   });
 
   assert.throws(
     () => verifyWebappBuild({ repositoryRoot: fixtureRoot }),
-    /source map manifest for event demo-v1 is missing/,
+    /source map manifest for event C108 is missing/,
   );
 });
 
 test("rejects a missing referenced built asset", () => {
   unlinkSync(
-    join(fixtureRoot, "dist/webapp/assets/maps/demo-v1/demo-east/points.json"),
+    join(fixtureRoot, "dist/webapp/assets/maps/C108/e456/points.json"),
   );
 
   assert.throws(
@@ -206,7 +207,7 @@ test("rejects a missing referenced built asset", () => {
 
 test("rejects an asset reference that escapes the event bundle", () => {
   const invalidManifest = structuredClone(mapManifest);
-  invalidManifest.areas[0].mapFile = "../outside.png";
+  invalidManifest.areas[0].assets.svg = "../outside.png";
   rewriteMapManifest(invalidManifest);
 
   assert.throws(
@@ -218,7 +219,7 @@ test("rejects an asset reference that escapes the event bundle", () => {
 test("rejects a symbolic link in the built artifact", () => {
   symlinkSync(
     "manifest.json",
-    join(fixtureRoot, "dist/webapp/assets/maps/demo-v1/manifest-link.json"),
+    join(fixtureRoot, "dist/webapp/assets/maps/C108/manifest-link.json"),
   );
 
   assert.throws(
