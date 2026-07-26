@@ -12,6 +12,7 @@ import {
   runDijkstraTrace,
   type DijkstraTrace,
 } from "./core";
+import { normalizeZoomPercent } from "./view-controls";
 
 const MANIFEST_PATH = "/assets/maps/C108/manifest.json";
 
@@ -28,6 +29,8 @@ const ui = {
   marker: element<HTMLSpanElement>("#originMarker"),
   status: element<HTMLParagraphElement>("#statusText"),
   speed: element<HTMLSelectElement>("#speedSelect"),
+  zoomRange: element<HTMLInputElement>("#zoomRange"),
+  zoomOutput: element<HTMLOutputElement>("#zoomOutput"),
   pause: element<HTMLButtonElement>("#pauseButton"),
   reset: element<HTMLButtonElement>("#resetButton"),
   startCell: element<HTMLElement>("#startCell"),
@@ -65,6 +68,13 @@ function setStatus(message: string, isError = false): void {
   ui.status.dataset.state = isError ? "error" : "normal";
 }
 
+function applyZoom(value: number): void {
+  const zoomPercent = normalizeZoomPercent(value);
+  ui.zoomRange.value = String(zoomPercent);
+  ui.zoomOutput.value = `${zoomPercent}%`;
+  ui.stage.style.width = `${zoomPercent}%`;
+}
+
 async function fetchJson(url: string, label: string): Promise<unknown> {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
@@ -100,6 +110,7 @@ async function loadW12(): Promise<void> {
   ui.stage.style.aspectRatio = `${state.meta.width} / ${state.meta.height}`;
   ui.canvas.width = state.meta.cols;
   ui.canvas.height = state.meta.rows;
+  applyZoom(Number(ui.zoomRange.value));
   ui.stage.hidden = false;
   ui.reset.disabled = false;
   setStatus("地図上の通路をクリックしてください。");
@@ -240,6 +251,9 @@ ui.pause.addEventListener("click", togglePause);
 ui.reset.addEventListener("click", clearHeatmap);
 ui.speed.addEventListener("change", () => {
   if (state.trace) play(state.trace);
+});
+ui.zoomRange.addEventListener("input", () => {
+  applyZoom(Number(ui.zoomRange.value));
 });
 
 loadW12().catch((error: unknown) => {
