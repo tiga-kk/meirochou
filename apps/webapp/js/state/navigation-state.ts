@@ -47,6 +47,26 @@ function deriveEndpointFromPosition(pos: ConfirmedPosition): RouteEndpointId {
   });
 }
 
+function prioritizeTarget(
+  order: readonly string[],
+  targetSpace: string,
+): readonly string[] {
+  return [targetSpace, ...order.filter((space) => space !== targetSpace)];
+}
+
+function validatePosition(position: ConfirmedPosition, areaId: string): void {
+  if (position.areaId !== areaId) {
+    throw new NavigationStateError(
+      "Position area does not match the navigation area",
+    );
+  }
+  if (position.source === "arrived-circle" && !position.circleSpace) {
+    throw new NavigationStateError(
+      "Arrived-circle position must include a circle space",
+    );
+  }
+}
+
 export class NavigationStateMachine {
   private state: NavigationState;
 
@@ -65,6 +85,7 @@ export class NavigationStateMachine {
     order?: readonly string[];
   }): NavigationState {
     const { areaId, position, targetSpace = null, order = [] } = params;
+    validatePosition(position, areaId);
     const stage: NavigationStage = targetSpace ? "navigating" : "idle";
 
     let lockedFirstLeg: LockedLeg | null = null;
@@ -100,12 +121,19 @@ export class NavigationStateMachine {
       from: fromEndpoint,
       toSpace: newTargetSpace,
     });
+    const provisionalOrder = prioritizeTarget(
+      this.state.provisionalOrder,
+      newTargetSpace,
+    );
+    const bestOrder = prioritizeTarget(this.state.bestOrder, newTargetSpace);
 
     const nextState: NavigationState = Object.freeze({
       ...this.state,
       stage: "navigating" as const,
       targetSpace: newTargetSpace,
       lockedFirstLeg,
+      provisionalOrder: Object.freeze(provisionalOrder),
+      bestOrder: Object.freeze(bestOrder),
     });
 
     this.state = nextState;
@@ -113,8 +141,19 @@ export class NavigationStateMachine {
   }
 
   arrive(targetPosition: ConfirmedPosition): NavigationState {
-    if (this.state.stage === "idle") {
-      throw new NavigationStateError("Cannot arrive when stage is idle");
+    if (this.state.stage !== "navigating") {
+      throw new NavigationStateError(
+        "Cannot arrive unless navigation is in progress",
+      );
+    }
+    if (
+      targetPosition.source !== "arrived-circle" ||
+      targetPosition.circleSpace !== this.state.targetSpace ||
+      targetPosition.areaId !== this.state.areaId
+    ) {
+      throw new NavigationStateError(
+        "Arrived position does not match the current target",
+      );
     }
 
     const nextState: NavigationState = Object.freeze({
@@ -132,6 +171,12 @@ export class NavigationStateMachine {
     remainingOrder: readonly string[];
   }): NavigationState {
     const { nextTargetSpace, remainingOrder } = params;
+
+    if (this.state.stage === "idle") {
+      throw new NavigationStateError(
+        "Cannot process visit state change while navigation is idle",
+      );
+    }
 
     if (
       !nextTargetSpace ||

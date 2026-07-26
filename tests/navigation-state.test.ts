@@ -43,6 +43,19 @@ describe("Phase 5C Task 2: Navigation State Machine", () => {
     expect(stateAfterOpt.targetSpace).toBe("A-01");
   });
 
+  test("setStart rejects a position from another area", () => {
+    const sm = new NavigationStateMachine();
+
+    expect(() =>
+      sm.setStart({
+        areaId: "w12",
+        position: startPos,
+        targetSpace: "A-01",
+      }),
+    ).toThrow();
+    expect(sm.getState().stage).toBe("idle");
+  });
+
   test("arrive moves current position to target endpoint and sets stage to atTarget", () => {
     const sm = new NavigationStateMachine();
     sm.setStart({
@@ -58,6 +71,25 @@ describe("Phase 5C Task 2: Navigation State Machine", () => {
     expect(state.stage).toBe("atTarget");
     expect(state.currentPosition).toEqual(circleAPos);
     expect(state.targetSpace).toBe("A-01");
+  });
+
+  test("arrive rejects a position that does not match the current target", () => {
+    const sm = new NavigationStateMachine();
+    sm.setStart({
+      areaId: "e456",
+      position: startPos,
+      targetSpace: "A-01",
+      order: ["A-01", "A-02"],
+    });
+
+    expect(() =>
+      sm.arrive({
+        ...circleAPos,
+        circleSpace: "A-02",
+      }),
+    ).toThrow();
+    expect(sm.getState().stage).toBe("navigating");
+    expect(sm.getState().currentPosition).toEqual(startPos);
   });
 
   test("optimizer result updates bestOrder only and preserves current target and locked leg", () => {
@@ -98,6 +130,8 @@ describe("Phase 5C Task 2: Navigation State Machine", () => {
       from: { type: "start", areaId: "e456", gridIndex: 123 },
       toSpace: "A-02",
     });
+    expect(state.provisionalOrder).toEqual(["A-02", "A-01"]);
+    expect(state.bestOrder).toEqual(["A-02", "A-01"]);
   });
 
   test("resetStart clears navigation state to idle without mutating external circle states", () => {
@@ -161,6 +195,18 @@ describe("Phase 5C Task 2: Navigation State Machine", () => {
       remainingOrder: [],
     });
 
+    expect(sm.getState().stage).toBe("idle");
+  });
+
+  test("processVisitStateChange rejects calls while navigation is idle", () => {
+    const sm = new NavigationStateMachine();
+
+    expect(() =>
+      sm.processVisitStateChange({
+        nextTargetSpace: null,
+        remainingOrder: [],
+      }),
+    ).toThrow();
     expect(sm.getState().stage).toBe("idle");
   });
 });
