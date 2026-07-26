@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import type { GridMeta } from "../apps/webapp/js/types/domain";
+import { resolveBundleAssetUrl } from "../apps/webapp/js/demos/w12-dijkstra/asset-url";
 import {
   distanceToColor,
   findNearestWalkableIndex,
@@ -8,6 +8,7 @@ import {
   revealCountAtTime,
   runDijkstraTrace,
 } from "../apps/webapp/js/demos/w12-dijkstra/core";
+import type { GridMeta } from "../apps/webapp/js/types/domain";
 
 const META: GridMeta = {
   width: 24,
@@ -16,6 +17,17 @@ const META: GridMeta = {
   cols: 3,
   rows: 2,
 };
+
+test("W12 visualizer resolves relative bundle assets from the Vite page URL", () => {
+  assert.equal(
+    resolveBundleAssetUrl(
+      "/assets/maps/C108/manifest.json",
+      "./w12/map.svg",
+      "http://127.0.0.1:5173/demos/w12-dijkstra/",
+    ),
+    "http://127.0.0.1:5173/assets/maps/C108/w12/map.svg",
+  );
+});
 
 test("W12 visualizer applies the same normal and crowded edge weights as routing", () => {
   const grid = new Uint8Array([
