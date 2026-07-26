@@ -38,14 +38,14 @@
 
 ## Task Table
 
-| Task | 正本 | 成果物 |
-|---|---|---|
-| 1 | `task-01-documentation-and-input-inventory.md` | 文書構成の整理、C108入力棚卸し、正式なarea一覧 |
-| 2 | `task-02-map-bundle-contract.md` | C108 manifest contractとruntime parser |
-| 3 | `task-03-public-assets-and-validation.md` | 4地図の公開bundle、構造・安全性・座標検証 |
-| 4 | `task-04-event-registry-and-runtime-loading.md` | C108 day1/day2登録、production/demo分離、runtime load |
-| 5 | `task-05-browser-smoke-and-benchmark.md` | 実ブラウザsmoke、経路・座標確認、Dijkstra benchmark |
-| 6 | `task-06-phase-verification-and-handoff.md` | 全体検証、公開境界audit、Phase 5C handoff |
+| Task | 正本 | 成果物 | ステータス |
+|---|---|---|---|
+| 1 | `task-01-documentation-and-input-inventory.md` | 文書構成の整理、C108入力棚卸し、正式なarea一覧 | 完了 |
+| 2 | `task-02-map-bundle-contract.md` | C108 manifest contractとruntime parser | 完了 |
+| 3 | `task-03-public-assets-and-validation.md` | 4地図の公開bundle、構造・安全性・座標検証 | 完了 |
+| 4 | `task-04-event-registry-and-runtime-loading.md` | C108 day1/day2登録、production/demo分離、runtime load | 完了 |
+| 5 | `task-05-browser-smoke-and-benchmark.md` | 実ブラウザsmoke、経路・座標確認、Dijkstra benchmark | 完了 |
+| 6 | `task-06-phase-verification-and-handoff.md` | 全体検証、公開境界audit、Phase 5C handoff | 完了 |
 
 ## Required Order
 

@@ -196,9 +196,9 @@ Route smoke result: 8/8 tests passed in Playwright (both projects)
 E2E regression: 25 passed, 6 existing visual snapshot mismatches, 8 C108 smoke tests skipped without RUN_C108_SMOKE=1; snapshots were not updated
 Benchmark command: npm run benchmark:c108-routing
 Benchmark document: docs/reviews/phase-05b-c108-benchmark.md
-Slowest desktop median/p95: w12 (54.00 ms / 72.17 ms 1-source)
-Slowest mobile-equivalent p95: e456 (82.95 ms 1-source)
-Largest estimated matrix time: w12 desktop (81.00 s median, 108.26 s p95); e456 mobile-equivalent p95 (198.83 s)
+Slowest desktop median/p95: w12 (51.05 ms / 66.88 ms 1-source)
+Slowest mobile-equivalent p95: w12 (71.48 ms 1-source)
+Largest estimated matrix time: w12 desktop (76.58 s median, 100.32 s p95); e456 mobile-equivalent p95 (163.66 s)
 Largest storage estimate: e456 (43.84 MB Float64, 26.89 MB JSON estimate)
 Known limitations: Full distance matrix exceeds LocalStorage limits (~5-10MB). Worker + IndexedDB or on-demand matrix generation is required in Phase 5C.
 Proposed commit message: test(maps): verify c108 routing performance
