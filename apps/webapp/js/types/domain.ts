@@ -332,3 +332,37 @@ export interface EventMapBundleManifest {
   readonly bundleVersion: string;
   readonly areas: readonly EventMapAreaManifest[];
 }
+
+export type NavigationStage = "idle" | "navigating" | "atTarget";
+
+export type RouteEndpointId =
+  | {
+      readonly type: "start";
+      readonly areaId: string;
+      readonly gridIndex: number;
+    }
+  | { readonly type: "circle"; readonly space: string };
+
+export interface ConfirmedPosition {
+  readonly areaId: string;
+  readonly gridIndex: number;
+  readonly svgX: number;
+  readonly svgY: number;
+  readonly source: "manual-start" | "arrived-circle";
+  readonly circleSpace?: string;
+}
+
+export interface LockedLeg {
+  readonly from: RouteEndpointId;
+  readonly toSpace: string;
+}
+
+export interface NavigationState {
+  readonly stage: NavigationStage;
+  readonly areaId: string | null;
+  readonly currentPosition: ConfirmedPosition | null;
+  readonly targetSpace: string | null;
+  readonly lockedFirstLeg: LockedLeg | null;
+  readonly provisionalOrder: readonly string[];
+  readonly bestOrder: readonly string[];
+}

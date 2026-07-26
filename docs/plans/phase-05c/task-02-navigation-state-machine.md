@@ -47,23 +47,23 @@ export interface NavigationState {
 
 ## TDD procedure
 
-- [ ] 到着前はcurrent positionがtargetへ移らない失敗testを書く。
-- [ ] arriveでcurrent positionがtarget endpointへ移り、stageがatTargetになる失敗testを書く。
-- [ ] optimizer resultでtargetが変わらない失敗testを書く。
-- [ ] manual target changeでold pending targetが候補へ戻る失敗testを書く。
-- [ ] held target選択時にcircle stateをpendingへ戻すservice連携testを書く。
-- [ ] resetStartがnavigationだけをclearする失敗testを書く。
-- [ ] REDを確認する。
+- [x] 到着前はcurrent positionがtargetへ移らない失敗testを書く。
+- [x] arriveでcurrent positionがtarget endpointへ移り、stageがatTargetになる失敗testを書く。
+- [x] optimizer resultでtargetが変わらない失敗testを書く。
+- [x] manual target changeでold pending targetが候補へ戻る失敗testを書く。
+- [x] held target選択時にcircle stateをpendingへ戻すservice連携testを書く。
+- [x] resetStartがnavigationだけをclearする失敗testを書く。
+- [x] REDを確認する。
 
 ```bash
 npx vitest run tests/navigation-state.test.ts
 ```
 
-- [ ] pure reducerまたはstate machineを実装する。
-- [ ] 不正eventを安全なdomain errorとして拒否する。
-- [ ] appから直接複数fieldを書き換えず、transition API経由にする。
-- [ ] current targetとlocked first legを同じtransactionで更新する。
-- [ ] GREENを確認する。
+- [x] pure reducerまたはstate machineを実装する。
+- [x] 不正eventを安全なdomain errorとして拒否する。
+- [x] appから直接複数fieldを書き換えず、transition API経由にする。
+- [x] current targetとlocked first legを同じtransactionで更新する。
+- [x] GREENを確認する。
 
 ```bash
 npx vitest run tests/navigation-state.test.ts tests/event-day-transition-service.test.ts
