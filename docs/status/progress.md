@@ -1,8 +1,8 @@
 # Current Progress
 
 **更新日:** 2026-07-26
-**現在の段階:** Phase 5B Task 4完了 (C108 event registry & runtime loading)
-**コード実装:** Task 4実装・検証完了。C108 (day1/day2) がproduction event registryへ登録され、両日程で同じC108 map manifestを参照する。demo-v1はproduction選択肢から除外され、E2E fixture registryへ分離された。
+**現在の段階:** Phase 5B Task 5完了 (Browser smoke test & Dijkstra benchmark)
+**コード実装:** Task 5実装・検証完了。C108 4エリアの実ブラウザスモークテスト (Playwright Chromium / Mobile Chromium 8件全PASS) と Dijkstra 性能ベンチマークの測定・レポート作成完了。全E2E回帰は25件PASS、既存visual snapshot差分6件、通常実行時のC108 smoke skip 8件。
 
 ## 統合済み
 
@@ -22,13 +22,14 @@
 - Phase 5B Task 1 (文書整備・入力棚卸し): 完了。
 - Phase 5B Task 2 (C108 bundle contract): 完了。
 - Phase 5B Task 3 (C108 public assets & validation): 完了。4 area × 4 assets、manifest、SVG安全性、points/grid、到達可能性、production build、public boundaryを検証済み。
-- Phase 5B Task 4 (C108 event registry & runtime loading): 完了。productionにC108 (day1/day2) のみを登録、demo-v1を除外、day共通manifest参照、C108 runtime adapter、E2E fixture分離を検証済み。focused 33件、webapp 396件、E2Eは25件成功・既存visual snapshot 6件差分。
+- Phase 5B Task 4 (C108 event registry & runtime loading): 完了。productionにC108 (day1/day2) のみを登録、demo-v1を除外、day共通manifest参照を検証済み。
+- Phase 5B Task 5 (Browser smoke test & Dijkstra benchmark): 完了。Playwright実ブラウザスモーク(4エリア×2環境PASS)、Dijkstraカーネルによるベンチマーク計測・レポート作成を完了。全E2E回帰は25件PASS、既存visual snapshot差分6件、通常実行時のC108 smoke skip 8件。
 - Phase 5B実装branch: `feature/phase-05b` 作成済み。
 
 ## 次の操作
 
-1. Task 4のコミット承認・提示を行う。
-2. Task 5の着手は別途ユーザー指示を受けてから行う。
+1. Task 5のコミット承認・提示を行う。
+2. Task 6の着手は別途ユーザー指示を受けてから行う。
 
 ## 人手入力
 
