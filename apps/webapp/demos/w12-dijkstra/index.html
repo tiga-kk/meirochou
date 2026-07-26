@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>W12 ダイクストラ距離可視化</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">C108 / W12 ROUTING DEMO</p>
+          <h1>ダイクストラ法による会場内距離</h1>
+          <p class="lead">
+            地図をクリックすると、通路に沿った重み付き最短距離が、近距離の青から遠距離の赤へ広がります。
+          </p>
+        </div>
+      </header>
+
+      <section class="control-bar" aria-label="デモ操作">
+        <label class="speed-control" for="speedSelect">
+          <span>再生時間</span>
+          <select id="speedSelect">
+            <option value="900">0.9秒</option>
+            <option value="1800" selected>1.8秒</option>
+            <option value="3500">3.5秒</option>
+            <option value="6000">6.0秒</option>
+          </select>
+        </label>
+        <button id="pauseButton" type="button" disabled>一時停止</button>
+        <button id="resetButton" type="button" disabled>表示を消す</button>
+        <p id="statusText" class="status" aria-live="polite">
+          W12の地図と歩行グリッドを読み込んでいます…
+        </p>
+      </section>
+
+      <section class="visualizer" aria-label="W12距離ヒートマップ">
+        <div class="map-frame">
+          <div id="mapStage" class="map-stage" hidden>
+            <img
+              id="mapImage"
+              alt="C108 西12ホールの抽象化地図"
+              draggable="false"
+            />
+            <canvas
+              id="heatCanvas"
+              aria-label="最短距離ヒートマップ"
+            ></canvas>
+            <span
+              id="originMarker"
+              class="origin-marker"
+              hidden
+              aria-hidden="true"
+            ></span>
+          </div>
+        </div>
+
+        <aside class="readout" aria-label="計算結果">
+          <dl>
+            <div><dt>開始セル</dt><dd id="startCell">—</dd></div>
+            <div><dt>確定セル</dt><dd id="visitedCells">—</dd></div>
+            <div><dt>最大距離</dt><dd id="maxDistance">—</dd></div>
+            <div><dt>計算時間</dt><dd id="computeTime">—</dd></div>
+          </dl>
+          <div class="legend" aria-label="距離色凡例">
+            <span>近い</span>
+            <div class="legend-ramp"></div>
+            <span>遠い</span>
+          </div>
+          <p class="note">
+            通常セルの倍率は1.0、混雑セルは1.5です。黒い障害物は通過せず、クリック地点が障害物なら最寄りの通路へ補正します。
+          </p>
+        </aside>
+      </section>
+    </main>
+
+    <script
+      type="module"
+      src="../../js/demos/w12-dijkstra/app.ts"
+    ></script>
+  </body>
+</html>
