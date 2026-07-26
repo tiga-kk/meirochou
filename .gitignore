@@ -22,12 +22,10 @@ blob-report/
 .env.private
 .env.*.local
 
-#documents
-/docs/
+# Local-only agent files
 CLAUDE.md
 CODEX.md
 GEMINI.md
-AGENTS.md
 
 # User local overrides
 integrations/gas-spreadsheet/README.md
