@@ -27,7 +27,22 @@
             <option value="1800" selected>1.8秒</option>
             <option value="3500">3.5秒</option>
             <option value="6000">6.0秒</option>
+            <option value="10000">10秒</option>
+            <option value="20000">20秒</option>
+            <option value="30000">30秒</option>
           </select>
+        </label>
+        <label class="zoom-control" for="zoomRange">
+          <span>地図倍率</span>
+          <input
+            id="zoomRange"
+            type="range"
+            min="100"
+            max="300"
+            step="25"
+            value="100"
+          />
+          <output id="zoomOutput" for="zoomRange">100%</output>
         </label>
         <button id="pauseButton" type="button" disabled>一時停止</button>
         <button id="resetButton" type="button" disabled>表示を消す</button>
