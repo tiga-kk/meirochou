@@ -30,6 +30,7 @@ export function createInitialNavigationState(): NavigationState {
     lockedFirstLeg: null,
     provisionalOrder: Object.freeze([]),
     bestOrder: Object.freeze([]),
+    optimizationGeneration: 0,
   });
 }
 

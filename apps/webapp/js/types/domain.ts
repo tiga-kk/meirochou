@@ -180,6 +180,7 @@ export interface CircleRecord {
   readonly tweet?: string;
   readonly memo?: string;
   readonly isSale?: string;
+  readonly queueClass?: "normal" | "wall";
   readonly removedFromSource?: boolean;
 }
 
@@ -365,4 +366,6 @@ export interface NavigationState {
   readonly lockedFirstLeg: LockedLeg | null;
   readonly provisionalOrder: readonly string[];
   readonly bestOrder: readonly string[];
+  /** Monotonic token used to discard progress from an obsolete optimizer job. */
+  readonly optimizationGeneration?: number;
 }

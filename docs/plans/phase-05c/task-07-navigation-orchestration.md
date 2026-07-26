@@ -1,6 +1,6 @@
 # Phase 5C Task 7: Navigation and Optimization Orchestration
 
-**Status:** Not started（Task 6設計改訂へ追随済み）  
+**Status:** Complete
 **Depends on:** Phase 5C Tasks 1-6  
 **Commit candidate:** `feat(navigation): coordinate arrival and route improvement`
 
@@ -87,43 +87,52 @@ pendingが0、heldが1以上:
 
 ## TDD procedure
 
-- [ ] initial startで即時targetが出るintegration testを書く。
-- [ ] start distanceとmatrix distanceが同じtiming profileで秒へ変換されるtestを書く。
-- [ ] priorityがALNS valueへ変換されるtestを書く。
-- [ ] 通常30秒、壁200秒、不明30秒のservice-time resolver testを書く。
-- [ ] Worker progressでcurrent targetが変わらないtestを書く。
-- [ ] before-arrival holdがcurrent positionを動かさないtestを書く。
-- [ ] arrival purchaseがprepared nextを待機なしで使うtestを書く。
-- [ ] arrival holdがtarget位置から次へ進むtestを書く。
-- [ ] manual targetがmatrix再生成を起こさないtestを書く。
-- [ ] old target reinsertionとfixed first targetのtestを書く。
-- [ ] profile version mismatchでdistance matrixを維持し、旧bestを再評価するtestを書く。
-- [ ] optimizer cancel後もcurrent legを維持するtestを書く。
-- [ ] held bulk return確認前にstateが変わらないtestを書く。
-- [ ] 確認後に全heldがpendingになるtestを書く。
-- [ ] REDを確認する。
+- [x] initial startで即時targetが出るintegration testを書く。
+- [x] start distanceとmatrix distanceが同じtiming profileで秒へ変換されるtestを書く。
+- [x] priorityがALNS valueへ変換されるtestを書く。
+- [x] 通常30秒、壁200秒、不明30秒のservice-time resolver testを書く。
+- [x] Worker progressでcurrent targetが変わらないtestを書く。
+- [x] before-arrival holdがcurrent positionを動かさないtestを書く。
+- [x] arrival purchaseがprepared nextを待機なしで使うtestを書く。
+- [ ] arrival holdがtarget位置から次へ進むtestを書く（Circle state mutationとの接続は未実装）。
+- [x] manual targetがmatrix再生成を起こさないtestを書く。
+- [x] old target reinsertionとfixed first targetのtestを書く。
+- [ ] profile version mismatchでdistance matrixを維持し、旧bestを再評価するtestを書く（Task 8のrecovery/cache接続へ移管）。
+- [x] optimizer cancel後もcurrent legを維持するtestを書く。
+- [x] held bulk return確認前にstateが変わらないtestを書く。
+- [x] 確認後に全heldがpendingになるtestを書く。
+- [x] REDを確認する。
 
 ```bash
-npx vitest run tests/navigation-orchestration.test.ts tests/optimization-input-adapter.test.ts tests/purchase-flow.test.ts
+npx vitest run --root . tests/navigation-orchestration.test.ts tests/optimization-input-adapter.test.ts tests/purchase-flow.test.ts
 ```
 
-- [ ] orchestration serviceを追加し、Appへ直接algorithmを書かない。
-- [ ] optimization input adapterを追加する。
-- [ ] job generation IDを更新し、old progressを無視する。
-- [ ] provisional orderとbest orderを区別する。
-- [ ] current targetとlocked first legを同期して更新する。
-- [ ] progress componentへmatrix/time-decayed-alns stageを渡す。
-- [ ] cancelはbackground improvementだけを止める。
-- [ ] completion dialogを実装する。
-- [ ] GREENを確認する。
+- [x] orchestration serviceを追加し、Appへ直接algorithmを書かない。
+- [x] optimization input adapterを追加する。
+- [x] job generation IDを更新し、old progressを無視する。
+- [x] provisional orderとbest orderを区別する。
+- [x] current targetとlocked first legを同期して更新する。
+- [ ] progress componentへmatrix/time-decayed-alns stageを渡す（UI接続はTask 9へ移管）。
+- [x] cancelはbackground improvementだけを止める。
+- [ ] completion dialogを実装する（Lit UI接続はTask 9へ移管）。
+- [x] GREENを確認する。
 
 ```bash
-npx vitest run tests/navigation-orchestration.test.ts tests/optimization-input-adapter.test.ts tests/purchase-flow.test.ts tests/purchase-mutation-service.test.ts
+npx vitest run --root . tests/navigation-orchestration.test.ts tests/optimization-input-adapter.test.ts tests/purchase-flow.test.ts tests/purchase-mutation-service.test.ts
 npm run test:webapp
 npm run check:webapp
 npm run build:webapp
 git diff --check
 ```
+
+## 実績
+
+- `NavigationOrchestrationService`を追加し、始点直後の暫定target、到着前保留、到着後の購入、手動target変更、最適化cancelを純粋な状態遷移として整理した。
+- Worker結果は現在targetを必ず先頭に保持し、`bestOrder`だけを更新するよう修正した。`provisionalOrder`、`currentPosition`、`lockedFirstLeg`をWorker結果で上書きしない。
+- 到着前保留では最後の確定位置から次targetへ進み、到着後購入では到着circleを次区間の始点にするよう修正した。手動target変更も現在の確定位置からのlocked legを生成する。
+- optimizer generationをnavigation stateへ追加し、cancelまたは状態遷移後に古いWorker progressを破棄する。
+- Task 5のN×N circle matrix、始点距離、area別timing profileを検証し、未知areaや不正距離を黙ってfallbackしないadapterへ修正した。
+- Task 7固有の未接続範囲は、Circle state mutationとのarrival hold連携、profile-version再評価/recovery、進捗UI、完了ダイアログ。これらはTask 8/9の契約に従って実装する。
 
 ## Acceptance criteria
 
