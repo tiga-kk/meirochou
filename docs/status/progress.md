@@ -1,7 +1,7 @@
 # Current Progress
 
 **更新日:** 2026-07-27
-**現在の段階:** Phase 5C Task 5完了・Task 6設計改訂完了
+**現在の段階:** Phase 5C Task 6完了
 **コード実装:** Phase 5C Task 5のpure kernel・Worker・controller・repositoryを実装・レビュー修正した。
 - `buildDistanceMatrixCacheKey`: コンテントアドレス型キャッシュキー生成（メタデータ依存排除、grid/endpoint/version駆動）
 - `dijkstraFromCell` / `computeAllPairsDistances`: all-pairsパス幾何学を保存せず平坦配列へ計算する純粋Dijkstraカーネル（crowded weight 1.5対応）
@@ -18,6 +18,14 @@ Task 6以降の最適化設計は2026-07-27に改訂した。
 - search timeは5/10/15秒、defaultは10秒とする。
 - production solverはALNSのみとし、GAは実装しない。
 - 正本追補: `docs/specs/2026-07-27-phase-05c-time-decayed-alns-amendment.md`
+
+Task 6の実装・レビュー修正:
+- `OptimizationTimingProfile` & `convertDistanceToTravelTime`: 重み付きグリッド距離からエリア別移動秒数への純粋アダプター
+- `calculateDecay` & `evaluateRouteScore`: 半減時間（30分, 60分, 120分等重み）の購入完了時間ベースTime-Decayed評価関数
+- `TimeDecayedAlnsSolver`: 探索時間制限（5s, 10s, 15s）、決定性擬似乱数、複数初期候補、Destroy & Repair、`fixedFirstTarget`固定、warm-start解保持
+- `TimeDecayedAlnsWorkerKernel` / protocol / entrypoint: `time-decayed-alns` stage、progress、complete、cancelled、error、途中キャンセル時の最新best返却
+- settings component: 5/10/15秒の探索時間選択とdefault 10秒
+Task 6 focused test 24件、webapp全体43ファイル428件、型チェック・build・artifact検証・Biome・git diff検査はPASS。E2Eは31 PASS・8 skipped（CI相当Playwrightコンテナで実行）。
 
 ## 統合済み
 
@@ -37,13 +45,13 @@ Task 6以降の最適化設計は2026-07-27に改訂した。
 - Phase 5C Task 2: **実装・検証完了**。
 - Phase 5C Task 3: **実装・レビュー修正・検証完了・コミット済み**。
 - Phase 5C Task 4: **実装・レビュー修正・検証完了・コミット済み**。
-- Phase 5C Task 5: **実装・レビュー修正・検証完了・コミット済み**（`8218ce9`）。
-- Phase 5C Task 6: **設計改訂完了・実装未着手**。
+- Phase 5C Task 5: **実装・レビュー修正・検証完了・コミット済み**（`828c57e`）。
+- Phase 5C Task 6: **実装・レビュー修正・検証完了**（本Task commit）。
 
 ## 次の操作
 
-1. 改訂済みのPhase 5C Task 6（Time-Decayed ALNS Adapter and Worker Execution）の実装に着手する。
-2. Task 6完了後、Task 7でnavigation orchestrationへ接続する。
+1. Phase 5C Task 6のcommitを確認する。
+2. Phase 5C Task 7 (Navigation Service Integration and Worker Wiring) の実装に着手する。
 
 ## 人手入力
 

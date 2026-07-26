@@ -1,6 +1,6 @@
 # Phase 5C Task 6: Time-Decayed ALNS Adapter and Worker Execution
 
-**Status:** Not started（2026-07-27設計改訂済み）  
+**Status:** Complete
 **Depends on:** Phase 5C Task 5  
 **Commit candidate:** `feat(optimizer): add time-decayed alns worker`
 
@@ -159,41 +159,49 @@ score(route)
 
 ## TDD procedure
 
-- [ ] weighted distanceからarea別travel timeへ変換する失敗testを書く。
-- [ ] crowded weightをTask 6で二重適用しない失敗testを書く。
-- [ ] 30秒/200秒service timeを含むcompletion timeの失敗testを書く。
-- [ ] 1800/3600/7200秒の等重みscoreを手計算fixtureと比較する失敗testを書く。
-- [ ] priority未設定と負値を0へ正規化する失敗testを書く。
-- [ ] fixed first targetを破らない失敗testを書く。
-- [ ] 5/10/15秒以外を拒否する失敗testを書く。
-- [ ] same seedで同じ初期結果になる失敗testを書く。
-- [ ] initialSolutionsと修復済みprevious bestを受ける失敗testを書く。
-- [ ] cancel時に最新bestを返す失敗testを書く。
-- [ ] profile version mismatch時に旧scoreを無条件再利用しない失敗testを書く。
-- [ ] REDを確認する。
+- [x] weighted distanceからarea別travel timeへ変換する失敗testを書く。
+- [x] crowded weightをTask 6で二重適用しない失敗testを書く。
+- [x] 30秒/200秒service timeを含むcompletion timeの失敗testを書く。
+- [x] 1800/3600/7200秒の等重みscoreを手計算fixtureと比較する失敗testを書く。
+- [x] priority未設定と負値を0へ正規化する失敗testを書く。
+- [x] fixed first targetを破らない失敗testを書く。
+- [x] 5/10/15秒以外を拒否する失敗testを書く。
+- [x] same seedで同じ初期結果になる失敗testを書く。
+- [x] initialSolutionsと修復済みprevious bestを受ける失敗testを書く。
+- [x] cancel時に最新bestを返す失敗testを書く。
+- [x] profile version mismatch時に旧scoreを無条件再利用しない失敗testを書く。
+- [x] REDを確認する。
 
 ```bash
-npx vitest run tests/time-decayed-objective.test.ts tests/alns-adapter.test.ts tests/alns-worker.test.ts
+npx vitest run --root . tests/time-decayed-objective.test.ts tests/alns-adapter.test.ts tests/alns-worker.test.ts tests/alns-worker-protocol.test.ts
 ```
 
-- [ ] timing profile parserとdistance-to-time adapterを最小実装する。
-- [ ] pure objectiveとcompletion-time evaluatorを実装する。
-- [ ] ALNS kernelを実装する。
-- [ ] Worker protocolへprogress、complete、cancelled、errorを追加する。
-- [ ] 初回seedとして複数の決定的heuristic routeを渡す。
-- [ ] 再実行時はprevious bestと修復済みrouteをinitialSolutionsへ入れる。
-- [ ] search timeまで改善し、progressで最新bestを返す。
-- [ ] UI settingsへ5/10/15秒を追加しdefaultを10秒にする。
-- [ ] 実行ごとの確認dialogを追加しない。
-- [ ] GREENを確認する。
+- [x] timing profile parserとdistance-to-time adapterを最小実装する。
+- [x] pure objectiveとcompletion-time evaluatorを実装する。
+- [x] ALNS kernelを実装する。
+- [x] Worker protocolへprogress、complete、cancelled、errorを追加する。
+- [x] 初回seedとして複数の決定的heuristic routeを渡す。
+- [x] 再実行時はprevious bestと修復済みrouteをinitialSolutionsへ入れる。
+- [x] search timeまで改善し、progressで最新bestを返す。
+- [x] UI settingsへ5/10/15秒を追加しdefaultを10秒にする。
+- [x] 実行ごとの確認dialogを追加しない。
+- [x] GREENを確認する。
 
 ```bash
-npx vitest run tests/time-decayed-objective.test.ts tests/alns-adapter.test.ts tests/alns-worker.test.ts tests/settings-component.test.ts
-npm run test:webapp
+npx vitest run --root . tests/time-decayed-objective.test.ts tests/alns-adapter.test.ts tests/alns-worker.test.ts tests/alns-worker-protocol.test.ts tests/settings-component.test.ts
 npm run check:webapp
 npm run build:webapp
 git diff --check
 ```
+
+## 実績
+
+- timing profile parserとarea別distance-to-time adapterを追加し、未知areaの暗黙fallbackと半減時間weightsの不正値を拒否するようにした。
+- 購入完了時刻ベースのobjectiveを実装し、通常/壁service time、priorityの非負化、非有限距離nodeの除外、profile versionを検証した。
+- nearest、priority/value、value-per-time、修復済みwarm startを初期解として使うALNS kernelを実装し、random/worst/related destroy、greedy/regret repair、operator weight更新、fixed first targetを実装した。
+- `time-decayed-alns` stageのWorker protocol、runtime parser、entrypointを追加し、progress、complete、cancelled、errorと探索時間制限をWorker境界へ実装した。
+- 設定画面に5/10/15秒の探索時間選択を追加し、defaultを10秒、変更イベントを`optimization-time-limit-change`とした。実行開始と永続化はTask 7へ委譲する。
+- focused test 24件、webapp全体43ファイル428件、型チェック、build、Biome、公開ビルド検証、`git diff --check`を実行した。E2EはCI相当Playwrightコンテナで31 PASS・8 skippedを確認した。
 
 ## Acceptance criteria
 
