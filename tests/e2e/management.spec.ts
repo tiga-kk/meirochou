@@ -579,7 +579,10 @@ test.describe("Mobile Management Flows", () => {
     await confirmDelete(page);
     let state = await readState(page, { eventId: "demo-v1", dayId: "day1" });
     expect(state.circles).toEqual([]);
-    expect(state.circleStates).toEqual({ 東ア23a: "purchased" });
+    expect(state.circleStates).toEqual({
+      東ア23a: "purchased",
+      東ア31b: "held",
+    });
 
     await page
       .getByRole("button", { name: /購入・チェック履歴の削除/ })
