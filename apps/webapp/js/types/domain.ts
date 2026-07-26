@@ -203,15 +203,25 @@ export interface GasOutboxEntry {
   readonly lastError: string | null;
 }
 
+export type CircleVisitState = "pending" | "held" | "purchased" | "excluded";
+
+export interface CircleStateOverrides {
+  readonly [space: string]: Exclude<CircleVisitState, "pending">;
+}
+
+export interface CircleStateUndoToken {
+  readonly space: string;
+  readonly before: CircleVisitState;
+  readonly after: CircleVisitState;
+  readonly createdAtMs: number;
+}
+
 export interface LocalEventDayState {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly source: DataSource;
   readonly sourceGeneration: string;
   readonly circles: readonly CircleRecord[];
-  readonly purchased: readonly string[];
-  readonly hold: readonly string[];
-  readonly history: readonly HistoryEntry[];
-  readonly redo: readonly HistoryEntry[];
+  readonly circleStates: CircleStateOverrides;
   readonly gasOutbox: readonly GasOutboxEntry[];
   readonly timestamps: {
     readonly createdAt: string;

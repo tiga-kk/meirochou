@@ -127,22 +127,15 @@ describe("source-diff", () => {
       updatedAt: "2026-07-21T00:00:00.000Z",
       sourceUpdatedAt: "2026-07-21T00:00:00.000Z",
     };
-
     const baseState: LocalEventDayState = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: { type: "csv", fileName: "circles.csv" },
       sourceGeneration: "g-001",
       circles: [dummyCircle1, dummyCircle2],
-      purchased: ["東A01a"],
-      hold: ["東A01b"],
-      history: [
-        {
-          type: "purchase",
-          space: "東A01a",
-          timestamp: "2026-07-21T00:00:00.000Z",
-        },
-      ],
-      redo: [],
+      circleStates: {
+        東A01a: "purchased",
+        東A01b: "held",
+      },
       gasOutbox: [],
       timestamps: initialTimestamps,
     };
@@ -161,9 +154,10 @@ describe("source-diff", () => {
         dummyCircle3,
         { ...dummyCircle2, removedFromSource: true },
       ]);
-      expect(nextState.timestamps.createdAt).toBe(initialTimestamps.createdAt);
+      expect(nextState.schemaVersion).toBe(2);
       expect(nextState.timestamps.updatedAt).toBe(now);
       expect(nextState.timestamps.sourceUpdatedAt).toBe(now);
+      expect(nextState.timestamps.createdAt).toBe(initialTimestamps.createdAt);
     });
 
     it("should preserve existing removedFromSource circles if they remain absent", () => {
@@ -198,22 +192,19 @@ describe("source-diff", () => {
       expect(nextState.circles).toEqual([dummyCircle1, dummyCircle2]);
     });
 
-    it("should preserve user local lists (purchased, hold, history, redo, gasOutbox)", () => {
-      const incoming = [dummyCircle1];
+    it("should preserve existing circleStates and gasOutbox across applySourceDiff", () => {
+      const incoming = [dummyCircle1, dummyCircle2];
       const now = "2026-07-21T01:00:00.000Z";
 
       const nextState = applySourceDiff(baseState, incoming, now);
 
-      expect(nextState.purchased).toEqual(baseState.purchased);
-      expect(nextState.hold).toEqual(baseState.hold);
-      expect(nextState.history).toEqual(baseState.history);
-      expect(nextState.redo).toEqual(baseState.redo);
+      expect(nextState.circleStates).toEqual(baseState.circleStates);
       expect(nextState.gasOutbox).toEqual(baseState.gasOutbox);
     });
 
-    it("should automatically purchase if incoming circle has isSale=x or X, and add to history", () => {
-      // dummyCircle3 is incoming and has isSale: "x" (not in current purchased)
-      // dummyCircle4 is incoming and has isSale: "X" (not in current purchased)
+    it("should automatically purchase if incoming circle has isSale=x or X", () => {
+      // dummyCircle3 is incoming and has isSale: "x" (not in current circleStates)
+      // dummyCircle4 is incoming and has isSale: "X" (not in current circleStates)
       const incoming: CircleRecord[] = [
         dummyCircle1,
         { ...dummyCircle3, isSale: "x" },
@@ -223,30 +214,22 @@ describe("source-diff", () => {
 
       const nextState = applySourceDiff(baseState, incoming, now);
 
-      // baseState already has "東A01a" in purchased
-      // Now "東A02a" (dummyCircle3) and "東A01b" (dummyCircle2) should be added to purchased
-      expect(nextState.purchased).toContain("東A01a");
-      expect(nextState.purchased).toContain("東A02a");
-      expect(nextState.purchased).toContain("東A01b");
-      expect(nextState.purchased.length).toBe(3);
-
-      // history should contain purchase events for the new ones
-      expect(nextState.history).toEqual([
-        ...baseState.history,
-        { type: "purchase", space: "東A02a", timestamp: now },
-        { type: "purchase", space: "東A01b", timestamp: now },
-      ]);
+      // baseState already has "東A01a" as purchased
+      // Now "東A02a" (dummyCircle3) and "東A01b" (dummyCircle2) should be updated to purchased in circleStates
+      expect(nextState.circleStates.東A01a).toBe("purchased");
+      expect(nextState.circleStates.東A02a).toBe("purchased");
+      expect(nextState.circleStates.東A01b).toBe("purchased");
     });
 
-    it("should NOT remove from purchased if incoming circle has empty isSale", () => {
-      // dummyCircle1 has isSale: "" in incoming, but "東A01a" is already in baseState.purchased.
-      // It should NOT be removed from purchased.
+    it("should NOT remove from circleStates if incoming circle has empty isSale", () => {
+      // dummyCircle1 has isSale: "" in incoming, but "東A01a" is already in baseState.circleStates.
+      // It should NOT be removed from circleStates.
       const incoming: CircleRecord[] = [{ ...dummyCircle1, isSale: "" }];
       const now = "2026-07-21T01:00:00.000Z";
 
       const nextState = applySourceDiff(baseState, incoming, now);
 
-      expect(nextState.purchased).toEqual(baseState.purchased);
+      expect(nextState.circleStates).toEqual(baseState.circleStates);
     });
 
     it("should enforce deep immutability by freezing the output state and all nested objects/arrays", () => {
@@ -258,16 +241,12 @@ describe("source-diff", () => {
       expect(Object.isFrozen(nextState)).toBe(true);
       expect(Object.isFrozen(nextState.circles)).toBe(true);
       expect(Object.isFrozen(nextState.circles[0])).toBe(true);
-      expect(Object.isFrozen(nextState.purchased)).toBe(true);
-      expect(Object.isFrozen(nextState.hold)).toBe(true);
-      expect(Object.isFrozen(nextState.history)).toBe(true);
-      expect(Object.isFrozen(nextState.history[0])).toBe(true);
-      expect(Object.isFrozen(nextState.redo)).toBe(true);
+      expect(Object.isFrozen(nextState.circleStates)).toBe(true);
       expect(Object.isFrozen(nextState.gasOutbox)).toBe(true);
       expect(Object.isFrozen(nextState.timestamps)).toBe(true);
 
       // Ensure input was not mutated
-      expect(Object.isFrozen(baseState)).toBe(false); // we didn't freeze baseState in this test, so it shouldn't become frozen unless cloned
+      expect(Object.isFrozen(baseState)).toBe(false);
     });
   });
 });

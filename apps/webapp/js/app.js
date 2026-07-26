@@ -279,7 +279,7 @@ export class App {
           eventDayCount: this.dm.repository.list().length,
           activeCircleCount: activeState ? activeState.circles.length : 0,
           activityCount: activeState
-            ? activeState.purchased.length + activeState.hold.length
+            ? Object.keys(activeState.circleStates).length
             : 0,
           selectedPendingCount,
           totalPendingCount,
@@ -1293,10 +1293,6 @@ export class App {
     document.getElementById("btn-hold").onclick = () =>
       this.handleAction("hold");
 
-    // Undo / Redo
-    document.getElementById("btn-undo").onclick = () => this.handleUndo();
-    document.getElementById("btn-redo").onclick = () => this.handleRedo();
-
     document.getElementById("btn-reset-all").onclick = () => this.handleReset();
 
     // 保留リストリセットのコールバック設定 (StatsRenderer経由)
@@ -1517,54 +1513,6 @@ export class App {
     this.updateManagementModels();
     this.ui.updateCurrentLocation(space); // 現在地を更新
     this.searchNext(space, false); // 到着地点から自動で次を検索
-  }
-
-  /**
-   * 取り消し処理
-   */
-  async handleUndo() {
-    let action;
-    try {
-      action = this.dm.undoLastAction();
-    } catch (error) {
-      this.reportLocalMutationFailure(error);
-      return;
-    }
-    if (action) {
-      if (this.dm.activeState?.source.type === "gas") {
-        this.flushOutboxWithDiagnostic();
-      }
-      this.ui.showToast(`${action.space} の操作を取り消しました`);
-      this.ui.updateCounts(this.dm);
-      this.ui.updateCurrentLocation(action.space); // 現在地を元に戻す
-      // 画面は更新しない（現在地が変わっていないため）
-    } else {
-      this.ui.showToast("履歴がありません");
-    }
-  }
-
-  /**
-   * やり直し処理 (Redo)
-   */
-  async handleRedo() {
-    let action;
-    try {
-      action = this.dm.redoAction();
-    } catch (error) {
-      this.reportLocalMutationFailure(error);
-      return;
-    }
-    if (action) {
-      if (this.dm.activeState?.source.type === "gas") {
-        this.flushOutboxWithDiagnostic();
-      }
-      this.ui.showToast(`${action.space} の操作をやり直しました`);
-      this.ui.updateCounts(this.dm);
-      this.ui.updateCurrentLocation(action.space); // 現在地を更新
-      this.searchNext(action.space); // 到着地点から次を自動検索
-    } else {
-      this.ui.showToast("やり直す操作がありません");
-    }
   }
 
   /**

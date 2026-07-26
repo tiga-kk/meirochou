@@ -31,9 +31,6 @@ export class ModalManager {
       galleryMapHeader: document.getElementById("gallery-map-header"),
       galleryMapImage: document.getElementById("gallery-map-image"),
       galleryMapScroll: document.getElementById("gallery-map-scroll"),
-
-      // Undo button
-      btnGalleryUndo: document.getElementById("btn-gallery-undo"),
     };
 
     this.onSetNextTarget = null;
@@ -82,11 +79,6 @@ export class ModalManager {
           this.hideGalleryModal(); // ギャラリーも閉じる
         }
       });
-    }
-
-    // ギャラリーUndo
-    if (this.els.btnGalleryUndo) {
-      this.els.btnGalleryUndo.onclick = () => this.handleGalleryUndo();
     }
 
     // ギャラリーフィルターボタン設定
@@ -418,29 +410,6 @@ export class ModalManager {
 
     // メイン画面のカウントも更新
     if (this.uiManager) this.uiManager.updateCounts(this.dataManager);
-  }
-
-  /**
-   * ギャラリー内でのUndo操作
-   */
-  async handleGalleryUndo() {
-    if (!this.dataManager) return;
-
-    const action = this.dataManager.undoLastAction();
-    if (action) {
-      if (this.uiManager)
-        this.uiManager.showToast(`${action.space} の操作を取り消しました`);
-
-      // メイン画面のカウント更新
-      if (this.uiManager) this.uiManager.updateCounts(this.dataManager);
-
-      // ギャラリーの再描画（直前のエリア状態を復元）
-      if (this.currentGalleryArea) {
-        this.showGallery(this.currentGalleryArea, this.currentGalleryIsHold);
-      }
-    } else {
-      if (this.uiManager) this.uiManager.showToast("履歴がありません");
-    }
   }
 
   /**

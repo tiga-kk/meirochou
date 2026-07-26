@@ -1,6 +1,6 @@
 # Phase 5C Task 1: Storage Schema and Exclusive Circle State
 
-**Status:** Not started  
+**Status:** 完了（レビュー修正・検証済み）
 **Depends on:** Phase 5C entry gate  
 **Commit candidate:** `feat(state): add exclusive circle visit states`
 
@@ -74,25 +74,25 @@ excluded  → pending
 
 ## TDD procedure
 
-- [ ] legacy purchasedだけをmigrateする失敗testを書く。
-- [ ] legacy holdだけをmigrateする失敗testを書く。
-- [ ] purchasedとhold重複でpurchased優先の失敗testを書く。
-- [ ] gasOutboxとsource metadata保持の失敗testを書く。
-- [ ] malformed legacy valueで旧storageを破壊しない失敗testを書く。
-- [ ] focused testを実行しREDを確認する。
+- [x] legacy purchasedだけをmigrateする失敗testを書く。
+- [x] legacy holdだけをmigrateする失敗testを書く。
+- [x] purchasedとhold重複でpurchased優先の失敗testを書く。
+- [x] gasOutboxとsource metadata保持の失敗testを書く。
+- [x] malformed legacy valueで旧storageを破壊しない失敗testを書く。
+- [x] focused testを実行しREDを確認する。
 
 ```bash
-npx vitest run tests/storage-schema.test.ts tests/event-day-repository.test.ts
+npx vitest run --root . tests/storage-schema.test.ts tests/event-day-repository.test.ts
 ```
 
-- [ ] `CircleVisitState`とoverride helperを最小実装する。
-- [ ] migration parserとatomic saveを実装する。
-- [ ] DataManagerの`purchased`/`hold`独立配列をstate queryへ置換する。
-- [ ] purchase serviceを`pending ↔ purchased`に接続する。
-- [ ] held/excluded変更ではoutboxが変わらないtestを書く。
-- [ ] purchased変更ではlocal save後にだけPOSTを試みる既存testを維持する。
-- [ ] global Undo/Redo APIをUI正本から外し、使用箇所をcompile errorで洗い出す。
-- [ ] 操作直後の1回取消用token型を追加する。tokenはmemoryだけに置き、current positionを含めない。
+- [x] `CircleVisitState`とoverride helperを最小実装する。
+- [x] migration parserとatomic saveを実装する。
+- [x] DataManagerの`purchased`/`hold`独立配列をstate queryへ置換する。
+- [x] purchase serviceを`pending ↔ purchased`に接続する。
+- [x] held/excluded変更ではoutboxが変わらないtestを書く。
+- [x] purchased変更ではlocal save後にだけPOSTを試みる既存testを維持する。
+- [x] global Undo/Redo APIをUI正本から外し、使用箇所をcompile errorで洗い出す。
+- [x] 操作直後の1回取消用token型を追加する。tokenはmemoryだけに置き、current positionを含めない。
 
 ```ts
 export interface CircleStateUndoToken {
@@ -103,13 +103,22 @@ export interface CircleStateUndoToken {
 }
 ```
 
-- [ ] GREENを確認する。
+- [x] GREENを確認する。
 
 ```bash
-npx vitest run tests/storage-schema.test.ts tests/event-day-repository.test.ts tests/data-manager-event-day.test.ts tests/purchase-mutation-service.test.ts tests/purchase-flow.test.ts
+npx vitest run --root . tests/storage-schema.test.ts tests/event-day-repository.test.ts tests/data-manager-event-day.test.ts tests/purchase-mutation-service.test.ts tests/purchase-flow.test.ts
 npm run check:webapp
 git diff --check
 ```
+
+## 実績
+
+- `EventDayRepository.load()`でv1 parse成功後にのみv2を保存し、保存・index更新失敗時はv1 raw値へrollbackする移行処理を追加した。
+- `excluded`を`DataManager.getUnvisited()`の通常候補から除外した。
+- 永続Undo/Redoの画面ボタンとハンドラを削除し、短時間取消tokenの型だけをdomainへ追加した。現在位置はtokenへ含めていない。
+- E2EのGAS同期・管理フローfixture/helperをschema v2へ追随させ、関連12ケースを検証した。visual snapshotは既存の6差分を更新していない。
+- focused testはRED（移行未保存、excludedが候補に残る）を確認後、修正してGREENを確認した。
+- `npm run test:webapp`（39 files / 408 tests）、`npm run check:webapp`、`npm run build:webapp`、`npm run verify:webapp:build`、`npx biome check`、`git diff --check`を実行済み。
 
 ## Acceptance criteria
 

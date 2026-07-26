@@ -30,27 +30,18 @@ function createSampleState(
   pendingOutboxCount = 0,
 ): LocalEventDayState {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     source: {
       type: "gas",
       gasUrl: `https://script.google.com/macros/s/test_${ref.eventId}_${ref.dayId}/exec`,
       sheetName: ref.dayId,
     },
     sourceGeneration: "gen-1",
-    circles: [
-      { space: "東A01a", priority: 1 },
-      { space: "東A02b", priority: 2 },
-    ],
-    purchased: ["東A01a"],
-    hold: ["東A02b"],
-    history: [
-      {
-        type: "purchase",
-        space: "東A01a",
-        timestamp: "2026-07-25T00:00:00.000Z",
-      },
-    ],
-    redo: [],
+    circles: [{ space: "東A01a" }, { space: "東A02b" }],
+    circleStates: {
+      東A01a: "purchased",
+      東A02b: "held",
+    },
     gasOutbox: Array.from({ length: pendingOutboxCount }, (_, i) => ({
       id: `outbox-${i}`,
       eventId: ref.eventId,
@@ -73,7 +64,7 @@ function createSampleState(
 }
 
 describe("StorageDeletionService", () => {
-  it("deletes circles scope while preserving activity, setting empty.csv sentinel, and minting sourceGeneration", () => {
+  it("deletes circles scope while preserving activity and setting empty.csv sentinel", () => {
     const storage = createMockStorage();
     const repo = new EventDayRepository(storage);
     const sourceSettings = new SourceSettingsService(repo);
@@ -99,9 +90,10 @@ describe("StorageDeletionService", () => {
     expect(updated?.circles).toHaveLength(0);
     expect(updated?.source).toEqual({ type: "csv", fileName: "empty.csv" });
     expect(updated?.sourceGeneration).toBe("gen-new-1");
-    expect(updated?.purchased).toEqual(["東A01a"]);
-    expect(updated?.hold).toEqual(["東A02b"]);
-    expect(updated?.history).toHaveLength(1);
+    expect(updated?.circleStates).toEqual({
+      東A01a: "purchased",
+      東A02b: "held",
+    });
     expect(updated?.timestamps.sourceUpdatedAt).toBe(
       "2026-07-25T01:00:00.000Z",
     );
@@ -129,10 +121,7 @@ describe("StorageDeletionService", () => {
     expect(result.activeRefDeleted).toBe(false);
 
     const updated = repo.load(ref);
-    expect(updated?.purchased).toHaveLength(0);
-    expect(updated?.hold).toHaveLength(0);
-    expect(updated?.history).toHaveLength(0);
-    expect(updated?.redo).toHaveLength(0);
+    expect(updated?.circleStates).toEqual({});
     expect(updated?.circles).toHaveLength(2);
     expect(updated?.sourceGeneration).toBe("gen-1");
   });

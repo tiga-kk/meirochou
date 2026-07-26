@@ -106,15 +106,26 @@ async function readGasState(page: Page): Promise<GasStateSnapshot> {
     }
     const state = value as {
       purchased?: unknown;
+      circleStates?: unknown;
       gasOutbox?: unknown;
     };
-    if (!Array.isArray(state.purchased) || !Array.isArray(state.gasOutbox)) {
+    const purchased =
+      state.circleStates &&
+      typeof state.circleStates === "object" &&
+      !Array.isArray(state.circleStates)
+        ? Object.entries(state.circleStates).flatMap(([space, visitState]) =>
+            visitState === "purchased" ? [space] : [],
+          )
+        : Array.isArray(state.purchased)
+          ? state.purchased.filter(
+              (space): space is string => typeof space === "string",
+            )
+          : null;
+    if (purchased === null || !Array.isArray(state.gasOutbox)) {
       throw new Error("GAS state has an invalid activity shape");
     }
     return {
-      purchased: state.purchased.filter(
-        (space): space is string => typeof space === "string",
-      ),
+      purchased,
       gasOutbox: state.gasOutbox.map((entry) => {
         if (!entry || typeof entry !== "object") {
           throw new Error("GAS outbox entry is not an object");

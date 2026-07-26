@@ -61,10 +61,7 @@ export class StorageDeletionService {
     const current = this.sourceSettings.assertCanMutate(ref, "activity-delete");
     const nextState: LocalEventDayState = {
       ...current,
-      purchased: [],
-      hold: [],
-      history: [],
-      redo: [],
+      circleStates: {},
       timestamps: {
         ...current.timestamps,
         updatedAt: now,

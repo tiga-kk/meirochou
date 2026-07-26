@@ -5,11 +5,12 @@ import {
 } from "../types/boundary-parsers";
 import type {
   CircleRecord,
+  CircleStateOverrides,
+  CircleVisitState,
   CsvDataSource,
   DataSource,
   GasDataSource,
   GasOutboxEntry,
-  HistoryEntry,
   LocalEventDayState,
 } from "../types/domain";
 
@@ -19,6 +20,37 @@ export class StorageSchemaError extends Error {
     this.name = "StorageSchemaError";
     Object.setPrototypeOf(this, StorageSchemaError.prototype);
   }
+}
+
+export function getCircleVisitState(
+  overrides: CircleStateOverrides,
+  space: string,
+): CircleVisitState {
+  return overrides[space] || "pending";
+}
+
+export function transitionCircleVisitState(
+  current: CircleVisitState,
+  requested: CircleVisitState,
+): CircleVisitState {
+  if (current === requested) {
+    return current;
+  }
+
+  const allowed: Record<CircleVisitState, readonly CircleVisitState[]> = {
+    pending: ["held", "purchased", "excluded"],
+    held: ["pending", "purchased", "excluded"],
+    purchased: ["pending"],
+    excluded: ["pending"],
+  };
+
+  if (!allowed[current].includes(requested)) {
+    throw new StorageSchemaError(
+      `Invalid circle state transition from '${current}' to '${requested}'`,
+    );
+  }
+
+  return requested;
 }
 
 const ISO_8601_REGEX =
@@ -88,14 +120,11 @@ export function createEmptyEventDayState(
   }
 
   const state: LocalEventDayState = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     source,
     sourceGeneration: generation,
     circles: [],
-    purchased: [],
-    hold: [],
-    history: [],
-    redo: [],
+    circleStates: {},
     gasOutbox: [],
     timestamps: {
       createdAt: now,
@@ -115,9 +144,9 @@ export function parseLocalEventDayState(value: unknown): LocalEventDayState {
   const raw = value as Record<string, unknown>;
 
   // 1. schemaVersion
-  if (raw.schemaVersion !== 1) {
+  if (raw.schemaVersion !== 1 && raw.schemaVersion !== 2) {
     throw new StorageSchemaError(
-      `Expected schemaVersion to be 1, got ${raw.schemaVersion}`,
+      `Expected schemaVersion to be 1 or 2, got ${raw.schemaVersion}`,
     );
   }
 
@@ -252,113 +281,153 @@ export function parseLocalEventDayState(value: unknown): LocalEventDayState {
   const isCsvEmptySentinel =
     source.type === "csv" && source.fileName === "empty.csv";
 
-  // 5. purchased
-  const rawPurchased = raw.purchased;
-  if (!Array.isArray(rawPurchased)) {
-    throw new StorageSchemaError("purchased must be an array");
-  }
-  const purchasedSpaces = new Set<string>();
-  for (let i = 0; i < rawPurchased.length; i++) {
-    const p = rawPurchased[i];
-    if (typeof p !== "string" || !p) {
-      throw new StorageSchemaError(
-        `purchased[${i}] must be a non-empty string`,
-      );
-    }
-    if (purchasedSpaces.has(p)) {
-      throw new StorageSchemaError(`Duplicate purchased space detected: ${p}`);
-    }
-    if (!isCsvEmptySentinel && !circleSpaces.has(p)) {
-      throw new StorageSchemaError(
-        `purchased[${i}] references space not in circle list: ${p}`,
-      );
-    }
-    purchasedSpaces.add(p);
-  }
+  // 5. circleStates (and v1 migration)
+  const circleStates: Record<string, Exclude<CircleVisitState, "pending">> = {};
 
-  // 6. hold
-  const rawHold = raw.hold;
-  if (!Array.isArray(rawHold)) {
-    throw new StorageSchemaError("hold must be an array");
-  }
-  const holdSpaces = new Set<string>();
-  for (let i = 0; i < rawHold.length; i++) {
-    const h = rawHold[i];
-    if (typeof h !== "string" || !h) {
-      throw new StorageSchemaError(`hold[${i}] must be a non-empty string`);
+  if (raw.schemaVersion === 1) {
+    // Migration from v1
+    const rawPurchased = raw.purchased;
+    if (!Array.isArray(rawPurchased)) {
+      throw new StorageSchemaError("purchased must be an array");
     }
-    if (holdSpaces.has(h)) {
-      throw new StorageSchemaError(`Duplicate hold space detected: ${h}`);
+    const purchasedSpaces = new Set<string>();
+    for (let i = 0; i < rawPurchased.length; i++) {
+      const p = rawPurchased[i];
+      if (typeof p !== "string" || !p) {
+        throw new StorageSchemaError(
+          `purchased[${i}] must be a non-empty string`,
+        );
+      }
+      if (purchasedSpaces.has(p)) {
+        throw new StorageSchemaError(
+          `Duplicate purchased space detected: ${p}`,
+        );
+      }
+      if (!isCsvEmptySentinel && !circleSpaces.has(p)) {
+        throw new StorageSchemaError(
+          `purchased[${i}] references space not in circle list: ${p}`,
+        );
+      }
+      purchasedSpaces.add(p);
     }
-    if (!isCsvEmptySentinel && !circleSpaces.has(h)) {
-      throw new StorageSchemaError(
-        `hold[${i}] references space not in circle list: ${h}`,
-      );
-    }
-    holdSpaces.add(h);
-  }
 
-  // Helper validation function for history entry
-  const validateHistoryEntry = (
-    entry: unknown,
-    index: number,
-    arrayName: string,
-  ): HistoryEntry => {
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-      throw new StorageSchemaError(`${arrayName}[${index}] must be an object`);
+    const rawHold = raw.hold;
+    if (!Array.isArray(rawHold)) {
+      throw new StorageSchemaError("hold must be an array");
     }
-    const entryObj = entry as Record<string, unknown>;
-    if (
-      entryObj.type !== "purchase" &&
-      entryObj.type !== "hold" &&
-      entryObj.type !== "unpurchase" &&
-      entryObj.type !== "unhold"
-    ) {
-      throw new StorageSchemaError(
-        `${arrayName}[${index}].type must be purchase, hold, unpurchase, or unhold`,
-      );
+    const holdSpaces = new Set<string>();
+    for (let i = 0; i < rawHold.length; i++) {
+      const h = rawHold[i];
+      if (typeof h !== "string" || !h) {
+        throw new StorageSchemaError(`hold[${i}] must be a non-empty string`);
+      }
+      if (holdSpaces.has(h)) {
+        throw new StorageSchemaError(`Duplicate hold space detected: ${h}`);
+      }
+      if (!isCsvEmptySentinel && !circleSpaces.has(h)) {
+        throw new StorageSchemaError(
+          `hold[${i}] references space not in circle list: ${h}`,
+        );
+      }
+      holdSpaces.add(h);
     }
-    if (typeof entryObj.space !== "string" || !entryObj.space) {
-      throw new StorageSchemaError(
-        `${arrayName}[${index}].space must be a non-empty string`,
-      );
+
+    // Validate history & redo structure to ensure malformed v1 fails schema parse
+    if (!Array.isArray(raw.history)) {
+      throw new StorageSchemaError("history must be an array");
     }
-    if (!isCsvEmptySentinel && !circleSpaces.has(entryObj.space)) {
-      throw new StorageSchemaError(
-        `${arrayName}[${index}].space references space not in circle list: ${entryObj.space}`,
-      );
+    if (!Array.isArray(raw.redo)) {
+      throw new StorageSchemaError("redo must be an array");
     }
-    if (!isIso8601(entryObj.timestamp)) {
-      throw new StorageSchemaError(
-        `${arrayName}[${index}].timestamp must be a valid ISO 8601 string`,
-      );
-    }
-    return {
-      type: entryObj.type,
-      space: entryObj.space,
-      timestamp: entryObj.timestamp,
+
+    const validateHistoryEntry = (
+      entry: unknown,
+      index: number,
+      arrayName: string,
+    ): void => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        throw new StorageSchemaError(
+          `${arrayName}[${index}] must be an object`,
+        );
+      }
+      const entryObj = entry as Record<string, unknown>;
+      if (
+        entryObj.type !== "purchase" &&
+        entryObj.type !== "hold" &&
+        entryObj.type !== "unpurchase" &&
+        entryObj.type !== "unhold"
+      ) {
+        throw new StorageSchemaError(
+          `${arrayName}[${index}].type must be purchase, hold, unpurchase, or unhold`,
+        );
+      }
+      if (typeof entryObj.space !== "string" || !entryObj.space) {
+        throw new StorageSchemaError(
+          `${arrayName}[${index}].space must be a non-empty string`,
+        );
+      }
+      if (!isCsvEmptySentinel && !circleSpaces.has(entryObj.space)) {
+        throw new StorageSchemaError(
+          `${arrayName}[${index}].space references space not in circle list: ${entryObj.space}`,
+        );
+      }
+      if (!isIso8601(entryObj.timestamp)) {
+        throw new StorageSchemaError(
+          `${arrayName}[${index}].timestamp must be a valid ISO 8601 string`,
+        );
+      }
     };
-  };
 
-  // 7. history
-  const rawHistory = raw.history;
-  if (!Array.isArray(rawHistory)) {
-    throw new StorageSchemaError("history must be an array");
+    raw.history.forEach((entry, index) => {
+      validateHistoryEntry(entry, index, "history");
+    });
+    raw.redo.forEach((entry, index) => {
+      validateHistoryEntry(entry, index, "redo");
+    });
+
+    // Build migrated circleStates: purchased takes priority over hold
+    for (const space of purchasedSpaces) {
+      circleStates[space] = "purchased";
+    }
+    for (const space of holdSpaces) {
+      if (!circleStates[space]) {
+        circleStates[space] = "held";
+      }
+    }
+  } else {
+    // Schema version 2 parsing
+    const rawCircleStates = raw.circleStates;
+    if (
+      !rawCircleStates ||
+      typeof rawCircleStates !== "object" ||
+      Array.isArray(rawCircleStates)
+    ) {
+      throw new StorageSchemaError("circleStates must be an object");
+    }
+
+    const stateEntries = Object.entries(
+      rawCircleStates as Record<string, unknown>,
+    );
+    for (const [space, stateVal] of stateEntries) {
+      if (!isCsvEmptySentinel && !circleSpaces.has(space)) {
+        throw new StorageSchemaError(
+          `circleStates references space not in circle list: ${space}`,
+        );
+      }
+      if (
+        stateVal !== "held" &&
+        stateVal !== "purchased" &&
+        stateVal !== "excluded"
+      ) {
+        throw new StorageSchemaError(
+          `Invalid state '${stateVal}' for space '${space}' in circleStates`,
+        );
+      }
+      circleStates[space] = stateVal;
+    }
   }
-  const parsedHistory = rawHistory.map((entry, index) =>
-    validateHistoryEntry(entry, index, "history"),
-  );
 
-  // 8. redo
-  const rawRedo = raw.redo;
-  if (!Array.isArray(rawRedo)) {
-    throw new StorageSchemaError("redo must be an array");
-  }
-  const parsedRedo = rawRedo.map((entry, index) =>
-    validateHistoryEntry(entry, index, "redo"),
-  );
-
-  // 9. gasOutbox
+  // 6. gasOutbox
   const rawOutbox = raw.gasOutbox;
   if (!Array.isArray(rawOutbox)) {
     throw new StorageSchemaError("gasOutbox must be an array");
@@ -464,7 +533,7 @@ export function parseLocalEventDayState(value: unknown): LocalEventDayState {
     );
   }
 
-  // 10. timestamps
+  // 7. timestamps
   const rawTimestamps = raw.timestamps;
   if (
     !rawTimestamps ||
@@ -491,14 +560,11 @@ export function parseLocalEventDayState(value: unknown): LocalEventDayState {
   }
 
   const state: LocalEventDayState = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     source: rawSource as DataSource,
     sourceGeneration: sourceGen,
     circles: parsedCircles,
-    purchased: Array.from(purchasedSpaces),
-    hold: Array.from(holdSpaces),
-    history: parsedHistory,
-    redo: parsedRedo,
+    circleStates: Object.freeze(circleStates),
     gasOutbox: parsedOutbox,
     timestamps: {
       createdAt: timestamps.createdAt as string,

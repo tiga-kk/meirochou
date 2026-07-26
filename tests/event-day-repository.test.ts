@@ -89,6 +89,47 @@ describe("EventDayRepository", () => {
     expect(adapter.map.has("comipath:v1:C108:day2:state")).toBe(true);
   });
 
+  test("migrates a legacy v1 state in storage when it is first loaded", () => {
+    const adapter = new MockStorageAdapter();
+    const repository = new EventDayRepository(new StorageService(adapter));
+    const ref: EventDayRef = { eventId: "C108", dayId: "day1" };
+    const legacyState = {
+      schemaVersion: 1,
+      source: validCsvSource,
+      sourceGeneration: "g-legacy",
+      circles: [{ space: "A-01" }, { space: "B-02" }],
+      purchased: ["A-01"],
+      hold: ["A-01", "B-02"],
+      history: [],
+      redo: [],
+      gasOutbox: [],
+      timestamps: {
+        createdAt: validNow,
+        updatedAt: validNow,
+        sourceUpdatedAt: validNow,
+      },
+    };
+    adapter.setItem("comipath:v1:C108:day1:state", JSON.stringify(legacyState));
+
+    const loaded = repository.load(ref);
+
+    expect(loaded?.schemaVersion).toBe(2);
+    expect(loaded?.circleStates).toEqual({
+      "A-01": "purchased",
+      "B-02": "held",
+    });
+    const stored = JSON.parse(
+      adapter.map.get("comipath:v1:C108:day1:state") ?? "null",
+    ) as Record<string, unknown>;
+    expect(stored.schemaVersion).toBe(2);
+    expect(stored.circleStates).toEqual({
+      "A-01": "purchased",
+      "B-02": "held",
+    });
+    expect(stored.purchased).toBeUndefined();
+    expect(stored.history).toBeUndefined();
+  });
+
   test("rejects event/day identifiers that would make storage keys ambiguous", () => {
     const adapter = new MockStorageAdapter();
     const repository = new EventDayRepository(new StorageService(adapter));

@@ -96,10 +96,7 @@ function isEmptyGasImportSentinel(state: LocalEventDayState): boolean {
     state.source.type === "csv" &&
     state.source.fileName === "empty.csv" &&
     state.circles.length === 0 &&
-    state.purchased.length === 0 &&
-    state.hold.length === 0 &&
-    state.history.length === 0 &&
-    state.redo.length === 0 &&
+    Object.keys(state.circleStates).length === 0 &&
     state.gasOutbox.length === 0
   );
 }
@@ -199,15 +196,12 @@ export class SourceSettingsService {
     if (isReplacement) {
       // Source replacement preserves local activity and starts with empty outbox.
       // The empty GAS sentinel is the one replacement that may derive initial
-      // purchase/history entries from the fetched source in the same save.
+      // purchase entries from the fetched source in the same save.
       finalNextState = {
         ...update.nextState,
-        purchased: isInitialImport
-          ? update.nextState.purchased
-          : current.purchased,
-        hold: current.hold,
-        history: isInitialImport ? update.nextState.history : current.history,
-        redo: current.redo,
+        circleStates: isInitialImport
+          ? update.nextState.circleStates
+          : current.circleStates,
         gasOutbox: [],
         timestamps: {
           ...update.nextState.timestamps,
@@ -220,10 +214,7 @@ export class SourceSettingsService {
         ...update.nextState,
         source: current.source,
         sourceGeneration: current.sourceGeneration,
-        purchased: current.purchased,
-        hold: current.hold,
-        history: current.history,
-        redo: current.redo,
+        circleStates: current.circleStates,
         gasOutbox: current.gasOutbox,
         timestamps: {
           ...update.nextState.timestamps,

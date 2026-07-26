@@ -1,8 +1,8 @@
 # Current Progress
 
 **更新日:** 2026-07-26
-**現在の段階:** Phase 5B Task 6完了 (Final verification & Phase 5C handoff)
-**コード実装:** Phase 5B全体検証および Handoff ドキュメント (`docs/reviews/phase-05b-handoff.md`) 作成完了。隔離clean install・webapp 398テスト・GAS 27テスト・パブリック境界監査・C108実ブラウザスモーク（8件PASS）を検証済み。全E2Eは25件PASS、既存visual snapshot差分6件、通常実行時のC108 smoke skip 8件。Phase 5Cはhandoffの未確認entry gateとLocalStorage容量設計の確定後に着手する。
+**現在の段階:** Phase 5C Task 1完了 (Storage Schema Migration and Exclusive Circle Visit State)
+**コード実装:** Phase 5C Task 1の実装・レビュー修正が完了。LocalStorageスキーマを`schemaVersion: 2`へ昇格し、訪問状態を排他的な`circleStates` (`pending` | `held` | `purchased` | `excluded`)に一元化。legacy `purchased`/`hold`配列はrepository load時にparse成功後だけv2へ移行保存し、保存失敗時は旧値を保持する。`PurchaseMutationService`, `DataManager`, `SourceSettingsService`, `StorageDeletionService`へ適用し、`excluded`を通常候補から除外。永続Undo/RedoのUI正本も撤去した。単体テスト（39ファイル408ケース全てPASS）、`check:webapp`、`build:webapp`、`verify:webapp:build`、`biome check`、`git diff --check`をパス済み。schema v2へ追随したGAS同期・管理E2Eの関連12ケースも通過したが、既存visual snapshot 6件は更新していない。
 
 ## 統合済み
 
@@ -16,17 +16,14 @@
 ## 承認状態
 
 - Phase 5B/5C共有設計: 承認済み。
-- Phase 5B正式実装計画: 承認済み。
+- Phase 5B正式実装計画: 承認済み（全Tasks 1-6完了）。
 - Phase 5C正式実装計画: 承認済み。
-- 文書整理方針: 承認済み。
-- Phase 5B Tasks 1-6 (C108 Map Bundle Integration): **全タスク完了**。
-- Phase 5B Handoff レポート: [docs/reviews/phase-05b-handoff.md](../reviews/phase-05b-handoff.md) 作成完了。
-- Phase 5B実装branch: `feature/phase-05b` 作成済み。
+- Phase 5C Task 1: **実装・検証完了**。
 
 ## 次の操作
 
-1. Task 6のコミット承認・提示を行う。
-2. Phase 5C Task 1 (全距離行列のデータ構造とWeb Worker設計) は、entry gateとLocalStorage容量設計を確認したうえで、別途ユーザー指示を受けてから着手する。
+1. Task 1の変更をコミットする。
+2. Phase 5C Task 2 (UI Navigation State and Visited State Management) の実装に着手する。
 
 ## 人手入力
 
