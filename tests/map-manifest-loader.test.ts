@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "vitest";
 import {
+  loadEventMapBundleManifestFromUrl,
   loadMapBundleManifest,
   renderMapBootstrapError,
 } from "../apps/webapp/js/map-manifest-loader";
@@ -93,4 +94,105 @@ test("fatal map bootstrap errors replace the app with an accessible diagnostic p
   assert.match(alert.textContent || "", /地図設定を読み込めませんでした/);
   assert.match(alert.textContent || "", /map manifest\.areas\[0\]\.id/);
   assert.doesNotMatch(document.body.textContent || "", /old app/);
+});
+
+const validC108Payload = {
+  schemaVersion: 1,
+  eventId: "C108",
+  bundleVersion: "fixture-v1",
+  areas: [
+    {
+      areaId: "e456",
+      displayName: "東456ホール",
+      assets: {
+        svg: "./e456/map.svg",
+        points: "./e456/points.json",
+        gridMeta: "./e456/grid-meta.json",
+        grid: "./e456/grid.bin",
+      },
+    },
+    {
+      areaId: "e7",
+      displayName: "東7ホール",
+      assets: {
+        svg: "./e7/map.svg",
+        points: "./e7/points.json",
+        gridMeta: "./e7/grid-meta.json",
+        grid: "./e7/grid.bin",
+      },
+    },
+    {
+      areaId: "s12",
+      displayName: "南12ホール",
+      assets: {
+        svg: "./s12/map.svg",
+        points: "./s12/points.json",
+        gridMeta: "./s12/grid-meta.json",
+        grid: "./s12/grid.bin",
+      },
+    },
+    {
+      areaId: "w12",
+      displayName: "西12ホール",
+      assets: {
+        svg: "./w12/map.svg",
+        points: "./w12/points.json",
+        gridMeta: "./w12/grid-meta.json",
+        grid: "./w12/grid.bin",
+      },
+    },
+  ],
+};
+
+test("loadEventMapBundleManifestFromUrl fetches manifest and returns validated 4 areas", async () => {
+  let fetchCount = 0;
+  const manifest = await loadEventMapBundleManifestFromUrl(
+    "https://example.test/map-bundles/C108/manifest.json",
+    {
+      fetcher: async (input) => {
+        fetchCount++;
+        assert.equal(
+          input,
+          "https://example.test/map-bundles/C108/manifest.json",
+        );
+        return {
+          ok: true,
+          status: 200,
+          json: async () => validC108Payload,
+        } as Response;
+      },
+    },
+  );
+
+  assert.equal(fetchCount, 1);
+  assert.equal(manifest.eventId, "C108");
+  assert.equal(manifest.areas.length, 4);
+  assert.equal(manifest.areas[0].areaId, "e456");
+  assert.equal(manifest.areas[1].areaId, "e7");
+  assert.equal(manifest.areas[2].areaId, "s12");
+  assert.equal(manifest.areas[3].areaId, "w12");
+});
+
+test("loadEventMapBundleManifestFromUrl does not fetch sub-assets on manifest parse failure", async () => {
+  const fetchedUrls: string[] = [];
+  await assert.rejects(
+    loadEventMapBundleManifestFromUrl(
+      "https://example.test/map-bundles/C108/manifest.json",
+      {
+        fetcher: async (input) => {
+          fetchedUrls.push(String(input));
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ ...validC108Payload, areas: [] }),
+          } as Response;
+        },
+      },
+    ),
+    /BoundaryValidationError|manifest.areas/,
+  );
+
+  assert.deepEqual(fetchedUrls, [
+    "https://example.test/map-bundles/C108/manifest.json",
+  ]);
 });

@@ -1,5 +1,12 @@
-import { parseMapBundleManifest } from "./types/boundary-parsers";
-import type { EventRegistryEntryV1, MapBundleManifestV1 } from "./types/domain";
+import {
+  parseEventMapBundleManifest,
+  parseMapBundleManifest,
+} from "./types/boundary-parsers";
+import type {
+  EventMapBundleManifest,
+  EventRegistryEntryV1,
+  MapBundleManifestV1,
+} from "./types/domain";
 
 const MAP_MANIFEST_PATH = "./assets/maps/manifest.json";
 
@@ -66,6 +73,45 @@ export function resolveEventMapManifestUrl(
   }
 
   return resolved.href;
+}
+
+/** Fetch and validate a C108 event map bundle manifest from an explicit URL. */
+export async function loadEventMapBundleManifestFromUrl(
+  manifestUrl: string,
+  options: LoadMapBundleManifestOptions = {},
+): Promise<EventMapBundleManifest> {
+  const fetcher =
+    options.fetcher ??
+    (globalThis.fetch ? globalThis.fetch.bind(globalThis) : undefined);
+  if (!fetcher) {
+    throw new Error("Map manifest request failed: fetch is unavailable");
+  }
+  let response: Response;
+  try {
+    response = await fetcher(manifestUrl, {
+      headers: { Accept: "application/json" },
+      signal: options.signal,
+    });
+  } catch (error) {
+    throw new Error(`Map manifest request failed: ${errorDetail(error)}`, {
+      cause: error,
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error(`Map manifest request failed with HTTP ${response.status}`);
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    throw new Error(
+      `Map manifest JSON could not be parsed: ${errorDetail(error)}`,
+      { cause: error },
+    );
+  }
+  return parseEventMapBundleManifest(payload);
 }
 
 /** Fetch and validate a map bundle manifest from an explicit URL. */

@@ -1,8 +1,8 @@
 # Current Progress
 
 **更新日:** 2026-07-26
-**現在の段階:** Phase 5B Task 1完了 / Task 2開始待ち
-**コード実装:** 未開始 (Task 1文書整備完了)
+**現在の段階:** Phase 5B Task 2完了 / Task 3開始待ち
+**コード実装:** Task 2完了 (C108 map bundle contract & runtime parser)
 
 ## 統合済み
 
@@ -20,12 +20,13 @@
 - Phase 5C正式実装計画: 承認済み。
 - 文書整理方針: 承認済み。
 - Phase 5B Task 1 (文書整備・入力棚卸し): 完了。
-- Phase 5B実装branch: `feature/phase-05b-task-01` (Task 1用) 作成済み。
+- Phase 5B Task 2 (C108 bundle contract): 完了。
+- Phase 5B実装branch: `feature/phase-05b` 作成済み。
 
 ## 次の操作
 
-1. Task 1 のコミット `docs: prepare phase 5b map integration` を確認する。
-2. `AGENTS.mdを読んで、Phase 5B Task 2を実装して` という指示で Task 2 を進める。
+1. Task 2 のコミット `feat(maps): define c108 bundle contract` を確認する。
+2. `AGENTS.mdを読んで、Phase 5B Task 3を実装して` という指示で Task 3 を進める。
 
 ## 人手入力
 

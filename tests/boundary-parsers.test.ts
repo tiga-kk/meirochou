@@ -3,6 +3,7 @@ import { test } from "vitest";
 import { Config } from "../apps/webapp/js/config";
 import {
   BoundaryValidationError,
+  parseEventMapBundleManifest,
   parseGasCircleResponse,
   parseGasSheetListResponse,
   parseGridMeta,
@@ -280,6 +281,189 @@ test("points parser skips OCR entries whose identifier is unresolved", () => {
 
   assert.equal(payload.points.length, 1);
   assert.equal(payload.points[0].identifier, "A");
+});
+
+const validC108Manifest = {
+  schemaVersion: 1,
+  eventId: "C108",
+  bundleVersion: "fixture-v1",
+  areas: [
+    {
+      areaId: "area-a",
+      displayName: "Area A",
+      assets: {
+        svg: "./area-a/map.svg",
+        points: "./area-a/points.json",
+        gridMeta: "./area-a/grid-meta.json",
+        grid: "./area-a/grid.bin",
+      },
+    },
+    {
+      areaId: "area-b",
+      displayName: "Area B",
+      assets: {
+        svg: "./area-b/map.svg",
+        points: "./area-b/points.json",
+        gridMeta: "./area-b/grid-meta.json",
+        grid: "./area-b/grid.bin",
+      },
+    },
+    {
+      areaId: "area-c",
+      displayName: "Area C",
+      assets: {
+        svg: "./area-c/map.svg",
+        points: "./area-c/points.json",
+        gridMeta: "./area-c/grid-meta.json",
+        grid: "./area-c/grid.bin",
+      },
+    },
+    {
+      areaId: "area-d",
+      displayName: "Area D",
+      assets: {
+        svg: "./area-d/map.svg",
+        points: "./area-d/points.json",
+        gridMeta: "./area-d/grid-meta.json",
+        grid: "./area-d/grid.bin",
+      },
+    },
+  ],
+};
+
+test("parseEventMapBundleManifest accepts valid 4-area C108 manifest", () => {
+  const manifest = parseEventMapBundleManifest(validC108Manifest);
+  assert.equal(manifest.schemaVersion, 1);
+  assert.equal(manifest.eventId, "C108");
+  assert.equal(manifest.bundleVersion, "fixture-v1");
+  assert.equal(manifest.areas.length, 4);
+  assert.equal(manifest.areas[0].areaId, "area-a");
+  assert.equal(manifest.areas[0].assets.svg, "./area-a/map.svg");
+});
+
+test("parseEventMapBundleManifest rejects unsafe asset paths", () => {
+  const unsafePaths = [
+    "/absolute/map.svg",
+    "../map.svg",
+    "./area-a/../map.svg",
+    "https://example.invalid/map.svg",
+    "data:image/svg+xml,...",
+    "./area-a/map.svg?x=1",
+    "./area-a/map.svg#fragment",
+    ".\\area-a\\map.svg",
+    "area-a/map.svg",
+    "./area-a/map.svg ",
+    "./area-b/map.svg",
+  ];
+
+  for (const unsafePath of unsafePaths) {
+    const invalidManifest = {
+      ...validC108Manifest,
+      areas: [
+        {
+          ...validC108Manifest.areas[0],
+          assets: {
+            ...validC108Manifest.areas[0].assets,
+            svg: unsafePath,
+          },
+        },
+        ...validC108Manifest.areas.slice(1),
+      ],
+    };
+    assert.throws(
+      () => parseEventMapBundleManifest(invalidManifest),
+      BoundaryValidationError,
+      `Should reject unsafe path: ${unsafePath}`,
+    );
+  }
+});
+
+test("parseEventMapBundleManifest rejects invalid manifest structure", () => {
+  const cases: [string, unknown][] = [
+    ["schemaVersion is not 1", { ...validC108Manifest, schemaVersion: 2 }],
+    ["eventId is empty", { ...validC108Manifest, eventId: "" }],
+    ["bundleVersion is empty", { ...validC108Manifest, bundleVersion: "" }],
+    [
+      "areas count is 3",
+      { ...validC108Manifest, areas: validC108Manifest.areas.slice(0, 3) },
+    ],
+    [
+      "areas count is 5",
+      {
+        ...validC108Manifest,
+        areas: [...validC108Manifest.areas, validC108Manifest.areas[0]],
+      },
+    ],
+    [
+      "duplicate areaId",
+      {
+        ...validC108Manifest,
+        areas: [
+          validC108Manifest.areas[0],
+          validC108Manifest.areas[0],
+          validC108Manifest.areas[2],
+          validC108Manifest.areas[3],
+        ],
+      },
+    ],
+    [
+      "displayName is empty",
+      {
+        ...validC108Manifest,
+        areas: [
+          { ...validC108Manifest.areas[0], displayName: "" },
+          ...validC108Manifest.areas.slice(1),
+        ],
+      },
+    ],
+    [
+      "areaId has surrounding whitespace",
+      {
+        ...validC108Manifest,
+        areas: [
+          { ...validC108Manifest.areas[0], areaId: " area-a " },
+          ...validC108Manifest.areas.slice(1),
+        ],
+      },
+    ],
+    [
+      "missing asset field",
+      {
+        ...validC108Manifest,
+        areas: [
+          {
+            ...validC108Manifest.areas[0],
+            assets: { svg: "./area-a/map.svg", points: "./area-a/points.json" },
+          },
+          ...validC108Manifest.areas.slice(1),
+        ],
+      },
+    ],
+    [
+      "invalid extension",
+      {
+        ...validC108Manifest,
+        areas: [
+          {
+            ...validC108Manifest.areas[0],
+            assets: {
+              ...validC108Manifest.areas[0].assets,
+              svg: "./area-a/map.png",
+            },
+          },
+          ...validC108Manifest.areas.slice(1),
+        ],
+      },
+    ],
+  ];
+
+  for (const [description, invalidInput] of cases) {
+    assert.throws(
+      () => parseEventMapBundleManifest(invalidInput),
+      BoundaryValidationError,
+      `Should fail when ${description}`,
+    );
+  }
 });
 
 /*

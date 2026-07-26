@@ -302,3 +302,23 @@ export interface OnlineEventTarget {
   addEventListener(type: "online", listener: () => void): void;
   removeEventListener(type: "online", listener: () => void): void;
 }
+
+export interface MapAssetPaths {
+  readonly svg: string;
+  readonly points: string;
+  readonly gridMeta: string;
+  readonly grid: string;
+}
+
+export interface EventMapAreaManifest {
+  readonly areaId: string;
+  readonly displayName: string;
+  readonly assets: MapAssetPaths;
+}
+
+export interface EventMapBundleManifest {
+  readonly schemaVersion: 1;
+  readonly eventId: string;
+  readonly bundleVersion: string;
+  readonly areas: readonly EventMapAreaManifest[];
+}

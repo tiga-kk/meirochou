@@ -1,6 +1,6 @@
 # Phase 5B Task 2: C108 Map Bundle Contract and Runtime Parser
 
-**Status:** Not started  
+**Status:** Completed
 **Depends on:** Phase 5B Task 1  
 **Commit candidate:** `feat(maps): define c108 bundle contract`
 
@@ -233,10 +233,33 @@ git diff --check
 
 ```text
 Implemented types/functions:
+- MapAssetPaths, EventMapAreaManifest, EventMapBundleManifest (apps/webapp/js/types/domain.ts)
+- parseEventMapBundleManifest (apps/webapp/js/types/boundary-parsers.ts)
+- loadEventMapBundleManifestFromUrl (apps/webapp/js/map-manifest-loader.ts)
 Changed files:
+- apps/webapp/js/types/domain.ts
+- apps/webapp/js/types/boundary-parsers.ts
+- apps/webapp/js/map-manifest-loader.ts
+- tests/boundary-parsers.test.ts
+- tests/map-manifest-loader.test.ts
+- docs/plans/phase-05b/task-02-map-bundle-contract.md
+- docs/status/progress.md
 RED command and failure:
+- npx vitest run --root . tests/boundary-parsers.test.ts (3 failed tests: Not implemented / BoundaryValidationError expected)
 GREEN commands:
+- npx vitest run --root . tests/boundary-parsers.test.ts
+- npm run test:webapp
+- npm run check:webapp
+- npx biome check apps/webapp/js tests/boundary-parsers.test.ts tests/map-manifest-loader.test.ts
+- npm run verify:gas
+- npm run test:e2e
+- git diff --check
 Test results:
-Known limitations:
-Proposed commit message:
+- 36 test files passed, 379 tests passed.
+- GAS 2 test files passed, 27 tests passed.
+- E2E 25 of 31 tests passed; 6 existing visual snapshot assertions differ by 1-2px or rendered pixels in unchanged UI surfaces.
+- Biome check passed with 0 errors.
+- Review fix: asset paths now require the exact `./<areaId>/<file>` form and reject surrounding whitespace in paths and area IDs.
+Known limitations: Full `npx biome check` remains non-zero for 5 pre-existing formatting/import-order issues outside this Task's changed files. E2E has 6 pre-existing visual snapshot mismatches in unchanged UI surfaces; no UI/CSS/app rendering file changed in Task 2.
+Proposed commit message: feat(maps): define c108 bundle contract
 ```
