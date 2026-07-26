@@ -1,7 +1,7 @@
 # Current Progress
 
 **更新日:** 2026-07-26
-**現在の段階:** Phase 5C Task 7完了（Navigation and Optimization Orchestration）
+**現在の段階:** Phase 5C Task 8完了（Reload Recovery and Local Data Deletion）
 
 ## コード実装
 
@@ -38,13 +38,24 @@ Task 7の実装・レビュー修正:
 - optimizer generationを追加し、cancelまたは状態遷移後の古いWorker progressを破棄
 - `buildOptimizationProblem`: Task 5のN×N circle matrix、始点距離、area別timing profile、priority、service timeをTask 6 problemへ変換
 - 未知area、不足行列、負値・非数の距離を明示的に拒否し、Task 5の距離行列を黙ってfallbackしない
-- Circle state mutationとのarrival hold連携、profile-version再評価/recovery、進捗UI、完了ダイアログはTask 8/9へ移管
+
+Task 8の実装:
+
+- `LocalStorageNavigationSnapshotRepository` & `validateSnapshotForResume`:
+  - schema、event/day identity、案内状態（`navState`）、確定位置（`currentPosition`）、locked leg、最適化時間設定をruntime parser経由で永続化
+  - Workerプロセスや未処理Promiseなどのランタイム状態を保存対象から完全除外
+  - バンドルバージョン、pending候補、circle state、target endpointの不一致を安全に再開拒否
+- `StorageDeletionService`:
+  - 巡回状態の初期化（`activity`削除）時に距離行列（`distance matrix`）を保持し、ナビゲーションスナップショットのみ削除
+  - circle source変更、日程データの完全削除（`event-day` / `all-events`削除）時に距離行列およびスナップショットを削除
+- 管理画面の削除説明を、距離行列と再開snapshotの保持・削除境界に合わせて更新
+- 再読込dialog、route geometry再構築、warm-start実行はTask 9のnavigation UI/E2E接続へ移管
 
 ## 検証
 
-Task 5 focused test 27件、Task 6 focused test 24件。Task 7 focused test 14件はGREEN。Task 7変更を含む`npm run test:webapp`は45ファイル442件、`check:webapp`、build、artifact検証、Biome、git diff検査はPASS。
+Task 5 focused test 27件、Task 6 focused test 24件、Task 7 focused test 14件。Task 8 core focused test 18件、関連UI/管理テスト41件はGREEN。Task 8変更を含む`npm run test:webapp`は46ファイル454件PASS。build、artifact検証、Biome、git diff検査はPASS。
 
-`npm run test:e2e`は標準の`test-results`とVite cacheが`nobody`所有で書込み不可だったため、そのままでは起動できなかった。生成物出力先と一時Vite設定を使った同一Playwright実行では39件中31 failed・8 skippedとなった。失敗は全てmobile-chromiumで、初期画面のlocatorが存在しない／表示されない状態だったため、Task 7の変更が原因と断定せず、E2E環境・既存mobile suiteの別途調査事項として残す。
+`npm run test:e2e`は標準の`test-results`とVite cacheが`nobody`所有で書込み不可だったため、そのままでは起動できなかった。生成物出力先と一時Vite設定を使った同一Playwright実行では39件中31 failed・8 skippedとなった。失敗は全てmobile-chromiumで、初期画面のlocatorが存在しない／表示されない状態だったため、Task 8の変更が原因と断定せず、E2E環境・既存mobile suiteの別途調査事項として残す。
 
 ## 統合済み
 
@@ -52,6 +63,8 @@ Task 5 focused test 27件、Task 6 focused test 24件。Task 7 focused test 14�
 - Phase 5AはPR #3で`main`へ統合済み。
 - Phase 5A merge後に確認された`main` commitは`b731e8e0a14cb80d27551630f79d4a8cadff046c`。
 - Cloudflare Pages production公開はPhase 5Aで完了済み。
+
+作業開始時は現在の`main`、remote、working treeを再確認する。
 
 ## 承認状態
 
@@ -64,12 +77,13 @@ Task 5 focused test 27件、Task 6 focused test 24件。Task 7 focused test 14�
 - Phase 5C Task 4: **実装・検証完了**（コミット未）。
 - Phase 5C Task 5: **実装・検証完了**（コミット未）。
 - Phase 5C Task 6: **実装・レビュー修正・検証完了**（`33f3f58`）。
-- Phase 5C Task 7: **実装・レビュー修正・検証完了・コミット済み**（本Task commit）。
+- Phase 5C Task 7: **実装・レビュー修正・検証完了・コミット済み**（`3bc7b7e`）。
+- Phase 5C Task 8: **実装・レビュー修正・検証完了・コミット済み**（`6afdb13`）。
 
 ## 次の操作
 
-1. Task 7のコミット後、Phase 5C Task 8（Navigation Recovery Snapshot and Deletion Rules）へ進む。
-2. Task 8以降で、Task 7から移管したCircle state mutation、profile-version recovery、進捗UI、完了ダイアログを実装する。
+1. Phase 5C Task 9 (Mobile UX, Accessibility, and Visual Verification) の実装に着手する。
+2. Task 9で再読込dialog、route geometry/warm-start接続、mobile E2Eを実装・検証する。
 
 ## 人手入力
 

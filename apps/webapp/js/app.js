@@ -11,7 +11,9 @@ import {
   resolveEventMapManifestUrl,
 } from "./map-manifest-loader";
 import { planRoute, rankCandidatesByGridDistance } from "./route-planner";
+import { LocalStorageDistanceMatrixRepository } from "./routing/distance-matrix-repository";
 import { EventDayRepository } from "./state/event-day-repository";
+import { LocalStorageNavigationSnapshotRepository } from "./state/navigation-snapshot-repository";
 import { StorageDeletionService } from "./state/storage-deletion-service";
 import { StorageService } from "./state/storage-service";
 import { TspSolver } from "./tsp-solver.js";
@@ -189,6 +191,8 @@ export class App {
         typeof crypto !== "undefined" && crypto.randomUUID
           ? crypto.randomUUID()
           : `gen-${Date.now()}`,
+      new LocalStorageDistanceMatrixRepository(),
+      new LocalStorageNavigationSnapshotRepository(),
     );
   }
 

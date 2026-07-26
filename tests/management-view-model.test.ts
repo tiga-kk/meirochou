@@ -382,7 +382,7 @@ describe("buildDeleteOptions", () => {
       scope: { type: "activity", ref: { eventId: "c104", dayId: "day1" } },
       label: "購入・チェック履歴の削除（3件）",
       consequence:
-        "この日の購入済み・チェック状態・操作履歴をすべて消去します。サークル情報は保持されます。",
+        "この日の購入済み・チェック状態・操作履歴をすべて消去します。サークル情報と距離行列は保持し、ナビゲーション再開情報は削除します。",
       blocked: false,
       blockedReason: null,
     });
@@ -390,7 +390,8 @@ describe("buildDeleteOptions", () => {
     expect(options[2]).toEqual({
       scope: { type: "event-day", ref: { eventId: "c104", dayId: "day1" } },
       label: "この日（データ）の削除",
-      consequence: "この日程のサークル情報および履歴をすべて削除します。",
+      consequence:
+        "この日程のサークル情報、履歴、距離行列、ナビゲーション再開情報をすべて削除します。",
       blocked: false,
       blockedReason: null,
     });
@@ -399,7 +400,7 @@ describe("buildDeleteOptions", () => {
       scope: { type: "all-events" },
       label: "全日程データの削除（2日程）",
       consequence:
-        "登録されている全日程のサークル情報・履歴・設定を消去し、初期状態に戻します。",
+        "登録されている全日程のサークル情報・履歴・距離行列・ナビゲーション再開情報を消去し、初期状態に戻します。",
       blocked: false,
       blockedReason: null,
     });
