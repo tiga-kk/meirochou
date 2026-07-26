@@ -1,9 +1,14 @@
 # Current Progress
 
 **更新日:** 2026-07-26
-**現在の段階:** Phase 5C Task 4完了（Arbitrary Start and Per-map Session）
-**コード実装:** Phase 5C Task 4のpure foundationとして、`snapStartToWalkableCell`（SVG座標→walkableセルスナップ、有限値・grid buffer長・閾値・blocked cell・tie-breaking検証）と `MapSession` / `createMapSession` / `switchMapArea` / `updateSessionCache`（エリアごとの独立セッション、切り替え時navigation clear、同エリア復帰時のmatrix/best order引き継ぎ）を実装・レビュー修正した。map UIのclient座標変換、始点設定mode/cancel、preview/marker、keyboard control、App/Worker wiringはTask 7/9へ繰り越す。
-**検証:** focused test 12件、webapp test 39ファイル408件、型チェック・build・build検証・Biome・`git diff --check`はPASS。E2Eはsandbox外で25 PASS・8 skipped・6 failed（既存mobile visual snapshot差分）。
+**現在の段階:** Phase 5C Task 5完了（Distance Matrix Worker and LocalStorage Cache）
+**コード実装:** Phase 5C Task 5のpure kernel・Worker・controller・repositoryを実装・レビュー修正した。
+- `buildDistanceMatrixCacheKey`: コンテントアドレス型キャッシュキー生成（メタデータ依存排除、grid/endpoint/version駆動）
+- `dijkstraFromCell` / `computeAllPairsDistances`: all-pairsパス幾何学を保存せず平坦配列へ計算する純粋Dijkstraカーネル（crowded weight 1.5対応）
+- `DistanceMatrixWorkerKernel` / Worker protocol: キャンセル・進捗（N endpoints）・ETA・stale jobId拒否
+- `DistanceMatrixController`: cache hit/miss、UI progress model、stale response、cancel
+- `LocalStorageDistanceMatrixRepository`: runtime検証、`Infinity`復元、クォータエラーの安全な捕捉
+Task 5 focused test 27件、webapp全体39ファイル408件、型チェック・build・artifact検証・Biome・git diff検査はPASS。E2Eは31 PASS・8 skipped（sandbox外で実行）。
 
 ## 統合済み
 
@@ -22,11 +27,12 @@
 - Phase 5C Task 1: **実装・検証完了**。
 - Phase 5C Task 2: **実装・検証完了**。
 - Phase 5C Task 3: **実装・レビュー修正・検証完了・コミット済み**。
-- Phase 5C Task 4: **実装・レビュー修正・検証完了・コミット済み**（`3c8bc3b`）。
+- Phase 5C Task 4: **実装・レビュー修正・検証完了・コミット済み**。
+- Phase 5C Task 5: **実装・レビュー修正・検証完了・コミット済み**（`8218ce9`）。
 
 ## 次の操作
 
-1. Phase 5C Task 5 (Distance Matrix Worker) の実装に着手する。
+1. Phase 5C Task 6 (TOPTW Worker with Time Budget and Solver Core) の実装に着手する。
 
 ## 人手入力
 
