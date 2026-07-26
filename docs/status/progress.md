@@ -1,9 +1,9 @@
 # Current Progress
 
 **更新日:** 2026-07-26
-**現在の段階:** Phase 5C Task 3完了（レビュー修正・検証済み・コミット済み）
-**コード実装:** Phase 5C Task 3の実装をレビューし、`buildUnpurchasedCircleList`（pending/held分離・purchased/excluded除外）、`buildAllCircleList`（4状態バッジ付き）、`getAvailableActionsForCircle`（状態別アクション）、`CircleDetailDialog`（state badge・状態別action・44pxタップ領域・Escape close・focus return）、`CircleStateUndoService`（TTL付き1回取消token）を確認した。レビュー修正として`その他`actionをメニュー内へ隠し、buttonのsubmit誤動作を防止した。App/Map/Galleryとmutation/navigation serviceの接続はTask 7へ移管する。
-**検証:** focused test 17件、webapp全体39ファイル408テスト、型チェック、build、artifact検証、Biome、diff検査を実行済み。E2Eは25 passed、既存visual snapshot差分6件、8 skipped。
+**現在の段階:** Phase 5C Task 4完了（Arbitrary Start and Per-map Session）
+**コード実装:** Phase 5C Task 4のpure foundationとして、`snapStartToWalkableCell`（SVG座標→walkableセルスナップ、有限値・grid buffer長・閾値・blocked cell・tie-breaking検証）と `MapSession` / `createMapSession` / `switchMapArea` / `updateSessionCache`（エリアごとの独立セッション、切り替え時navigation clear、同エリア復帰時のmatrix/best order引き継ぎ）を実装・レビュー修正した。map UIのclient座標変換、始点設定mode/cancel、preview/marker、keyboard control、App/Worker wiringはTask 7/9へ繰り越す。
+**検証:** focused test 12件、webapp test 39ファイル408件、型チェック・build・build検証・Biome・`git diff --check`はPASS。E2Eはsandbox外で25 PASS・8 skipped・6 failed（既存mobile visual snapshot差分）。
 
 ## 統合済み
 
@@ -21,11 +21,12 @@
 - Phase 5C正式実装計画: 承認済み。
 - Phase 5C Task 1: **実装・検証完了**。
 - Phase 5C Task 2: **実装・検証完了**。
-- Phase 5C Task 3: **実装・レビュー修正・検証完了**（コミット未）。
+- Phase 5C Task 3: **実装・レビュー修正・検証完了・コミット済み**。
+- Phase 5C Task 4: **実装・レビュー修正・検証完了・コミット済み**（`3c8bc3b`）。
 
 ## 次の操作
 
-1. Phase 5C Task 4 (Arbitrary Start and Map Session) の実装に着手する。
+1. Phase 5C Task 5 (Distance Matrix Worker) の実装に着手する。
 
 ## 人手入力
 
