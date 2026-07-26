@@ -2,7 +2,8 @@ import {
   parseEventMapBundleManifest,
   parseGridMeta,
 } from "../../types/boundary-parsers";
-import type { EventMapAreaManifest, GridMeta } from "../../types/domain";
+import type { GridMeta } from "../../types/domain";
+import { resolveBundleAssetUrl } from "./asset-url";
 import {
   distanceToColor,
   findNearestWalkableIndex,
@@ -12,268 +13,235 @@ import {
   type DijkstraTrace,
 } from "./core";
 
-const MANIFEST_URL = "/assets/maps/C108/manifest.json";
-const TARGET_AREA_ID = "w12";
+const MANIFEST_PATH = "/assets/maps/C108/manifest.json";
 
-function requiredElement<T extends Element>(selector: string): T {
-  const element = document.querySelector<T>(selector);
-  if (!element) throw new Error(`Missing required element: ${selector}`);
-  return element;
+function element<T extends Element>(selector: string): T {
+  const found = document.querySelector<T>(selector);
+  if (!found) throw new Error(`Missing element: ${selector}`);
+  return found;
 }
 
-const elements = {
-  mapStage: requiredElement<HTMLDivElement>("#mapStage"),
-  mapImage: requiredElement<HTMLImageElement>("#mapImage"),
-  heatCanvas: requiredElement<HTMLCanvasElement>("#heatCanvas"),
-  originMarker: requiredElement<HTMLSpanElement>("#originMarker"),
-  status: requiredElement<HTMLParagraphElement>("#statusText"),
-  speed: requiredElement<HTMLSelectElement>("#speedSelect"),
-  pause: requiredElement<HTMLButtonElement>("#pauseButton"),
-  reset: requiredElement<HTMLButtonElement>("#resetButton"),
-  startCell: requiredElement<HTMLElement>("#startCell"),
-  visitedCells: requiredElement<HTMLElement>("#visitedCells"),
-  maxDistance: requiredElement<HTMLElement>("#maxDistance"),
-  computeTime: requiredElement<HTMLElement>("#computeTime"),
+const ui = {
+  stage: element<HTMLDivElement>("#mapStage"),
+  map: element<HTMLImageElement>("#mapImage"),
+  canvas: element<HTMLCanvasElement>("#heatCanvas"),
+  marker: element<HTMLSpanElement>("#originMarker"),
+  status: element<HTMLParagraphElement>("#statusText"),
+  speed: element<HTMLSelectElement>("#speedSelect"),
+  pause: element<HTMLButtonElement>("#pauseButton"),
+  reset: element<HTMLButtonElement>("#resetButton"),
+  startCell: element<HTMLElement>("#startCell"),
+  visited: element<HTMLElement>("#visitedCells"),
+  maxDistance: element<HTMLElement>("#maxDistance"),
+  computeTime: element<HTMLElement>("#computeTime"),
 };
 
-interface VisualizerState {
-  gridMeta: GridMeta | null;
-  gridBytes: Uint8Array | null;
+const state: {
+  meta: GridMeta | null;
+  grid: Uint8Array | null;
   trace: DijkstraTrace | null;
-  imageData: ImageData | null;
-  revealedCount: number;
-  animationFrameId: number | null;
-  animationStartedAt: number;
-  pauseStartedAt: number;
-  accumulatedPauseMs: number;
+  pixels: ImageData | null;
+  revealed: number;
+  frame: number | null;
+  startedAt: number;
+  pausedAt: number;
+  pauseTotal: number;
   paused: boolean;
-}
-
-const state: VisualizerState = {
-  gridMeta: null,
-  gridBytes: null,
+} = {
+  meta: null,
+  grid: null,
   trace: null,
-  imageData: null,
-  revealedCount: 0,
-  animationFrameId: null,
-  animationStartedAt: 0,
-  pauseStartedAt: 0,
-  accumulatedPauseMs: 0,
+  pixels: null,
+  revealed: 0,
+  frame: null,
+  startedAt: 0,
+  pausedAt: 0,
+  pauseTotal: 0,
   paused: false,
 };
 
-function setStatus(message: string, error = false): void {
-  elements.status.textContent = message;
-  elements.status.dataset.state = error ? "error" : "normal";
+function setStatus(message: string, isError = false): void {
+  ui.status.textContent = message;
+  ui.status.dataset.state = isError ? "error" : "normal";
 }
 
-function resolveAssetUrl(manifestUrl: string, relativePath: string): string {
-  return new URL(relativePath, manifestUrl).href;
-}
-
-async function readJson(response: Response, label: string): Promise<unknown> {
+async function fetchJson(url: string, label: string): Promise<unknown> {
+  const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`${label}の取得に失敗しました (${response.status})`);
   }
   return response.json();
 }
 
-async function loadW12Area(): Promise<void> {
-  setStatus("W12の地図と歩行グリッドを読み込んでいます…");
-  const manifestResponse = await fetch(MANIFEST_URL, { cache: "no-store" });
-  const manifestJson = await readJson(manifestResponse, "C108 manifest.json");
-  const manifest = parseEventMapBundleManifest(manifestJson);
-  const area = manifest.areas.find(
-    (candidate): candidate is EventMapAreaManifest =>
-      candidate.areaId === TARGET_AREA_ID,
+async function loadW12(): Promise<void> {
+  const manifest = parseEventMapBundleManifest(
+    await fetchJson(MANIFEST_PATH, "C108 manifest.json"),
   );
+  const area = manifest.areas.find((candidate) => candidate.areaId === "w12");
   if (!area) throw new Error("C108 manifest.jsonにW12がありません");
 
-  const mapUrl = resolveAssetUrl(MANIFEST_URL, area.assets.svg);
-  const gridMetaUrl = resolveAssetUrl(MANIFEST_URL, area.assets.gridMeta);
-  const gridUrl = resolveAssetUrl(MANIFEST_URL, area.assets.grid);
-  const [gridMetaResponse, gridResponse] = await Promise.all([
-    fetch(gridMetaUrl, { cache: "no-store" }),
-    fetch(gridUrl, { cache: "no-store" }),
+  const assetUrl = (path: string) =>
+    resolveBundleAssetUrl(MANIFEST_PATH, path, window.location.href);
+  const [metaJson, gridResponse] = await Promise.all([
+    fetchJson(assetUrl(area.assets.gridMeta), "W12 grid-meta.json"),
+    fetch(assetUrl(area.assets.grid), { cache: "no-store" }),
   ]);
-  const gridMetaJson = await readJson(gridMetaResponse, "W12 grid-meta.json");
   if (!gridResponse.ok) {
     throw new Error(`W12 grid.binの取得に失敗しました (${gridResponse.status})`);
   }
 
-  const gridMeta = parseGridMeta(gridMetaJson);
-  const gridBytes = new Uint8Array(await gridResponse.arrayBuffer());
-  if (gridBytes.length !== gridMeta.cols * gridMeta.rows) {
+  state.meta = parseGridMeta(metaJson);
+  state.grid = new Uint8Array(await gridResponse.arrayBuffer());
+  if (state.grid.length !== state.meta.cols * state.meta.rows) {
     throw new Error("W12 grid.binのセル数がgrid-meta.jsonと一致しません");
   }
 
-  state.gridMeta = gridMeta;
-  state.gridBytes = gridBytes;
-  elements.mapImage.src = mapUrl;
-  elements.mapStage.style.aspectRatio = `${gridMeta.width} / ${gridMeta.height}`;
-  elements.heatCanvas.width = gridMeta.cols;
-  elements.heatCanvas.height = gridMeta.rows;
-  elements.mapStage.hidden = false;
-  elements.reset.disabled = false;
+  ui.map.src = assetUrl(area.assets.svg);
+  ui.stage.style.aspectRatio = `${state.meta.width} / ${state.meta.height}`;
+  ui.canvas.width = state.meta.cols;
+  ui.canvas.height = state.meta.rows;
+  ui.stage.hidden = false;
+  ui.reset.disabled = false;
   setStatus("地図上の通路をクリックしてください。");
 }
 
 function stopAnimation(): void {
-  if (state.animationFrameId !== null) {
-    cancelAnimationFrame(state.animationFrameId);
-  }
-  state.animationFrameId = null;
+  if (state.frame !== null) cancelAnimationFrame(state.frame);
+  state.frame = null;
   state.paused = false;
-  state.pauseStartedAt = 0;
-  state.accumulatedPauseMs = 0;
-  elements.pause.textContent = "一時停止";
+  state.pausedAt = 0;
+  state.pauseTotal = 0;
+  ui.pause.textContent = "一時停止";
 }
 
 function clearHeatmap(): void {
   stopAnimation();
-  const context = elements.heatCanvas.getContext("2d");
-  context?.clearRect(0, 0, elements.heatCanvas.width, elements.heatCanvas.height);
+  ui.canvas
+    .getContext("2d")
+    ?.clearRect(0, 0, ui.canvas.width, ui.canvas.height);
   state.trace = null;
-  state.imageData = null;
-  state.revealedCount = 0;
-  elements.originMarker.hidden = true;
-  elements.startCell.textContent = "—";
-  elements.visitedCells.textContent = "—";
-  elements.maxDistance.textContent = "—";
-  elements.computeTime.textContent = "—";
-  elements.pause.disabled = true;
-  if (state.gridMeta) setStatus("地図上の通路をクリックしてください。");
+  state.pixels = null;
+  state.revealed = 0;
+  ui.marker.hidden = true;
+  ui.startCell.textContent = "—";
+  ui.visited.textContent = "—";
+  ui.maxDistance.textContent = "—";
+  ui.computeTime.textContent = "—";
+  ui.pause.disabled = true;
+  if (state.meta) setStatus("地図上の通路をクリックしてください。");
 }
 
-function paintSettledCells(from: number, to: number): void {
-  if (!state.trace || !state.imageData) return;
+function paint(from: number, to: number): void {
+  if (!state.trace || !state.pixels) return;
   for (let cursor = from; cursor < to; cursor += 1) {
-    const cellIndex: number = state.trace.settledOrder[cursor];
+    const index: number = state.trace.settledOrder[cursor];
     const color = distanceToColor(
-      state.trace.distances[cellIndex],
+      state.trace.distances[index],
       state.trace.maxDistance,
     );
-    const offset = cellIndex * 4;
-    state.imageData.data[offset] = color.r;
-    state.imageData.data[offset + 1] = color.g;
-    state.imageData.data[offset + 2] = color.b;
-    state.imageData.data[offset + 3] = color.a;
+    const offset = index * 4;
+    state.pixels.data.set([color.r, color.g, color.b, color.a], offset);
   }
 }
 
-function renderAnimation(timestamp: number): void {
-  if (!state.trace || !state.imageData || state.paused) return;
-  const durationMs = Number(elements.speed.value);
-  const elapsedMs =
-    timestamp - state.animationStartedAt - state.accumulatedPauseMs;
-  const nextCount = revealCountAtTime(
-    elapsedMs,
-    durationMs,
-    state.trace.settledOrder.length,
+function animate(timestamp: number): void {
+  if (!state.trace || !state.pixels || state.paused) return;
+  const count = revealCountAtTime(
+    timestamp - state.startedAt - state.pauseTotal,
+    Number(ui.speed.value),
+    state.trace.visitedCount,
   );
-  paintSettledCells(state.revealedCount, nextCount);
-  state.revealedCount = nextCount;
-  elements.heatCanvas
-    .getContext("2d")
-    ?.putImageData(state.imageData, 0, 0);
-  elements.visitedCells.textContent = `${nextCount.toLocaleString()} / ${state.trace.visitedCount.toLocaleString()}`;
+  paint(state.revealed, count);
+  state.revealed = count;
+  ui.canvas.getContext("2d")?.putImageData(state.pixels, 0, 0);
+  ui.visited.textContent = `${count.toLocaleString()} / ${state.trace.visitedCount.toLocaleString()}`;
 
-  if (nextCount < state.trace.settledOrder.length) {
-    state.animationFrameId = requestAnimationFrame(renderAnimation);
-    return;
+  if (count < state.trace.visitedCount) {
+    state.frame = requestAnimationFrame(animate);
+  } else {
+    state.frame = null;
+    ui.pause.disabled = true;
+    setStatus("探索完了。別の地点をクリックすると再計算します。");
   }
-  state.animationFrameId = null;
-  elements.pause.disabled = true;
-  setStatus("探索完了。別の地点をクリックすると再計算します。");
 }
 
-function startAnimation(trace: DijkstraTrace): void {
-  const context = elements.heatCanvas.getContext("2d");
-  if (!context || !state.gridMeta) throw new Error("Canvasを初期化できません");
+function play(trace: DijkstraTrace): void {
+  if (!state.meta) return;
+  const context = ui.canvas.getContext("2d");
+  if (!context) throw new Error("Canvasを初期化できません");
   stopAnimation();
   state.trace = trace;
-  state.imageData = context.createImageData(
-    state.gridMeta.cols,
-    state.gridMeta.rows,
-  );
-  state.revealedCount = 0;
-  state.animationStartedAt = performance.now();
-  elements.pause.disabled = false;
+  state.pixels = context.createImageData(state.meta.cols, state.meta.rows);
+  state.revealed = 0;
+  state.startedAt = performance.now();
+  ui.pause.disabled = false;
   setStatus("最短距離の確定順を再生しています。");
-  state.animationFrameId = requestAnimationFrame(renderAnimation);
+  state.frame = requestAnimationFrame(animate);
 }
 
-function runFromPointer(event: PointerEvent): void {
-  if (!state.gridMeta || !state.gridBytes) return;
-  const bounds = elements.mapStage.getBoundingClientRect();
-  const clickedCell = pointerToGridCell(
+function runFromClick(event: PointerEvent): void {
+  if (!state.meta || !state.grid) return;
+  const bounds = ui.stage.getBoundingClientRect();
+  const cell = pointerToGridCell(
     event.clientX - bounds.left,
     event.clientY - bounds.top,
     bounds.width,
     bounds.height,
-    state.gridMeta,
+    state.meta,
   );
   const startIndex = findNearestWalkableIndex(
-    state.gridMeta,
-    state.gridBytes,
-    clickedCell.col,
-    clickedCell.row,
+    state.meta,
+    state.grid,
+    cell.col,
+    cell.row,
   );
-  const startCol = startIndex % state.gridMeta.cols;
-  const startRow = Math.floor(startIndex / state.gridMeta.cols);
   const startedAt = performance.now();
-  const trace = runDijkstraTrace(state.gridMeta, state.gridBytes, startIndex);
-  const computeMs = performance.now() - startedAt;
+  const trace = runDijkstraTrace(state.meta, state.grid, startIndex);
+  const col = startIndex % state.meta.cols;
+  const row = Math.floor(startIndex / state.meta.cols);
 
-  elements.originMarker.style.left = `${((startCol + 0.5) / state.gridMeta.cols) * 100}%`;
-  elements.originMarker.style.top = `${((startRow + 0.5) / state.gridMeta.rows) * 100}%`;
-  elements.originMarker.hidden = false;
-  elements.startCell.textContent = `(${startCol}, ${startRow})`;
-  elements.visitedCells.textContent = `0 / ${trace.visitedCount.toLocaleString()}`;
-  elements.maxDistance.textContent = `${trace.maxDistance.toFixed(1)} px-cost`;
-  elements.computeTime.textContent = `${computeMs.toFixed(2)} ms`;
-  startAnimation(trace);
+  ui.marker.style.left = `${((col + 0.5) / state.meta.cols) * 100}%`;
+  ui.marker.style.top = `${((row + 0.5) / state.meta.rows) * 100}%`;
+  ui.marker.hidden = false;
+  ui.startCell.textContent = `(${col}, ${row})`;
+  ui.visited.textContent = `0 / ${trace.visitedCount.toLocaleString()}`;
+  ui.maxDistance.textContent = `${trace.maxDistance.toFixed(1)} px-cost`;
+  ui.computeTime.textContent = `${(performance.now() - startedAt).toFixed(2)} ms`;
+  play(trace);
 }
 
 function togglePause(): void {
   if (!state.trace) return;
   if (!state.paused) {
     state.paused = true;
-    state.pauseStartedAt = performance.now();
-    if (state.animationFrameId !== null) {
-      cancelAnimationFrame(state.animationFrameId);
-      state.animationFrameId = null;
-    }
-    elements.pause.textContent = "再開";
+    state.pausedAt = performance.now();
+    if (state.frame !== null) cancelAnimationFrame(state.frame);
+    state.frame = null;
+    ui.pause.textContent = "再開";
     setStatus("一時停止中です。");
     return;
   }
 
   state.paused = false;
-  state.accumulatedPauseMs += performance.now() - state.pauseStartedAt;
-  state.pauseStartedAt = 0;
-  elements.pause.textContent = "一時停止";
+  state.pauseTotal += performance.now() - state.pausedAt;
+  ui.pause.textContent = "一時停止";
   setStatus("最短距離の確定順を再生しています。");
-  state.animationFrameId = requestAnimationFrame(renderAnimation);
+  state.frame = requestAnimationFrame(animate);
 }
 
-function restartAnimationAtSelectedSpeed(): void {
-  if (!state.trace) return;
-  const trace = state.trace;
-  startAnimation(trace);
-}
-
-elements.mapStage.addEventListener("pointerdown", (event) => {
+ui.stage.addEventListener("pointerdown", (event) => {
   try {
-    runFromPointer(event);
+    runFromClick(event);
   } catch (error) {
     setStatus(error instanceof Error ? error.message : String(error), true);
   }
 });
-elements.pause.addEventListener("click", togglePause);
-elements.reset.addEventListener("click", clearHeatmap);
-elements.speed.addEventListener("change", restartAnimationAtSelectedSpeed);
+ui.pause.addEventListener("click", togglePause);
+ui.reset.addEventListener("click", clearHeatmap);
+ui.speed.addEventListener("change", () => {
+  if (state.trace) play(state.trace);
+});
 
-loadW12Area().catch((error: unknown) => {
+loadW12().catch((error: unknown) => {
   setStatus(error instanceof Error ? error.message : String(error), true);
 });
