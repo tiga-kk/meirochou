@@ -37,6 +37,23 @@ function isInside(parentDirectory: string, candidate: string): boolean {
   );
 }
 
+function assertSafeBundleId(
+  eventId: unknown,
+  label: string,
+): asserts eventId is string {
+  if (
+    typeof eventId !== "string" ||
+    eventId.length === 0 ||
+    eventId === "." ||
+    eventId === ".." ||
+    eventId.includes("/") ||
+    eventId.includes("\\") ||
+    eventId.includes("\0")
+  ) {
+    throw new Error(`${label} must be a safe bundle path segment`);
+  }
+}
+
 function assertNoSymbolicLinks(directory: string): void {
   readdirSync(directory, { withFileTypes: true }).forEach((entry) => {
     const entryPath = resolve(directory, entry.name);
@@ -87,11 +104,7 @@ export function selectMapBundles(
 
     const manifestContent = JSON.parse(readFileSync(manifestPath, "utf8"));
     const eventId = manifestContent.eventId;
-    if (!eventId || typeof eventId !== "string") {
-      throw new Error(
-        `Invalid or missing eventId in private map bundle manifest`,
-      );
-    }
+    assertSafeBundleId(eventId, "Private map bundle eventId");
     mapBundles.set(eventId, bundleDirectory);
   } else {
     const registryPath = resolve(webappRoot, "events/manifest.json");
@@ -109,35 +122,26 @@ export function selectMapBundles(
     }
 
     const mapBundlesDir = resolve(webappRoot, "map-bundles");
+    if (!existsSync(mapBundlesDir) || !statSync(mapBundlesDir).isDirectory()) {
+      throw new Error(
+        `Map bundle root directory does not exist: ${mapBundlesDir}`,
+      );
+    }
+    assertNoSymbolicLinks(mapBundlesDir);
 
-    for (const event of registryContent.events) {
-      const { eventId, mapBundle } = event;
-      if (!eventId || typeof eventId !== "string") {
-        throw new Error("Invalid eventId in registry");
+    const entries = readdirSync(mapBundlesDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) {
+        throw new Error(
+          `Map bundles directory contains symbolic link: ${entry.name}`,
+        );
       }
-      if (!mapBundle || typeof mapBundle !== "string") {
-        throw new Error("Invalid mapBundle in registry");
-      }
+      if (!entry.isDirectory()) continue;
 
-      if (!mapBundle.startsWith("../maps/")) {
-        throw new Error(`Invalid mapBundle path in registry: ${mapBundle}`);
-      }
-
-      const remaining = mapBundle.slice("../maps/".length);
-      const configuredPath = resolve(mapBundlesDir, dirname(remaining));
-
+      const configuredPath = resolve(mapBundlesDir, entry.name);
       if (!isInside(mapBundlesDir, configuredPath)) {
         throw new Error(
           `Map bundle path outside map-bundles: ${configuredPath}`,
-        );
-      }
-
-      if (
-        !existsSync(configuredPath) ||
-        !statSync(configuredPath).isDirectory()
-      ) {
-        throw new Error(
-          `Map bundle directory does not exist: ${configuredPath}`,
         );
       }
 
@@ -150,8 +154,86 @@ export function selectMapBundles(
       }
 
       assertNoSymbolicLinks(bundleDirectory);
+
+      const manifestContent = JSON.parse(readFileSync(manifestPath, "utf8"));
+      const eventId = manifestContent.eventId;
+      assertSafeBundleId(eventId, `Map bundle eventId at ${entry.name}`);
+      if (eventId !== entry.name) {
+        throw new Error(
+          `Map bundle directory must match manifest eventId: ${entry.name}`,
+        );
+      }
+      if (mapBundles.has(eventId)) {
+        throw new Error(`Duplicate map bundle eventId: ${eventId}`);
+      }
       mapBundles.set(eventId, bundleDirectory);
     }
+
+    const registeredEventIds: string[] = [];
+    const registeredBundles = new Map<string, string>();
+    const seenRegistryEventIds = new Set<string>();
+    for (const event of registryContent.events) {
+      const { eventId, mapBundle } = event ?? {};
+      if (!eventId || typeof eventId !== "string") {
+        throw new Error("Invalid eventId in registry");
+      }
+      if (seenRegistryEventIds.has(eventId)) {
+        throw new Error(`Duplicate eventId in registry: ${eventId}`);
+      }
+      seenRegistryEventIds.add(eventId);
+      if (!mapBundle || typeof mapBundle !== "string") {
+        throw new Error("Invalid mapBundle in registry");
+      }
+      if (!mapBundle.startsWith("../maps/")) {
+        throw new Error(`Invalid mapBundle path in registry: ${mapBundle}`);
+      }
+
+      const remaining = mapBundle.slice("../maps/".length);
+      const configuredPath = resolve(mapBundlesDir, dirname(remaining));
+      if (!isInside(mapBundlesDir, configuredPath)) {
+        throw new Error(
+          `Map bundle path outside map-bundles: ${configuredPath}`,
+        );
+      }
+      const bundleDirectory = realpathSync(configuredPath);
+      const manifestPath = resolve(bundleDirectory, "manifest.json");
+      if (!existsSync(manifestPath) || !statSync(manifestPath).isFile()) {
+        throw new Error(
+          `Map bundle manifest.json does not exist: ${manifestPath}`,
+        );
+      }
+      const manifestContent = JSON.parse(readFileSync(manifestPath, "utf8"));
+      if (manifestContent.eventId !== eventId) {
+        throw new Error(
+          `Registry eventId does not match map bundle manifest: ${eventId}`,
+        );
+      }
+      const selectedBundle = mapBundles.get(eventId);
+      if (!selectedBundle || realpathSync(selectedBundle) !== bundleDirectory) {
+        throw new Error(
+          `Registry map bundle is not a public bundle: ${eventId}`,
+        );
+      }
+      registeredEventIds.push(eventId);
+      registeredBundles.set(eventId, bundleDirectory);
+    }
+
+    // Keep the registry's first event as the compatibility/default manifest,
+    // while retaining every public bundle for build output and direct assets.
+    const orderedBundles = new Map<string, string>();
+    for (const eventId of registeredEventIds) {
+      const bundleDirectory = registeredBundles.get(eventId);
+      if (!bundleDirectory) {
+        throw new Error(`Registered map bundle is missing: ${eventId}`);
+      }
+      orderedBundles.set(eventId, bundleDirectory);
+    }
+    for (const [eventId, bundleDirectory] of mapBundles) {
+      if (!orderedBundles.has(eventId)) {
+        orderedBundles.set(eventId, bundleDirectory);
+      }
+    }
+    return orderedBundles;
   }
 
   return mapBundles;
@@ -160,6 +242,7 @@ export function selectMapBundles(
 const contentTypes = new Map([
   [".json", "application/json; charset=utf-8"],
   [".png", "image/png"],
+  [".svg", "image/svg+xml"],
   [".bin", "application/octet-stream"],
 ]);
 

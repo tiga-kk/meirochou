@@ -1,8 +1,8 @@
 # Current Progress
 
 **更新日:** 2026-07-26
-**現在の段階:** Phase 5B Task 2完了 / Task 3開始待ち
-**コード実装:** Task 2完了 (C108 map bundle contract & runtime parser)
+**現在の段階:** Phase 5B Task 3完了 (C108 public assets, build copy, boundary verification)
+**コード実装:** Task 3実装・検証完了。C108はproduction distへ含まれるがevent registry未登録のためUIには公開しない。
 
 ## 統合済み
 
@@ -21,12 +21,14 @@
 - 文書整理方針: 承認済み。
 - Phase 5B Task 1 (文書整備・入力棚卸し): 完了。
 - Phase 5B Task 2 (C108 bundle contract): 完了。
+- Phase 5B Task 3 (C108 public assets & validation): 完了。4 area × 4 assets、manifest、SVG安全性、points/grid、到達可能性、production build、public boundaryを検証済み。
 - Phase 5B実装branch: `feature/phase-05b` 作成済み。
 
 ## 次の操作
 
-1. Task 2 のコミット `feat(maps): define c108 bundle contract` を確認する。
-2. `AGENTS.mdを読んで、Phase 5B Task 3を実装して` という指示で Task 3 を進める。
+1. Task 3のコミット内容を確認する。
+2. モバイルvisual snapshot 6件は既存demo UIの別保守課題として、UI変更時に個別レビューして更新する。
+3. Task 4の着手は別途ユーザー指示を受けてから行う。
 
 ## 人手入力
 

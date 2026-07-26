@@ -10,7 +10,7 @@
 
 ## 地図と配信物
 
-- public bundleはevent registryに明示したものだけを配信し、sourceと`dist`のバイト一致を検証する。
+- public bundle (`apps/webapp/map-bundles/*`) はすべてプロダクションビルドへコピーされ source と `dist` のバイト一致を検証する。UI選択肢は `apps/webapp/events/manifest.json` で分離管理する。
 - private mapはリポジトリ外の絶対パスをprivateコマンドで明示指定する。通常コマンドはprivate mapを読まない。
 - 画像、points、grid metadata、gridは同一原画像ピクセル座標系を共有する。ピンと経路は地図画像と同じtransform層へ置く。
 

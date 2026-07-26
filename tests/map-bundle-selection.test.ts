@@ -13,6 +13,23 @@ import { selectMapBundles } from "../vite.config";
 
 const temporaryDirectories: string[] = [];
 
+function createRepo(): string {
+  const repositoryRoot = mkdtempSync(join(tmpdir(), "comipath-bundle-test-"));
+  temporaryDirectories.push(repositoryRoot);
+  return repositoryRoot;
+}
+
+function addBundle(
+  repositoryRoot: string,
+  relativePath: string,
+  manifestContent = "{}\n",
+): string {
+  const bundle = resolve(repositoryRoot, relativePath);
+  mkdirSync(bundle, { recursive: true });
+  writeFileSync(resolve(bundle, "manifest.json"), manifestContent, "utf8");
+  return bundle;
+}
+
 function makeBundle(
   relativePath: string,
   manifestContent = "{}\n",
@@ -20,11 +37,8 @@ function makeBundle(
   repositoryRoot: string;
   bundle: string;
 } {
-  const repositoryRoot = mkdtempSync(join(tmpdir(), "comipath-bundle-test-"));
-  temporaryDirectories.push(repositoryRoot);
-  const bundle = resolve(repositoryRoot, relativePath);
-  mkdirSync(bundle, { recursive: true });
-  writeFileSync(resolve(bundle, "manifest.json"), manifestContent, "utf8");
+  const repositoryRoot = createRepo();
+  const bundle = addBundle(repositoryRoot, relativePath, manifestContent);
   return { repositoryRoot, bundle };
 }
 
@@ -44,10 +58,20 @@ afterEach(() => {
   });
 });
 
-test("normal webapp modes select map bundles declared in the event registry", () => {
-  const { repositoryRoot, bundle } = makeBundle(
+test("normal webapp modes select all map bundles in map-bundles directory regardless of registry entries", () => {
+  const repositoryRoot = createRepo();
+  const demoBundle = addBundle(
+    repositoryRoot,
     "apps/webapp/map-bundles/demo-v1",
+    JSON.stringify({ eventId: "demo-v1" }),
   );
+  const c108Bundle = addBundle(
+    repositoryRoot,
+    "apps/webapp/map-bundles/C108",
+    JSON.stringify({ eventId: "C108" }),
+  );
+
+  // Registry only contains demo-v1, C108 is NOT registered
   writeRegistry(repositoryRoot, {
     schemaVersion: 1,
     events: [
@@ -66,12 +90,17 @@ test("normal webapp modes select map bundles declared in the event registry", ()
     privateBundleDirectory: "/must/not/be/used",
   });
 
-  assert.equal(resolved.size, 1);
-  assert.equal(resolved.get("demo-v1"), bundle);
+  assert.equal(resolved.size, 2);
+  assert.deepEqual([...resolved.keys()], ["demo-v1", "C108"]);
+  assert.equal(resolved.get("demo-v1"), demoBundle);
+  assert.equal(resolved.get("C108"), c108Bundle);
 });
 
-test("normal webapp modes reject map bundles outside map-bundles directory", () => {
-  const { repositoryRoot } = makeBundle("apps/webapp/map-bundles/demo-v1");
+test("normal webapp modes reject registry paths outside map-bundles", () => {
+  const { repositoryRoot } = makeBundle(
+    "apps/webapp/map-bundles/demo-v1",
+    JSON.stringify({ eventId: "demo-v1" }),
+  );
   writeRegistry(repositoryRoot, {
     schemaVersion: 1,
     events: [
@@ -85,17 +114,55 @@ test("normal webapp modes reject map bundles outside map-bundles directory", () 
   });
 
   assert.throws(
-    () =>
-      selectMapBundles({
-        mode: "development",
-        repositoryRoot,
-      }),
+    () => selectMapBundles({ mode: "development", repositoryRoot }),
     /mapBundle|outside/i,
   );
 });
 
+test("normal webapp modes reject symbolic links in map-bundles directory", () => {
+  const { repositoryRoot, bundle } = makeBundle(
+    "apps/webapp/map-bundles/demo-v1",
+    JSON.stringify({ eventId: "demo-v1" }),
+  );
+  writeRegistry(repositoryRoot, {
+    schemaVersion: 1,
+    events: [
+      {
+        eventId: "demo-v1",
+        displayName: "Demo V1",
+        mapBundle: "../maps/demo-v1/manifest.json",
+        days: [],
+      },
+    ],
+  });
+  symlinkSync(resolve(bundle, "manifest.json"), resolve(bundle, "linked.json"));
+
+  assert.throws(
+    () => selectMapBundles({ mode: "production", repositoryRoot }),
+    /symbolic links/,
+  );
+});
+
+test("normal webapp modes reject a manifest eventId that escapes its bundle directory", () => {
+  const repositoryRoot = createRepo();
+  addBundle(
+    repositoryRoot,
+    "apps/webapp/map-bundles/C108",
+    JSON.stringify({ eventId: "../private" }),
+  );
+  writeRegistry(repositoryRoot, { schemaVersion: 1, events: [] });
+
+  assert.throws(
+    () => selectMapBundles({ mode: "production", repositoryRoot }),
+    /safe bundle path segment|must match manifest eventId/i,
+  );
+});
+
 test("private mode requires an explicitly configured bundle and gets eventId from its manifest", () => {
-  const { repositoryRoot } = makeBundle("apps/webapp/map-bundles/demo-v1");
+  const { repositoryRoot } = makeBundle(
+    "apps/webapp/map-bundles/demo-v1",
+    JSON.stringify({ eventId: "demo-v1" }),
+  );
   const privateBundle = makeBundle(
     "private-bundle",
     JSON.stringify({ eventId: "private-ev" }),
@@ -116,25 +183,20 @@ test("private mode requires an explicitly configured bundle and gets eventId fro
   assert.equal(resolved.get("private-ev"), privateBundle);
 });
 
-test("map bundles reject symbolic links before serving or copying", () => {
-  const { repositoryRoot, bundle } = makeBundle(
-    "apps/webapp/map-bundles/demo-v1",
-  );
-  writeRegistry(repositoryRoot, {
-    schemaVersion: 1,
-    events: [
-      {
-        eventId: "demo-v1",
-        displayName: "Demo V1",
-        mapBundle: "../maps/demo-v1/manifest.json",
-        days: [],
-      },
-    ],
-  });
-  symlinkSync(resolve(bundle, "manifest.json"), resolve(bundle, "linked.json"));
+test("private mode rejects a manifest eventId that escapes the output directory", () => {
+  const { repositoryRoot } = makeBundle("apps/webapp/map-bundles/demo-v1");
+  const privateBundle = makeBundle(
+    "private-bundle",
+    JSON.stringify({ eventId: "../private" }),
+  ).bundle;
 
   assert.throws(
-    () => selectMapBundles({ mode: "production", repositoryRoot }),
-    /symbolic links/,
+    () =>
+      selectMapBundles({
+        mode: "private",
+        repositoryRoot,
+        privateBundleDirectory: privateBundle,
+      }),
+    /safe bundle path segment/,
   );
 });

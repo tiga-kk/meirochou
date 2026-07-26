@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import {
   existsSync,
-  readFileSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -17,7 +17,10 @@ function withFixture(files, callback) {
   const fixtureRoot = mkdtempSync(join(tmpdir(), "comipath-public-audit-"));
   try {
     mkdirSync(join(fixtureRoot, "apps/webapp"), { recursive: true });
-    writeFileSync(join(fixtureRoot, "apps/webapp/index.html"), "<!doctype html>\n");
+    writeFileSync(
+      join(fixtureRoot, "apps/webapp/index.html"),
+      "<!doctype html>\n",
+    );
 
     for (const [relativePath, content] of Object.entries(files)) {
       const path = join(fixtureRoot, relativePath);
@@ -37,6 +40,10 @@ test("tracked public tree excludes private projects and credentials", () => {
   assert.ok(
     result.files.includes("apps/webapp/map-bundles/demo-v1/manifest.json"),
   );
+  assert.ok(
+    result.files.includes("apps/webapp/map-bundles/C108/manifest.json"),
+  );
+  assert.ok(result.files.includes("apps/webapp/map-bundles/C108/e456/map.svg"));
 
   for (const path of [
     "wrangler.toml",
@@ -116,4 +123,74 @@ test("Cloudflare Pages runbook documents the minimal deployment contract", () =>
   );
   assert.doesNotMatch(guide, /CLOUDFLARE_API_TOKEN\s*=/);
   assert.match(readme, /guides\/cloudflare-pages-deployment\.md/);
+});
+
+test("rejects python files and private folders in public tree audit", () => {
+  for (const forbiddenFile of [
+    "script.py",
+    "private/secret.json",
+    "work/draft.txt",
+    "output/map.png",
+    "apps/webapp/private/secret.json",
+    "apps/webapp/work/draft.txt",
+    "apps/webapp/output/map.png",
+    "apps/webapp/assets/__pycache__/module.pyc",
+  ]) {
+    withFixture(
+      {
+        [forbiddenFile]: "content\n",
+      },
+      (rootUrl) => {
+        assert.throws(
+          () => auditPublicTree(rootUrl),
+          /Forbidden path|Forbidden python file/,
+        );
+      },
+    );
+  }
+});
+
+test("rejects local absolute paths in public content", () => {
+  withFixture(
+    {
+      "apps/webapp/assets/leak.json":
+        '{"source":"/home/tiga/projects/private-map"}\n',
+    },
+    (rootUrl) => {
+      assert.throws(
+        () => auditPublicTree(rootUrl),
+        /Local absolute path found/,
+      );
+    },
+  );
+});
+
+test("does not hide a forbidden nested maps directory", () => {
+  withFixture(
+    {
+      "apps/webapp/assets/maps/private.txt": "content\n",
+    },
+    (rootUrl) => {
+      assert.throws(
+        () => auditPublicTree(rootUrl),
+        /Forbidden path detected: apps\/webapp\/assets\/maps/,
+      );
+    },
+  );
+});
+
+test("does not hide nested test-results-like directories", () => {
+  withFixture(
+    {
+      "apps/webapp/assets/test-results-private/secret.txt": "content\n",
+    },
+    (rootUrl) => {
+      const result = auditPublicTree(rootUrl);
+      assert.ok(
+        result.files.includes(
+          "apps/webapp/assets/test-results-private/secret.txt",
+        ),
+      );
+    },
+  );
 });

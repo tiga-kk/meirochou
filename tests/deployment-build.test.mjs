@@ -1,10 +1,5 @@
 import assert from "node:assert/strict";
 import {
-  afterEach,
-  beforeEach,
-  test,
-} from "vitest";
-import {
   appendFileSync,
   cpSync,
   mkdirSync,
@@ -14,8 +9,9 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, test } from "vitest";
 import { verifyWebappBuild } from "../scripts/verify-webapp-build.mjs";
 
 const registry = {
@@ -60,13 +56,17 @@ function createFixture() {
   const sourceEvents = join(root, "apps/webapp/events");
   const sourceBundle = join(root, "apps/webapp/map-bundles/demo-v1");
   const sourceArea = join(sourceBundle, "demo-east");
+  const publicBundle = join(root, "apps/webapp/map-bundles/public-v1");
+  const publicArea = join(publicBundle, "public-east");
   const outputRoot = join(root, "dist/webapp");
   const outputEvents = join(outputRoot, "assets/events");
   const outputBundle = join(outputRoot, "assets/maps/demo-v1");
+  const outputPublicBundle = join(outputRoot, "assets/maps/public-v1");
   const outputAssets = join(outputRoot, "assets");
 
   mkdirSync(sourceEvents, { recursive: true });
   mkdirSync(sourceArea, { recursive: true });
+  mkdirSync(publicArea, { recursive: true });
   mkdirSync(outputEvents, { recursive: true });
   mkdirSync(outputAssets, { recursive: true });
 
@@ -83,8 +83,37 @@ function createFixture() {
   });
   writeFileSync(join(sourceArea, "grid.bin"), Buffer.from([1]));
 
+  writeJson(join(publicBundle, "manifest.json"), {
+    ...mapManifest,
+    eventId: "public-v1",
+    displayName: "Unregistered public fixture",
+    areas: [
+      {
+        ...mapManifest.areas[0],
+        id: "public-east",
+        mapId: "public-east",
+        name: "Public East",
+        mapFile: "./public-east/source.png",
+        pointsFile: "./public-east/points.json",
+        gridMetaFile: "./public-east/grid-meta.json",
+        gridFile: "./public-east/grid.bin",
+      },
+    ],
+  });
+  writeFileSync(join(publicArea, "source.png"), Buffer.from([4, 5, 6]));
+  writeJson(join(publicArea, "points.json"), { points: [] });
+  writeJson(join(publicArea, "grid-meta.json"), {
+    width: 1,
+    height: 1,
+    cell_size: 1,
+    cols: 1,
+    rows: 1,
+  });
+  writeFileSync(join(publicArea, "grid.bin"), Buffer.from([1]));
+
   writeJson(join(outputEvents, "manifest.json"), registry);
   cpSync(sourceBundle, outputBundle, { recursive: true });
+  cpSync(publicBundle, outputPublicBundle, { recursive: true });
   writeFileSync(
     join(outputRoot, "index.html"),
     '<!doctype html><script type="module" src="./assets/app.js"></script>\n',
@@ -96,7 +125,10 @@ function createFixture() {
 
 function rewriteRegistries(value) {
   writeJson(join(fixtureRoot, "apps/webapp/events/manifest.json"), value);
-  writeJson(join(fixtureRoot, "dist/webapp/assets/events/manifest.json"), value);
+  writeJson(
+    join(fixtureRoot, "dist/webapp/assets/events/manifest.json"),
+    value,
+  );
 }
 
 function rewriteMapManifest(value) {
@@ -118,11 +150,11 @@ afterEach(() => {
   rmSync(fixtureRoot, { recursive: true, force: true });
 });
 
-test("accepts a demo-only relative static artifact", () => {
+test("accepts registered and unregistered public static artifacts", () => {
   const result = verifyWebappBuild({ repositoryRoot: fixtureRoot });
 
-  assert.deepEqual(result.eventIds, ["demo-v1"]);
-  assert.equal(result.verifiedFiles, 5);
+  assert.deepEqual(result.eventIds, ["demo-v1", "public-v1"]);
+  assert.equal(result.verifiedFiles, 10);
 });
 
 test("rejects a second published event", () => {
@@ -140,7 +172,7 @@ test("rejects a second published event", () => {
 
   assert.throws(
     () => verifyWebappBuild({ repositoryRoot: fixtureRoot }),
-    /Phase 5A must publish only demo-v1/,
+    /Phase 5B event registry must contain only demo-v1/,
   );
 });
 
@@ -163,10 +195,7 @@ test("rejects a missing referenced event map manifest", () => {
 
 test("rejects a missing referenced built asset", () => {
   unlinkSync(
-    join(
-      fixtureRoot,
-      "dist/webapp/assets/maps/demo-v1/demo-east/points.json",
-    ),
+    join(fixtureRoot, "dist/webapp/assets/maps/demo-v1/demo-east/points.json"),
   );
 
   assert.throws(

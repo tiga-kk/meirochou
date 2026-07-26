@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "map_id": "image3",
+  "width": 1872,
+  "height": 972,
+  "cell_size": 8,
+  "cols": 234,
+  "rows": 122,
+  "cell_values": {
+    "blocked": 0,
+    "normal": 1,
+    "crowded": 2
+  },
+  "byte_order": "unsigned_uint8",
+  "layout": "row-major",
+  "grid_file": "grid.bin",
+  "source": "reconstructed_from_corrected_points_and_map03_image_review",
+  "postprocess": {
+    "cardinally_enclosed_fill_passes": 1
+  },
+  "reference_grid_usage": "validation_only"
+}

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "map_id": "image2",
+  "width": 2904,
+  "height": 2166,
+  "cell_size": 8,
+  "cols": 363,
+  "rows": 271,
+  "cell_values": {
+    "blocked": 0,
+    "normal": 1,
+    "crowded": 2
+  },
+  "byte_order": "unsigned_uint8",
+  "layout": "row-major",
+  "grid_file": "grid.bin",
+  "source": "reconstructed_from_corrected_points_and_coarse_neutral_gray_structure_mask",
+  "postprocess": {
+    "cardinally_enclosed_fill_passes": 1
+  },
+  "structure_extraction": {
+    "source_width": 2904,
+    "source_height": 2166,
+    "retained_dark_components": 21,
+    "retained_light_components": 2,
+    "structural_blocked_cells": 4136,
+    "method": "neutral_gray_component_segmentation_then_grid_closing_standard_library_png_decoder",
+    "cardinal_fill_changed_cells": 590
+  },
+  "reference_comparison": null,
+  "copyright_safety": {
+    "source_image_embedded": false,
+    "official_icons_reproduced": false,
+    "official_venue_labels_reproduced": false,
+    "visual_style_reused": false,
+    "retained_data": "booth identifiers, booth numbers, corrected coordinates, and coarse functional obstacle geometry"
+  }
+}

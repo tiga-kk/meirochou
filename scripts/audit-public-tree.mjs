@@ -21,12 +21,23 @@ const FORBIDDEN_PATHS = [
   "integrations/gas-spreadsheet/space-normalizer.js",
   "integrations/gas-spreadsheet/config.js",
   "python",
+  "private",
+  "work",
+  "output",
   ".clasp.json",
   ".vscode",
   "CODEX.md",
   ".local-docs",
   ".superpowers",
 ];
+const FORBIDDEN_PATH_SEGMENTS = new Set([
+  "private",
+  "work",
+  "output",
+  "__pycache__",
+]);
+const LOCAL_ABSOLUTE_PATH_PATTERN =
+  /\/home\/|\/Users\/|\/tmp\/|\/var\/|\b[A-Za-z]:[\\/]/i;
 
 // Content scanning:
 // Runtime scan rejects deployed GAS URLs, catalogSpreadsheetId, non-empty scriptId values,
@@ -48,12 +59,19 @@ export function auditPublicTree(rootUrl) {
   function walk(dir) {
     const entries = readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.isDirectory() && EXCLUDE_DIRS.has(entry.name)) {
-        continue;
-      }
-
       const fullPath = join(dir, entry.name);
       const relPath = relative(rootPath, fullPath).replace(/\\/g, "/");
+
+      // Only the private root-level maps directory is excluded. Nested maps
+      // directories must remain visible to the forbidden-path check.
+      if (
+        entry.isDirectory() &&
+        (relPath === "maps" ||
+          EXCLUDE_DIRS.has(entry.name) ||
+          (relPath === entry.name && entry.name.startsWith("test-results-")))
+      ) {
+        continue;
+      }
 
       // Check forbidden path prefix
       for (const forbidden of FORBIDDEN_PATHS) {
@@ -61,10 +79,19 @@ export function auditPublicTree(rootUrl) {
           throw new Error(`Forbidden path detected: ${relPath}`);
         }
       }
+      const pathSegments = relPath.split("/");
+      if (
+        pathSegments.some((segment) => FORBIDDEN_PATH_SEGMENTS.has(segment))
+      ) {
+        throw new Error(`Forbidden path segment detected: ${relPath}`);
+      }
 
       if (entry.isDirectory()) {
         walk(fullPath);
       } else if (entry.isFile()) {
+        if (relPath.endsWith(".py") || relPath.endsWith(".pyc")) {
+          throw new Error(`Forbidden python file detected: ${relPath}`);
+        }
         files.push(relPath);
 
         // Content scanning
@@ -106,6 +133,9 @@ export function auditPublicTree(rootUrl) {
             throw new Error(
               `Cloudflare credential assignment found in ${relPath}`,
             );
+          }
+          if (LOCAL_ABSOLUTE_PATH_PATTERN.test(content)) {
+            throw new Error(`Local absolute path found in ${relPath}`);
           }
         }
       }
