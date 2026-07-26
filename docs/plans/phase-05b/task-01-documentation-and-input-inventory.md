@@ -1,6 +1,6 @@
 # Phase 5B Task 1: Documentation Structure and C108 Input Inventory
 
-**Status:** Not started  
+**Status:** Completed
 **Depends on:** Phase 5B entry gate  
 **Commit candidate:** `docs: prepare phase 5b map integration`
 
@@ -46,7 +46,7 @@
 
 ## Procedure
 
-- [ ] **Step 1: 作業状態を確認する**
+- [x] **Step 1: 作業状態を確認する**
 
 ```bash
 git status --short --branch
@@ -67,7 +67,7 @@ Expected:
 - 同じ地図に複数の候補ファイルがあり、完成版を判断できない。
 - 元地図と公開可能なSVGを区別できない。
 
-- [ ] **Step 2: 完了済み文書を分類する**
+- [x] **Step 2: 完了済み文書を分類する**
 
 既存`docs/`の各ファイルについて、次のいずれかを記録する。
 
@@ -88,7 +88,7 @@ Phase 1から5Aに固有の完了文書は本文を変更せず移動する。
 現在も有効な横断契約だけを`docs/architecture/`へ残す。
 分類結果を`docs/reorganization-manifest.md`の実施記録へ追記する。
 
-- [ ] **Step 3: 文書を移動する**
+- [x] **Step 3: 文書を移動する**
 
 `git mv`を使い、内容を変更せずPhase別archiveへ移す。
 
@@ -101,13 +101,13 @@ Expected:
 - 移動した過去文書の本文差分がない。
 - 現行文書のリンク先が新しい構成を指す。
 
-- [ ] **Step 4: AGENTSと索引を配置する**
+- [x] **Step 4: AGENTSと索引を配置する**
 
 承認済み候補の`AGENTS.md`、`docs/README.md`、`docs/status/progress.md`、`docs/plans/roadmap.md`、archive policy、共有設計を正式位置へ配置する。
 
 `docs/README.md`の読む順序とPhase 5B Task表から、このTask文書へ到達できることを確認する。
 
-- [ ] **Step 5: C108入力一覧を生成する**
+- [x] **Step 5: C108入力一覧を生成する**
 
 次の形式で`docs/plans/phase-05b/c108-input-inventory.md`を作る。
 
@@ -116,7 +116,7 @@ Expected:
 
 | order | areaId | displayName | privateSvg | privatePoints | privateGridMeta | privateGrid | publicDirectory |
 |---:|---|---|---|---|---|---|---|
-| 1 | ... | ... | maps/C108/... | maps/C108/... | maps/C108/... | maps/C108/... | apps/webapp/map-bundles/C108/... |
+| 1 | ... | ... | maps/C108/... | maps/C108/... | maps/C108/... | maps/C108/... | apps/webapp/map-bundles/C108/<areaId>/ |
 ```
 
 規則:
@@ -129,7 +129,7 @@ Expected:
 - 元地図、Python、中間画像を公開対象列へ記載しない。
 - 日程ごとの複製pathを作らない。
 
-- [ ] **Step 6: 各入力の最低限の形式を検査する**
+- [x] **Step 6: 各入力の最低限の形式を検査する**
 
 ```bash
 file maps/C108/**
@@ -145,7 +145,7 @@ Expected:
 - pointsとgrid-metaはJSONとしてparseできる。
 - grid.binは空ではない。
 
-- [ ] **Step 7: .gitignore境界を確認する**
+- [x] **Step 7: .gitignore境界を確認する**
 
 `.gitignore`にroot `/maps/`が存在することを維持する。
 不足している場合だけ、次を追加する。
@@ -156,10 +156,10 @@ Expected:
 
 Python cacheやprivate map pipelineの新規規則は、このWebリポジトリへPython pipelineを追加しない方針のため追加しない。
 
-- [ ] **Step 8: 文書リンクを検査する**
+- [x] **Step 8: 文書リンクを検査する**
 
 ```bash
-grep -RInE '未確定|要確認|仮置き' AGENTS.md docs/plans/phase-05b docs/specs docs/status docs/README.md
+grep -RInE --exclude='task-01-documentation-and-input-inventory.md' '未確定|要確認|仮置き' AGENTS.md docs/plans/phase-05b docs/specs docs/status docs/README.md
 git diff --check
 git status --short
 ```
@@ -190,15 +190,36 @@ Expected:
 
 ## Completion record
 
-実装担当は次を記録する。
+実態を記録：
 
 ```text
-Branch:
-Base commit:
+Branch: feature/phase-05b-task-01
+Base commit: b463cd6 Merge pull request #4 from tiga-kk/docs/phase-5bc-implementation-plan
 Changed files:
+- docs/architecture/* (current cross-phase contracts)
+- docs/reorganization-manifest.md
+- docs/plans/phase-05b/c108-input-inventory.md
+- docs/plans/phase-05b/task-01-documentation-and-input-inventory.md
+- docs/status/progress.md
+- docs/archive/* (reorganized legacy docs without text modification)
 Four area IDs:
+- e456 (東456ホール)
+- e7 (東7ホール)
+- s12 (南12ホール)
+- w12 (西12ホール)
 Validation commands:
+- file maps/C108/*/*
+- python3 -m json.tool maps/C108/<area>/points.corrected.json
+- python3 -m json.tool maps/C108/<area>/grid-meta.json
+- grep -RInE --exclude='task-01-documentation-and-input-inventory.md' '未確定|要確認|仮置き' AGENTS.md docs/plans/phase-05b docs/specs docs/status docs/README.md
+- git diff --check
+- git status --short
 Validation results:
-Known limitations:
-Proposed commit message:
+- All 4 areas passed format check (SVG, JSON, bin).
+- All 4 area IDs, display names, private inputs, and public directories registered in c108-input-inventory.md.
+- Legacy docs reorganized into archive/ directory structure without text changes.
+- Placeholder scan passed after excluding this command's own search expression.
+- Current architecture links were checked against the reorganized document paths.
+Known limitations: `npx biome check` remains non-zero because of pre-existing formatting/import-order issues in `scripts/verify-webapp-build.mjs` and three test files outside this Task's allowed changes.
+Proposed commit message: docs: prepare phase 5b map integration
 ```
