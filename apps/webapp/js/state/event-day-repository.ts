@@ -56,7 +56,18 @@ export class EventDayRepository {
     if (raw === null) {
       return null;
     }
-    return parseLocalEventDayState(raw);
+    const parsed = parseLocalEventDayState(raw);
+    if (
+      typeof raw === "object" &&
+      raw !== null &&
+      !Array.isArray(raw) &&
+      (raw as Record<string, unknown>).schemaVersion === 1
+    ) {
+      // Persist only after parsing succeeds; save() rolls back to the v1 raw
+      // value if the migration write or index update fails.
+      this.save(ref, parsed);
+    }
+    return parsed;
   }
 
   save(ref: EventDayRef, state: LocalEventDayState): void {

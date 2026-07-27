@@ -442,14 +442,11 @@ describe("EventDayTransitionService commit & rollback", () => {
       event: sampleRegistry.events[0],
       manifest: resolvedManifestC104,
       state: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         source: { type: "csv", fileName: "test.csv" },
         sourceGeneration: "gen_1",
         circles: [],
-        purchased: [],
-        hold: [],
-        history: [],
-        redo: [],
+        circleStates: {},
         gasOutbox: [],
         timestamps: {
           createdAt: "2026-07-23T00:00:00Z",
@@ -486,14 +483,11 @@ describe("EventDayTransitionService commit & rollback", () => {
     // Save an existing initial state
     const initialRef = { eventId: "c104", dayId: "day1" };
     repo.save(initialRef, {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: { type: "csv", fileName: "init.csv" },
       sourceGeneration: "gen_0",
       circles: [],
-      purchased: [],
-      hold: [],
-      history: [],
-      redo: [],
+      circleStates: {},
       gasOutbox: [],
       timestamps: {
         createdAt: "2026-07-23T00:00:00Z",
@@ -516,14 +510,11 @@ describe("EventDayTransitionService commit & rollback", () => {
       event: sampleRegistry.events[1],
       manifest: resolvedManifestC105,
       state: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         source: { type: "csv", fileName: "c105.csv" },
         sourceGeneration: "gen_c105",
         circles: [],
-        purchased: [],
-        hold: [],
-        history: [],
-        redo: [],
+        circleStates: {},
         gasOutbox: [],
         timestamps: {
           createdAt: "2026-07-23T00:00:00Z",

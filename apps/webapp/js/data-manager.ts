@@ -23,7 +23,10 @@ import {
   SourceSettingsService,
   StaleSourceStateError,
 } from "./state/source-settings-service";
-import { createEmptyEventDayState } from "./state/storage-schema";
+import {
+  createEmptyEventDayState,
+  getCircleVisitState,
+} from "./state/storage-schema";
 import { StorageService } from "./state/storage-service.js";
 import type {
   ActionHistoryEntry,
@@ -301,20 +304,14 @@ export class DataManager {
       .filter((circle) => !circle.removedFromSource)
       .map(circleRecordToCircle);
     this.spreadsheetTitle = "";
-    this.purchasedList = [...state.purchased];
-    this.holdList = [...state.hold];
-    this.actionHistory = state.history
-      .filter(
-        (entry): entry is HistoryEntry & { type: ActionType } =>
-          entry.type === "purchase" || entry.type === "hold",
-      )
-      .map(({ type, space }) => ({ type, space }));
-    this.redoStack = state.redo
-      .filter(
-        (entry): entry is HistoryEntry & { type: ActionType } =>
-          entry.type === "purchase" || entry.type === "hold",
-      )
-      .map(({ type, space }) => ({ type, space }));
+    this.purchasedList = Object.entries(state.circleStates)
+      .filter(([_, s]) => s === "purchased")
+      .map(([space]) => space);
+    this.holdList = Object.entries(state.circleStates)
+      .filter(([_, s]) => s === "held")
+      .map(([space]) => space);
+    this.actionHistory = [];
+    this.redoStack = [];
   }
 
   private persistState(state: LocalEventDayState): LocalEventDayState {
@@ -361,33 +358,26 @@ export class DataManager {
       (current.circles.length > 0 ||
         current.source.type !== "csv" ||
         current.source.fileName !== "empty.csv" ||
-        current.purchased.length > 0 ||
-        current.hold.length > 0 ||
-        current.history.length > 0 ||
-        current.redo.length > 0)
+        Object.keys(current.circleStates).length > 0)
     ) {
       throw new Error("Initial CSV import requires an empty state");
     }
 
     const circles = this.parseCsv(text);
     const now = this.timestamp();
-    const purchased = circles
+    const circleStates: Record<string, "purchased"> = {};
+    circles
       .filter((circle) => circle.isSale?.toLowerCase() === "x")
-      .map((circle) => circle.space);
-    const history: HistoryEntry[] = purchased.map((space) => ({
-      type: "purchase",
-      space,
-      timestamp: now,
-    }));
+      .forEach((circle) => {
+        circleStates[circle.space] = "purchased";
+      });
+
     const state: LocalEventDayState = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: { type: "csv", fileName },
       sourceGeneration: this.createSourceGeneration(),
       circles,
-      purchased,
-      hold: [],
-      history,
-      redo: [],
+      circleStates,
       gasOutbox: [],
       timestamps: {
         createdAt: current?.timestamps.createdAt || now,
@@ -507,7 +497,12 @@ export class DataManager {
     const activeCircles = state.circles.filter(
       (circle) => !circle.removedFromSource,
     );
-    return serializeCircleCsv(activeCircles, new Set(state.purchased));
+    const purchasedSet = new Set(
+      Object.entries(state.circleStates)
+        .filter(([_, s]) => s === "purchased")
+        .map(([space]) => space),
+    );
+    return serializeCircleCsv(activeCircles, purchasedSet);
   }
 
   private readLegacyJson(key: string, issues: string[]): unknown {
@@ -626,15 +621,22 @@ export class DataManager {
     }
 
     const now = this.timestamp();
+    const circleStates: Record<string, "purchased" | "held"> = {};
+    for (const space of preview.purchased) {
+      circleStates[space] = "purchased";
+    }
+    for (const space of preview.hold) {
+      if (!circleStates[space]) {
+        circleStates[space] = "held";
+      }
+    }
+
     const state: LocalEventDayState = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: { type: "csv", fileName: "legacy_imported.csv" },
       sourceGeneration: this.createSourceGeneration(),
       circles: preview.circles,
-      purchased: preview.purchased,
-      hold: preview.hold,
-      history: preview.history,
-      redo: preview.redo,
+      circleStates,
       gasOutbox: [],
       timestamps: { createdAt: now, updatedAt: now, sourceUpdatedAt: now },
     };
@@ -674,8 +676,6 @@ export class DataManager {
     if (!this.activeState || !this.activeRef) {
       if (!this.purchasedList.includes(space)) {
         this.purchasedList.push(space);
-        this.actionHistory.push({ type: "purchase", space });
-        this.redoStack = [];
       }
       return;
     }
@@ -687,77 +687,30 @@ export class DataManager {
     if (!this.activeState || !this.activeRef) {
       if (!this.holdList.includes(space)) {
         this.holdList.push(space);
-        this.actionHistory.push({ type: "hold", space });
-        this.redoStack = [];
       }
       return;
     }
-    if (this.activeState.hold.includes(space)) return;
-    this.updateActiveState((state, now) => ({
-      ...state,
-      hold: [...state.hold, space],
-      history: [...state.history, { type: "hold", space, timestamp: now }],
-      redo: [],
-      timestamps: { ...state.timestamps, updatedAt: now },
-    }));
+    this.purchaseMutationService.setCircleState(
+      this.activeRef,
+      space,
+      "held",
+      this.timestamp(),
+    );
+    const updated = this.repository.load(this.activeRef);
+    if (updated) {
+      this.activeState = updated;
+      this.applyStateToMemory(updated);
+    }
   }
 
-  /** Undo one local purchase/hold while preserving the original timestamp in redo. */
+  /** Undo functionality is deprecated in favor of short-lived memory tokens. */
   undoLastAction(): ActionHistoryEntry | null {
-    if (!this.activeState || !this.activeRef) {
-      const last = this.actionHistory.pop();
-      if (!last) return null;
-      this.redoStack.push(last);
-      if (last.type === "purchase")
-        this.purchasedList = this.purchasedList.filter(
-          (space) => space !== last.space,
-        );
-      if (last.type === "hold")
-        this.holdList = this.holdList.filter((space) => space !== last.space);
-      return last;
-    }
-    const result = this.purchaseMutationService.undo(
-      this.activeRef,
-      this.timestamp(),
-    );
-    if (!result) return null;
-    const popped = result.state.redo.at(-1);
-    this.activeState = result.state;
-    this.applyStateToMemory(result.state);
-    if (!popped) return null;
-    const legacyType: ActionType =
-      popped.type === "purchase" || popped.type === "unpurchase"
-        ? "purchase"
-        : "hold";
-    return { type: legacyType, space: popped.space };
+    return null;
   }
 
-  /** Redo one local purchase/hold while preserving its original history timestamp. */
+  /** Redo functionality is deprecated. */
   redoAction(): ActionHistoryEntry | null {
-    if (!this.activeState || !this.activeRef) {
-      const last = this.redoStack.pop();
-      if (!last) return null;
-      this.actionHistory.push(last);
-      if (last.type === "purchase" && !this.purchasedList.includes(last.space))
-        this.purchasedList.push(last.space);
-      if (last.type === "hold" && !this.holdList.includes(last.space))
-        this.holdList.push(last.space);
-      return last;
-    }
-    const result = this.purchaseMutationService.redo(
-      this.activeRef,
-      this.timestamp(),
-    );
-    if (!result) return null;
-    const pushed = result.state.history.at(-1);
-    this.activeState = result.state;
-    this.applyStateToMemory(result.state);
-    if (!pushed) return null;
-    const legacyType: ActionType =
-      pushed.type === "purchase" || pushed.type === "unpurchase"
-        ? "purchase"
-        : "hold";
-    return { type: legacyType, space: pushed.space };
+    return null;
   }
 
   /** Clear local purchase and hold state while retaining the source snapshot. */
@@ -810,13 +763,19 @@ export class DataManager {
       this.redoStack = [];
       return;
     }
-    this.updateActiveState((state, now) => ({
-      ...state,
-      hold: [],
-      history: state.history.filter((entry) => entry.type !== "hold"),
-      redo: [],
-      timestamps: { ...state.timestamps, updatedAt: now },
-    }));
+    this.updateActiveState((state, now) => {
+      const nextCircleStates = { ...state.circleStates };
+      for (const [space, visitState] of Object.entries(nextCircleStates)) {
+        if (visitState === "held") {
+          delete nextCircleStates[space];
+        }
+      }
+      return {
+        ...state,
+        circleStates: Object.freeze(nextCircleStates),
+        timestamps: { ...state.timestamps, updatedAt: now },
+      };
+    });
   }
 
   addHistory(type: ActionType, space: string, _sheetName = ""): void {
@@ -833,6 +792,15 @@ export class DataManager {
   }
 
   getUnvisited(): Circle[] {
+    if (this.activeState) {
+      return this.wantToBuy.filter(
+        (circle) =>
+          getCircleVisitState(
+            this.activeState?.circleStates ?? {},
+            circle.space,
+          ) === "pending",
+      );
+    }
     return this.wantToBuy.filter(
       (circle) =>
         !this.purchasedList.includes(circle.space) &&

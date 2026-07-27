@@ -19,20 +19,23 @@ function createState(
     circles?: Array<Record<string, unknown>>;
     purchased?: string[];
     hold?: string[];
-    history?: Array<Record<string, unknown>>;
     gasOutbox?: Array<Record<string, unknown>>;
   } = {},
 ): Record<string, unknown> {
+  const circleStates: Record<string, "held" | "purchased"> = {};
+  for (const space of options.purchased ?? []) {
+    circleStates[space] = "purchased";
+  }
+  for (const space of options.hold ?? []) {
+    if (!circleStates[space]) circleStates[space] = "held";
+  }
   const timestamp = "2026-07-25T00:00:00.000Z";
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     source: options.source ?? { type: "csv", fileName: "empty.csv" },
     sourceGeneration: options.sourceGeneration ?? "gen-e2e-01",
     circles: options.circles ?? [],
-    purchased: options.purchased ?? [],
-    hold: options.hold ?? [],
-    history: options.history ?? [],
-    redo: [],
+    circleStates,
     gasOutbox: options.gasOutbox ?? [],
     timestamps: {
       createdAt: timestamp,
@@ -238,9 +241,9 @@ test.describe("Mobile Management Flows", () => {
       .poll(
         async () =>
           (await readState(page, { eventId: "demo-v1", dayId: "day1" }))
-            .purchased,
+            .circleStates,
       )
-      .toEqual(["東ア23a"]);
+      .toEqual({ 東ア23a: "purchased" });
     await page.locator("#loc-number").fill("10");
 
     await openSettings(page);
@@ -252,16 +255,15 @@ test.describe("Mobile Management Flows", () => {
     expect(manifestRequestCount).toBe(initialManifestCount);
 
     expect(
-      (await readState(page, { eventId: "demo-v1", dayId: "day2" })).hold,
-    ).toEqual(["東ア31b"]);
+      (await readState(page, { eventId: "demo-v1", dayId: "day2" }))
+        .circleStates,
+    ).toEqual({ 東ア31b: "held" });
     await page.locator("event-day-selector #day-select").selectOption("day1");
     await expect(page.locator("source-manager h3")).toContainText("day1");
     const day1 = await readState(page, { eventId: "demo-v1", dayId: "day1" });
     const day2 = await readState(page, { eventId: "demo-v1", dayId: "day2" });
-    expect(day1.purchased).toEqual(["東ア23a"]);
-    expect(day1.hold).toEqual([]);
-    expect(day2.purchased).toEqual([]);
-    expect(day2.hold).toEqual(["東ア31b"]);
+    expect(day1.circleStates).toEqual({ 東ア23a: "purchased" });
+    expect(day2.circleStates).toEqual({ 東ア31b: "held" });
   });
 
   test("Flow 3: イベント地図の分離とマニフェスト取得遅延・失敗時の安全挙動", async ({
@@ -440,7 +442,7 @@ test.describe("Mobile Management Flows", () => {
       eventId: "demo-v1",
       dayId: "day1",
     });
-    expect(failedState.purchased).toEqual(["東ア23a"]);
+    expect(failedState.circleStates).toEqual({ 東ア23a: "purchased" });
     expect(failedState.gasOutbox).toHaveLength(1);
 
     await openSettings(page);
@@ -519,8 +521,9 @@ test.describe("Mobile Management Flows", () => {
       sourceManager.locator('button[role="tab"]').first(),
     ).toBeEnabled();
     expect(
-      (await readState(page, { eventId: "demo-v1", dayId: "day1" })).purchased,
-    ).toEqual(["東ア23a"]);
+      (await readState(page, { eventId: "demo-v1", dayId: "day1" }))
+        .circleStates,
+    ).toEqual({ 東ア23a: "purchased" });
 
     await sourceManager.getByRole("tab", { name: "CSVファイル" }).click();
     await sourceManager.locator('input[type="file"]').setInputFiles({
@@ -559,13 +562,6 @@ test.describe("Mobile Management Flows", () => {
           circles: [{ space: "東ア23a", priority: 1 }],
           purchased: ["東ア23a"],
           hold: ["東ア31b"],
-          history: [
-            {
-              type: "purchase",
-              space: "東ア23a",
-              timestamp: "2026-07-25T00:00:00.000Z",
-            },
-          ],
         }),
       },
       {
@@ -583,16 +579,17 @@ test.describe("Mobile Management Flows", () => {
     await confirmDelete(page);
     let state = await readState(page, { eventId: "demo-v1", dayId: "day1" });
     expect(state.circles).toEqual([]);
-    expect(state.purchased).toEqual(["東ア23a"]);
+    expect(state.circleStates).toEqual({
+      東ア23a: "purchased",
+      東ア31b: "held",
+    });
 
     await page
       .getByRole("button", { name: /購入・チェック履歴の削除/ })
       .click();
     await confirmDelete(page);
     state = await readState(page, { eventId: "demo-v1", dayId: "day1" });
-    expect(state.purchased).toEqual([]);
-    expect(state.hold).toEqual([]);
-    expect(state.history).toEqual([]);
+    expect(state.circleStates).toEqual({});
 
     await page.getByRole("button", { name: "この日（データ）の削除" }).click();
     await confirmDelete(page);

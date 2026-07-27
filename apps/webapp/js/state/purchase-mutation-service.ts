@@ -1,11 +1,15 @@
 import type {
+  CircleVisitState,
   EventDayRef,
-  HistoryEntry,
   LocalEventDayState,
   PurchaseMutationResult,
 } from "../types/domain";
 import type { EventDayRepository } from "./event-day-repository";
 import type { GasOutboxService } from "./gas-outbox-service";
+import {
+  getCircleVisitState,
+  transitionCircleVisitState,
+} from "./storage-schema";
 
 /** Applies local activity transitions and atomically appends GAS desired states. */
 export class PurchaseMutationService {
@@ -24,11 +28,11 @@ export class PurchaseMutationService {
     return state;
   }
 
-  /** Persist a purchase or explicit cancellation before any remote processing. */
-  setPurchased(
+  /** Change circle visit state directly based on allowed state transitions. */
+  setCircleState(
     ref: EventDayRef,
     space: string,
-    purchased: boolean,
+    requestedState: CircleVisitState,
     now: string,
   ): PurchaseMutationResult {
     const trimmedSpace = space.trim();
@@ -37,132 +41,48 @@ export class PurchaseMutationService {
     }
 
     const state = this.requireState(ref);
+    const currentState = getCircleVisitState(state.circleStates, trimmedSpace);
 
-    if (purchased) {
-      if (state.purchased.includes(trimmedSpace)) {
-        return {
-          state,
-          pendingCount: state.gasOutbox.length,
-          queuedEntryId: null,
-        };
-      }
-    } else {
-      if (!state.purchased.includes(trimmedSpace)) {
-        return {
-          state,
-          pendingCount: state.gasOutbox.length,
-          queuedEntryId: null,
-        };
-      }
+    if (currentState === requestedState) {
+      return {
+        state,
+        pendingCount: state.gasOutbox.length,
+        queuedEntryId: null,
+      };
     }
 
-    let nextPurchased: string[];
-    let nextHold: string[];
-    let historyEntry: HistoryEntry;
+    const nextVisitState = transitionCircleVisitState(
+      currentState,
+      requestedState,
+    );
 
-    if (purchased) {
-      nextPurchased = [...state.purchased, trimmedSpace];
-      nextHold = [...state.hold];
-      historyEntry = {
-        type: "purchase",
-        space: trimmedSpace,
-        timestamp: now,
-      };
+    const nextCircleStates = { ...state.circleStates };
+    if (nextVisitState === "pending") {
+      delete nextCircleStates[trimmedSpace];
     } else {
-      nextPurchased = state.purchased.filter((s) => s !== trimmedSpace);
-      nextHold = [...state.hold];
-      historyEntry = {
-        type: "unpurchase",
-        space: trimmedSpace,
-        timestamp: now,
-      };
+      nextCircleStates[trimmedSpace] = nextVisitState;
     }
 
     const nextStateDraft: LocalEventDayState = {
       ...state,
-      purchased: nextPurchased,
-      hold: nextHold,
-      history: [...state.history, historyEntry],
-      redo: [],
+      circleStates: Object.freeze(nextCircleStates),
       timestamps: {
         ...state.timestamps,
         updatedAt: now,
       },
     };
 
-    if (state.source.type === "gas") {
+    // Only append to GAS outbox when purchased state is involved
+    const isPurchasedTransition =
+      currentState === "purchased" || requestedState === "purchased";
+
+    if (state.source.type === "gas" && isPurchasedTransition) {
+      const isPurchased = requestedState === "purchased";
       const appended = this.outbox.append(
         nextStateDraft,
         ref,
         trimmedSpace,
-        purchased,
-        now,
-      );
-      this.repository.save(ref, appended.state);
-      return {
-        state: appended.state,
-        pendingCount: appended.state.gasOutbox.length,
-        queuedEntryId: appended.entry.id,
-      };
-    }
-
-    this.repository.save(ref, nextStateDraft);
-    return {
-      state: nextStateDraft,
-      pendingCount: 0,
-      queuedEntryId: null,
-    };
-  }
-
-  /** Undo the latest activity entry and queue a compensating purchase state. */
-  undo(ref: EventDayRef, now: string): PurchaseMutationResult | null {
-    const state = this.requireState(ref);
-    if (state.history.length === 0) return null;
-
-    const last = state.history.at(-1);
-    if (!last) return null;
-
-    const historyWithoutLast = state.history.slice(0, -1);
-    const nextRedo = [...state.redo, last];
-
-    let nextPurchased = [...state.purchased];
-    let nextHold = [...state.hold];
-    let queuedPurchaseState: boolean | null = null;
-
-    if (last.type === "purchase") {
-      nextPurchased = nextPurchased.filter((s) => s !== last.space);
-      queuedPurchaseState = false;
-    } else if (last.type === "unpurchase") {
-      if (!nextPurchased.includes(last.space)) {
-        nextPurchased.push(last.space);
-      }
-      queuedPurchaseState = true;
-    } else if (last.type === "hold") {
-      nextHold = nextHold.filter((s) => s !== last.space);
-    } else if (last.type === "unhold") {
-      if (!nextHold.includes(last.space)) {
-        nextHold.push(last.space);
-      }
-    }
-
-    const nextStateDraft: LocalEventDayState = {
-      ...state,
-      purchased: nextPurchased,
-      hold: nextHold,
-      history: historyWithoutLast,
-      redo: nextRedo,
-      timestamps: {
-        ...state.timestamps,
-        updatedAt: now,
-      },
-    };
-
-    if (state.source.type === "gas" && queuedPurchaseState !== null) {
-      const appended = this.outbox.append(
-        nextStateDraft,
-        ref,
-        last.space,
-        queuedPurchaseState,
+        isPurchased,
         now,
       );
       this.repository.save(ref, appended.state);
@@ -181,84 +101,29 @@ export class PurchaseMutationService {
     };
   }
 
-  /** Reapply the latest undone activity and queue its desired purchase state. */
-  redo(ref: EventDayRef, now: string): PurchaseMutationResult | null {
-    const state = this.requireState(ref);
-    if (state.redo.length === 0) return null;
-
-    const last = state.redo.at(-1);
-    if (!last) return null;
-
-    const redoWithoutLast = state.redo.slice(0, -1);
-    const nextHistory = [...state.history, last];
-
-    let nextPurchased = [...state.purchased];
-    let nextHold = [...state.hold];
-    let queuedPurchaseState: boolean | null = null;
-
-    if (last.type === "purchase") {
-      if (!nextPurchased.includes(last.space)) {
-        nextPurchased.push(last.space);
-      }
-      queuedPurchaseState = true;
-    } else if (last.type === "unpurchase") {
-      nextPurchased = nextPurchased.filter((s) => s !== last.space);
-      queuedPurchaseState = false;
-    } else if (last.type === "hold") {
-      if (!nextHold.includes(last.space)) {
-        nextHold.push(last.space);
-      }
-    } else if (last.type === "unhold") {
-      nextHold = nextHold.filter((s) => s !== last.space);
-    }
-
-    const nextStateDraft: LocalEventDayState = {
-      ...state,
-      purchased: nextPurchased,
-      hold: nextHold,
-      history: nextHistory,
-      redo: redoWithoutLast,
-      timestamps: {
-        ...state.timestamps,
-        updatedAt: now,
-      },
-    };
-
-    if (state.source.type === "gas" && queuedPurchaseState !== null) {
-      const appended = this.outbox.append(
-        nextStateDraft,
-        ref,
-        last.space,
-        queuedPurchaseState,
-        now,
-      );
-      this.repository.save(ref, appended.state);
-      return {
-        state: appended.state,
-        pendingCount: appended.state.gasOutbox.length,
-        queuedEntryId: appended.entry.id,
-      };
-    }
-
-    this.repository.save(ref, nextStateDraft);
-    return {
-      state: nextStateDraft,
-      pendingCount: nextStateDraft.gasOutbox.length,
-      queuedEntryId: null,
-    };
+  /** Persist a purchase or explicit cancellation before any remote processing. */
+  setPurchased(
+    ref: EventDayRef,
+    space: string,
+    purchased: boolean,
+    now: string,
+  ): PurchaseMutationResult {
+    const requestedState: CircleVisitState = purchased
+      ? "purchased"
+      : "pending";
+    return this.setCircleState(ref, space, requestedState, now);
   }
 
   /** Clear local activity and queue false for every purchased GAS space. */
   resetActivity(ref: EventDayRef, now: string): PurchaseMutationResult {
     const state = this.requireState(ref);
-    const previouslyPurchased = [...state.purchased];
+    const previouslyPurchased = Object.entries(state.circleStates)
+      .filter(([_, s]) => s === "purchased")
+      .map(([space]) => space);
 
     const nextStateDraft: LocalEventDayState = {
       ...state,
-      purchased: [],
-      hold: [],
-      history: [],
-      redo: [],
+      circleStates: {},
       timestamps: {
         ...state.timestamps,
         updatedAt: now,

@@ -1,6 +1,5 @@
 import type {
   CircleRecord,
-  HistoryEntry,
   LocalEventDayState,
   SourceDiff,
 } from "../types/domain";
@@ -102,32 +101,25 @@ export function applySourceDiff(
     }
   }
 
-  // Preserve and merge user lists
-  const purchasedList = [...current.purchased];
-  const historyList: HistoryEntry[] = current.history.map((h) => ({ ...h }));
+  // Preserve and merge circle states
+  const nextCircleStates: Record<string, "purchased" | "held" | "excluded"> = {
+    ...current.circleStates,
+  };
 
   // Check for auto-purchases (isSale=x or X in incoming)
   for (const inc of incoming) {
     const isSaleFlag = inc.isSale?.toLowerCase() === "x";
-    if (isSaleFlag && !purchasedList.includes(inc.space)) {
-      purchasedList.push(inc.space);
-      historyList.push({
-        type: "purchase",
-        space: inc.space,
-        timestamp: now,
-      });
+    if (isSaleFlag && nextCircleStates[inc.space] !== "purchased") {
+      nextCircleStates[inc.space] = "purchased";
     }
   }
 
   const nextState: LocalEventDayState = {
-    schemaVersion: current.schemaVersion,
+    schemaVersion: 2,
     source: { ...current.source },
     sourceGeneration: current.sourceGeneration,
     circles: nextCircles,
-    purchased: purchasedList,
-    hold: current.hold.slice(),
-    history: historyList,
-    redo: current.redo.map((h) => ({ ...h })),
+    circleStates: Object.freeze(nextCircleStates),
     gasOutbox: current.gasOutbox.map((g) => ({ ...g })),
     timestamps: {
       createdAt: current.timestamps.createdAt,

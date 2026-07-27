@@ -152,6 +152,36 @@ input[type="text"] {
   font-weight: 500;
 }
 
+.optimization-settings {
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.optimization-settings h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.optimization-settings label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.optimization-settings select {
+  min-height: 44px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: #fff;
+  color: var(--text-main);
+  font-size: 0.92rem;
+  font-family: inherit;
+}
+
 .event-day-select-row {
   display: flex;
   gap: 8px;

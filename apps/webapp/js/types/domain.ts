@@ -19,6 +19,8 @@ export interface MapBundleManifestV1 {
   schemaVersion: 1;
   eventId: string;
   displayName: string;
+  /** Content-derived bundle identity used by navigation snapshot validation. */
+  bundleVersion?: string;
   areas: readonly MapBundleAreaV1[];
 }
 
@@ -180,6 +182,7 @@ export interface CircleRecord {
   readonly tweet?: string;
   readonly memo?: string;
   readonly isSale?: string;
+  readonly queueClass?: "normal" | "wall";
   readonly removedFromSource?: boolean;
 }
 
@@ -203,15 +206,25 @@ export interface GasOutboxEntry {
   readonly lastError: string | null;
 }
 
+export type CircleVisitState = "pending" | "held" | "purchased" | "excluded";
+
+export interface CircleStateOverrides {
+  readonly [space: string]: Exclude<CircleVisitState, "pending">;
+}
+
+export interface CircleStateUndoToken {
+  readonly space: string;
+  readonly before: CircleVisitState;
+  readonly after: CircleVisitState;
+  readonly createdAtMs: number;
+}
+
 export interface LocalEventDayState {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly source: DataSource;
   readonly sourceGeneration: string;
   readonly circles: readonly CircleRecord[];
-  readonly purchased: readonly string[];
-  readonly hold: readonly string[];
-  readonly history: readonly HistoryEntry[];
-  readonly redo: readonly HistoryEntry[];
+  readonly circleStates: CircleStateOverrides;
   readonly gasOutbox: readonly GasOutboxEntry[];
   readonly timestamps: {
     readonly createdAt: string;
@@ -321,4 +334,40 @@ export interface EventMapBundleManifest {
   readonly eventId: string;
   readonly bundleVersion: string;
   readonly areas: readonly EventMapAreaManifest[];
+}
+
+export type NavigationStage = "idle" | "navigating" | "atTarget";
+
+export type RouteEndpointId =
+  | {
+      readonly type: "start";
+      readonly areaId: string;
+      readonly gridIndex: number;
+    }
+  | { readonly type: "circle"; readonly space: string };
+
+export interface ConfirmedPosition {
+  readonly areaId: string;
+  readonly gridIndex: number;
+  readonly svgX: number;
+  readonly svgY: number;
+  readonly source: "manual-start" | "arrived-circle";
+  readonly circleSpace?: string;
+}
+
+export interface LockedLeg {
+  readonly from: RouteEndpointId;
+  readonly toSpace: string;
+}
+
+export interface NavigationState {
+  readonly stage: NavigationStage;
+  readonly areaId: string | null;
+  readonly currentPosition: ConfirmedPosition | null;
+  readonly targetSpace: string | null;
+  readonly lockedFirstLeg: LockedLeg | null;
+  readonly provisionalOrder: readonly string[];
+  readonly bestOrder: readonly string[];
+  /** Monotonic token used to discard progress from an obsolete optimizer job. */
+  readonly optimizationGeneration?: number;
 }

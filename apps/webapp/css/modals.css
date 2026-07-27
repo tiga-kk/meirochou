@@ -48,8 +48,8 @@
   border: 1px solid var(--ink);
   color: var(--ink);
   font-size: 0.75rem;
-  width: 26px;
-  height: 26px;
+  width: 44px;
+  height: 44px;
   border-radius: 0;
   cursor: pointer;
   transition: all 0.2s;
@@ -76,8 +76,8 @@
   border: 1px solid var(--ink);
   color: var(--ink);
   border-radius: 0;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -99,8 +99,8 @@
   background: var(--panel);
   border: 1px solid var(--ink);
   border-radius: 0;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;

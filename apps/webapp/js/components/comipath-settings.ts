@@ -1,4 +1,9 @@
 import { html, LitElement, type PropertyValues } from "lit";
+import {
+  ALNS_SEARCH_TIME_LIMITS,
+  type AlnsSearchTimeLimitMs,
+  DEFAULT_SEARCH_TIME_LIMIT_MS,
+} from "../routing/time-decayed-objective";
 import { dispatchManagementEvent } from "../ui/management-events";
 import type {
   DeleteOptionViewModel,
@@ -26,6 +31,7 @@ export class ComipathSettings extends LitElement {
     outboxPanelModel: { attribute: false },
     deleteOptions: { attribute: false },
     deleteDialogModel: { attribute: false },
+    optimizationTimeLimitMs: { type: Number },
     busy: { type: Boolean },
     errorMessage: { type: String },
   };
@@ -38,6 +44,7 @@ export class ComipathSettings extends LitElement {
   declare outboxPanelModel: OutboxPanelModel | null;
   declare deleteOptions: readonly DeleteOptionViewModel[];
   declare deleteDialogModel: StorageDeleteDialogModel | null;
+  declare optimizationTimeLimitMs: AlnsSearchTimeLimitMs;
   declare busy: boolean;
   declare errorMessage: string;
 
@@ -51,6 +58,7 @@ export class ComipathSettings extends LitElement {
     this.outboxPanelModel = null;
     this.deleteOptions = [];
     this.deleteDialogModel = null;
+    this.optimizationTimeLimitMs = DEFAULT_SEARCH_TIME_LIMIT_MS;
     this.busy = false;
     this.errorMessage = "";
   }
@@ -76,6 +84,40 @@ export class ComipathSettings extends LitElement {
       ></event-day-selector>
       <source-manager .model=${this.sourceManagerModel}></source-manager>
       <outbox-panel .model=${this.outboxPanelModel}></outbox-panel>
+      <section class="optimization-settings" aria-labelledby="optimization-settings-title">
+        <h3 id="optimization-settings-title">巡回最適化</h3>
+        <label for="optimization-time-limit">探索時間</label>
+        <select
+          id="optimization-time-limit"
+          .value=${String(this.optimizationTimeLimitMs)}
+          @change=${(event: Event) => {
+            const value = Number.parseInt(
+              (event.currentTarget as HTMLSelectElement).value,
+              10,
+            );
+            if (
+              ALNS_SEARCH_TIME_LIMITS.includes(value as AlnsSearchTimeLimitMs)
+            ) {
+              this.optimizationTimeLimitMs = value as AlnsSearchTimeLimitMs;
+              this.dispatchEvent(
+                new CustomEvent("optimization-time-limit-change", {
+                  bubbles: true,
+                  composed: true,
+                  detail: { searchTimeLimitMs: this.optimizationTimeLimitMs },
+                }),
+              );
+            }
+          }}
+        >
+          ${ALNS_SEARCH_TIME_LIMITS.map(
+            (limit) =>
+              html`<option
+                value=${limit}
+                ?selected=${limit === this.optimizationTimeLimitMs}
+              >${limit / 1000}秒</option>`,
+          )}
+        </select>
+      </section>
       <section class="storage-delete-options" aria-labelledby="storage-delete-title">
         <h3 id="storage-delete-title">ローカルデータ管理</h3>
         ${this.deleteOptions.map(

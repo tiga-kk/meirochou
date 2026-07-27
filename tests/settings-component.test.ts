@@ -129,3 +129,32 @@ test("blocked delete option exposes reason text with role=status for screen read
 
   document.body.removeChild(element);
 });
+
+test("settings shell exposes the approved ALNS search-time choices", async () => {
+  const element = new ComipathSettings();
+  const events: CustomEvent[] = [];
+  element.addEventListener("optimization-time-limit-change", (event) => {
+    events.push(event as CustomEvent);
+  });
+
+  document.body.appendChild(element);
+  await element.updateComplete;
+
+  const select = element.querySelector<HTMLSelectElement>(
+    "#optimization-time-limit",
+  );
+  expect(select).not.toBeNull();
+  if (!select) throw new Error("optimization time select is missing");
+  expect([...select.options].map((option) => option.value)).toEqual([
+    "5000",
+    "10000",
+    "15000",
+  ]);
+  expect(select?.value).toBe("10000");
+
+  select.value = "15000";
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+
+  expect(events).toHaveLength(1);
+  expect(events[0].detail).toEqual({ searchTimeLimitMs: 15000 });
+});

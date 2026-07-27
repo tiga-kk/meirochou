@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import { App } from "../apps/webapp/js/app";
 import { DataManager } from "../apps/webapp/js/data-manager";
 import { EventDayRepository } from "../apps/webapp/js/state/event-day-repository";
+import { getCircleVisitState } from "../apps/webapp/js/state/storage-schema";
 import {
   type StorageAdapter,
   StorageService,
@@ -78,14 +79,11 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
     const { repository, manager, fetchSpy } = createSetup();
 
     const gasState: LocalEventDayState = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: gasSource,
       sourceGeneration: "gen-1",
       circles: [{ space: "A-01", priority: 1 }],
-      purchased: [],
-      hold: [],
-      history: [],
-      redo: [],
+      circleStates: {},
       gasOutbox: [],
       timestamps: {
         createdAt: "2026-07-21T07:45:00.000Z",
@@ -101,11 +99,15 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
 
     // 1. Call setPurchased
     const result = manager.setPurchased("A-01", true);
-    expect(result.state.purchased).toEqual(["A-01"]);
+    expect(getCircleVisitState(result.state.circleStates, "A-01")).toBe(
+      "purchased",
+    );
 
     // At the moment setPurchased finishes, repository MUST contain the purchase AND outbox entry
     const saved = repository.load(ref);
-    expect(saved?.purchased).toEqual(["A-01"]);
+    expect(
+      saved ? getCircleVisitState(saved.circleStates, "A-01") : "pending",
+    ).toBe("purchased");
     expect(saved?.gasOutbox).toHaveLength(1);
     expect(saved?.gasOutbox[0].space).toBe("A-01");
     expect(saved?.gasOutbox[0].purchased).toBe(true);
@@ -117,7 +119,11 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
 
     // Verify purchase state remains intact in LocalStorage after POST failure
     const finalSaved = repository.load(ref);
-    expect(finalSaved?.purchased).toEqual(["A-01"]);
+    expect(
+      finalSaved
+        ? getCircleVisitState(finalSaved.circleStates, "A-01")
+        : "pending",
+    ).toBe("purchased");
     expect(finalSaved?.gasOutbox[0].attempts).toBe(1);
     expect(finalSaved?.gasOutbox[0].lastError).toBe("network");
   });
@@ -126,14 +132,11 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
     const { adapter, repository, manager, fetchSpy } = createSetup();
 
     const gasState: LocalEventDayState = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: gasSource,
       sourceGeneration: "gen-1",
       circles: [{ space: "A-01", priority: 1 }],
-      purchased: [],
-      hold: [],
-      history: [],
-      redo: [],
+      circleStates: {},
       gasOutbox: [],
       timestamps: {
         createdAt: "2026-07-21T07:45:00.000Z",
@@ -156,14 +159,11 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
   test("Step 3: App reports local save failure instead of success", async () => {
     const { adapter, repository, manager } = createSetup();
     repository.save(ref, {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: gasSource,
       sourceGeneration: "gen-1",
       circles: [{ space: "A-01", priority: 1 }],
-      purchased: [],
-      hold: [],
-      history: [],
-      redo: [],
+      circleStates: {},
       gasOutbox: [],
       timestamps: {
         createdAt: "2026-07-21T07:45:00.000Z",
@@ -197,14 +197,11 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
   test("Step 7: App reports a later GAS failure while keeping local success", async () => {
     const { repository, manager, fetchSpy } = createSetup();
     repository.save(ref, {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: gasSource,
       sourceGeneration: "gen-1",
       circles: [{ space: "A-01", priority: 1 }],
-      purchased: [],
-      hold: [],
-      history: [],
-      redo: [],
+      circleStates: {},
       gasOutbox: [],
       timestamps: {
         createdAt: "2026-07-21T07:45:00.000Z",
@@ -239,14 +236,11 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
   test("Task 6 Step 3: App startup ordering, zero GET calls, non-blocking start", async () => {
     const { repository, manager, fetchSpy } = createSetup();
     repository.save(ref, {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: gasSource,
       sourceGeneration: "gen-1",
       circles: [{ space: "A-01", priority: 1 }],
-      purchased: [],
-      hold: [],
-      history: [],
-      redo: [],
+      circleStates: {},
       gasOutbox: [],
       timestamps: {
         createdAt: "2026-07-21T07:45:00.000Z",
@@ -262,7 +256,7 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
     app.ui.updateCounts = vi.fn();
     app.ui.showToast = vi.fn();
     app.searchNext = vi.fn();
-    const startSyncSpy = vi.spyOn(manager, "startSyncCoordinator");
+    const startSyncSpy = vi.spyOn(manager.syncCoordinator, "start");
 
     // App opens cached GAS state and starts background sync only after local init
     await app.init({ eventId: "C108", areas: [] });

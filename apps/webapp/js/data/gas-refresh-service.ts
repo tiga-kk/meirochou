@@ -163,10 +163,7 @@ export class GasRefreshService {
       state.source.type !== "csv" ||
       state.source.fileName !== "empty.csv" ||
       state.circles.length > 0 ||
-      state.purchased.length > 0 ||
-      state.hold.length > 0 ||
-      state.history.length > 0 ||
-      state.redo.length > 0 ||
+      Object.keys(state.circleStates).length > 0 ||
       state.gasOutbox.length > 0
     ) {
       throw new Error("Initial GAS import requires an empty sentinel state");
@@ -349,8 +346,7 @@ export class GasRefreshService {
       preview.mode === "refresh"
         ? {
             ...applySourceDiff(latest, fetchedCircles, applyTimestamp),
-            purchased: latest.purchased,
-            history: latest.history,
+            circleStates: latest.circleStates,
           }
         : applySourceDiff(latest, fetchedCircles, applyTimestamp);
 

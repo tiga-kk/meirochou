@@ -66,6 +66,18 @@ test("Phase 2 keeps GAS sale actions outside the local data service", () => {
   assert.doesNotMatch(source, /\?\s*\{\s*spaces:\s*space,\s*undo:\s*true\s*\}/);
 });
 
+test("Phase 5C Task 1 removes persistent Undo/Redo controls from the UI", () => {
+  const appSource = read("apps/webapp/js/app.js");
+  const modalSource = read("apps/webapp/js/modal-manager.js");
+  const indexSource = read("apps/webapp/index.html");
+
+  assert.doesNotMatch(indexSource, /id=["']btn-(?:undo|redo)["']/);
+  assert.doesNotMatch(indexSource, /id=["']btn-gallery-undo["']/);
+  assert.doesNotMatch(appSource, /handle(?:Undo|Redo)\(/);
+  assert.doesNotMatch(modalSource, /handleGalleryUndo\(/);
+  assert.doesNotMatch(modalSource, /btnGalleryUndo/);
+});
+
 test("GAS sale responses expose success response contract", () => {
   const responseSource = read("integrations/gas-spreadsheet/src/response.js");
   const saleSource = read("integrations/gas-spreadsheet/src/web-api.js");
@@ -1087,23 +1099,29 @@ test("webapp uses an exact numeric input for the current location", () => {
   );
 });
 
-test("webapp preserves current location when setting a gallery target", () => {
+test("webapp routes gallery target changes through navigation orchestration", () => {
   const appSource = read("apps/webapp/js/app.js");
   const handler =
     appSource.match(
       /async\s+handleSetNextTarget\(circle\)[\s\S]*?\n\s*}\n\n\s*\/\*\*/,
     )?.[0] || "";
 
-  assert.match(handler, /readCurrentSpace/);
-  assert.match(handler, /rankCandidatesByGrid\(currentSpace,\s*\[circle\]\)/);
+  assert.match(handler, /orchestrationService\.handleManualTarget\(/);
+  assert.doesNotMatch(handler, /rankCandidatesByGrid\(/);
   assert.doesNotMatch(handler, /updateCurrentLocation/);
 });
 
-test("webapp restarts automatic search from the exact completed space", () => {
+test("webapp advances purchased navigation through orchestration", () => {
   const appSource = read("apps/webapp/js/app.js");
 
-  assert.match(appSource, /this\.searchNext\(space,\s*false\)/);
-  assert.match(appSource, /this\.searchNext\(action\.space\)/);
+  const purchaseHandler =
+    appSource.match(
+      /async\s+handleAction\(type\)[\s\S]*?\n\s*}\n\n\s*\/\*\*/,
+    )?.[0] || "";
+
+  assert.match(purchaseHandler, /orchestrationService\.handleArrival\(/);
+  assert.match(purchaseHandler, /orchestrationService\.handlePurchaseNext\(/);
+  assert.doesNotMatch(purchaseHandler, /searchNext\(space,\s*false\)/);
 });
 
 test("webapp opens an empty local event/day on a first visit", () => {

@@ -7,6 +7,7 @@ import {
 } from "../apps/webapp/js/state/event-day-repository";
 import { GasOutboxService } from "../apps/webapp/js/state/gas-outbox-service";
 import { PurchaseMutationService } from "../apps/webapp/js/state/purchase-mutation-service";
+import { getCircleVisitState } from "../apps/webapp/js/state/storage-schema";
 import {
   type StorageAdapter,
   StorageService,
@@ -59,7 +60,7 @@ describe("Phase 3 Task 5: PurchaseMutationService", () => {
 
   function createInitialState(source = gasSource): LocalEventDayState {
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source,
       sourceGeneration: "gen-1",
       circles: [
@@ -67,10 +68,7 @@ describe("Phase 3 Task 5: PurchaseMutationService", () => {
         { space: "A-02", priority: 2 },
         { space: "B-01", priority: 1, removedFromSource: true },
       ],
-      purchased: [],
-      hold: [],
-      history: [],
-      redo: [],
+      circleStates: {},
       gasOutbox: [],
       timestamps: {
         createdAt: "2026-07-21T07:45:00.000Z",
@@ -86,13 +84,9 @@ describe("Phase 3 Task 5: PurchaseMutationService", () => {
 
     // 1. Purchase GAS space
     const res1 = service.setPurchased(ref, "A-01", true, now);
-    expect(res1.state.purchased).toEqual(["A-01"]);
-    expect(res1.state.history).toHaveLength(1);
-    expect(res1.state.history[0]).toEqual({
-      type: "purchase",
-      space: "A-01",
-      timestamp: now,
-    });
+    expect(getCircleVisitState(res1.state.circleStates, "A-01")).toBe(
+      "purchased",
+    );
     expect(res1.pendingCount).toBe(1);
     expect(res1.queuedEntryId).toBe("outbox-1");
     expect(res1.state.gasOutbox[0]).toMatchObject({
@@ -108,13 +102,9 @@ describe("Phase 3 Task 5: PurchaseMutationService", () => {
 
     // 3. Cancel purchase (setPurchased false)
     const res2 = service.setPurchased(ref, "A-01", false, now);
-    expect(res2.state.purchased).toEqual([]);
-    expect(res2.state.history).toHaveLength(2);
-    expect(res2.state.history[1]).toEqual({
-      type: "unpurchase",
-      space: "A-01",
-      timestamp: now,
-    });
+    expect(getCircleVisitState(res2.state.circleStates, "A-01")).toBe(
+      "pending",
+    );
     // Tail coalesced because attempts === 0 for A-01
     expect(res2.state.gasOutbox).toHaveLength(1);
     expect(res2.state.gasOutbox[0].purchased).toBe(false);
@@ -125,7 +115,9 @@ describe("Phase 3 Task 5: PurchaseMutationService", () => {
       ...createInitialState({ type: "csv", fileName: "test.csv" }),
     });
     const resCsv = service.setPurchased(csvRef, "A-01", true, now);
-    expect(resCsv.state.purchased).toEqual(["A-01"]);
+    expect(getCircleVisitState(resCsv.state.circleStates, "A-01")).toBe(
+      "purchased",
+    );
     expect(resCsv.pendingCount).toBe(0);
     expect(resCsv.queuedEntryId).toBeNull();
     expect(resCsv.state.gasOutbox).toHaveLength(0);
@@ -154,20 +146,27 @@ describe("Phase 3 Task 5: PurchaseMutationService", () => {
     expect(repository.load(ref)).toEqual(state);
   });
 
-  test("purchase keeps hold state independent", () => {
+  test("circle visit state transitions exclusively", () => {
     const { repository, service } = createSetup();
-    repository.save(ref, {
-      ...createInitialState(),
-      hold: ["A-01"],
-    });
+    repository.save(ref, createInitialState());
 
-    const result = service.setPurchased(ref, "A-01", true, now);
+    // 1. Transition to held
+    const res1 = service.setCircleState(ref, "A-01", "held", now);
+    expect(getCircleVisitState(res1.state.circleStates, "A-01")).toBe("held");
+    // Held state changes do not trigger GAS outbox
+    expect(res1.state.gasOutbox).toHaveLength(0);
 
-    expect(result.state.purchased).toEqual(["A-01"]);
-    expect(result.state.hold).toEqual(["A-01"]);
+    // 2. Transition from held to purchased
+    const res2 = service.setCircleState(ref, "A-01", "purchased", now);
+    expect(getCircleVisitState(res2.state.circleStates, "A-01")).toBe(
+      "purchased",
+    );
+    // Transitioning to purchased enqueues outbox
+    expect(res2.state.gasOutbox).toHaveLength(1);
+    expect(res2.state.gasOutbox[0].purchased).toBe(true);
   });
 
-  test("Step 4: undo / redo / reset queue tests", () => {
+  test("resetActivity resets circleStates and enqueues cancellation for purchased circles", () => {
     const { repository, service } = createSetup();
     repository.save(ref, createInitialState());
 
@@ -175,28 +174,9 @@ describe("Phase 3 Task 5: PurchaseMutationService", () => {
     service.setPurchased(ref, "A-01", true, now);
     service.setPurchased(ref, "A-02", true, now);
 
-    // Undo A-02
-    const undoRes = service.undo(ref, now);
-    expect(undoRes).not.toBeNull();
-    expect(undoRes?.state.purchased).toEqual(["A-01"]);
-    expect(undoRes?.state.redo).toHaveLength(1);
-    expect(undoRes?.state.redo[0].space).toBe("A-02");
-    // Outbox should contain desired false for A-02
-    const a02Outbox = undoRes?.state.gasOutbox.find((e) => e.space === "A-02");
-    expect(a02Outbox?.purchased).toBe(false);
-
-    // Redo A-02
-    const redoRes = service.redo(ref, now);
-    expect(redoRes).not.toBeNull();
-    expect(redoRes?.state.purchased).toEqual(["A-01", "A-02"]);
-    expect(redoRes?.state.redo).toHaveLength(0);
-
     // Reset activity
     const resetRes = service.resetActivity(ref, now);
-    expect(resetRes.state.purchased).toEqual([]);
-    expect(resetRes.state.hold).toEqual([]);
-    expect(resetRes.state.history).toEqual([]);
-    expect(resetRes.state.redo).toEqual([]);
+    expect(resetRes.state.circleStates).toEqual({});
     // Both A-01 and A-02 should have outbox entries with purchased: false
     const falseSpaces = resetRes.state.gasOutbox
       .filter((e) => !e.purchased)

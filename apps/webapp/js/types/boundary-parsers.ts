@@ -251,11 +251,17 @@ export function parseMapBundleManifest(
     mapIds.add(area.mapId);
   });
 
+  const bundleVersion =
+    typeof value.bundleVersion === "string" && value.bundleVersion.trim()
+      ? value.bundleVersion.trim()
+      : undefined;
+
   return {
     schemaVersion: 1,
     eventId: parseEventId(value.eventId, "map manifest.eventId"),
     displayName: nonEmptyText(value.displayName, "map manifest.displayName"),
     areas,
+    ...(bundleVersion ? { bundleVersion } : {}),
   };
 }
 

@@ -1,6 +1,8 @@
+import type { DistanceMatrixRepository } from "../routing/distance-matrix";
 import type { EventDayRef, LocalEventDayState } from "../types/domain";
 import type { DeleteScope } from "../ui/management-view-model";
 import type { EventDayRepository } from "./event-day-repository";
+import type { NavigationSnapshotRepository } from "./navigation-snapshot-repository";
 import type { SourceSettingsService } from "./source-settings-service";
 
 export interface StorageDeletionResult {
@@ -13,6 +15,8 @@ export class StorageDeletionService {
     private readonly repository: EventDayRepository,
     private readonly sourceSettings: SourceSettingsService,
     private readonly createSourceGeneration: () => string,
+    private readonly matrixRepository?: DistanceMatrixRepository | null,
+    private readonly snapshotRepository?: NavigationSnapshotRepository | null,
   ) {}
 
   delete(scope: DeleteScope, now: string): StorageDeletionResult {
@@ -51,6 +55,11 @@ export class StorageDeletionService {
       nextState,
     });
 
+    // Circle identity changed, so the endpoint matrix and recovery snapshot
+    // cannot be reused safely.
+    this.matrixRepository?.deleteByEventDay(ref.eventId, ref.dayId);
+    this.snapshotRepository?.clear(ref.eventId, ref.dayId);
+
     return Object.freeze({
       deletedRefs: Object.freeze([]),
       activeRefDeleted: false,
@@ -61,10 +70,7 @@ export class StorageDeletionService {
     const current = this.sourceSettings.assertCanMutate(ref, "activity-delete");
     const nextState: LocalEventDayState = {
       ...current,
-      purchased: [],
-      hold: [],
-      history: [],
-      redo: [],
+      circleStates: {},
       timestamps: {
         ...current.timestamps,
         updatedAt: now,
@@ -78,6 +84,11 @@ export class StorageDeletionService {
       nextState,
     });
 
+    // Clear navigation snapshot but KEEP distance matrix
+    if (this.snapshotRepository) {
+      this.snapshotRepository.clear(ref.eventId, ref.dayId);
+    }
+
     return Object.freeze({
       deletedRefs: Object.freeze([]),
       activeRefDeleted: false,
@@ -90,6 +101,14 @@ export class StorageDeletionService {
       "event-day-delete",
     );
     this.sourceSettings.deleteEventDay(ref, current.sourceGeneration);
+
+    // Delete distance matrices and navigation snapshot for this event-day
+    if (this.matrixRepository) {
+      this.matrixRepository.deleteByEventDay(ref.eventId, ref.dayId);
+    }
+    if (this.snapshotRepository) {
+      this.snapshotRepository.clear(ref.eventId, ref.dayId);
+    }
 
     return Object.freeze({
       deletedRefs: Object.freeze([{ eventId: ref.eventId, dayId: ref.dayId }]),
@@ -112,6 +131,18 @@ export class StorageDeletionService {
     );
 
     this.repository.deleteAllFailureSafe(expected);
+
+    for (const item of expected) {
+      if (this.matrixRepository) {
+        this.matrixRepository.deleteByEventDay(
+          item.ref.eventId,
+          item.ref.dayId,
+        );
+      }
+      if (this.snapshotRepository) {
+        this.snapshotRepository.clear(item.ref.eventId, item.ref.dayId);
+      }
+    }
 
     const deletedRefs = Object.freeze(
       expected.map((e) =>

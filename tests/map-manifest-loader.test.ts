@@ -11,6 +11,7 @@ const manifestPayload = {
   schemaVersion: 1,
   eventId: "demo-v1",
   displayName: "Demo",
+  bundleVersion: "fixture-v1",
   areas: [
     {
       id: "demo-east",
@@ -52,6 +53,22 @@ test("map loader fetches the stable manifest URL and validates its payload", asy
     manifest.areas[0].mapFile,
     "https://example.test/app/assets/maps/demo-east/source.png",
   );
+  assert.equal(manifest.bundleVersion, "fixture-v1");
+});
+
+test("map manifest accepts legacy payloads without optional bundleVersion", async () => {
+  const { bundleVersion: _bundleVersion, ...legacyPayload } = manifestPayload;
+  const manifest = await loadMapBundleManifest({
+    baseUrl: "https://example.test/app/",
+    fetcher: async () =>
+      ({
+        ok: true,
+        status: 200,
+        json: async () => legacyPayload,
+      }) as Response,
+  });
+
+  assert.equal(manifest.bundleVersion, undefined);
 });
 
 test("map loader reports HTTP and JSON failures with diagnostic context", async () => {
@@ -166,6 +183,7 @@ test("loadEventMapBundleManifestFromUrl fetches manifest and returns validated 4
 
   assert.equal(fetchCount, 1);
   assert.equal(manifest.eventId, "C108");
+  assert.equal(manifest.bundleVersion, "fixture-v1");
   assert.equal(manifest.areas.length, 4);
   assert.equal(manifest.areas[0].areaId, "e456");
   assert.equal(manifest.areas[1].areaId, "e7");

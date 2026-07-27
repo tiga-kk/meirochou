@@ -1,6 +1,6 @@
 # Phase 5C Task 8: Reload Recovery and Local Data Deletion
 
-**Status:** Not started  
+**Status:** Complete（保存契約・削除境界。再開UI/geometry接続はTask 9）
 **Depends on:** Phase 5C Task 7  
 **Commit candidate:** `feat(storage): recover navigation and clear route data safely`
 
@@ -73,35 +73,43 @@ delete:
 
 ## TDD procedure
 
-- [ ] valid snapshot round-trip testを書く。
-- [ ] Worker runtime fieldを保存しないtestを書く。
-- [ ] valid resumeでtarget/current positionを復元するtestを書く。
-- [ ] invalid target/bundleでresume拒否testを書く。
-- [ ] reset startがmatrix/bestを保持するtestを書く。
-- [ ] activity resetがmatrixを保持するtestを書く。
-- [ ] event-day deleteがmatrixを削除するtestを書く。
-- [ ] pending outbox lock/preflight/rollback testを維持する。
-- [ ] REDを確認する。
+- [x] valid snapshot round-trip testを書く。
+- [x] Worker runtime fieldを保存しないtestを書く。
+- [x] valid resumeでtarget/current positionを復元するtestを書く。
+- [x] invalid target/bundleでresume拒否testを書く。
+- [x] reset startがmatrix/bestを保持するtestを書く。
+- [x] activity resetがmatrixを保持するtestを書く。
+- [x] event-day deleteがmatrixを削除するtestを書く。
+- [x] pending outbox lock/preflight/rollback testを維持する。
+- [x] REDを確認する。
 
 ```bash
-npx vitest run tests/navigation-recovery.test.ts tests/storage-deletion-service.test.ts
+npx vitest run --root . tests/navigation-recovery.test.ts tests/storage-deletion-service.test.ts
 ```
 
-- [ ] NavigationSnapshotRepositoryを実装する。
-- [ ] load時runtime parserを通す。
-- [ ] recovery dialogを実装する。
-- [ ] route geometry再構築とwarm startを接続する。
-- [ ] deletion serviceへmatrix/snapshot scopeを追加する。
-- [ ] existing delete dialogsの文言を実際の保持・削除範囲に合わせる。
-- [ ] GREENを確認する。
+- [x] NavigationSnapshotRepositoryを実装する。
+- [x] load時runtime parserを通す。
+- [ ] recovery dialogを実装する（Task 9のmobile UI接続へ移管）。
+- [ ] route geometry再構築とwarm startを接続する（Task 9のnavigation UI接続へ移管）。
+- [x] deletion serviceへmatrix/snapshot scopeを追加する。
+- [x] existing delete dialogsの文言を実際の保持・削除範囲に合わせる。
+- [x] GREENを確認する。
 
 ```bash
-npx vitest run tests/navigation-recovery.test.ts tests/storage-deletion-service.test.ts tests/storage-delete-dialog.test.ts tests/storage-deletion-app.test.ts
+npx vitest run --root . tests/navigation-recovery.test.ts tests/storage-deletion-service.test.ts tests/storage-delete-dialog.test.ts tests/storage-deletion-app.test.ts
 npm run test:webapp
 npm run check:webapp
 npm run build:webapp
 git diff --check
 ```
+
+## 実績
+
+- `LocalStorageNavigationSnapshotRepository`にruntime parserを追加し、schema、event/day identity、navigation state、confirmed position、locked leg、optimizer設定、保存日時を検証してからload/saveするようにした。
+- resume時はbundle version、pending candidate、circle state、current position、locked legの整合性を検証し、購入済み・対象外・別endpointのsnapshotを拒否する。
+- `StorageDeletionService`へmatrix/snapshot repositoryを接続し、activity resetではmatrixを保持してsnapshotだけを削除し、circle source変更・event-day/all-events削除ではmatrixとsnapshotを削除する。
+- 既存のoutbox lock、preflight、rollbackを含むStorageDeletionServiceテストを復元し、削除境界と管理画面の説明文を実際の保持・削除範囲に合わせた。
+- 再読込時の実際のdialog表示、route geometry再構築、warm-start実行はTask 9のnavigation UI/E2E接続で実装する。
 
 ## Acceptance criteria
 

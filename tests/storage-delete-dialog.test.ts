@@ -97,7 +97,7 @@ describe("StorageDeleteDialog Component (Lit)", () => {
         scope: { type: "all-events" },
         label: "全日程データの削除（2日程）",
         consequence:
-          "登録されている全日程のサークル情報・履歴・設定を消去します。",
+          "登録されている全日程のサークル情報・履歴・距離行列・ナビゲーション再開情報を消去します。",
         blocked: false,
         blockedReason: null,
       },

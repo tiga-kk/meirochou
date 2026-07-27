@@ -1,6 +1,6 @@
 # Phase 5C Task 3: Circle List and Shared Detail UI
 
-**Status:** Not started  
+**Status:** Complete（レビュー修正済み。App/Map/Galleryへのイベント接続はTask 7で実施）
 **Depends on:** Phase 5C Tasks 1-2  
 **Commit candidate:** `feat(ui): add circle states and shared detail actions`
 
@@ -56,26 +56,26 @@ detailにはspace、識別情報、state badge、memo/menu、現在距離、順�
 
 ## TDD procedure
 
-- [ ] view modelが未購入をpending/held sectionへ分ける失敗testを書く。
-- [ ] purchased/excludedが未購入へ出ない失敗testを書く。
-- [ ] 全サークルに4状態が出る失敗testを書く。
-- [ ] row全体のclickでdetailが開く失敗testを書く。
-- [ ] map markerとlist rowが同じdetail componentへ同一circleを渡す失敗testを書く。
-- [ ] state別actionの失敗testを書く。
-- [ ] action後に1回取消toastが出る失敗testを書く。
-- [ ] REDを確認する。
+- [x] view modelが未購入をpending/held sectionへ分ける失敗testを書く。
+- [x] purchased/excludedが未購入へ出ない失敗testを書く。
+- [x] 全サークルに4状態が出る失敗testを書く。
+- [ ] row全体のclickでdetailが開く失敗testを書く（実際のlist row wiringはTask 7へ移管）。
+- [ ] map markerとlist rowが同じdetail componentへ同一circleを渡す失敗testを書く（実際のMap/Gallery wiringはTask 7へ移管）。
+- [x] state別actionの失敗testを書く。
+- [ ] action後に1回取消toastが出る失敗testを書く（toastとmutationの接続はTask 7へ移管）。
+- [x] REDを確認する。
 
 ```bash
 npx vitest run tests/circle-list-view-model.test.ts tests/circle-detail.test.ts
 ```
 
-- [ ] view modelを新state queryへ変更する。
-- [ ] Litのshared detail componentを実装する。
-- [ ] actionをTask 1 mutation serviceへ接続する。
-- [ ] heldをtargetへ選ぶ操作は、stateをpendingへ戻してからnavigation serviceへ渡す。
-- [ ] list rowへ全action buttonを並べない。
-- [ ] 44px tap target、focus return、Escape close、state textを実装する。
-- [ ] GREENを確認する。
+- [x] view modelを新state queryへ変更する。
+- [x] Litのshared detail componentを実装する。
+- [ ] actionをTask 1 mutation serviceへ接続する（componentは`action-selected` eventを発火し、consumerはTask 7へ移管）。
+- [ ] heldをtargetへ選ぶ操作は、stateをpendingへ戻してからnavigation serviceへ渡す（Task 7へ移管）。
+- [x] list rowへ全action buttonを並べない。
+- [x] 44px tap target、focus return、Escape close、state textを実装する。
+- [x] GREENを確認する。
 
 ```bash
 npx vitest run tests/circle-list-view-model.test.ts tests/circle-detail.test.ts tests/settings-component.test.ts
@@ -83,6 +83,15 @@ npm run check:webapp
 npm run build:webapp
 git diff --check
 ```
+
+## 実績
+
+- pending/heldを分離し、purchased/excludedを未購入一覧から除外するview modelと、4状態をbadge付きで返す全サークルview modelを追加した。
+- `CircleDetailDialog`は状態別action、state badge、距離・順路slot、Escape close、focus return、44px以上のbuttonを提供する。
+- `その他`操作は常時全表示せず、メニューを開いた後だけ購入済み化・対象外化actionを表示するようレビュー修正した。
+- `CircleStateUndoService`は1回限りのTTL tokenをmemoryで管理する。永続化とtoast/mutationの実接続はTask 7へ移管した。
+- focused testは`circle-list-view-model`、`circle-detail`、`settings-component`の17件をGREENで確認した。
+- `npm run test:e2e`は25 passed、既存visual snapshot差分6件、8 skipped。今回の差分は新コンポーネントをAppへ接続していないため、既存snapshotは更新していない。
 
 ## Acceptance criteria
 

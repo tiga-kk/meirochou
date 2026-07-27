@@ -1,6 +1,6 @@
 # Phase 5C Task 4: Arbitrary Start and Per-map Session
 
-**Status:** Not started  
+**Status:** Complete（pure foundation・レビュー修正済み。map UI wiringはTask 7/9で実施）
 **Depends on:** Phase 5C Tasks 2-3  
 **Commit candidate:** `feat(navigation): add manual start per map`
 
@@ -35,36 +35,43 @@ export function snapStartToWalkableCell(
 
 ## TDD procedure
 
-- [ ] client座標→SVG座標変換testを書く。
-- [ ] walkable cell上のtapが同cellになるtestを書く。
-- [ ] blocked cell近傍が最寄walkableへsnapするtestを書く。
-- [ ] 閾値外がnullになるtestを書く。
-- [ ] tie時の選択順が決定的なtestを書く。
-- [ ] area切替時にcurrent position/targetを破棄するtestを書く。
-- [ ] matrix/best order identityは保持するtestを書く。
-- [ ] 戻ったareaで始点設定を要求するtestを書く。
-- [ ] REDを確認する。
+- [ ] client座標→SVG座標変換testを書く（client/map UI wiringと同時にTask 7/9で実施）。
+- [x] walkable cell上のtapが同cellになるtestを書く。
+- [x] blocked cell近傍が最寄walkableへsnapするtestを書く。
+- [x] 閾値外がnullになるtestを書く。
+- [x] tie時の選択順が決定的なtestを書く。
+- [x] area切替時にcurrent position/targetを破棄するtestを書く。
+- [x] matrix/best order identityは保持するtestを書く。
+- [x] 戻ったareaで始点設定を要求するtestを書く。
+- [x] REDを確認する。
 
 ```bash
-npx vitest run tests/start-selection.test.ts tests/map-session.test.ts
+npx vitest run --root . tests/start-selection.test.ts tests/map-session.test.ts
 ```
 
-- [ ] pure coordinate/snap helperを実装する。
-- [ ] 始点設定modeとcancelをmap UIへ追加する。
-- [ ] 確定前previewと確定後markerを区別する。
-- [ ] area session repositoryまたはmanagerを追加する。
-- [ ] area switchでnavigationだけをclearする。
-- [ ] 始点再設定後に再利用可能なmatrix/best order referenceを返す。
-- [ ] keyboard代替として、候補circleまたは入口候補から始点を選べるcontrolを用意する。
-- [ ] GREENを確認する。
+- [x] pure coordinate/snap helperを実装する。
+- [ ] 始点設定modeとcancelをmap UIへ追加する（Task 7/9へ繰越）。
+- [ ] 確定前previewと確定後markerを区別する（Task 7/9へ繰越）。
+- [x] area session repositoryまたはmanagerを追加する。
+- [x] area switchでnavigationだけをclearする。
+- [x] 始点再設定後に再利用可能なmatrix/best order referenceを返す。
+- [ ] keyboard代替として、候補circleまたは入口候補から始点を選べるcontrolを用意する（Task 7/9へ繰越）。
+- [x] GREENを確認する。
 
 ```bash
-npx vitest run tests/start-selection.test.ts tests/map-session.test.ts
+npx vitest run --root . tests/start-selection.test.ts tests/map-session.test.ts
 npm run test:webapp
 npm run check:webapp
 npm run build:webapp
 git diff --check
 ```
+
+## 実績
+
+- `snapStartToWalkableCell` と `MapSession` 系のpure foundationを実装し、有限値・grid buffer長・閾値・blocked cell・tie-breakingを検証した。
+- 同一area復帰時のcache引き継ぎは、配列のcloneとfreezeを行い、呼び出し側からの参照共有による変更を防止した。
+- focused testは12件、webapp testは39ファイル408件すべてPASS。型チェック、build、build検証、Biome、`git diff --check`もPASSした。
+- E2Eはsandbox外で実行し25 PASS・8 skipped・6 failed。失敗は既存のmobile visual snapshot差分で、Task4のpure helper/sessionとは無関係だった。map tapからのclient座標変換、UIのmode/cancel、preview/marker、keyboard control、App/Worker wiringはTask 7/9へ繰り越す。
 
 ## Acceptance criteria
 

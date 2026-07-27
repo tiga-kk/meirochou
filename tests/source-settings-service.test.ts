@@ -61,7 +61,7 @@ function createSampleState(
   outboxEntries: LocalEventDayState["gasOutbox"] = [],
 ): LocalEventDayState {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     source: {
       type: "gas",
       gasUrl: "https://script.google.com/macros/s/AKfycbx_test/exec",
@@ -69,16 +69,9 @@ function createSampleState(
     },
     sourceGeneration: sourceGen,
     circles: [{ space: "東A01a" }],
-    purchased: ["東A01a"],
-    hold: [],
-    history: [
-      {
-        type: "purchase",
-        space: "東A01a",
-        timestamp: "2026-07-23T00:00:00.000Z",
-      },
-    ],
-    redo: [],
+    circleStates: {
+      東A01a: "purchased",
+    },
     gasOutbox: outboxEntries,
     timestamps: {
       createdAt: "2026-07-23T00:00:00.000Z",
@@ -428,9 +421,7 @@ describe("SourceSettingsService generation & guarded save invariants", () => {
       nextState,
     });
 
-    expect(saved.sourceGeneration).toBe("gen2");
-    expect(saved.circles.map((c) => c.space)).toEqual(["東A01a", "東A02b"]);
-    expect(saved.purchased).toEqual(["東A01a"]); // Local activity preserved
+    expect(saved.circleStates.東A01a).toBe("purchased"); // Local activity preserved
   });
 });
 

@@ -6,17 +6,12 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <title>ComiPath - Comiket TSP</title>
-
-    <!-- Icons -->
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-    />
+    <title>Meirochou</title>
 
     <!-- Styles -->
     <link rel="stylesheet" href="css/tokens.css" />
     <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/icons.css" />
     <link rel="stylesheet" href="css/buttons.css" />
     <link rel="stylesheet" href="css/forms.css" />
     <link rel="stylesheet" href="css/target.css" />
@@ -178,14 +173,6 @@
                 <i class="fa-solid fa-pause"></i> 保留
               </button>
             </div>
-            <div class="undo-redo-container">
-              <button type="button" id="btn-undo" class="btn btn-secondary">
-                <i class="fa-solid fa-rotate-left"></i> Undo
-              </button>
-              <button type="button" id="btn-redo" class="btn btn-secondary">
-                <i class="fa-solid fa-rotate-right"></i> Redo
-              </button>
-            </div>
           </div>
         </div>
 
@@ -245,9 +232,6 @@
             <button type="button" class="filter-btn active" data-priority="8">8</button>
             <button type="button" class="filter-btn active" data-priority="7">7</button>
           </div>
-          <button type="button" id="btn-gallery-undo" class="gallery-undo-btn" aria-label="Undo">
-            <i class="fa-solid fa-rotate-left"></i>
-          </button>
         </div>
         <button type="button" id="btn-close-gallery" class="btn-close-modal">
           <i class="fa-solid fa-xmark"></i>
@@ -270,14 +254,8 @@
     </div>
 
     <source-diff-dialog id="source-diff-dialog"></source-diff-dialog>
+    <navigation-resume-dialog id="navigation-resume-dialog"></navigation-resume-dialog>
     <div id="toast"></div>
-
-    <!-- Twitter Widgets -->
-    <script
-      async
-      src="https://platform.twitter.com/widgets.js"
-      charset="utf-8"
-    ></script>
 
     <!-- Main Script (Module) -->
     <script type="module" src="js/app.js"></script>

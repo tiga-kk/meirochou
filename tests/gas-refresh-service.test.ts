@@ -118,7 +118,7 @@ describe("Phase 3 Task 4: GasRefreshService and DataManager integration", () => 
 
     // Prepare cached GAS state
     const gasState: LocalEventDayState = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: {
         type: "gas",
         gasUrl: "https://script.google.com/macros/s/AKfycbx_test/exec",
@@ -126,10 +126,7 @@ describe("Phase 3 Task 4: GasRefreshService and DataManager integration", () => 
       },
       sourceGeneration: "gen-100",
       circles: [{ space: "A-01", priority: 1 }],
-      purchased: [],
-      hold: [],
-      history: [],
-      redo: [],
+      circleStates: {},
       gasOutbox: [],
       timestamps: {
         createdAt: "2026-07-21T07:45:00.000Z",
@@ -185,10 +182,7 @@ describe("Phase 3 Task 4: GasRefreshService and DataManager integration", () => 
     expect(applied.source).toEqual(expectedSource);
     expect(applied.sourceGeneration).toBe("gen-2");
     expect(applied.circles).toHaveLength(2);
-    expect(applied.purchased).toEqual(["A-01"]);
-    expect(applied.history).toHaveLength(1);
-    expect(applied.history[0].type).toBe("purchase");
-    expect(applied.history[0].space).toBe("A-01");
+    expect(applied.circleStates["A-01"]).toBe("purchased");
     expect(saveSpy).toHaveBeenCalledTimes(1);
 
     // Preview removed after apply
@@ -208,14 +202,11 @@ describe("Phase 3 Task 4: GasRefreshService and DataManager integration", () => 
 
     // State is non-empty CSV (has circles)
     const state: LocalEventDayState = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: { type: "csv", fileName: "day1.csv" },
       sourceGeneration: "gen-0",
       circles: [{ space: "A-01", priority: 1 }],
-      purchased: [],
-      hold: [],
-      history: [],
-      redo: [],
+      circleStates: {},
       gasOutbox: [],
       timestamps: {
         createdAt: "2026-07-21T07:45:00.000Z",
@@ -241,23 +232,17 @@ describe("Phase 3 Task 4: GasRefreshService and DataManager integration", () => 
     };
 
     const initialGasState: LocalEventDayState = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: gasSource,
       sourceGeneration: "gen-10",
       circles: [
         { space: "A-01", priority: 1 },
         { space: "B-01", priority: 2 },
       ],
-      purchased: ["A-01"],
-      hold: ["B-01"],
-      history: [
-        {
-          type: "purchase",
-          space: "A-01",
-          timestamp: "2026-07-21T07:45:00.000Z",
-        },
-      ],
-      redo: [],
+      circleStates: {
+        "A-01": "purchased",
+        "B-01": "held",
+      },
       gasOutbox: [],
       timestamps: {
         createdAt: "2026-07-21T07:45:00.000Z",
@@ -289,8 +274,8 @@ describe("Phase 3 Task 4: GasRefreshService and DataManager integration", () => 
     // Generation remains same on refresh!
     expect(applied.sourceGeneration).toBe("gen-10");
     // Local purchases/holds preserved
-    expect(applied.purchased).toEqual(["A-01"]);
-    expect(applied.hold).toEqual(["B-01"]);
+    expect(applied.circleStates["A-01"]).toBe("purchased");
+    expect(applied.circleStates["B-01"]).toBe("held");
     // circles updated
     expect(applied.circles).toEqual([
       { space: "A-01", priority: 5 },
@@ -450,14 +435,11 @@ describe("Phase 3 Task 4: GasRefreshService and DataManager integration", () => 
       sheetName: "Day1",
     };
     repository.save(ref, {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: gasSource,
       sourceGeneration: "gen-1",
       circles: [],
-      purchased: [],
-      hold: [],
-      history: [],
-      redo: [],
+      circleStates: {},
       gasOutbox: [],
       timestamps: {
         createdAt: "2026-07-21T07:45:00.000Z",

@@ -2,6 +2,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { App } from "../apps/webapp/js/app";
 import { DataManager } from "../apps/webapp/js/data-manager";
+import { getCircleVisitState } from "../apps/webapp/js/state/storage-schema";
 import {
   type StorageAdapter,
   StorageService,
@@ -104,11 +105,32 @@ describe("Phase 2 Task 7 local data service", () => {
 
     expect(state.source).toEqual({ type: "csv", fileName: "day1.csv" });
     expect(state.sourceGeneration).toBe("generation-2");
-    expect(state.purchased).toEqual(["A-01"]);
+    expect(getCircleVisitState(state.circleStates, "A-01")).toBe("purchased");
     expect((await manager.openEventDay(ref)).circles).toEqual(state.circles);
     await expect(
       manager.importInitialCsv(ref, "again.csv", csv("B-01,1,,,,\r\n")),
     ).rejects.toThrow("Initial CSV import requires an empty state");
+  });
+
+  test("excludes circles marked excluded from the normal unvisited candidates", async () => {
+    const { manager } = createManager();
+    const ref: EventDayRef = { eventId: "C108", dayId: "day1" };
+    await manager.openEventDay(ref);
+    const imported = await manager.importInitialCsv(
+      ref,
+      "day1.csv",
+      csv("A-01,1,,,,\r\nB-02,1,,,,\r\n"),
+    );
+    manager.repository.save(ref, {
+      ...imported,
+      circleStates: { "A-01": "excluded" },
+    });
+
+    await manager.openEventDay(ref);
+
+    expect(manager.getUnvisited().map((circle) => circle.space)).toEqual([
+      "B-02",
+    ]);
   });
 
   test("applies only a valid CSV preview and preserves local state", async () => {
@@ -117,7 +139,6 @@ describe("Phase 2 Task 7 local data service", () => {
     await manager.openEventDay(ref);
     await manager.importInitialCsv(ref, "day1.csv", csv("A-01,1,,,,\r\n"));
     manager.addPurchased("A-01");
-    manager.addHold("A-01");
 
     const preview = await manager.previewCsvReplacement(
       ref,
@@ -137,9 +158,7 @@ describe("Phase 2 Task 7 local data service", () => {
       fileName: "replacement.csv",
     });
     expect(applied.sourceGeneration).toBe("generation-3");
-    expect(applied.purchased).toEqual(["A-01"]);
-    expect(applied.hold).toEqual(["A-01"]);
-    expect(applied.history).toHaveLength(2);
+    expect(getCircleVisitState(applied.circleStates, "A-01")).toBe("purchased");
     expect(manager.wantToBuy.map((circle) => circle.space)).toEqual([
       "A-01",
       "B-01",
@@ -210,7 +229,6 @@ describe("Phase 2 Task 7 local data service", () => {
     await manager.openEventDay(day1);
     await manager.importInitialCsv(day1, "day1.csv", csv("A-01,1,,,,\r\n"));
     manager.addPurchased("A-01");
-    manager.addHold("A-01");
 
     await manager.openEventDay(day2);
     await manager.importInitialCsv(day2, "day2.csv", csv("B-01,1,,,,\r\n"));
@@ -219,9 +237,9 @@ describe("Phase 2 Task 7 local data service", () => {
     expect(manager.actionHistory).toEqual([]);
 
     const restored = await manager.openEventDay(day1);
-    expect(restored.purchased).toEqual(["A-01"]);
-    expect(restored.hold).toEqual(["A-01"]);
-    expect(restored.history).toHaveLength(2);
+    expect(getCircleVisitState(restored.circleStates, "A-01")).toBe(
+      "purchased",
+    );
   });
 
   test("does not change in-memory local state when repository save fails", async () => {
@@ -235,7 +253,12 @@ describe("Phase 2 Task 7 local data service", () => {
       "Failed to save event day state",
     );
     expect(manager.purchasedList).toEqual([]);
-    expect(manager.repository.load(ref)?.purchased).toEqual([]);
+    const loadedState = manager.repository.load(ref);
+    expect(
+      loadedState
+        ? getCircleVisitState(loadedState.circleStates, "A-01")
+        : "pending",
+    ).toBe("pending");
   });
 
   test("legacy preview reports invalid rows and never deletes legacy keys", async () => {
@@ -281,7 +304,7 @@ describe("Phase 2 Task 7 local data service", () => {
     const state = manager.applyLegacyImport(ref, preview.previewId);
 
     expect(state.circles).toEqual([{ space: "A-01", priority: 1 }]);
-    expect(state.purchased).toEqual(["A-01"]);
+    expect(getCircleVisitState(state.circleStates, "A-01")).toBe("purchased");
     expect(adapter.getItem("comiketData")).not.toBeNull();
     expect(adapter.getItem("purchasedList")).not.toBeNull();
   });
@@ -313,7 +336,11 @@ describe("Phase 2 Task 7 local data service", () => {
     const manager = createManager(adapter).manager;
     const ref: EventDayRef = { eventId: "C108", dayId: "day1" };
     await manager.openEventDay(ref);
-    await manager.importInitialCsv(ref, "day1.csv", csv("A-01,1,,,,\r\n"));
+    await manager.importInitialCsv(
+      ref,
+      "day1.csv",
+      csv("A-01,1,,,,\r\nA-02,2,,,,\r\n"),
+    );
     const app = new App();
     app.dm = manager;
     app.searchNext = vi.fn();
@@ -325,7 +352,7 @@ describe("Phase 2 Task 7 local data service", () => {
 
     await app.init({ eventId: "C108", areas: [] });
     manager.addPurchased("A-01");
-    manager.addHold("A-01");
+    manager.addHold("A-02");
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(manager.activeRef).toEqual(ref);
@@ -378,7 +405,7 @@ describe("Phase 2 Task 7 local data service", () => {
 
     expect(applied.source).toEqual({ type: "csv", fileName: "from_gas.csv" });
     expect(applied.sourceGeneration).toBe("generation-2");
-    expect(applied.purchased).toEqual(["A-01"]);
+    expect(getCircleVisitState(applied.circleStates, "A-01")).toBe("purchased");
   });
 
   test("blocks CSV apply when pending outbox exists, preserving preview and state", async () => {
@@ -388,7 +415,7 @@ describe("Phase 2 Task 7 local data service", () => {
 
     // Initial state with GAS source
     const initialGasState: LocalEventDayState = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       source: {
         type: "gas",
         gasUrl: "https://script.google.com/macros/s/AKfycbx_test/exec",
@@ -396,10 +423,7 @@ describe("Phase 2 Task 7 local data service", () => {
       },
       sourceGeneration: "generation-1",
       circles: [{ space: "A-01", priority: 1 }],
-      purchased: ["A-01"],
-      hold: [],
-      history: [],
-      redo: [],
+      circleStates: { "A-01": "purchased" },
       gasOutbox: [],
       timestamps: {
         createdAt: "2026-07-21T07:45:00.000Z",
