@@ -1099,22 +1099,29 @@ test("webapp uses an exact numeric input for the current location", () => {
   );
 });
 
-test("webapp preserves current location when setting a gallery target", () => {
+test("webapp routes gallery target changes through navigation orchestration", () => {
   const appSource = read("apps/webapp/js/app.js");
   const handler =
     appSource.match(
       /async\s+handleSetNextTarget\(circle\)[\s\S]*?\n\s*}\n\n\s*\/\*\*/,
     )?.[0] || "";
 
-  assert.match(handler, /readCurrentSpace/);
-  assert.match(handler, /rankCandidatesByGrid\(currentSpace,\s*\[circle\]\)/);
+  assert.match(handler, /orchestrationService\.handleManualTarget\(/);
+  assert.doesNotMatch(handler, /rankCandidatesByGrid\(/);
   assert.doesNotMatch(handler, /updateCurrentLocation/);
 });
 
-test("webapp restarts automatic search from the exact completed space", () => {
+test("webapp advances purchased navigation through orchestration", () => {
   const appSource = read("apps/webapp/js/app.js");
 
-  assert.match(appSource, /this\.searchNext\(space,\s*false\)/);
+  const purchaseHandler =
+    appSource.match(
+      /async\s+handleAction\(type\)[\s\S]*?\n\s*}\n\n\s*\/\*\*/,
+    )?.[0] || "";
+
+  assert.match(purchaseHandler, /orchestrationService\.handleArrival\(/);
+  assert.match(purchaseHandler, /orchestrationService\.handlePurchaseNext\(/);
+  assert.doesNotMatch(purchaseHandler, /searchNext\(space,\s*false\)/);
 });
 
 test("webapp opens an empty local event/day on a first visit", () => {

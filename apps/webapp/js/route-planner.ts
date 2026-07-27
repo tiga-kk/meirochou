@@ -626,6 +626,129 @@ export function planRoute(
   };
 }
 
+export function planRouteFromGridIndex(
+  pointsPayload: PointsPayload,
+  gridMeta: Partial<GridMeta>,
+  gridBytes: Uint8Array,
+  startGridIndex: number,
+  targetSpace: string,
+): RouteResult | null {
+  if (!(gridBytes instanceof Uint8Array)) return null;
+
+  const spec = readGridSpec(pointsPayload, gridMeta);
+  if (!spec || gridBytes.length < spec.totalCells) return null;
+  if (startGridIndex < 0 || startGridIndex >= spec.totalCells) return null;
+  if (gridBytes[startGridIndex] === GRID_BLOCKED) return null;
+
+  const pointMap = buildPointMap(pointsPayload);
+  let targetPoints = pointMap.get(spaceKey(targetSpace)) || [];
+  if (targetPoints.length === 0 && Array.isArray(pointsPayload?.points)) {
+    targetPoints = pointsPayload.points.filter(
+      (p) => (p as unknown as Record<string, unknown>)?.space === targetSpace,
+    );
+  }
+  if (targetPoints.length === 0) return null;
+
+  const targetPortals = targetPoints.flatMap((point) =>
+    normalizePortals(point, spec, gridBytes),
+  );
+  if (targetPortals.length === 0) return null;
+
+  const cellCol = startGridIndex % spec.cols;
+  const cellRow = Math.floor(startGridIndex / spec.cols);
+  const indexedStartPortal = Array.from(pointMap.values())
+    .flatMap((points) =>
+      points.flatMap((point) => normalizePortals(point, spec, gridBytes)),
+    )
+    .find((portal) => portal.index === startGridIndex);
+  const startPortal: NormalizedPortal = indexedStartPortal || {
+    cell: { col: cellCol, row: cellRow },
+    index: startGridIndex,
+    point: {
+      x: (cellCol + 0.5) * spec.cellSize,
+      y: (cellRow + 0.5) * spec.cellSize,
+    },
+    sourcePoint: {
+      x: (cellCol + 0.5) * spec.cellSize,
+      y: (cellRow + 0.5) * spec.cellSize,
+    },
+  };
+
+  const targetByIndex = new Map<number, NormalizedPortal>();
+  targetPortals.forEach((portal) => {
+    if (!targetByIndex.has(portal.index))
+      targetByIndex.set(portal.index, portal);
+  });
+
+  const distances = new Float64Array(spec.totalCells);
+  distances.fill(Infinity);
+  const previous = new Int32Array(spec.totalCells);
+  previous.fill(-1);
+  const heap = new MinHeap();
+
+  distances[startGridIndex] = 0;
+  previous[startGridIndex] = startGridIndex;
+  heap.push({ cost: 0, index: startGridIndex });
+
+  let reachedIndex = -1;
+  if (targetByIndex.has(startGridIndex)) {
+    reachedIndex = startGridIndex;
+  } else {
+    while (heap.length > 0) {
+      const current = heap.pop();
+      if (!current || current.cost !== distances[current.index]) continue;
+      if (targetByIndex.has(current.index)) {
+        reachedIndex = current.index;
+        break;
+      }
+
+      neighborIndexes(current.index, spec, gridBytes).forEach(
+        (neighborIndex) => {
+          const nextCost =
+            current.cost +
+            edgeCost(current.index, neighborIndex, spec, gridBytes);
+          if (nextCost >= distances[neighborIndex]) return;
+
+          distances[neighborIndex] = nextCost;
+          previous[neighborIndex] = current.index;
+          heap.push({ cost: nextCost, index: neighborIndex });
+        },
+      );
+    }
+  }
+
+  if (reachedIndex < 0) return null;
+
+  const cellIndexes = restoreCellIndexes(previous, reachedIndex);
+  const targetPortal = targetByIndex.get(reachedIndex);
+  if (!targetPortal) return null;
+
+  const { cells, points } = buildRoutePoints(
+    cellIndexes,
+    startPortal,
+    targetPortal,
+    spec,
+  );
+
+  return {
+    cost: distances[reachedIndex],
+    cells,
+    points,
+    startPosition: {
+      x: (startPortal.sourcePoint.x / spec.width) * 100,
+      y: (startPortal.sourcePoint.y / spec.height) * 100,
+    },
+    targetPosition: {
+      x: (targetPortal.sourcePoint.x / spec.width) * 100,
+      y: (targetPortal.sourcePoint.y / spec.height) * 100,
+    },
+    image: {
+      width: spec.width,
+      height: spec.height,
+    },
+  };
+}
+
 interface FallbackOverlay {
   className: string;
   style: { pointerEvents: string };

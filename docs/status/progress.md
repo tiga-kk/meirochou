@@ -1,7 +1,7 @@
 # Current Progress
 
 **更新日:** 2026-07-27
-**現在の段階:** Phase 5C Task 11レビュー済み（App navigation runtime接続BLOCKER継続）
+**現在の段階:** Phase 5C Task 11実装・検証完了
 
 ## コード実装
 
@@ -59,7 +59,7 @@ Task 9の実装:
   - デスクトップキーボードフォーカス、Tab移動、Escapeダイアログクローズ等のキーボード操作性を検証
 - UI/UXの統合: 44px hit area、focus ring、Escape focus return、200% zoom、portrait overflow、外部通信監視を接続。
 - Font Awesome/Twitter widgetの外部CDN依存を除去し、ローカルicon CSSへ移行。same-origin外の自動通信を発生させない。
-- `NavigationSnapshotRepository`のreload/resume dialog接続、route geometry再構築、warm-startのApp runtime接続は未確認。Task 10のexit gateでBLOCKER判定する。
+- `NavigationSnapshotRepository`のreload/resume dialog、route geometry再構築、warm-start実行をApp runtimeへ接続した。production navigationはorchestration経路へ切り替え、旧順序決定はdev fixture専用helperへ隔離した。
 
 ## Task 10の最終検証・Handoff
 
@@ -67,7 +67,7 @@ Task 9の実装:
 - CIと同じPlaywright containerでsnapshotを再生成し、全Playwright 34件PASS・8件SKIPを確認。
 - clean installの`npm run verify`は46 files・454 tests PASS、型チェック・build・GAS検証・`audit-public-tree`検査をクリア。
 - C108実ブラウザsmokeはdesktop 4 area・mobile 4 areaの計8件PASS。
-- `App`本体はsnapshot repositoryを削除処理へ渡すだけで、reload/resume dialog、route geometry、warm-startへ未接続。Phase 5C完了のBLOCKERとして残す。
+- `App`本体へsnapshot load/save/clear、reload/resume dialog、route geometry再構築、ALNS warm-start、production orchestration経路を接続し、Phase 5C完了のclean verificationを通過した。
 
 ## Task 11の計画
 
@@ -78,13 +78,17 @@ Task 9の実装:
 - C108 production navigationの候補順序を旧`TspSolver`からPhase 5C orchestrationへ切り替える。
 - desktop/mobileのreload→resume、reload→始点再設定E2Eを追加し、Task 10 Exit Gateを再実行する。
 
-## Task 11レビュー・検証
+## Task 11レビュー・検証（2026-07-27更新）
 
-- `npx vitest run --root . tests/navigation-runtime-controller.test.ts tests/navigation-recovery.test.ts tests/navigation-orchestration.test.ts`: 3 files / 22 tests PASS。
-- `npm run check:webapp`: 型チェック PASS。
-- `npm run test:webapp`: 46 files / 454 tests PASS。
-- ただし、追加controllerはAppからimport・生成されず、追加E2Eもsnapshotをseedしていないため、productionのreload/resume、geometry再構築、ALNS warm-startは未検証・未接続。
-- `NavigationRuntimeController`、`NavigationResumeDialog`、Task11 E2Eは部分実装として未commit差分に残し、App接続完了までTask完了扱いにしない。
+- `npx vitest run --root . tests/navigation-runtime-startup.test.ts tests/navigation-runtime-controller.test.ts`: 2 files / 24 tests PASS。
+- `npm run test:webapp`: 46 files / 455 tests PASS。
+- `npm run check:webapp`: PASS。
+- `npm run build:webapp`: PASS。
+- `npx biome check`、`git diff --check`: PASS。
+- `npx playwright test tests/e2e/navigation-resume.spec.ts --project=chromium --project=mobile-chromium`: 4 tests PASS。
+- `npm run test:e2e`: 46 tests中38 PASS / 8 SKIP。
+- `RUN_C108_SMOKE=1 npx playwright test tests/c108-map-browser-smoke.spec.ts --project=chromium --project=mobile-chromium`: 8 tests PASS。
+- `node scripts/audit-public-tree.mjs`: PASS。
 
 ## 統合済み
 
@@ -109,14 +113,14 @@ Task 9の実装:
 - Phase 5C Task 7: **実装・レビュー修正・検証完了・コミット済み**（`3bc7b7e`）。
 - Phase 5C Task 8: **実装・レビュー修正・検証完了・コミット済み**（`12dced1`）。
 - Phase 5C Task 9: **レビュー修正・検証完了・コミット済み**（CI snapshot修正をTask 10で実施。navigation runtime未確認）。
-- Phase 5C Task 10: **レビュー・検証完了、CI snapshot修正済み**（`e972f98`。navigation runtime未接続のためPhase完了扱い不可）。
-- Phase 5C Task 11: **レビュー済み・BLOCKED**（controller/dialogの部分実装はあるが、App composition、snapshot lifecycle、geometry再構築、ALNS warm-start、production E2Eが未接続）。
+- Phase 5C Task 10: **レビュー・検証完了、CI snapshot修正済み**（`e972f98`。navigation runtimeはTask 11で接続）。
+- Phase 5C Task 11: **実装・レビュー修正・検証完了**。
 
 ## 次の操作
 
-1. `task-11-app-runtime-lifecycle-integration.md`のReview resultに従い、App runtime接続をTDDで実装する。
-2. Task 11完了後にPhase 5C Exit Gateを再実行し、Task 10、handoff、progressのBLOCKER記録を更新する。
-3. runtime接続が確認できるまでPhase 5Dへ進まない。
+1. Task 11の変更をcommitし、feature branchをremoteへpushする。
+2. Phase 5C Exit Gateの最終レビューを行う。
+3. Phase 5Dへ進む場合は別Taskとして計画する。
 
 ## 人手入力
 

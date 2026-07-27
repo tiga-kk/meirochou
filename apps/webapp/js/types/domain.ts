@@ -19,6 +19,8 @@ export interface MapBundleManifestV1 {
   schemaVersion: 1;
   eventId: string;
   displayName: string;
+  /** Content-derived bundle identity used by navigation snapshot validation. */
+  bundleVersion?: string;
   areas: readonly MapBundleAreaV1[];
 }
 

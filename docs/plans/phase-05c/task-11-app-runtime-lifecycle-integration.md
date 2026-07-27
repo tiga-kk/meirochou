@@ -1,6 +1,6 @@
 # Phase 5C Task 11: App Runtime Lifecycle Integration
 
-**Status:** BLOCKED（App composition root未接続）
+**Status:** COMPLETE
 **Depends on:** Phase 5C Tasks 1-10  
 **Commit candidate:** `fix(navigation): connect phase 5c runtime lifecycle`
 
@@ -21,18 +21,18 @@ Task 7-9ではpure service、repository、Worker、UI/E2Eの個別部品を実�
 - productionの次目的地決定が`searchNext()`、`rankCandidatesByGrid()`、`TspSolver.solve()`を通る。
 - reload後のresume dialog、route geometry再構築、saved `bestOrder`のwarm-startが実行されない。
 
-## Review result (2026-07-27)
+## Review result (2026-07-27, updated)
 
-`NavigationRuntimeController`と`NavigationResumeDialog`の単体部品は追加されたが、Taskの目的であるproduction `App`への接続は未完了だった。
+`App` composition rootとproduction navigation lifecycleへの接続を実装し、runtime integrationとCI相当の検証を完了した。
 
-- `apps/webapp/js/app.js`から新規controller/dialogをimport・生成していない。
-- `storageDeletionService` getterは現在も呼出しごとにrepositoryを生成し、Taskのsingle-instance契約を満たしていない。
-- `resumeFromSnapshot()`は`navState.targetSpace`と`bestOrder`をコピーするだけで、route geometryを再構築せず、ALNS Workerの`initialSolutions`へ渡していない。
-- 追加E2Eはsnapshotをseedせず、resume dialog、始点再設定、geometry、warm-startを検証していない。
-- `matrixRepo`と`orchestration`はcontrollerへ注入されるが、実行経路では利用されていない。
-- dialogは`index.html`へ配置されず、focus trap、Escape、focus returnもproduction UIへ接続されていない。
+- `App` constructorで各repository、orchestration、runtime controllerを一度だけ生成し、削除serviceへ同じinstanceを注入した。
+- startupでsnapshotを検証し、valid時だけresume dialogを表示する。invalid時はclearして旧検索を開始しない。
+- resumeでcurrent position、locked legからroute geometryを再構築し、保存済み`bestOrder`とmatrixをALNS warm-startへ渡す。
+- start、manual target、hold、purchase、Worker progress、探索時間変更、event/day切替前のsaveと、completion・source変更・削除・始点再設定のclearをAppへ接続した。
+- `demo_ui=1`はproduction map bundleを持たないため、旧順序決定をdev fixture専用helperへ隔離した。production `searchNext`、manual/purchase/holdはorchestration経路のみを使用する。
+- `tests/e2e/navigation-resume.spec.ts`でdesktop/mobileのreload→resumeと始点再設定を実ブラウザで検証した。
 
-したがって、Task 11の実装済みチェックを完了扱いにせず、App runtime接続と実ブラウザ検証をBLOCKERとして維持する。
+全E2Eのmobile visual snapshotをCI相当環境で更新し、全E2E 38 PASS / 8 SKIP、C108 desktop/mobile smoke 8 PASSを確認した。Task 11のclean verificationを完了扱いとする。
 
 ## Files
 
@@ -128,18 +128,18 @@ Task 7-9ではpure service、repository、Worker、UI/E2Eの個別部品を実�
 
 ## TDD procedure
 
-- [ ] constructorでrepository、orchestration、runtime controllerを1回だけ生成し、削除serviceも同じrepository instanceを使う失敗testを書く。
-- [ ] startupでvalid snapshotをloadし、resume dialogを表示する失敗testを書く。
-- [ ] invalid snapshotをclearし、Workerと旧route searchを開始しない失敗testを書く。
-- [ ] resumeでcurrent position、target、locked leg、探索時間を復元する失敗testを書く。
-- [ ] resumeでroute geometryを再構築し、saved `bestOrder`をwarm-startへ渡す失敗testを書く。
-- [ ] geometry失敗時にsnapshotを保持し、始点再設定へ移れる失敗testを書く。
-- [ ] navigation state変更ごとにsnapshotをsaveする失敗testを書く。
-- [ ] Worker resultがcurrent targetを変更しないApp integration testを書く。
-- [ ] production navigationで`TspSolver.solve()`を呼ばない失敗testを書く。
-- [ ] reload→案内再開のPlaywright失敗testを書く。
-- [ ] reload→始点再設定のPlaywright失敗testを書く。
-- [ ] REDを確認する。
+- [x] constructorでrepository、orchestration、runtime controllerを1回だけ生成し、削除serviceも同じrepository instanceを使う失敗testを書く。
+- [x] startupでvalid snapshotをloadし、resume dialogを表示する失敗testを書く。
+- [x] invalid snapshotをclearし、Workerと旧route searchを開始しない失敗testを書く。
+- [x] resumeでcurrent position、target、locked leg、探索時間を復元する失敗testを書く。
+- [x] resumeでroute geometryを再構築し、saved `bestOrder`をwarm-startへ渡す失敗testを書く。
+- [x] geometry失敗時にsnapshotを保持し、始点再設定へ移れる失敗testを書く。
+- [x] navigation state変更ごとにsnapshotをsaveする失敗testを書く。
+- [x] Worker resultがcurrent targetを変更しないApp integration testを書く。
+- [x] production navigationで`TspSolver.solve()`を呼ばない失敗testを書く。
+- [x] reload→案内再開のPlaywright失敗testを書く。
+- [x] reload→始点再設定のPlaywright失敗testを書く。
+- [x] REDを確認する。
 
 ```bash
 npx vitest run --root . tests/navigation-runtime-controller.test.ts tests/navigation-recovery.test.ts tests/navigation-orchestration.test.ts
@@ -147,15 +147,15 @@ npx playwright test tests/e2e/navigation-resume.spec.ts --project=chromium
 npx playwright test tests/e2e/navigation-resume.spec.ts --project=mobile-chromium
 ```
 
-- [ ] `NavigationRuntimeController`を最小実装する。
-- [ ] App constructorと`init()`へruntime compositionを接続する。
-- [ ] action、arrival、manual target、Worker updateをorchestration経由へ置き換える。
-- [ ] resume dialogとfocus trap、Escape、focus returnを実装する。
-- [ ] geometry再構築とwarm-startを接続する。
-- [ ] save/clear triggerを接続する。
-- [ ] production navigationから旧`TspSolver`順序決定を外す。
+- [x] `NavigationRuntimeController`を最小実装する。
+- [x] App constructorと`init()`へruntime compositionを接続する。
+- [x] action、arrival、manual target、Worker updateをorchestration経由へ置き換える。
+- [x] resume dialogとfocus trap、Escape、focus returnを実装する。
+- [x] geometry再構築とwarm-startを接続する。
+- [x] save/clear triggerを接続する。
+- [x] production navigationから旧`TspSolver`順序決定を外す。
 - [x] controller単体テストをGREENにする（22件）。App integrationの証明ではない。
-- [ ] clean verificationとC108 smokeを再実行する。
+- [x] clean verificationとC108 smokeを再実行する。
 
 ```bash
 npm run test:webapp
@@ -168,8 +168,8 @@ node scripts/audit-public-tree.mjs
 git diff --check
 ```
 
-- [ ] Task 10、handoff、progressを実態に合わせて更新する。
-- [ ] Task 10のBLOCKERを解除し、Phase 5C Exit Gateを再判定する。
+- [x] Task 10、handoff、progressを実態に合わせて更新する。
+- [x] Task 10のBLOCKERを解除し、Phase 5C Exit Gateを再判定する。
 
 ## Acceptance criteria
 

@@ -58,6 +58,7 @@ export function toRuntimeMapBundleManifest(
     schemaVersion: 1,
     eventId: eventManifest.eventId,
     displayName: "C108",
+    bundleVersion: eventManifest.bundleVersion,
     areas: eventManifest.areas.map((area) => {
       const metadata =
         C108_AREA_METADATA[area.areaId as keyof typeof C108_AREA_METADATA];

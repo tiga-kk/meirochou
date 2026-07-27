@@ -26,6 +26,7 @@ export default defineConfig({
       testMatch: [
         "**/c108-map-browser-smoke.spec.ts",
         "**/navigation-keyboard.spec.ts",
+        "**/navigation-resume.spec.ts",
       ],
       use: { ...devices["Desktop Chrome"] },
     },
