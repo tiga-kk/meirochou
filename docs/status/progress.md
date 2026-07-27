@@ -1,7 +1,7 @@
 # Current Progress
 
-**更新日:** 2026-07-26
-**現在の段階:** Phase 5C Task 9レビュー修正・検証完了（Mobile E2E and Accessibility Verification。runtime接続はTask 10で確認）
+**更新日:** 2026-07-27
+**現在の段階:** Phase 5C Task 10レビュー・検証完了（CI snapshot修正済み。ただしnavigation runtime接続BLOCKERあり）
 
 ## コード実装
 
@@ -61,9 +61,17 @@ Task 9の実装:
 - Font Awesome/Twitter widgetの外部CDN依存を除去し、ローカルicon CSSへ移行。same-origin外の自動通信を発生させない。
 - `NavigationSnapshotRepository`のreload/resume dialog接続、route geometry再構築、warm-startのApp runtime接続は未確認。Task 10のexit gateでBLOCKER判定する。
 
+## Task 10の最終検証・Handoff
+
+- Handoff文書作成: `docs/reviews/phase-05c-handoff.md`
+- CIと同じPlaywright containerでsnapshotを再生成し、全Playwright 34件PASS・8件SKIPを確認。
+- clean installの`npm run verify`は46 files・454 tests PASS、型チェック・build・GAS検証・`audit-public-tree`検査をクリア。
+- C108実ブラウザsmokeはdesktop 4 area・mobile 4 areaの計8件PASS。
+- `App`本体はsnapshot repositoryを削除処理へ渡すだけで、reload/resume dialog、route geometry、warm-startへ未接続。Phase 5C完了のBLOCKERとして残す。
+
 ## 検証
 
-Task 5 focused test 27件、Task 6 focused test 24件、Task 7 focused test 14件。Task 8 core focused test 18件、関連UI/管理テスト41件はGREEN。Task 8変更を含む`npm run test:webapp`は46ファイル454件PASS。Task 9 focused E2E 3件、全Playwright 34件PASS・8件SKIP。型チェック、build、artifact検証、Biome、git diff検査もPASS。
+Task 5 focused test 27件、Task 6 focused test 24件、Task 7 focused test 14件。Task 8 core focused test 18件、関連UI/管理テスト41件はGREEN。Task 10 clean containerの`npm run verify`は46ファイル454件PASS、全Playwright 34件PASS・8件SKIP、C108 smoke 8件PASS。型チェック、build、artifact検証、Biome、public audit、git diff検査もPASS。
 
 ## 統合済み
 
@@ -87,12 +95,13 @@ Task 5 focused test 27件、Task 6 focused test 24件、Task 7 focused test 14�
 - Phase 5C Task 6: **実装・レビュー修正・検証完了**（`33f3f58`）。
 - Phase 5C Task 7: **実装・レビュー修正・検証完了・コミット済み**（`3bc7b7e`）。
 - Phase 5C Task 8: **実装・レビュー修正・検証完了・コミット済み**（`12dced1`）。
-- Phase 5C Task 9: **レビュー修正・検証完了・コミット済み**（本コミット。E2E/accessibility、reload/resume runtime未確認）。
+- Phase 5C Task 9: **レビュー修正・検証完了・コミット済み**（CI snapshot修正をTask 10で実施。navigation runtime未確認）。
+- Phase 5C Task 10: **レビュー・検証完了、CI snapshot修正済み**（`e972f98`。navigation runtime未接続のためPhase完了扱い不可）。
 
 ## 次の操作
 
-1. Phase 5C Task 10 (Phase Verification and Handoff) のexit gateでreload/resume runtime接続を確認する。
-2. 未接続の場合はTask 10の完了条件を満たすまでPhase 5Cを完了扱いにしない。
+1. App本体へreload/resume dialog、route geometry再構築、warm-startを接続する。
+2. Phase 5C exit gateを再実行し、runtime接続が確認できるまでPhase 5Dへ進まない。
 
 ## 人手入力
 
