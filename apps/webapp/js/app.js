@@ -1695,8 +1695,8 @@ export class App {
     // UI描画をブロックしないように非同期実行
     return new Promise((resolve) =>
       setTimeout(async () => {
-        const candidates = this.dm.getUnvisited();
-        if (candidates.length === 0) {
+        const allCandidates = this.dm.getUnvisited();
+        if (allCandidates.length === 0) {
           this.clearNavigationSnapshot();
           this.resetNavigationRuntimeState();
           this.currentTarget = null;
@@ -1713,6 +1713,22 @@ export class App {
         const area = findAreaForSpace(currentSpace);
         if (!area) {
           this.ui.showToast("現在地のエリアを特定できませんでした", "error");
+          resolve();
+          return;
+        }
+
+        // Each C108 area has an independent grid/session. Do not ask the
+        // active area's points/grid assets to resolve circles from another
+        // area; those remain pending until the user switches maps and sets a
+        // start position there.
+        const candidates = allCandidates.filter(
+          (candidate) => findAreaForSpace(candidate.space)?.id === area.id,
+        );
+        if (candidates.length === 0) {
+          this.ui.showToast(
+            "現在のエリアに未訪問の候補がありません。地図を切り替えて始点を設定してください",
+            "warning",
+          );
           resolve();
           return;
         }

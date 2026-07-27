@@ -832,6 +832,100 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
     expect(app.currentTarget?.space).toBe("東A01a");
   });
 
+  test("searchNext limits production candidates to the current map area", async () => {
+    const app = new App();
+    app.ui.showLoading = vi.fn();
+    app.ui.showToast = vi.fn();
+    app.ui.showNavigation = vi.fn();
+
+    Config.replaceAreas([
+      {
+        id: "e456",
+        mapId: "m-e456",
+        name: "東456ホール",
+        prefixes: ["東"],
+        labels: ["ア"],
+        mapFile: "e456.svg",
+        pointsFile: "e456-points.json",
+        gridMetaFile: "e456-grid-meta.json",
+        gridFile: "e456-grid.bin",
+      },
+      {
+        id: "e7",
+        mapId: "m-e7",
+        name: "東7ホール",
+        prefixes: ["東"],
+        labels: ["A"],
+        mapFile: "e7.svg",
+        pointsFile: "e7-points.json",
+        gridMetaFile: "e7-grid-meta.json",
+        gridFile: "e7-grid.bin",
+      },
+    ]);
+
+    app.dm.wantToBuy = [
+      {
+        space: "東ア02a",
+        priority: 1,
+        isTarget: false,
+        removedFromSource: false,
+      },
+      {
+        space: "東A01a",
+        priority: 2,
+        isTarget: false,
+        removedFromSource: false,
+      },
+    ];
+
+    const gridBytes = new Uint8Array(100).fill(1);
+    app.loadGridRouteAssets = async () => ({
+      pointsPayload: {
+        points: [
+          {
+            space: "東ア99a",
+            identifier: "ア",
+            number: 99,
+            portals: [{ col: 1, row: 1, x: 15, y: 15 }],
+            center_x: 15,
+            center_y: 15,
+          },
+          {
+            space: "東ア02a",
+            identifier: "ア",
+            number: 2,
+            portals: [{ col: 2, row: 2, x: 25, y: 25 }],
+            center_x: 25,
+            center_y: 25,
+          },
+        ],
+      } as unknown as PointsPayload,
+      gridMeta: {
+        cell_size: 10,
+        cols: 10,
+        rows: 10,
+        width: 100,
+        height: 100,
+      },
+      gridBytes,
+    });
+
+    const startNavSpy = vi.spyOn(app.orchestrationService, "startNavigation");
+
+    await app.searchNext("東ア99a");
+
+    expect(startNavSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pendingCircles: [expect.objectContaining({ space: "東ア02a" })],
+      }),
+    );
+    expect(app.currentTarget?.space).toBe("東ア02a");
+    expect(app.ui.showToast).not.toHaveBeenCalledWith(
+      "候補サークルのグリッド位置を特定できませんでした",
+      "error",
+    );
+  });
+
   test("manual target change uses orchestration state and does not rank candidates", async () => {
     document.body.innerHTML = `
       <select id="loc-ewsn"><option value="east">東</option></select>
