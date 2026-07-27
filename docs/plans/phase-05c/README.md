@@ -4,7 +4,7 @@
 
 **Goal:** C108の各地図で、排他的なサークル状態、任意始点、到着確認、距離行列、時間減衰価値を最大化するALNS、進捗・取消、地図切替、再読込復帰を一貫したモバイルUIとして提供する。
 
-**Architecture:** 永続サークル状態と一時的なナビゲーション状態を分離する。距離行列と最適化はmain thread外で実行し、現在案内中の1区間を固定したまま残り順路だけを改善する。Task 5は重み付きグリッド距離を保存し、Task 6がarea別timing profileで秒へ変換する。各地図は独立した問題として扱い、地図へ戻ったときは距離行列と以前の解を再利用するが、始点を設定し直す。
+**Architecture:** 永続サークル状態と一時的なナビゲーション状態を分離する。距離行列と最適化はmain thread外で実行し、現在案内中の1区間を固定したまま残り順路だけを改善する。Task 5は重み付きグリッド距離を保存し、Task 6がarea別timing profileで秒へ変換する。各地図は独立した問題として扱い、地図へ戻ったときは距離行列と以前の解を再利用するが、始点を設定し直す。Task 11でこれらの部品をAppのcomposition rootと起動・保存・再読込ライフサイクルへ接続する。
 
 **Tech Stack:** TypeScript strict、Lit、LocalStorage repository、Web Worker、weighted 4-neighbor Dijkstra、time-decayed objective、ALNS、Vitest、Playwright。
 
@@ -59,12 +59,15 @@
 | 8 | `task-08-recovery-and-deletion.md` | 再読込復帰、始点再設定、巡回初期化、日程削除 |
 | 9 | `task-09-mobile-e2e-and-accessibility.md` | mobile E2E、dialog、進捗、accessibility |
 | 10 | `task-10-phase-verification-and-handoff.md` | clean verification、文書、Phase 5C完了判定 |
+| 11 | `task-11-app-runtime-lifecycle-integration.md` | App composition、snapshot load/save、resume、geometry、warm-start、再検証 |
 
 ## Required Order
 
-Task 1 → Task 2 → Task 3 → Task 4 → Task 5 → Task 6 → Task 7 → Task 8 → Task 9 → Task 10
+Task 1 → Task 2 → Task 3 → Task 4 → Task 5 → Task 6 → Task 7 → Task 8 → Task 9 → Task 10 → Task 11
 
 Task 5と6のpure kernel開発を並行してよいのは、Task 1-4が統合済みで、両Taskが同じfileを変更しないことをreviewerが確認した場合だけとする。通常は表の順序で進める。
+
+Task 11はTask 10の最終検証で発見されたApp runtime統合BLOCKERを解消するfollow-up Taskである。Task 11完了後にTask 10のExit Gateを再実行し、Phase 5C完了判定を更新する。
 
 ## Exit Gate
 
@@ -81,4 +84,9 @@ Task 5と6のpure kernel開発を並行してよいのは、Task 1-4が統合済
 - pendingが0でheldがある場合、確認後に全heldをpendingへ戻す。
 - reloadで案内再開または始点再設定を選べる。
 - 巡回状態初期化はmatrixを保持し、日程削除はmatrixを削除する。
+- production `App`が`NavigationOrchestrationService`とsnapshot repositoryを実際に生成・利用する。
+- navigation state変更時にsnapshotを保存し、startupでvalid snapshotをloadする。
+- resumeでroute geometryを再構築し、saved `bestOrder`をALNSのwarm-startへ渡す。
+- production navigationの候補順序が旧`TspSolver`へfallbackしない。
+- reload→resumeとreload→始点再設定をdesktop/mobile E2Eで確認する。
 - mobile E2E、accessibility、clean install verification、public auditが成功する。
