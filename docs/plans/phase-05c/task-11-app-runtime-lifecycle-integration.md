@@ -1,6 +1,6 @@
 # Phase 5C Task 11: App Runtime Lifecycle Integration
 
-**Status:** Planned  
+**Status:** BLOCKED（App composition root未接続）
 **Depends on:** Phase 5C Tasks 1-10  
 **Commit candidate:** `fix(navigation): connect phase 5c runtime lifecycle`
 
@@ -20,6 +20,19 @@ Task 7-9ではpure service、repository、Worker、UI/E2Eの個別部品を実�
 - `NavigationOrchestrationService`を生成・利用しない。
 - productionの次目的地決定が`searchNext()`、`rankCandidatesByGrid()`、`TspSolver.solve()`を通る。
 - reload後のresume dialog、route geometry再構築、saved `bestOrder`のwarm-startが実行されない。
+
+## Review result (2026-07-27)
+
+`NavigationRuntimeController`と`NavigationResumeDialog`の単体部品は追加されたが、Taskの目的であるproduction `App`への接続は未完了だった。
+
+- `apps/webapp/js/app.js`から新規controller/dialogをimport・生成していない。
+- `storageDeletionService` getterは現在も呼出しごとにrepositoryを生成し、Taskのsingle-instance契約を満たしていない。
+- `resumeFromSnapshot()`は`navState.targetSpace`と`bestOrder`をコピーするだけで、route geometryを再構築せず、ALNS Workerの`initialSolutions`へ渡していない。
+- 追加E2Eはsnapshotをseedせず、resume dialog、始点再設定、geometry、warm-startを検証していない。
+- `matrixRepo`と`orchestration`はcontrollerへ注入されるが、実行経路では利用されていない。
+- dialogは`index.html`へ配置されず、focus trap、Escape、focus returnもproduction UIへ接続されていない。
+
+したがって、Task 11の実装済みチェックを完了扱いにせず、App runtime接続と実ブラウザ検証をBLOCKERとして維持する。
 
 ## Files
 
@@ -141,7 +154,7 @@ npx playwright test tests/e2e/navigation-resume.spec.ts --project=mobile-chromiu
 - [ ] geometry再構築とwarm-startを接続する。
 - [ ] save/clear triggerを接続する。
 - [ ] production navigationから旧`TspSolver`順序決定を外す。
-- [ ] focused testをGREENにする。
+- [x] controller単体テストをGREENにする（22件）。App integrationの証明ではない。
 - [ ] clean verificationとC108 smokeを再実行する。
 
 ```bash

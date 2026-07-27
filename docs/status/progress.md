@@ -1,7 +1,7 @@
 # Current Progress
 
 **更新日:** 2026-07-27
-**現在の段階:** Phase 5C Task 11計画追加済み（Task 10で判明したnavigation runtime接続BLOCKERの解消待ち）
+**現在の段階:** Phase 5C Task 11レビュー済み（App navigation runtime接続BLOCKER継続）
 
 ## コード実装
 
@@ -78,9 +78,13 @@ Task 9の実装:
 - C108 production navigationの候補順序を旧`TspSolver`からPhase 5C orchestrationへ切り替える。
 - desktop/mobileのreload→resume、reload→始点再設定E2Eを追加し、Task 10 Exit Gateを再実行する。
 
-## 検証
+## Task 11レビュー・検証
 
-Task 5 focused test 27件、Task 6 focused test 24件、Task 7 focused test 14件。Task 8 core focused test 18件、関連UI/管理テスト41件はGREEN。Task 10 clean containerの`npm run verify`は46ファイル454件PASS、全Playwright 34件PASS・8件SKIP、C108 smoke 8件PASS。型チェック、build、artifact検証、Biome、public audit、git diff検査もPASS。
+- `npx vitest run --root . tests/navigation-runtime-controller.test.ts tests/navigation-recovery.test.ts tests/navigation-orchestration.test.ts`: 3 files / 22 tests PASS。
+- `npm run check:webapp`: 型チェック PASS。
+- `npm run test:webapp`: 46 files / 454 tests PASS。
+- ただし、追加controllerはAppからimport・生成されず、追加E2Eもsnapshotをseedしていないため、productionのreload/resume、geometry再構築、ALNS warm-startは未検証・未接続。
+- `NavigationRuntimeController`、`NavigationResumeDialog`、Task11 E2Eは部分実装として未commit差分に残し、App接続完了までTask完了扱いにしない。
 
 ## 統合済み
 
@@ -106,11 +110,11 @@ Task 5 focused test 27件、Task 6 focused test 24件、Task 7 focused test 14�
 - Phase 5C Task 8: **実装・レビュー修正・検証完了・コミット済み**（`12dced1`）。
 - Phase 5C Task 9: **レビュー修正・検証完了・コミット済み**（CI snapshot修正をTask 10で実施。navigation runtime未確認）。
 - Phase 5C Task 10: **レビュー・検証完了、CI snapshot修正済み**（`e972f98`。navigation runtime未接続のためPhase完了扱い不可）。
-- Phase 5C Task 11: **計画追加済み・実装未着手**（Task 10 BLOCKERの解消Task）。
+- Phase 5C Task 11: **レビュー済み・BLOCKED**（controller/dialogの部分実装はあるが、App composition、snapshot lifecycle、geometry再構築、ALNS warm-start、production E2Eが未接続）。
 
 ## 次の操作
 
-1. `task-11-app-runtime-lifecycle-integration.md`に従ってApp runtime接続をTDDで実装する。
+1. `task-11-app-runtime-lifecycle-integration.md`のReview resultに従い、App runtime接続をTDDで実装する。
 2. Task 11完了後にPhase 5C Exit Gateを再実行し、Task 10、handoff、progressのBLOCKER記録を更新する。
 3. runtime接続が確認できるまでPhase 5Dへ進まない。
 

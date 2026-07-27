@@ -4,7 +4,7 @@
 
 - Base commit: `b731e8e0a14cb80d27551630f79d4a8cadff046c` (main)
 - Feature branch: `feature/phase5c`
-- Implemented/reviewed tasks: Phase 5C Tasks 1-10
+- Implemented/reviewed tasks: Phase 5C Tasks 1-10; Task 11 partial implementation reviewed and blocked
 - Task 9 CI snapshot correction: CI browser container generated the mobile snapshots in this handoff diff.
 
 ## Storage schema version and migration
@@ -121,6 +121,7 @@
 
 - Host-side E2E execution may require a writable Vite/test-results directory; CI snapshots were generated in the CI Playwright container to avoid browser/font/layout drift.
 - **BLOCKER:** App runtime does not yet connect validated navigation snapshots to reload/resume, route geometry reconstruction, or warm-start.
+- **Task 11 review:** The added controller/dialog tests pass in isolation, but `App` does not import or instantiate them, and the added E2E does not seed or assert a snapshot. The Task 11 acceptance criteria therefore remain unmet.
 
 ## Deferred work
 
