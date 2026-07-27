@@ -167,6 +167,7 @@ export class App {
 
     this.activeDeleteScope = null;
     this.deleteErrorMessage = "";
+    this.settingsEscapeHandler = null;
 
     this.downloadAdapter = {
       createObjectURL: (blob) => URL.createObjectURL(blob),
@@ -1032,6 +1033,10 @@ export class App {
   /** Cleanup event listeners and coordinator timers. */
   dispose() {
     this.dm.disposeSyncCoordinator();
+    if (this.settingsEscapeHandler) {
+      document.removeEventListener("keydown", this.settingsEscapeHandler);
+      this.settingsEscapeHandler = null;
+    }
   }
 
   /** Build the complete render contract shared by the sheet and map. */
@@ -1212,7 +1217,8 @@ export class App {
    */
   setupEvents() {
     // 設定ボタン
-    document.getElementById("toggle-settings").onclick = () => {
+    const settingsToggle = document.getElementById("toggle-settings");
+    settingsToggle.onclick = () => {
       const isOpen = !this.ui.els.settingsArea.open;
       if (!isOpen) {
         this.clearActivePreviewIfAny();
@@ -1228,6 +1234,14 @@ export class App {
       }
       this.ui.toggleSettings(document.getElementById("toggle-settings"));
     };
+
+    this.settingsEscapeHandler = (event) => {
+      if (event.key !== "Escape" || !this.ui.els.settingsArea.open) return;
+      event.preventDefault();
+      settingsToggle.click();
+      settingsToggle.focus();
+    };
+    document.addEventListener("keydown", this.settingsEscapeHandler);
 
     const btnOpenGallery = document.getElementById("btn-open-gallery");
     if (btnOpenGallery) {

@@ -37,6 +37,15 @@
   border-radius: 0;
 }
 
+#btn-search,
+#btn-reset-all,
+.action-grid .btn,
+.route-selection-controls .btn,
+.route-confirmation-actions .btn,
+#btn-set-target {
+  min-height: 44px;
+}
+
 .btn:active {
   transform: translate(1px, 1px);
 }

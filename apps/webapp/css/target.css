@@ -144,12 +144,15 @@
 
 .map-pin {
   position: absolute;
-  width: 4px;
-  height: 4px;
-  padding: 0;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 20px;
   border: 0;
   border-radius: 0;
-  background: rgba(107, 114, 128, 0.4);
+  background-color: rgba(107, 114, 128, 0.4);
+  background-clip: content-box;
   box-shadow: none;
   transform: translate(-50%, -50%);
   cursor: pointer;
@@ -157,26 +160,26 @@
 }
 
 .map-pin.next {
-  background: rgba(210, 47, 39, 0.4);
+  background-color: rgba(210, 47, 39, 0.4);
   z-index: 5;
 }
 
 .map-pin.selected {
-  background: rgba(0, 90, 156, 0.4);
+  background-color: rgba(0, 90, 156, 0.4);
   z-index: 4;
 }
 
 .map-pin.start {
-  background: rgba(255, 255, 255, 0.4);
+  background-color: rgba(255, 255, 255, 0.4);
   z-index: 4;
 }
 
 .map-pin.done {
-  background: rgba(21, 128, 61, 0.4);
+  background-color: rgba(21, 128, 61, 0.4);
 }
 
 .map-pin.hold {
-  background: rgba(183, 121, 31, 0.4);
+  background-color: rgba(183, 121, 31, 0.4);
 }
 
 .target-sheet-name {

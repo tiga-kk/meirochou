@@ -1,7 +1,7 @@
 # Current Progress
 
 **更新日:** 2026-07-26
-**現在の段階:** Phase 5C Task 8完了（Reload Recovery and Local Data Deletion）
+**現在の段階:** Phase 5C Task 9レビュー修正・検証完了（Mobile E2E and Accessibility Verification。runtime接続はTask 10で確認）
 
 ## コード実装
 
@@ -51,11 +51,19 @@ Task 8の実装:
 - 管理画面の削除説明を、距離行列と再開snapshotの保持・削除境界に合わせて更新
 - 再読込dialog、route geometry再構築、warm-start実行はTask 9のnavigation UI/E2E接続へ移管
 
+Task 9の実装:
+
+- `tests/e2e/navigation-mobile.spec.ts`:
+  - モバイルnavigation UIの基礎状態、ターゲット表示、タッチターゲット（>=44px）、ポートレート幅横スクロールオーバーフロー非発生、外部ネットワークリクエスト非発生、コンソール/ページエラー検出なしを検証
+- `tests/e2e/navigation-keyboard.spec.ts`:
+  - デスクトップキーボードフォーカス、Tab移動、Escapeダイアログクローズ等のキーボード操作性を検証
+- UI/UXの統合: 44px hit area、focus ring、Escape focus return、200% zoom、portrait overflow、外部通信監視を接続。
+- Font Awesome/Twitter widgetの外部CDN依存を除去し、ローカルicon CSSへ移行。same-origin外の自動通信を発生させない。
+- `NavigationSnapshotRepository`のreload/resume dialog接続、route geometry再構築、warm-startのApp runtime接続は未確認。Task 10のexit gateでBLOCKER判定する。
+
 ## 検証
 
-Task 5 focused test 27件、Task 6 focused test 24件、Task 7 focused test 14件。Task 8 core focused test 18件、関連UI/管理テスト41件はGREEN。Task 8変更を含む`npm run test:webapp`は46ファイル454件PASS。build、artifact検証、Biome、git diff検査はPASS。
-
-`npm run test:e2e`は標準の`test-results`とVite cacheが`nobody`所有で書込み不可だったため、そのままでは起動できなかった。生成物出力先と一時Vite設定を使った同一Playwright実行では39件中31 failed・8 skippedとなった。失敗は全てmobile-chromiumで、初期画面のlocatorが存在しない／表示されない状態だったため、Task 8の変更が原因と断定せず、E2E環境・既存mobile suiteの別途調査事項として残す。
+Task 5 focused test 27件、Task 6 focused test 24件、Task 7 focused test 14件。Task 8 core focused test 18件、関連UI/管理テスト41件はGREEN。Task 8変更を含む`npm run test:webapp`は46ファイル454件PASS。Task 9 focused E2E 3件、全Playwright 34件PASS・8件SKIP。型チェック、build、artifact検証、Biome、git diff検査もPASS。
 
 ## 統合済み
 
@@ -78,12 +86,13 @@ Task 5 focused test 27件、Task 6 focused test 24件、Task 7 focused test 14�
 - Phase 5C Task 5: **実装・検証完了**（コミット未）。
 - Phase 5C Task 6: **実装・レビュー修正・検証完了**（`33f3f58`）。
 - Phase 5C Task 7: **実装・レビュー修正・検証完了・コミット済み**（`3bc7b7e`）。
-- Phase 5C Task 8: **実装・レビュー修正・検証完了・コミット済み**（`6afdb13`）。
+- Phase 5C Task 8: **実装・レビュー修正・検証完了・コミット済み**（`12dced1`）。
+- Phase 5C Task 9: **レビュー修正・検証完了・コミット済み**（本コミット。E2E/accessibility、reload/resume runtime未確認）。
 
 ## 次の操作
 
-1. Phase 5C Task 9 (Mobile UX, Accessibility, and Visual Verification) の実装に着手する。
-2. Task 9で再読込dialog、route geometry/warm-start接続、mobile E2Eを実装・検証する。
+1. Phase 5C Task 10 (Phase Verification and Handoff) のexit gateでreload/resume runtime接続を確認する。
+2. 未接続の場合はTask 10の完了条件を満たすまでPhase 5Cを完了扱いにしない。
 
 ## 人手入力
 

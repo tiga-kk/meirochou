@@ -105,7 +105,14 @@ header {
   font-weight: 900;
   cursor: pointer;
   padding: 8px 10px;
+  min-height: 44px;
+  min-width: 44px;
   box-shadow: var(--button-shadow);
+}
+
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 3px;
 }
 
 .settings-btn {

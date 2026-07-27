@@ -23,7 +23,10 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testMatch: ["**/c108-map-browser-smoke.spec.ts"],
+      testMatch: [
+        "**/c108-map-browser-smoke.spec.ts",
+        "**/navigation-keyboard.spec.ts",
+      ],
       use: { ...devices["Desktop Chrome"] },
     },
     {
