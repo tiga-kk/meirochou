@@ -1,125 +1,145 @@
-# Phase 5D Webapp Architecture Refactor Implementation Plan
+# Phase 5D Apps Internal Refactor Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 外部挙動を変えずに`App`、`DataManager`、`UIManager`へ集中した責務をfeature別Controller、Use Case、Domain、Port、Infrastructureへ段階移行し、3つの巨大facadeを削除または最小化する。
+**Goal:** user-visible behaviorを変えずに`apps/webapp/`をfeature別構造へ移し、`App`、`DataManager`、`UIManager`、`Config`、central type filesを削除する。
 
-**Architecture:** 機能別モジュラーモノリスを採用し、各feature内部でUI → Controller → Application → Domainの依存方向を守る。LocalStorage、GAS、fetch、Web Workerは内側で定義したPortを実装し、`app/composition-root.ts`だけがconcrete implementationを接続する。各Taskで旧facadeを一時adapterとして利用し、二重正本を作らずに責務を一つずつ移す。
+**Architecture:** featureごとにDomain、Use Case、Infrastructure、UIをまとめる。Use Caseは能力を表すinterfaceへ依存し、LocalStorage、GAS、HTTP、Web Workerのconcrete implementationは`app/assemble-comipath-application.ts`だけが接続する。
 
 **Tech Stack:** TypeScript strict、Lit、Vite、LocalStorage、GAS Web App、Web Worker、Vitest、Playwright、Biome、Node.js architecture checker。
 
 **Design:** `../../specs/2026-07-28-phase-05d-architecture-refactor-design.md`
-
 **Architecture rules:** `../../architecture/webapp-module-boundaries.md`
+**Naming rules:** `../../architecture/webapp-naming-guidelines.md`
 
-## Global Constraints
+## Global constraints
 
-- Phase 5Cの外部挙動、LocalStorage schema、GAS contract、CSV contract、navigation state、snapshot、distance matrix、ALNS objectiveを変更しない。
-- UIの広範な見た目変更を行わない。広範なvisual polishはPhase 5Eへ送る。
+- Phase 5Cの外部挙動、LocalStorage schema、GAS contract、CSV contract、route guidance state、snapshot、distance matrix、ALNS objectiveを変更しない。
 - package dependencyを追加しない。
 - 新規production moduleはTypeScript strictで実装する。
 - `any`を追加しない。
 - 外部入力は`unknown`として受け、runtime parserで検証する。
-- active event/day stateのmutable正本を複数作らない。
-- feature間は各feature rootの`index.ts`だけをcross-feature importに使用する。
-- DomainとApplicationからDOM、LocalStorage、GAS、fetch、Workerを直接利用しない。
-- Litは既存component用途を維持し、地図描画全体を作り直さない。
-- raw CSV、GAS URL、sheet内容、外部投稿本文、元地図、credentialをlog、snapshot、artifactへ出さない。
-- 各Taskは独立したcommit候補とし、Task文書の変更可能ファイル外を変更しない。
-- 各Task終了時にproduction build可能かつ既存機能を利用可能にする。
-- visual snapshot更新は、見た目変更がないことをレビューで確認できる場合だけ許可する。
-- Phase完了時に`app.js`、`data-manager.ts`、`ui-manager.js`を削除する。
-- Phase完了時に`app/app.ts`を200 physical lines以下にする。
+- active event/dayとroute guidance runtimeのmutable正本を複数作らない。
+- cross-feature importは`public-api.ts`だけを使う。
+- DomainとUse CaseからDOM、LocalStorage、GAS、HTTP、Workerを直接利用しない。
+- vague nameを追加しない。
+- UIの広範な見た目変更を行わない。
+- 各Task終了時にbuild可能かつ既存主要機能を利用可能にする。
+- visual snapshot更新は、不可避なDOM変更でも見た目が同一とレビューで確認できた場合だけ許可する。
+- Task 4-7は同じlegacy filesを段階変更するため並行実装しない。
 
----
+## Entry gate
 
-## Entry Gate
-
-- Phase 5C Task 11とPhase 5C Exit Gateが完了している。
-- `main`で`npm run verify`、`npm run test:e2e`、C108 smokeの成功記録が存在する。
-- designとmodule boundary文書が承認済みである。
+- Phase 5C Task 11とExit Gateが完了している。
+- baselineとして455/455 tests、typecheck、buildが成功している。
+- Git working treeがcleanである。
+- design、module boundary、naming文書が承認済みである。
 - Phase 5D implementation branch作成がユーザーに承認されている。
-- implementation開始前に最新`main`、remote、working treeを再確認する。
+- implementation subagent起動前にTask 1のpreflightを実行する。
 
-## Target file map
+## Target structure
 
 ```text
 apps/webapp/js/
 ├── app/
-│   ├── app.ts
-│   ├── bootstrap.ts
-│   ├── composition-root.ts
-│   └── app-lifecycle.ts
+│   ├── browser-entrypoint.ts
+│   ├── run-comipath-in-browser.ts
+│   ├── assemble-comipath-application.ts
+│   ├── comipath-application.ts
+│   └── bind-browser-events.ts
 ├── features/
 │   ├── event-day/
 │   │   ├── domain/
-│   │   ├── application/
-│   │   ├── ports/
+│   │   ├── use-cases/
 │   │   ├── infrastructure/
-│   │   ├── presentation/
-│   │   └── index.ts
-│   ├── circle-state/
-│   ├── navigation/
-│   ├── source-management/
-│   └── storage-management/
+│   │   ├── ui/
+│   │   └── public-api.ts
+│   ├── circle-status/
+│   ├── route-guidance/
+│   ├── circle-data-source/
+│   └── local-data-deletion/
 ├── shared/
 │   ├── domain/
-│   ├── infrastructure/
-│   └── presentation/
+│   ├── browser/
+│   └── ui/
 └── components/
 ```
 
-既存pure algorithm、repository、parserは、対応feature Taskで責務を確認してからmoveする。Task 1で一括moveしない。
+## Audited source paths
 
-## Task Table
+source pathsは`main` commit `be3d604d2da0d333dc2dab850f8bb1202ef47e49`で確認した。
 
-| Task | 正本 | 成果物 |
+| Task | Existing source paths |
+|---|---|
+| 3 | `data/event-day-key.ts`、`state/event-day-repository.ts`、`data-manager.ts` |
+| 4 | `state/purchase-mutation-service.ts`、`state/circle-state-undo-service.ts`、`state/gas-outbox-service.ts`、`state/gas-sync-coordinator.ts`、`ui/management-view-model.ts`、`ui/management-events.ts` |
+| 5 | `navigation/*`、`routing/*`、`route-planner.ts`、`tsp-solver.js`、`config.ts`、`ui/navigation-view-model.ts` |
+| 6 | `data/csv-circle-codec.ts`、`data/source-diff.ts`、`data/gas-refresh-service.ts`、`api/gas-api-client.ts`、`ui/management-session.ts`、`ui/management-view-model.ts`、`ui/management-events.ts`、`ui/csv-download.ts` |
+| 7 | `state/event-day-transition-service.ts`、`state/storage-deletion-service.ts`、`data/event-registry.ts`、`map-manifest-loader.ts`、`config.ts`、`ui/management-view-model.ts`、`ui/management-events.ts` |
+| 8 | `ui-manager.js`、`map-renderer.js`、`stats-renderer.js`、`modal-manager.js`、`ui/navigation-view-model.ts` |
+
+Task開始時にはTask文書のexact preflightを再実行し、source/target不整合があればsubagentを起動しない。
+
+## Task table
+
+| Task | Canonical document | Deliverable |
 |---|---|---|
-| 1 | `task-01-characterization-and-architecture-guardrails.md` | 外部挙動characterization、import graph checker、legacy allowlist |
-| 2 | `task-02-composition-root-and-app-shell.md` | bootstrap分離、composition root、lifecycle、legacy App adapter |
-| 3 | `task-03-active-event-day-session.md` | active event/dayの単一正本、query、repository port |
-| 4 | `task-04-circle-state-and-sync-extraction.md` | purchase/hold/excluded/undo、GAS mutation、sync Controller |
-| 5 | `task-05-navigation-feature-extraction.md` | navigation Controller、Use Case、route asset/optimizer/snapshot Port |
-| 6 | `task-06-source-management-extraction.md` | CSV/GAS preview/apply/export、outbox管理Controller |
-| 7 | `task-07-event-day-and-storage-controllers.md` | event/day transition、storage deletion、settings lifecycle |
-| 8 | `task-08-ui-view-split.md` | Navigation/Location/Management/Statistics/Toast/Map View分割 |
-| 9 | `task-09-remove-legacy-facades.md` | `App`最小化、`DataManager`/`UIManager`/旧`app.js`削除、allowlist廃止 |
-| 10 | `task-10-phase-verification-and-handoff.md` | clean install、全E2E、C108 smoke、architecture audit、handoff |
+| 1 | `task-01-lock-current-behavior-and-architecture-rules.md` | behavior characterization、architecture/naming checker |
+| 2 | `task-02-separate-browser-startup-and-dependency-assembly.md` | browser entrypoint、application assembly、legacy application wrapper |
+| 3 | `task-03-centralize-active-event-day-state.md` | `ActiveEventDaySession`、reader、repository contract |
+| 4 | `task-04-extract-circle-status-and-gas-update-queue.md` | circle status Use Cases、pending GAS update queue/sender |
+| 5 | `task-05-extract-route-guidance.md` | route guidance Controller、Use Cases、map assets、optimizer、snapshot |
+| 6 | `task-06-extract-circle-data-source-workflows.md` | CSV/Google Sheets preview・apply・export |
+| 7 | `task-07-extract-event-day-switching-and-local-data-deletion.md` | event/day switching、local data deletion、`Config`削除 |
+| 8 | `task-08-split-feature-specific-dom-views.md` | feature-specific DOM Views、大きなUI utility分割 |
+| 9 | `task-09-remove-legacy-app-data-ui-and-central-types.md` | legacy application/data/UI/config/type files削除 |
+| 10 | `task-10-verify-apps-refactor-and-write-handoff.md` | clean verification、C108 smoke、apps architecture handoff |
 
-## Required Order
+## Required order
 
 Task 1 → Task 2 → Task 3 → Task 4 → Task 5 → Task 6 → Task 7 → Task 8 → Task 9 → Task 10
 
-Task 4、5、6、7は同じlegacy facadeを段階的に変更するため、並行実装しない。Task 8はController contract確定後に実施する。Task 9は全featureが旧facade経由でなく動作するまで開始しない。
+Task 5はroute guidance screen modelを新規作成する。Task 8はold `ui/navigation-view-model.ts`を同pathへmoveせず、残存責務を複数の明確なfileへ分割し、screen formattingだけをTask 5のfileへ統合する。
 
 ## Migration rule
 
 各Taskは次の順序を守る。
 
-1. 現行の外部挙動を表す失敗testを追加する。
-2. 新しいfeature contractとfakeを定義する。
-3. 旧facadeの対象責務を新Use Caseへ委譲する。
-4. production event bindingを新Controllerへ切り替える。
-5. 旧method/propertyのproduction callerを0にする。
-6. 対象legacy codeを削除する。
-7. architecture allowlistから解消項目を削除する。
-8. focused test、full webapp test、buildを実行する。
-9. diffとimport graphを自己レビューする。
-10. Task単位でcommit候補を提示する。
+1. exact source/target preflight
+2. public behaviorの失敗test
+3. namingとpublic interfaceの確認
+4. new Use Caseとfake dependency
+5. legacy codeからnew Use Caseへのdelegation
+6. production event binding切替
+7. old callerを0にする
+8. old implementation削除
+9. architecture allowlist縮小
+10. focused test、full test、typecheck、build
+11. diff、import graph、naming self-review
+12. Task単位commit候補提示
 
-## Exit Gate
+## Phase boundary
+
+Phase 5Dは`apps/webapp/`内部のproduction architectureを完成させる。`tests/`のfeature別再配置、fixture命名、test script整理、および`docs/`の正本・archive構造整理はPhase 5Eで行う。広範なvisual polishはPhase 5Fで行う。
+
+## Exit gate
 
 - `apps/webapp/js/app.js`が存在しない。
 - `apps/webapp/js/data-manager.ts`が存在しない。
 - `apps/webapp/js/ui-manager.js`が存在しない。
-- `apps/webapp/js/app/app.ts`が200 physical lines以下である。
-- `scripts/webapp-architecture-legacy-allowlist.json`が存在しない。
+- `apps/webapp/js/config.ts`が存在しない。
+- `apps/webapp/js/types/domain.ts`が存在しない。
+- `apps/webapp/js/types/boundary-parsers.ts`が存在しない。
+- `apps/webapp/js/app/comipath-application.ts`が200 physical lines以下である。
+- architecture legacy allowlistが存在しない。
+- vague new namesがarchitecture checkerで拒否される。
 - active event/dayのmutable正本が`ActiveEventDaySession`に一つだけ存在する。
-- Appはfeature controllerのinit/disposeとglobal lifecycleだけを扱う。
-- feature application codeがconcrete LocalStorage、GAS、fetch、Workerをimportしない。
-- componentがrepository、GAS client、Worker controllerをimportしない。
+- route guidance runtimeのmutable正本が`RouteGuidanceSession`に一つだけ存在する。
+- production applicationがrouting algorithm、CSV parser、storage key、GAS protocolをimportしない。
+- feature Use Caseがconcrete LocalStorage、GAS、HTTP、Workerをimportしない。
+- componentがrepository、client、loader、optimizerをimportしない。
 - feature間deep importがない。
-- LocalStorage migration、GAS local-first、outbox、CSV preview、event/day切替、purchase/hold/excluded、navigation、resume、deleteの既存契約が維持される。
-- desktop/mobile E2Eで既存主要操作が成功する。
+- LocalStorage migration、GAS local-first、CSV preview、event/day switching、circle status、route guidance、resume、delete contractが維持される。
+- desktop/mobile E2Eが成功する。
 - `npm run verify`、`npm run test:e2e`、C108 smoke、public audit、architecture checkが成功する。
 - `docs/reviews/phase-05d-handoff.md`が作成される。
