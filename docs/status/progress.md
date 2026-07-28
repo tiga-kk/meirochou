@@ -1,141 +1,113 @@
 # Current Progress
 
-**更新日:** 2026-07-27
-**現在の段階:** Phase 5C Task 11実装・検証完了
+**更新日:** 2026-07-28
+**現在の段階:** Phase 5C完了。Phase 5D architecture refactor設計・実装計画作成済み、実装未着手。
 
-## コード実装
+## 現在の正本
 
-Phase 5C Task 5のpure kernel・Worker・controller・repositoryを実装・レビュー修正した。
+- Phase 5C plan: `docs/plans/phase-05c/README.md`
+- Phase 5C handoff: `docs/reviews/phase-05c-handoff.md`
+- Phase 5D design: `docs/specs/2026-07-28-phase-05d-architecture-refactor-design.md`
+- Phase 5D architecture rules: `docs/architecture/webapp-module-boundaries.md`
+- Phase 5D plan: `docs/plans/phase-05d/README.md`
 
-- `buildDistanceMatrixCacheKey`: コンテントアドレス型キャッシュキー生成（メタデータ依存排除、grid/endpoint/version駆動）
-- `dijkstraFromCell` / `computeAllPairsDistances`: all-pairsパス幾何学を保存せず平坦配列へ計算する純粋Dijkstraカーネル（crowded weight 1.5対応）
-- `DistanceMatrixWorkerKernel` / Worker protocol: キャンセル・進捗（N endpoints）・ETA・stale jobId拒否
-- `DistanceMatrixController`: cache hit/miss、UI progress model、stale response、cancel
-- `LocalStorageDistanceMatrixRepository`: runtime検証、`Infinity`復元、クォータエラーの安全な捕捉
+## Phase 5C完了状態
 
-Task 6以降の最適化設計は2026-07-27に改訂した。
+Phase 5Cでは次をproduction Appへ統合した。
 
-- 時間制限付きTOPTWを廃止し、購入完了時刻に応じた時間減衰価値を最大化するALNSを採用する。
-- 地図内の総滞在時間とサークル個別締切を要求しない。
-- Task 5の重み付きdistance matrixは維持し、Task 6でarea別係数により秒へ変換する。
-- 半減時間は30/60/120分の等重み、通常service timeは30秒、壁service timeは200秒とする。
-- search timeは5/10/15秒、defaultは10秒とする。
-- production solverはALNSのみとし、GAは実装しない。
-- 正本追補: `docs/specs/2026-07-27-phase-05c-time-decayed-alns-amendment.md`
+- 排他的circle state
+- 任意始点と地図別session
+- weighted distance matrix WorkerとLocalStorage cache
+- distance-to-time adapter
+- 30/60/120分の時間減衰価値を最大化するALNS
+- search time 5/10/15秒、default 10秒
+- current leg固定、warm start、progress、cancel
+- 到着、購入、保留、manual target変更
+- navigation snapshot、reload resume、始点再設定
+- source変更・削除時のsnapshot/matrix invalidation
+- desktop/mobile/keyboard/accessibility E2E
+- C108 4 areaのdesktop/mobile smoke
 
-Task 6の実装・レビュー修正:
+Phase 5C Task 11の最終記録:
 
-- `OptimizationTimingProfile` & `convertDistanceToTravelTime`: 重み付きグリッド距離からエリア別移動秒数への純粋アダプター
-- `calculateDecay` & `evaluateRouteScore`: 半減時間（30分, 60分, 120分等重み）の購入完了時間ベースTime-Decayed評価関数
-- `TimeDecayedAlnsSolver`: 探索時間制限（5s, 10s, 15s）、決定性擬似乱数、複数初期候補、Destroy & Repair、`fixedFirstTarget`固定、warm-start解保持
-- `TimeDecayedAlnsWorkerKernel` / protocol / entrypoint: `time-decayed-alns` stage、progress、complete、cancelled、error、途中キャンセル時の最新best返却
-- settings component: 5/10/15秒の探索時間選択とdefault 10秒
+- focused navigation runtime tests: PASS
+- `npm run test:webapp`: PASS
+- `npm run check:webapp`: PASS
+- `npm run build:webapp`: PASS
+- `npm run test:e2e`: PASS（意図されたSKIPを除く）
+- C108 desktop/mobile smoke: PASS
+- `node scripts/audit-public-tree.mjs`: PASS
+- Phase 5C branchはPR #6で`main`へ統合済み
 
-Task 7の実装・レビュー修正:
+## Phase 5Dの決定
 
-- `NavigationOrchestrationService`: 始点直後の暫定target、到着前保留、到着後購入、手動target変更、Worker progress/cancelを統合
-- Worker結果は現在targetを先頭に保持し、`bestOrder`だけを更新。`provisionalOrder`、current position、locked first legを上書きしない
-- optimizer generationを追加し、cancelまたは状態遷移後の古いWorker progressを破棄
-- `buildOptimizationProblem`: Task 5のN×N circle matrix、始点距離、area別timing profile、priority、service timeをTask 6 problemへ変換
-- 未知area、不足行列、負値・非数の距離を明示的に拒否し、Task 5の距離行列を黙ってfallbackしない
+Phase 5Dは、厳密な層別Clean Architectureの全面導入ではなく、機能別モジュラーモノリスへClean Architectureの依存方向を適用する。
 
-Task 8の実装:
+```text
+UI / Components
+      ↓
+Feature Controller / View
+      ↓
+Application Use Case
+      ↓
+Domain
 
-- `LocalStorageNavigationSnapshotRepository` & `validateSnapshotForResume`:
-  - schema、event/day identity、案内状態（`navState`）、確定位置（`currentPosition`）、locked leg、最適化時間設定をruntime parser経由で永続化
-  - Workerプロセスや未処理Promiseなどのランタイム状態を保存対象から完全除外
-  - バンドルバージョン、pending候補、circle state、target endpointの不一致を安全に再開拒否
-- `StorageDeletionService`:
-  - 巡回状態の初期化（`activity`削除）時に距離行列（`distance matrix`）を保持し、ナビゲーションスナップショットのみ削除
-  - circle source変更、日程データの完全削除（`event-day` / `all-events`削除）時に距離行列およびスナップショットを削除
-- 管理画面の削除説明を、距離行列と再開snapshotの保持・削除境界に合わせて更新
-- 再読込dialog、route geometry再構築、warm-start実行はTask 9のnavigation UI/E2E接続へ移管
+Application Use Case
+      ↓
+Port / Repository interface
+      ↑
+LocalStorage / GAS / fetch / Worker
+```
 
-Task 9の実装:
+最終目標:
 
-- `tests/e2e/navigation-mobile.spec.ts`:
-  - モバイルnavigation UIの基礎状態、ターゲット表示、タッチターゲット（>=44px）、ポートレート幅横スクロールオーバーフロー非発生、外部ネットワークリクエスト非発生、コンソール/ページエラー検出なしを検証
-- `tests/e2e/navigation-keyboard.spec.ts`:
-  - デスクトップキーボードフォーカス、Tab移動、Escapeダイアログクローズ等のキーボード操作性を検証
-- UI/UXの統合: 44px hit area、focus ring、Escape focus return、200% zoom、portrait overflow、外部通信監視を接続。
-- Font Awesome/Twitter widgetの外部CDN依存を除去し、ローカルicon CSSへ移行。same-origin外の自動通信を発生させない。
-- `NavigationSnapshotRepository`のreload/resume dialog、route geometry再構築、warm-start実行をApp runtimeへ接続した。production navigationはorchestration経路へ切り替え、旧順序決定はdev fixture専用helperへ隔離した。
+- `apps/webapp/js/app.js`削除
+- `apps/webapp/js/data-manager.ts`削除
+- `apps/webapp/js/ui-manager.js`削除
+- `apps/webapp/js/app/app.ts`を200 physical lines以下へ縮小
+- active event/day stateを`ActiveEventDaySession`へ一元化
+- feature間deep import禁止
+- architecture allowlistなしでimport graph check成功
+- 既存LocalStorage、GAS、CSV、navigation、E2E contract維持
 
-## Task 10の最終検証・Handoff
+## Phase 5D Task一覧
 
-- Handoff文書作成: `docs/reviews/phase-05c-handoff.md`
-- CIと同じPlaywright containerでsnapshotを再生成し、全Playwright 34件PASS・8件SKIPを確認。
-- clean installの`npm run verify`は46 files・454 tests PASS、型チェック・build・GAS検証・`audit-public-tree`検査をクリア。
-- C108実ブラウザsmokeはdesktop 4 area・mobile 4 areaの計8件PASS。
-- `App`本体へsnapshot load/save/clear、reload/resume dialog、route geometry再構築、ALNS warm-start、production orchestration経路を接続し、Phase 5C完了のclean verificationを通過した。
+1. Characterization and Architecture Guardrails
+2. Composition Root and App Shell
+3. Active Event Day Session
+4. Circle State and Sync Extraction
+5. Navigation Feature Extraction
+6. Source Management Extraction
+7. Event Day and Storage Controllers
+8. UI View Split
+9. Remove Legacy Facades
+10. Phase Verification and Handoff
 
-## Task 11の計画
-
-- 正本: `docs/plans/phase-05c/task-11-app-runtime-lifecycle-integration.md`
-- `NavigationRuntimeController`をcomposition/lifecycle adapterとして追加する。
-- `App`起動時のsnapshot load・validation、resume dialog、route geometry再構築、saved `bestOrder`のALNS warm-startを接続する。
-- 到着、購入、保留、手動target変更、Worker更新、探索時間変更後にsnapshotをsaveする。
-- C108 production navigationの候補順序を旧`TspSolver`からPhase 5C orchestrationへ切り替える。
-- desktop/mobileのreload→resume、reload→始点再設定E2Eを追加し、Task 10 Exit Gateを再実行する。
-
-## Task 11レビュー・検証（2026-07-27更新）
-
-- `npx vitest run --root . tests/navigation-runtime-startup.test.ts tests/navigation-runtime-controller.test.ts`: 2 files / 24 tests PASS。
-- `npm run test:webapp`: 46 files / 455 tests PASS。
-- `npm run check:webapp`: PASS。
-- `npm run build:webapp`: PASS。
-- `npx biome check`、`git diff --check`: PASS。
-- `npx playwright test tests/e2e/navigation-resume.spec.ts --project=chromium --project=mobile-chromium`: 4 tests PASS。
-- `npm run test:e2e`: 46 tests中38 PASS / 8 SKIP。
-- `RUN_C108_SMOKE=1 npx playwright test tests/c108-map-browser-smoke.spec.ts --project=chromium --project=mobile-chromium`: 8 tests PASS。
-- `node scripts/audit-public-tree.mjs`: PASS。
-
-## 統合済み
-
-- Phase 4はPR #2で`main`へ統合済み。
-- Phase 5AはPR #3で`main`へ統合済み。
-- Phase 5A merge後に確認された`main` commitは`b731e8e0a14cb80d27551630f79d4a8cadff046c`。
-- Cloudflare Pages production公開はPhase 5Aで完了済み。
-
-作業開始時は現在の`main`、remote、working treeを再確認する。
+Taskは順番に実施し、同じlegacy facadeを触るTask 4-7を並行実装しない。
 
 ## 承認状態
 
-- Phase 5B/5C共有設計: 承認済み。ALNS追補がoptimizer条項を上書きする。
-- Phase 5B正式実装計画: 承認済み（全Tasks 1-6完了）。
-- Phase 5C正式実装計画: 承認済み。
-- Phase 5C Task 1: **実装・検証完了**。
-- Phase 5C Task 2: **実装・検証完了**。
-- Phase 5C Task 3: **実装・検証完了**（コミット未）。
-- Phase 5C Task 4: **実装・検証完了**（コミット未）。
-- Phase 5C Task 5: **実装・検証完了**（コミット未）。
-- Phase 5C Task 6: **実装・レビュー修正・検証完了**（`33f3f58`）。
-- Phase 5C Task 7: **実装・レビュー修正・検証完了・コミット済み**（`3bc7b7e`）。
-- Phase 5C Task 8: **実装・レビュー修正・検証完了・コミット済み**（`12dced1`）。
-- Phase 5C Task 9: **レビュー修正・検証完了・コミット済み**（CI snapshot修正をTask 10で実施。navigation runtime未確認）。
-- Phase 5C Task 10: **レビュー・検証完了、CI snapshot修正済み**（`e972f98`。navigation runtimeはTask 11で接続）。
-- Phase 5C Task 11: **実装・レビュー修正・検証完了**。
+- Phase 5B/5C共有設計: 承認済み
+- Phase 5C ALNS追補: 承認済み
+- Phase 5B: 完了
+- Phase 5C: 完了
+- Phase 5D architecture design: 承認済み
+- Phase 5D implementation plan: 作成済み
+- Phase 5D implementation: 未着手
+- Phase 5E visual polish: Phase 5D完了後に計画
 
 ## 次の操作
 
-1. Task 11の変更をcommitし、feature branchをremoteへpushする。
-2. Phase 5C Exit Gateの最終レビューを行う。
-3. Phase 5Dへ進む場合は別Taskとして計画する。
+1. Phase 5D実装開始指示を受けたら、最新`main`、remote、working treeを確認する。
+2. ユーザー承認後にPhase 5D implementation branchを作成する。
+3. `AGENTS.md`、Phase 5D design、architecture rules、Phase README、Task 1の順で読む。
+4. Phase 5D Task 1だけをTDDで実装する。
+5. Task 1の差分・検証結果・commit candidateを提示し、承認境界を守る。
 
-## 人手入力
+## 変更禁止の継続事項
 
-Phase 5B Task 1開始前:
-
-- Git管理外の`/maps/C108/`へ4地図の完成済みSVG、points、grid metadata、grid binaryを配置する。
-- 元地図、OCR入力、Python地図生成コード、中間画像をWebリポジトリへ入れない。
-
-Phase 5C Task 6開始前:
-
-- Python版TOPTW参照実装の配置は不要。
-- Task 5のdistance matrix契約を変更しない。
-- 初期timing profile、半減時間、service time、search timeは設計追補の値を使用する。
-- 壁分類が信頼できないcircleは通常service time 30秒として扱う。
-
-## GitHub上の計画文書
-
-正式計画文書は`feature/phase5c` branch上の`docs/plans/phase-05c/`と`docs/specs/`を正本とする。
+- `/maps/`の私的作業領域をGit管理へ追加しない。
+- 元地図、OCR入力、Python生成コード、中間画像をWebリポジトリへ追加しない。
+- 実地図を一般unit/E2E fixtureへコピーしない。
+- raw CSV、GAS URL、sheet内容、外部投稿本文、credentialをartifactへ出さない。
+- Phase 5DでLocalStorage schema、GAS contract、ALNS objective、timing profile、map assetを変更しない。
