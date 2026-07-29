@@ -1,0 +1,292 @@
+[
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/api/gas-api-client.ts",
+    "imported": "../types/boundary-parsers"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/api/gas-api-client.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/app.js",
+    "imported": "./config.js"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/app.js",
+    "imported": "./data-manager.js"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/app.js",
+    "imported": "./types/boundary-parsers"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/app.js",
+    "imported": "./ui-manager.js"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/components/circle-detail-dialog.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/components/outbox-panel.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "vague-name",
+    "importer": "apps/webapp/js/components/source-manager.ts",
+    "imported": null
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/components/source-manager.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/config.ts",
+    "imported": "./types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/data/csv-circle-codec.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/data/event-day-key.ts",
+    "imported": "../types/boundary-parsers"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/data/event-day-key.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/data/event-registry.ts",
+    "imported": "../types/boundary-parsers"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/data/event-registry.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/data/gas-refresh-service.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/data/local-state-adapters.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/data/source-diff.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/data/source-snapshot.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/data-manager.ts",
+    "imported": "./config.js"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/data-manager.ts",
+    "imported": "./types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/map-manifest-loader.ts",
+    "imported": "./types/boundary-parsers"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/map-manifest-loader.ts",
+    "imported": "./types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/map-renderer.js",
+    "imported": "./config.js"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/map-renderer.js",
+    "imported": "./types/boundary-parsers"
+  },
+  {
+    "ruleId": "vague-name",
+    "importer": "apps/webapp/js/modal-manager.js",
+    "imported": null
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/navigation/navigation-orchestration.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/navigation/navigation-runtime-controller.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/navigation/optimization-input-adapter.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/navigation/start-selection.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/route-planner.ts",
+    "imported": "./types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/state/circle-state-undo-service.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/state/event-day-repository.ts",
+    "imported": "../types/boundary-parsers"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/state/event-day-repository.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/state/event-day-transition-service.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/state/gas-outbox-service.ts",
+    "imported": "../types/boundary-parsers"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/state/gas-outbox-service.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/state/gas-sync-coordinator.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/state/navigation-snapshot-repository.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/state/navigation-state.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/state/purchase-mutation-service.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/state/source-settings-service.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/state/storage-deletion-service.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/state/storage-schema.ts",
+    "imported": "../types/boundary-parsers"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/state/storage-schema.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/stats-renderer.js",
+    "imported": "./config.js"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/tsp-solver.js",
+    "imported": "./config.js"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/types/boundary-parsers.ts",
+    "imported": "./domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/ui/circle-list-view-model.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/ui/csv-download.ts",
+    "imported": "../types/boundary-parsers"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/ui/csv-download.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/ui/management-events.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/ui/management-session.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/ui/management-view-model.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/ui/navigation-view-model.ts",
+    "imported": "../types/domain"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/ui-manager.js",
+    "imported": "./config.js"
+  },
+  {
+    "ruleId": "vague-name",
+    "importer": "apps/webapp/js/utils/gesture-helper.js",
+    "imported": null
+  }
+]
