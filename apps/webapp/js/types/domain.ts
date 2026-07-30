@@ -7,7 +7,6 @@ import type {
   GasOutboxEntry,
   LocalEventDayState,
   MapPoint,
-  SourceRef,
 } from "../features/event-day/domain/event-day-types";
 
 export type {

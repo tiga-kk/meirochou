@@ -18,11 +18,9 @@ import {
   type ActiveEventDaySession,
   createActiveEventDayReader,
   createActiveEventDaySession,
-} from "./features/event-day/public-api";
-import {
   type EventDayRepository,
   LocalStorageEventDayRepository,
-} from "./features/event-day/use-cases/event-day-repository";
+} from "./features/event-day/public-api";
 import { EventDayTransitionService } from "./state/event-day-transition-service";
 import { GasOutboxService } from "./state/gas-outbox-service";
 import { GasSyncCoordinator } from "./state/gas-sync-coordinator";

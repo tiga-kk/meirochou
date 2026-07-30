@@ -136,7 +136,8 @@ describe("App & OutboxPanel Integration", () => {
     app.dm.repository.save(ref, createSampleGasState("c104", "day1"));
     app.dm.activeEventDaySession.setActiveEventDay(
       ref,
-      app.dm.repository.load(ref)!,
+      app.dm.repository.load(ref) ??
+        createSampleGasState(ref.eventId, ref.dayId),
     );
 
     const retrySpy = vi
@@ -162,7 +163,8 @@ describe("App & OutboxPanel Integration", () => {
     app.dm.repository.save(ref, initialState);
     app.dm.activeEventDaySession.setActiveEventDay(
       ref,
-      app.dm.repository.load(ref)!,
+      app.dm.repository.load(ref) ??
+        createSampleGasState(ref.eventId, ref.dayId),
     );
 
     const discardSpy = vi.spyOn(app.dm.outboxService, "discard");
@@ -191,7 +193,8 @@ describe("App & OutboxPanel Integration", () => {
     app.dm.repository.save(ref, createSampleGasState("c104", "day1"));
     app.dm.activeEventDaySession.setActiveEventDay(
       ref,
-      app.dm.repository.load(ref)!,
+      app.dm.repository.load(ref) ??
+        createSampleGasState(ref.eventId, ref.dayId),
     );
 
     const discardSpy = vi.spyOn(app.dm.outboxService, "discard");
@@ -216,7 +219,8 @@ describe("App & OutboxPanel Integration", () => {
     app.dm.repository.save(ref2, createSampleGasState("c104", "day2"));
     app.dm.activeEventDaySession.setActiveEventDay(
       ref1,
-      app.dm.repository.load(ref1)!,
+      app.dm.repository.load(ref1) ??
+        createSampleGasState(ref1.eventId, ref1.dayId),
     );
 
     app.updateManagementModels();

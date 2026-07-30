@@ -2,8 +2,8 @@ import { App } from "../app.js";
 import {
   createActiveEventDayReader,
   createActiveEventDaySession,
+  LocalStorageEventDayRepository,
 } from "../features/event-day/public-api";
-import { LocalStorageEventDayRepository } from "../features/event-day/use-cases/event-day-repository";
 import { StorageService } from "../state/storage-service";
 import {
   createComiPathApplication,

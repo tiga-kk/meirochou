@@ -60,7 +60,8 @@ describe("App & Storage Deletion Integration", () => {
     app.dm.repository.save(ref2, createSampleState("c104", "day2"));
     app.dm.activeEventDaySession.setActiveEventDay(
       ref1,
-      app.dm.repository.load(ref1)!,
+      app.dm.repository.load(ref1) ??
+        createSampleState(ref1.eventId, ref1.dayId),
     );
 
     const transitionSpy = vi
@@ -89,7 +90,8 @@ describe("App & Storage Deletion Integration", () => {
     app.dm.repository.save(deletedRef, createSampleState("c104", "day2"));
     app.dm.activeEventDaySession.setActiveEventDay(
       activeRef,
-      app.dm.repository.load(activeRef)!,
+      app.dm.repository.load(activeRef) ??
+        createSampleState(activeRef.eventId, activeRef.dayId),
     );
 
     const transitionSpy = vi.spyOn(app, "handleEventDaySelect");
@@ -117,7 +119,8 @@ describe("App & Storage Deletion Integration", () => {
     app.dm.repository.save(ref2, createSampleState("c104", "day2"));
     app.dm.activeEventDaySession.setActiveEventDay(
       ref1,
-      app.dm.repository.load(ref1)!,
+      app.dm.repository.load(ref1) ??
+        createSampleState(ref1.eventId, ref1.dayId),
     );
 
     const transitionSpy = vi

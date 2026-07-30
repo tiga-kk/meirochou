@@ -1,4 +1,3 @@
-import { getCircleVisitState } from "../../../state/storage-schema";
 import type { Circle, CircleStatus } from "../domain/event-day-types";
 import type { ActiveEventDaySession } from "./active-event-day-session";
 
@@ -20,7 +19,7 @@ export function createActiveEventDayReader(
       .map((circle) => ({ ...circle })) ?? [];
   const status = (space: string): CircleStatus => {
     const state = session.getActiveEventDay()?.state;
-    return state ? getCircleVisitState(state.circleStates, space) : "pending";
+    return state?.circleStates[space] ?? "pending";
   };
   return {
     getAllCircles: circles,
