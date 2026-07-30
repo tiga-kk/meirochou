@@ -6,7 +6,7 @@ import { Config } from "./config.js";
 import { loadEventRegistryWithUrl } from "./data/event-registry";
 import { CsvValidationError, DataManager } from "./data-manager.js";
 import { createDevDemoData, isDevDemoEnabled } from "./dev-demo-data.js";
-import { LocalStorageEventDayRepository } from "./features/event-day/use-cases/event-day-repository";
+import { LocalStorageEventDayRepository } from "./features/event-day/public-api";
 import {
   loadRuntimeMapBundleManifestFromUrl,
   renderMapBootstrapError,
