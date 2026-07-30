@@ -53,6 +53,16 @@ const mapManifest = parseMapBundleManifest(
 );
 Config.initializeAreas(mapManifest.areas);
 
+test("browser entrypoint owns startup side effects", () => {
+  const html = read("apps/webapp/index.html");
+  assert.match(
+    html,
+    /<script\s+type="module"\s+src="js\/app\/browser-entrypoint\.ts"><\/script>/,
+  );
+  const appSource = read("apps/webapp/js/app.js");
+  assert.doesNotMatch(appSource, /DOMContentLoaded/);
+});
+
 // GAS contract tests are restored for Task 4
 test("Phase 2 keeps GAS sale actions outside the local data service", () => {
   const source = read("apps/webapp/js/data-manager.ts");

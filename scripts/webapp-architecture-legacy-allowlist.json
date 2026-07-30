@@ -1,6 +1,11 @@
 [
   {
     "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/app/assemble-comipath-application.ts",
+    "imported": "../app.js"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/api/gas-api-client.ts",
     "imported": "../types/boundary-parsers"
   },

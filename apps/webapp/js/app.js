@@ -151,6 +151,9 @@ const DEFAULT_NAVIGATION_OPTIMIZATION_TIME_LIMIT_MS = 10000;
  */
 export class App {
   constructor(options = {}) {
+    this.started = false;
+    this.stopped = false;
+    this.ownedWorkers = new Set();
     this.dm = new DataManager();
     this.ui = new UIManager();
     this.session = new ManagementSession();
@@ -183,6 +186,9 @@ export class App {
     this.activeDeleteScope = null;
     this.deleteErrorMessage = "";
     this.settingsEscapeHandler = null;
+    this.ownedEventListeners = [];
+    this.ownedTimers = new Set();
+    this.ownedTimerCancels = new Map();
 
     this.downloadAdapter = {
       createObjectURL: (blob) => URL.createObjectURL(blob),
@@ -206,8 +212,45 @@ export class App {
       snapshotRepo: this.snapshotRepository,
       matrixRepo: this.matrixRepository,
       orchestration: this.orchestrationService,
-      workerFactory: options?.alnsWorkerFactory,
+      workerFactory: () => {
+        const worker = options?.alnsWorkerFactory
+          ? options.alnsWorkerFactory()
+          : new Worker(new URL("./routing/alns-worker.ts", import.meta.url), {
+              type: "module",
+            });
+        this.ownedWorkers.add(worker);
+        return worker;
+      },
     });
+  }
+
+  addOwnedEventListener(target, type, listener, options) {
+    target.addEventListener(type, listener, options);
+    this.ownedEventListeners.push(() =>
+      target.removeEventListener(type, listener),
+    );
+  }
+
+  scheduleTimeout(callback, delay, onCancel) {
+    const timer = setTimeout(() => {
+      this.ownedTimers.delete(timer);
+      this.ownedTimerCancels.delete(timer);
+      if (!this.stopped) callback();
+    }, delay);
+    this.ownedTimers.add(timer);
+    if (onCancel) this.ownedTimerCancels.set(timer, onCancel);
+    return timer;
+  }
+
+  async start() {
+    if (this.started) return;
+    this.started = true;
+    try {
+      await bootstrapApp(this);
+    } catch (error) {
+      this.started = false;
+      throw error;
+    }
   }
 
   get storageDeletionService() {
@@ -1101,10 +1144,33 @@ export class App {
 
   /** Cleanup event listeners and coordinator timers. */
   dispose() {
+    if (this.stopped) return;
+    this.stopped = true;
     this.dm.disposeSyncCoordinator();
+    for (const remove of this.ownedEventListeners.splice(0)) remove();
+    for (const timer of this.ownedTimers) clearTimeout(timer);
+    this.ownedTimers.clear();
+    for (const cancel of this.ownedTimerCancels.values()) cancel();
+    this.ownedTimerCancels.clear();
+    for (const worker of this.ownedWorkers) {
+      worker.onmessage = null;
+      worker.terminate?.();
+    }
+    this.ownedWorkers.clear();
     if (this.settingsEscapeHandler) {
       document.removeEventListener("keydown", this.settingsEscapeHandler);
       this.settingsEscapeHandler = null;
+    }
+    for (const id of [
+      "toggle-settings",
+      "btn-open-gallery",
+      "btn-search",
+      "btn-purchased",
+      "btn-hold",
+      "btn-reset-all",
+    ]) {
+      const element = document.getElementById(id);
+      if (element) element.onclick = null;
     }
   }
 
@@ -1469,7 +1535,7 @@ export class App {
       settingsToggle.click();
       settingsToggle.focus();
     };
-    document.addEventListener("keydown", this.settingsEscapeHandler);
+    this.addOwnedEventListener(document, "keydown", this.settingsEscapeHandler);
 
     const btnOpenGallery = document.getElementById("btn-open-gallery");
     if (btnOpenGallery) {
@@ -1481,70 +1547,74 @@ export class App {
     }
 
     const settings = this.ui.els.settingsArea;
-    settings.addEventListener("event-day-select", (e) => {
+    this.addOwnedEventListener(settings, "event-day-select", (e) => {
       this.handleEventDaySelect(e.detail);
     });
 
-    settings.addEventListener("csv-preview-request", (e) => {
+    this.addOwnedEventListener(settings, "csv-preview-request", (e) => {
       this.handleCsvPreviewRequest(e.detail.file);
     });
 
-    settings.addEventListener("csv-export-request", (e) => {
+    this.addOwnedEventListener(settings, "csv-export-request", (e) => {
       this.handleCsvExportRequest(e.detail.ref);
     });
 
-    settings.addEventListener("gas-sheets-request", (e) => {
+    this.addOwnedEventListener(settings, "gas-sheets-request", (e) => {
       this.handleGasSheetsRequest(e.detail.gasUrl);
     });
 
-    settings.addEventListener("gas-preview-request", (e) => {
+    this.addOwnedEventListener(settings, "gas-preview-request", (e) => {
       this.handleGasPreviewRequest(e.detail.source, e.detail.mode);
     });
 
-    settings.addEventListener("gas-retry-request", (e) => {
+    this.addOwnedEventListener(settings, "gas-retry-request", (e) => {
       this.handleGasRetryRequest(e.detail);
     });
 
-    settings.addEventListener("optimization-time-limit-change", (e) => {
-      const value = Number(e.detail?.searchTimeLimitMs);
-      if ([5000, 10000, 15000].includes(value)) {
-        this.optimizationTimeLimitMs = value;
-        if (this.navigationState) this.saveNavigationSnapshot();
-      }
-    });
+    this.addOwnedEventListener(
+      settings,
+      "optimization-time-limit-change",
+      (e) => {
+        const value = Number(e.detail?.searchTimeLimitMs);
+        if ([5000, 10000, 15000].includes(value)) {
+          this.optimizationTimeLimitMs = value;
+          if (this.navigationState) this.saveNavigationSnapshot();
+        }
+      },
+    );
 
-    settings.addEventListener("gas-discard-request", (e) => {
+    this.addOwnedEventListener(settings, "gas-discard-request", (e) => {
       this.handleGasDiscardRequest(e.detail);
     });
 
-    settings.addEventListener("delete-option-select", (e) => {
+    this.addOwnedEventListener(settings, "delete-option-select", (e) => {
       this.handleDeleteOptionSelect(e.detail.scope);
     });
 
-    settings.addEventListener("storage-delete-request", (e) => {
+    this.addOwnedEventListener(settings, "storage-delete-request", (e) => {
       this.handleStorageDeleteRequest(e.detail);
     });
 
-    settings.addEventListener("storage-delete-cancel", () => {
+    this.addOwnedEventListener(settings, "storage-delete-cancel", () => {
       this.handleDeleteDialogCancel();
     });
 
     const diffDialog = document.getElementById("source-diff-dialog");
     if (diffDialog) {
-      diffDialog.addEventListener("source-preview-apply", (e) => {
+      this.addOwnedEventListener(diffDialog, "source-preview-apply", (e) => {
         this.handleSourcePreviewApply(e.detail.previewId);
       });
-      diffDialog.addEventListener("source-preview-cancel", () => {
+      this.addOwnedEventListener(diffDialog, "source-preview-cancel", () => {
         this.handleSourcePreviewCancel();
       });
     }
 
     const resumeDialog = document.getElementById("navigation-resume-dialog");
     if (resumeDialog) {
-      resumeDialog.addEventListener("resume-confirm", () => {
+      this.addOwnedEventListener(resumeDialog, "resume-confirm", () => {
         this.handleResumeConfirm();
       });
-      resumeDialog.addEventListener("resume-reset-start", () => {
+      this.addOwnedEventListener(resumeDialog, "resume-reset-start", () => {
         this.handleResumeResetStart();
       });
     }
@@ -1694,206 +1764,218 @@ export class App {
 
     // UI描画をブロックしないように非同期実行
     return new Promise((resolve) =>
-      setTimeout(async () => {
-        const allCandidates = this.dm.getUnvisited();
-        if (allCandidates.length === 0) {
-          this.clearNavigationSnapshot();
-          this.resetNavigationRuntimeState();
-          this.currentTarget = null;
-          this.currentRoute = null;
-          this.selectedTarget = null;
-          this.selectedRoute = null;
-          this.ui.showTarget(null);
-          if (notifyComplete) this.ui.showToast("全てのサークルを回りました！");
-          resolve();
-          return;
-        }
+      this.scheduleTimeout(
+        async () => {
+          const allCandidates = this.dm.getUnvisited();
+          if (allCandidates.length === 0) {
+            this.clearNavigationSnapshot();
+            this.resetNavigationRuntimeState();
+            this.currentTarget = null;
+            this.currentRoute = null;
+            this.selectedTarget = null;
+            this.selectedRoute = null;
+            this.ui.showTarget(null);
+            if (notifyComplete)
+              this.ui.showToast("全てのサークルを回りました！");
+            resolve();
+            return;
+          }
 
-        // Initial navigation start via NavigationOrchestrationService
-        const area = findAreaForSpace(currentSpace);
-        if (!area) {
-          this.ui.showToast("現在地のエリアを特定できませんでした", "error");
-          resolve();
-          return;
-        }
+          // Initial navigation start via NavigationOrchestrationService
+          const area = findAreaForSpace(currentSpace);
+          if (!area) {
+            this.ui.showToast("現在地のエリアを特定できませんでした", "error");
+            resolve();
+            return;
+          }
 
-        // Each C108 area has an independent grid/session. Do not ask the
-        // active area's points/grid assets to resolve circles from another
-        // area; those remain pending until the user switches maps and sets a
-        // start position there.
-        const candidates = allCandidates.filter(
-          (candidate) => findAreaForSpace(candidate.space)?.id === area.id,
-        );
-        if (candidates.length === 0) {
-          this.ui.showToast(
-            "現在のエリアに未訪問の候補がありません。地図を切り替えて始点を設定してください",
-            "warning",
+          // Each C108 area has an independent grid/session. Do not ask the
+          // active area's points/grid assets to resolve circles from another
+          // area; those remain pending until the user switches maps and sets a
+          // start position there.
+          const candidates = allCandidates.filter(
+            (candidate) => findAreaForSpace(candidate.space)?.id === area.id,
           );
-          resolve();
-          return;
-        }
+          if (candidates.length === 0) {
+            this.ui.showToast(
+              "現在のエリアに未訪問の候補がありません。地図を切り替えて始点を設定してください",
+              "warning",
+            );
+            resolve();
+            return;
+          }
 
-        const assets = await this.loadGridRouteAssets(area);
-        if (!assets) {
-          this.ui.showToast(
-            "グリッド経路アセットの読み込みに失敗しました",
-            "error",
-          );
-          resolve();
-          return;
-        }
+          const assets = await this.loadGridRouteAssets(area);
+          if (!assets) {
+            this.ui.showToast(
+              "グリッド経路アセットの読み込みに失敗しました",
+              "error",
+            );
+            resolve();
+            return;
+          }
 
-        const startPortalIndex = this.findPointPortalIndex(
-          assets.pointsPayload,
-          assets.gridMeta,
-          currentSpace,
-        );
-
-        if (startPortalIndex === null) {
-          this.ui.showToast(
-            "現在地のグリッド位置を特定できませんでした",
-            "error",
-          );
-          resolve();
-          return;
-        }
-
-        const endpointIndexes = candidates.flatMap((c) => {
-          const idx = this.findPointPortalIndex(
+          const startPortalIndex = this.findPointPortalIndex(
             assets.pointsPayload,
             assets.gridMeta,
-            c.space,
+            currentSpace,
           );
-          return idx !== null ? [idx] : [];
-        });
 
-        if (endpointIndexes.length !== candidates.length) {
-          this.ui.showToast(
-            "候補サークルのグリッド位置を特定できませんでした",
-            "error",
-          );
-          resolve();
-          return;
-        }
+          if (startPortalIndex === null) {
+            this.ui.showToast(
+              "現在地のグリッド位置を特定できませんでした",
+              "error",
+            );
+            resolve();
+            return;
+          }
 
-        const dists = distancesFromStartToEndpoints(
-          startPortalIndex,
-          {
-            grid: assets.gridBytes,
-            cols: assets.gridMeta.cols,
-            rows: assets.gridMeta.rows,
-            cellSize: assets.gridMeta.cell_size,
-          },
-          endpointIndexes,
-        );
+          const endpointIndexes = candidates.flatMap((c) => {
+            const idx = this.findPointPortalIndex(
+              assets.pointsPayload,
+              assets.gridMeta,
+              c.space,
+            );
+            return idx !== null ? [idx] : [];
+          });
 
-        const startDistances = new Map();
-        candidates.forEach((c, i) => {
-          startDistances.set(c.space, dists[i]);
-        });
+          if (endpointIndexes.length !== candidates.length) {
+            this.ui.showToast(
+              "候補サークルのグリッド位置を特定できませんでした",
+              "error",
+            );
+            resolve();
+            return;
+          }
 
-        const startPointPosition = this.findPointPortalPosition(
-          assets.pointsPayload,
-          assets.gridMeta,
-          currentSpace,
-        );
-        if (!startPointPosition) {
-          this.ui.showToast("現在地の表示位置を特定できませんでした", "error");
-          resolve();
-          return;
-        }
-
-        const startPosition = {
-          areaId: area.id,
-          gridIndex: startPortalIndex,
-          ...startPointPosition,
-          source: "manual-start",
-        };
-
-        const initialNavState = this.navigationState || {
-          stage: "idle",
-          areaId: area.id,
-          currentPosition: startPosition,
-          targetSpace: null,
-          lockedFirstLeg: null,
-          provisionalOrder: [],
-          bestOrder: [],
-        };
-
-        const startResult = this.orchestrationService.startNavigation({
-          navState: initialNavState,
-          startPosition,
-          pendingCircles: candidates,
-          startDistances,
-        });
-
-        const chosenTargetSpace = startResult.chosenTargetSpace;
-
-        if (!chosenTargetSpace) {
-          this.clearNavigationSnapshot();
-          this.resetNavigationRuntimeState();
-          this.currentTarget = null;
-          this.currentRoute = null;
-          this.selectedTarget = null;
-          this.selectedRoute = null;
-          this.ui.showTarget(null);
-          if (notifyComplete) this.ui.showToast("全てのサークルを回りました！");
-          resolve();
-          return;
-        }
-
-        const targetCircle = candidates.find(
-          (c) => c.space === chosenTargetSpace,
-        );
-        if (!targetCircle) {
-          this.ui.showToast("目的地のサークルが見つかりませんでした", "error");
-          resolve();
-          return;
-        }
-
-        let route = null;
-        try {
-          route = planRouteFromGridIndex(
-            assets.pointsPayload,
-            assets.gridMeta,
-            assets.gridBytes,
+          const dists = distancesFromStartToEndpoints(
             startPortalIndex,
-            chosenTargetSpace,
+            {
+              grid: assets.gridBytes,
+              cols: assets.gridMeta.cols,
+              rows: assets.gridMeta.rows,
+              cellSize: assets.gridMeta.cell_size,
+            },
+            endpointIndexes,
           );
-        } catch (error) {
-          console.warn("Route planning from grid index failed:", error);
-        }
 
-        if (!route) {
-          this.ui.showToast(
-            "経路の再構築に失敗したため、案内を開始できませんでした",
-            "error",
+          const startDistances = new Map();
+          candidates.forEach((c, i) => {
+            startDistances.set(c.space, dists[i]);
+          });
+
+          const startPointPosition = this.findPointPortalPosition(
+            assets.pointsPayload,
+            assets.gridMeta,
+            currentSpace,
           );
+          if (!startPointPosition) {
+            this.ui.showToast(
+              "現在地の表示位置を特定できませんでした",
+              "error",
+            );
+            resolve();
+            return;
+          }
+
+          const startPosition = {
+            areaId: area.id,
+            gridIndex: startPortalIndex,
+            ...startPointPosition,
+            source: "manual-start",
+          };
+
+          const initialNavState = this.navigationState || {
+            stage: "idle",
+            areaId: area.id,
+            currentPosition: startPosition,
+            targetSpace: null,
+            lockedFirstLeg: null,
+            provisionalOrder: [],
+            bestOrder: [],
+          };
+
+          const startResult = this.orchestrationService.startNavigation({
+            navState: initialNavState,
+            startPosition,
+            pendingCircles: candidates,
+            startDistances,
+          });
+
+          const chosenTargetSpace = startResult.chosenTargetSpace;
+
+          if (!chosenTargetSpace) {
+            this.clearNavigationSnapshot();
+            this.resetNavigationRuntimeState();
+            this.currentTarget = null;
+            this.currentRoute = null;
+            this.selectedTarget = null;
+            this.selectedRoute = null;
+            this.ui.showTarget(null);
+            if (notifyComplete)
+              this.ui.showToast("全てのサークルを回りました！");
+            resolve();
+            return;
+          }
+
+          const targetCircle = candidates.find(
+            (c) => c.space === chosenTargetSpace,
+          );
+          if (!targetCircle) {
+            this.ui.showToast(
+              "目的地のサークルが見つかりませんでした",
+              "error",
+            );
+            resolve();
+            return;
+          }
+
+          let route = null;
+          try {
+            route = planRouteFromGridIndex(
+              assets.pointsPayload,
+              assets.gridMeta,
+              assets.gridBytes,
+              startPortalIndex,
+              chosenTargetSpace,
+            );
+          } catch (error) {
+            console.warn("Route planning from grid index failed:", error);
+          }
+
+          if (!route) {
+            this.ui.showToast(
+              "経路の再構築に失敗したため、案内を開始できませんでした",
+              "error",
+            );
+            resolve();
+            return;
+          }
+
+          this.navigationState = startResult.navState;
+          this.currentStartSpace = currentSpace;
+          this.currentRoute = route;
+          this.currentTarget = this.targetWithRoute(targetCircle, route);
+          const bestOrder = this.navigationState.bestOrder || [];
+          const nextTargetSpace = bestOrder.find(
+            (space) => space !== chosenTargetSpace,
+          );
+          this.nextTarget = nextTargetSpace
+            ? this.dm.wantToBuy.find((c) => c.space === nextTargetSpace) || null
+            : null;
+          this.selectedTarget = this.currentTarget;
+          this.selectedRoute = route;
+          this.selectionState = "idle";
+          this.selectionMessage = "";
+          this.ui.showNavigation(this.getNavigationContext("current"));
+
+          this.saveNavigationSnapshot();
+
           resolve();
-          return;
-        }
-
-        this.navigationState = startResult.navState;
-        this.currentStartSpace = currentSpace;
-        this.currentRoute = route;
-        this.currentTarget = this.targetWithRoute(targetCircle, route);
-        const bestOrder = this.navigationState.bestOrder || [];
-        const nextTargetSpace = bestOrder.find(
-          (space) => space !== chosenTargetSpace,
-        );
-        this.nextTarget = nextTargetSpace
-          ? this.dm.wantToBuy.find((c) => c.space === nextTargetSpace) || null
-          : null;
-        this.selectedTarget = this.currentTarget;
-        this.selectedRoute = route;
-        this.selectionState = "idle";
-        this.selectionMessage = "";
-        this.ui.showNavigation(this.getNavigationContext("current"));
-
-        this.saveNavigationSnapshot();
-
-        resolve();
-      }, 50),
+        },
+        50,
+        resolve,
+      ),
     );
   }
 
@@ -1911,61 +1993,72 @@ export class App {
     this.ui.showLoading();
 
     return new Promise((resolve) =>
-      setTimeout(async () => {
-        const candidates = this.dm.getUnvisited();
-        if (candidates.length === 0) {
-          this.currentTarget = null;
-          this.currentRoute = null;
-          this.selectedTarget = null;
-          this.selectedRoute = null;
-          this.ui.showTarget(null);
-          if (notifyComplete) this.ui.showToast("全てのサークルを回りました！");
-          resolve();
-          return;
-        }
+      this.scheduleTimeout(
+        async () => {
+          const candidates = this.dm.getUnvisited();
+          if (candidates.length === 0) {
+            this.currentTarget = null;
+            this.currentRoute = null;
+            this.selectedTarget = null;
+            this.selectedRoute = null;
+            this.ui.showTarget(null);
+            if (notifyComplete)
+              this.ui.showToast("全てのサークルを回りました！");
+            resolve();
+            return;
+          }
 
-        let gridRanked = null;
-        try {
-          gridRanked = await this.rankCandidatesByGrid(
-            currentSpace,
-            candidates,
-          );
-        } catch (error) {
-          console.warn("Grid candidate ranking failed; using fallback.", error);
-        }
-
-        let path;
-        try {
-          path = gridRanked
-            ? [{ space: currentSpace, isStart: true }, ...gridRanked]
-            : TspSolver.solve(currentSpace, candidates);
-        } catch (error) {
-          console.warn("Candidate ordering failed; using source order.", error);
-          path = [{ space: currentSpace, isStart: true }, ...candidates];
-        }
-
-        if (path.length > 1) {
-          let route = null;
+          let gridRanked = null;
           try {
-            route = await this.planGridRoute(currentSpace, path[1].space);
+            gridRanked = await this.rankCandidatesByGrid(
+              currentSpace,
+              candidates,
+            );
           } catch (error) {
             console.warn(
-              "Grid route planning failed; showing target without route.",
+              "Grid candidate ranking failed; using fallback.",
               error,
             );
           }
-          this.currentStartSpace = currentSpace;
-          this.currentRoute = route;
-          this.currentTarget = this.targetWithRoute(path[1], route);
-          this.nextTarget = path.length > 2 ? path[2] : null;
-          this.selectedTarget = this.currentTarget;
-          this.selectedRoute = route;
-          this.selectionState = "idle";
-          this.selectionMessage = "";
-          this.ui.showNavigation(this.getNavigationContext("current"));
-        }
-        resolve();
-      }, 50),
+
+          let path;
+          try {
+            path = gridRanked
+              ? [{ space: currentSpace, isStart: true }, ...gridRanked]
+              : TspSolver.solve(currentSpace, candidates);
+          } catch (error) {
+            console.warn(
+              "Candidate ordering failed; using source order.",
+              error,
+            );
+            path = [{ space: currentSpace, isStart: true }, ...candidates];
+          }
+
+          if (path.length > 1) {
+            let route = null;
+            try {
+              route = await this.planGridRoute(currentSpace, path[1].space);
+            } catch (error) {
+              console.warn(
+                "Grid route planning failed; showing target without route.",
+                error,
+              );
+            }
+            this.currentStartSpace = currentSpace;
+            this.currentRoute = route;
+            this.currentTarget = this.targetWithRoute(path[1], route);
+            this.nextTarget = path.length > 2 ? path[2] : null;
+            this.selectedTarget = this.currentTarget;
+            this.selectedRoute = route;
+            this.selectionState = "idle";
+            this.selectionMessage = "";
+            this.ui.showNavigation(this.getNavigationContext("current"));
+          }
+          resolve();
+        },
+        50,
+        resolve,
+      ),
     );
   }
 
@@ -2616,7 +2709,7 @@ export class App {
 }
 
 /** Load the selected map bundle via event registry before creating application controllers. */
-async function bootstrapApp() {
+async function bootstrapApp(existingApp) {
   let manifest;
   let registry;
   let registryUrl;
@@ -2657,11 +2750,6 @@ async function bootstrapApp() {
     return;
   }
 
-  const app = new App();
+  const app = existingApp || new App();
   await app.init(manifest, targetRef, { registry, registryUrl });
 }
-
-// アプリ起動
-document.addEventListener("DOMContentLoaded", () => {
-  void bootstrapApp();
-});
