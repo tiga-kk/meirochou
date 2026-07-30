@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  LocalStorageEventDayRepository as EventDayRepository,
+  StorageWriteError,
+} from "../apps/webapp/js/features/event-day/use-cases/event-day-repository";
+import {
   loadMapBundleManifestFromUrl,
   resolveEventMapManifestUrl,
 } from "../apps/webapp/js/map-manifest-loader";
-import {
-  EventDayRepository,
-  StorageWriteError,
-} from "../apps/webapp/js/state/event-day-repository";
 import {
   EventDayTransitionService,
   type PreparedEventDayTransition,

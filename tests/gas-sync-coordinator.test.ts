@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, test, vi } from "vitest";
 import { GasApiClient } from "../apps/webapp/js/api/gas-api-client";
-import { EventDayRepository } from "../apps/webapp/js/state/event-day-repository";
+import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/use-cases/event-day-repository";
 import { GasOutboxService } from "../apps/webapp/js/state/gas-outbox-service";
 import { GasSyncCoordinator } from "../apps/webapp/js/state/gas-sync-coordinator";
 import {

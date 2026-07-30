@@ -2,8 +2,8 @@ import {
   parseDayId,
   parseEventId,
   parseSourceGeneration,
-} from "../types/boundary-parsers";
-import type { EventDayRef, SourceRef } from "../types/domain";
+} from "../../../types/boundary-parsers";
+import type { EventDayRef, SourceRef } from "./event-day-types";
 
 export { parseDayId, parseEventId, parseSourceGeneration };
 

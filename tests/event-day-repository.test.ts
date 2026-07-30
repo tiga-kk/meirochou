@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 import {
-  EventDayRepository,
+  LocalStorageEventDayRepository as EventDayRepository,
   StorageWriteError,
-} from "../apps/webapp/js/state/event-day-repository";
+} from "../apps/webapp/js/features/event-day/use-cases/event-day-repository";
 import {
   createEmptyEventDayState,
   StorageSchemaError,
@@ -445,5 +445,24 @@ describe("EventDayRepository", () => {
     expect(repository.load(ref1)).toBeNull();
     expect(repository.load(ref2)).toBeNull();
     expect(repository.getLastOpened()).toBeNull();
+  });
+
+  test("exposes the event-day repository contract under feature names", () => {
+    const repository = new EventDayRepository(
+      new StorageService(new MockStorageAdapter()),
+    );
+    const ref: EventDayRef = { eventId: "c104", dayId: "day1" };
+    const state = createEmptyEventDayState(
+      validCsvSource,
+      "g-contract",
+      validNow,
+    );
+
+    repository.saveAndRememberLastOpened(ref, state);
+    expect(repository.listEventDays()).toEqual([ref]);
+    expect(repository.getLastOpenedEventDay()).toEqual(ref);
+    expect(repository.listEventDaysForDeletion()).toEqual([{ ref, state }]);
+    repository.deleteEventDay(ref);
+    expect(repository.listEventDays()).toEqual([]);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { EventDayRepository } from "../apps/webapp/js/state/event-day-repository";
+import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/use-cases/event-day-repository";
 import {
   PendingOutboxError,
   SourceSettingsService,

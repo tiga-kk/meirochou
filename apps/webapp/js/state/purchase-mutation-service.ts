@@ -1,10 +1,10 @@
+import type { EventDayRepository } from "../features/event-day/use-cases/event-day-repository";
 import type {
   CircleVisitState,
   EventDayRef,
   LocalEventDayState,
   PurchaseMutationResult,
 } from "../types/domain";
-import type { EventDayRepository } from "./event-day-repository";
 import type { GasOutboxService } from "./gas-outbox-service";
 import {
   getCircleVisitState,

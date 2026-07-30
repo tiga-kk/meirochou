@@ -1,7 +1,30 @@
-export interface MapPoint {
-  x: number;
-  y: number;
-}
+import type {
+  Circle,
+  CircleRecord,
+  CircleVisitState,
+  EventDayRef,
+  GasDataSource,
+  GasOutboxEntry,
+  LocalEventDayState,
+  MapPoint,
+  SourceRef,
+} from "../features/event-day/domain/event-day-types";
+
+export type {
+  Circle,
+  CircleRecord,
+  CircleStateOverrides,
+  CircleVisitState,
+  CsvDataSource,
+  DataSource,
+  DataSourceType,
+  EventDayRef,
+  GasDataSource,
+  GasOutboxEntry,
+  LocalEventDayState,
+  MapPoint,
+  SourceRef,
+} from "../features/event-day/domain/event-day-types";
 
 export interface MapBundleAreaV1 {
   id: string;
@@ -22,18 +45,6 @@ export interface MapBundleManifestV1 {
   /** Content-derived bundle identity used by navigation snapshot validation. */
   bundleVersion?: string;
   areas: readonly MapBundleAreaV1[];
-}
-
-export interface Circle {
-  space: string;
-  priority?: number | string;
-  isSale?: string;
-  account?: string;
-  tweet?: string;
-  sheetName?: string;
-  gridDistance?: number;
-  mapPosition?: MapPoint;
-  [key: string]: unknown;
 }
 
 export interface OcrPortal extends MapPoint {
@@ -132,17 +143,6 @@ export type SaleUpdatePayload =
   | { action: "sale"; space: string; undo: boolean; sheetName?: string }
   | { action: "sale"; spaces: string[]; undo: true };
 
-export interface EventDayRef {
-  readonly eventId: string;
-  readonly dayId: string;
-}
-
-export interface SourceRef {
-  readonly eventId: string;
-  readonly dayId: string;
-  readonly sourceGeneration: string;
-}
-
 export interface EventDay {
   readonly dayId: string;
   readonly displayName: string;
@@ -160,56 +160,10 @@ export interface EventRegistryV1 {
   readonly events: readonly EventRegistryEntryV1[];
 }
 
-export type DataSourceType = "csv" | "gas";
-
-export interface CsvDataSource {
-  readonly type: "csv";
-  readonly fileName: string;
-}
-
-export interface GasDataSource {
-  readonly type: "gas";
-  readonly gasUrl: string;
-  readonly sheetName: string;
-}
-
-export type DataSource = CsvDataSource | GasDataSource;
-
-export interface CircleRecord {
-  readonly space: string;
-  readonly priority?: number;
-  readonly account?: string;
-  readonly tweet?: string;
-  readonly memo?: string;
-  readonly isSale?: string;
-  readonly queueClass?: "normal" | "wall";
-  readonly removedFromSource?: boolean;
-}
-
 export interface HistoryEntry {
   readonly type: "purchase" | "hold" | "unpurchase" | "unhold";
   readonly space: string;
   readonly timestamp: string;
-}
-
-export interface GasOutboxEntry {
-  readonly id: string;
-  readonly eventId: string;
-  readonly dayId: string;
-  readonly sourceGeneration: string;
-  readonly gasUrl: string;
-  readonly sheetName: string;
-  readonly space: string;
-  readonly purchased: boolean;
-  readonly createdAt: string;
-  readonly attempts: number;
-  readonly lastError: string | null;
-}
-
-export type CircleVisitState = "pending" | "held" | "purchased" | "excluded";
-
-export interface CircleStateOverrides {
-  readonly [space: string]: Exclude<CircleVisitState, "pending">;
 }
 
 export interface CircleStateUndoToken {
@@ -217,20 +171,6 @@ export interface CircleStateUndoToken {
   readonly before: CircleVisitState;
   readonly after: CircleVisitState;
   readonly createdAtMs: number;
-}
-
-export interface LocalEventDayState {
-  readonly schemaVersion: 2;
-  readonly source: DataSource;
-  readonly sourceGeneration: string;
-  readonly circles: readonly CircleRecord[];
-  readonly circleStates: CircleStateOverrides;
-  readonly gasOutbox: readonly GasOutboxEntry[];
-  readonly timestamps: {
-    readonly createdAt: string;
-    readonly updatedAt: string;
-    readonly sourceUpdatedAt: string;
-  };
 }
 
 export interface CsvIssue {

@@ -1,5 +1,11 @@
 import { App } from "../app.js";
 import {
+  createActiveEventDayReader,
+  createActiveEventDaySession,
+} from "../features/event-day/public-api";
+import { LocalStorageEventDayRepository } from "../features/event-day/use-cases/event-day-repository";
+import { StorageService } from "../state/storage-service";
+import {
   createComiPathApplication,
   type StartableApplication,
 } from "./comipath-application";
@@ -16,8 +22,20 @@ export function assembleComiPathApplication(
 ): StartableApplication {
   void options.document;
   void options.window;
+  const storage = new StorageService();
+  const repository = new LocalStorageEventDayRepository(storage);
+  const activeEventDaySession = createActiveEventDaySession();
+  const activeEventDayReader = createActiveEventDayReader(
+    activeEventDaySession,
+  );
   const legacyApplication = new App({
     alnsWorkerFactory: options.createAlnsWorker,
+    dataManagerOptions: {
+      storage,
+      repository,
+      activeEventDaySession,
+      activeEventDayReader,
+    },
   });
   return createComiPathApplication({
     legacyApplication: {

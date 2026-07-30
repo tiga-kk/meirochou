@@ -1,7 +1,7 @@
-import { parseDayId, parseEventId } from "../types/boundary-parsers";
-import type { EventDayRef, LocalEventDayState } from "../types/domain";
-import { parseLocalEventDayState } from "./storage-schema";
-import type { StorageService } from "./storage-service";
+import { parseLocalEventDayState } from "../../../state/storage-schema";
+import type { StorageService } from "../../../state/storage-service";
+import { parseDayId, parseEventId } from "../../../types/boundary-parsers";
+import type { EventDayRef, LocalEventDayState } from "../../../types/domain";
 
 export type StorageRollbackKey = "state" | "index" | "last-opened";
 
@@ -47,7 +47,42 @@ function getEventDayStateKey(ref: EventDayRef): string {
   return `comipath:v1:${parsed.eventId}:${parsed.dayId}:state`;
 }
 
-export class EventDayRepository {
+export interface EventDayRepository {
+  load(ref: EventDayRef): LocalEventDayState | null;
+  save(ref: EventDayRef, state: LocalEventDayState): void;
+  saveAndRememberLastOpened(ref: EventDayRef, state: LocalEventDayState): void;
+  listEventDays(): readonly EventDayRef[];
+  getLastOpenedEventDay(): EventDayRef | null;
+  rememberLastOpenedEventDay(ref: EventDayRef): void;
+  deleteEventDay(ref: EventDayRef): void;
+  listEventDaysForDeletion(): readonly {
+    readonly ref: EventDayRef;
+    readonly state: LocalEventDayState;
+  }[];
+  deleteAllEventDays(
+    expected: readonly {
+      readonly ref: EventDayRef;
+      readonly sourceGeneration: string;
+    }[],
+  ): void;
+  saveWithLastOpened(ref: EventDayRef, state: LocalEventDayState): void;
+  list(): EventDayRef[];
+  getLastOpened(): EventDayRef | null;
+  setLastOpened(ref: EventDayRef): void;
+  deleteState(ref: EventDayRef): void;
+  listForDeletionStrict(): readonly {
+    readonly ref: EventDayRef;
+    readonly state: LocalEventDayState;
+  }[];
+  deleteAllFailureSafe(
+    expected: readonly {
+      readonly ref: EventDayRef;
+      readonly sourceGeneration: string;
+    }[],
+  ): void;
+}
+
+export class LocalStorageEventDayRepository implements EventDayRepository {
   constructor(private readonly storageService: StorageService) {}
 
   load(ref: EventDayRef): LocalEventDayState | null {
@@ -189,6 +224,10 @@ export class EventDayRepository {
     }
   }
 
+  saveAndRememberLastOpened(ref: EventDayRef, state: LocalEventDayState): void {
+    this.saveWithLastOpened(ref, state);
+  }
+
   list(): EventDayRef[] {
     const raw = this.storageService.getJson<unknown>(INDEX_KEY, []);
     if (!Array.isArray(raw)) {
@@ -212,6 +251,10 @@ export class EventDayRepository {
     });
   }
 
+  listEventDays(): readonly EventDayRef[] {
+    return this.list();
+  }
+
   getLastOpened(): EventDayRef | null {
     try {
       const item = this.storageService.getJson<unknown | null>(
@@ -232,6 +275,10 @@ export class EventDayRepository {
     }
   }
 
+  getLastOpenedEventDay(): EventDayRef | null {
+    return this.getLastOpened();
+  }
+
   setLastOpened(ref: EventDayRef): void {
     const parsedRef = parseEventDayRef(ref.eventId, ref.dayId);
     try {
@@ -242,6 +289,10 @@ export class EventDayRepository {
         error,
       );
     }
+  }
+
+  rememberLastOpenedEventDay(ref: EventDayRef): void {
+    this.setLastOpened(ref);
   }
 
   deleteState(ref: EventDayRef): void {
@@ -324,6 +375,10 @@ export class EventDayRepository {
     }
   }
 
+  deleteEventDay(ref: EventDayRef): void {
+    this.deleteState(ref);
+  }
+
   /** Strict index listing that fails closed on any malformed, duplicate, or missing state data. */
   listForDeletionStrict(): readonly {
     readonly ref: EventDayRef;
@@ -363,6 +418,13 @@ export class EventDayRepository {
     }
 
     return Object.freeze(result);
+  }
+
+  listEventDaysForDeletion(): readonly {
+    readonly ref: EventDayRef;
+    readonly state: LocalEventDayState;
+  }[] {
+    return this.listForDeletionStrict();
   }
 
   /** Atomic, failure-safe deletion of all event days with strict generation preflight and full rollback. */
@@ -462,5 +524,14 @@ export class EventDayRepository {
         report,
       );
     }
+  }
+
+  deleteAllEventDays(
+    expected: readonly {
+      readonly ref: EventDayRef;
+      readonly sourceGeneration: string;
+    }[],
+  ): void {
+    this.deleteAllFailureSafe(expected);
   }
 }

@@ -1,3 +1,4 @@
+import type { EventDayRepository } from "../features/event-day/use-cases/event-day-repository";
 import {
   loadRuntimeMapBundleManifestFromUrl,
   resolveEventMapManifestUrl,
@@ -9,7 +10,6 @@ import type {
   LocalEventDayState,
   MapBundleManifestV1,
 } from "../types/domain";
-import type { EventDayRepository } from "./event-day-repository";
 import { createEmptyEventDayState } from "./storage-schema";
 
 /** Immutable data prepared without changing the active screen or storage. */
@@ -143,7 +143,7 @@ export class EventDayTransitionService {
       throw new Error("Invalid or stale transition token");
     }
 
-    this.repository.saveWithLastOpened(prepared.ref, prepared.state);
+    this.repository.saveAndRememberLastOpened(prepared.ref, prepared.state);
     this.currentManifest = prepared.manifest;
     this.activeToken = null;
     return prepared.state;

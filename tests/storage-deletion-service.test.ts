@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/use-cases/event-day-repository";
 import type { StoredDistanceMatrix } from "../apps/webapp/js/routing/distance-matrix";
 import { LocalStorageDistanceMatrixRepository } from "../apps/webapp/js/routing/distance-matrix-repository";
-import { EventDayRepository } from "../apps/webapp/js/state/event-day-repository";
 import { LocalStorageNavigationSnapshotRepository } from "../apps/webapp/js/state/navigation-snapshot-repository";
 import {
   PendingOutboxError,

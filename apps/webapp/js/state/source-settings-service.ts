@@ -1,9 +1,9 @@
+import type { EventDayRepository } from "../features/event-day/use-cases/event-day-repository";
 import type {
   EventDayRef,
   LocalEventDayState,
   ProtectedSourceOperation,
 } from "../types/domain";
-import type { EventDayRepository } from "./event-day-repository";
 import { parseLocalEventDayState } from "./storage-schema";
 
 export class PendingOutboxError extends Error {
@@ -251,6 +251,6 @@ export class SourceSettingsService {
     const latest = this.requireCurrent(ref);
     this.assertExpectedGeneration(latest, expectedSourceGeneration);
     this.assertNoPending(latest, "event-day-delete");
-    this.repository.deleteState(ref);
+    this.repository.deleteEventDay(ref);
   }
 }

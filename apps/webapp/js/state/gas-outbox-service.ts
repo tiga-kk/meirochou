@@ -3,6 +3,7 @@ import {
   GasResponseError,
   GasTransportError,
 } from "../api/gas-api-client";
+import type { EventDayRepository } from "../features/event-day/use-cases/event-day-repository";
 import { parseDayId, parseEventId } from "../types/boundary-parsers";
 import type {
   AppendedOutboxState,
@@ -11,7 +12,6 @@ import type {
   GasOutboxResult,
   LocalEventDayState,
 } from "../types/domain";
-import type { EventDayRepository } from "./event-day-repository";
 
 export interface GasOutboxServiceOptions {
   readonly createId?: () => string;

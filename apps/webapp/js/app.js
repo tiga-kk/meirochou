@@ -6,6 +6,7 @@ import { Config } from "./config.js";
 import { loadEventRegistryWithUrl } from "./data/event-registry";
 import { CsvValidationError, DataManager } from "./data-manager.js";
 import { createDevDemoData, isDevDemoEnabled } from "./dev-demo-data.js";
+import { LocalStorageEventDayRepository } from "./features/event-day/use-cases/event-day-repository";
 import {
   loadRuntimeMapBundleManifestFromUrl,
   renderMapBootstrapError,
@@ -20,7 +21,6 @@ import {
 } from "./route-planner";
 import { distancesFromStartToEndpoints } from "./routing/distance-matrix";
 import { LocalStorageDistanceMatrixRepository } from "./routing/distance-matrix-repository";
-import { EventDayRepository } from "./state/event-day-repository";
 import { LocalStorageNavigationSnapshotRepository } from "./state/navigation-snapshot-repository";
 import { StorageDeletionService } from "./state/storage-deletion-service";
 import { StorageService } from "./state/storage-service";
@@ -154,7 +154,7 @@ export class App {
     this.started = false;
     this.stopped = false;
     this.ownedWorkers = new Set();
-    this.dm = new DataManager();
+    this.dm = new DataManager(undefined, options?.dataManagerOptions);
     this.ui = new UIManager();
     this.session = new ManagementSession();
     this.currentTarget = null;
@@ -350,7 +350,7 @@ export class App {
     const deleteOptions = activeRef
       ? buildDeleteOptions({
           selected: activeRef,
-          eventDayCount: this.dm.repository.list().length,
+          eventDayCount: this.dm.repository.listEventDays().length,
           activeCircleCount: activeState ? activeState.circles.length : 0,
           activityCount: activeState
             ? Object.keys(activeState.circleStates).length
@@ -861,10 +861,9 @@ export class App {
       if (activeRefDeleted) {
         this.clearNavigationSnapshot(activeRefBeforeDelete);
         this.resetNavigationRuntimeState();
-        this.dm.activeRef = null;
-        this.dm.activeState = null;
+        this.dm.activeEventDaySession.clearActiveEventDay();
 
-        const remainingList = this.dm.repository.list();
+        const remainingList = this.dm.repository.listEventDays();
         if (remainingList.length > 0) {
           await this.handleEventDaySelect(remainingList[0]);
         } else {
@@ -1041,10 +1040,26 @@ export class App {
     const devDemoEnabled = isDevDemoEnabled(window.location);
     if (devDemoEnabled) {
       const demoData = createDevDemoData();
-      this.dm.wantToBuy = demoData.wantToBuy;
       this.dm.spreadsheetTitle = demoData.spreadsheetTitle;
-      this.dm.purchasedList = demoData.purchasedList;
-      this.dm.holdList = demoData.holdList;
+      const demoRef = { eventId: "demo-v1", dayId: "day1" };
+      const now = new Date().toISOString();
+      const purchased = new Set(demoData.purchasedList);
+      const held = new Set(demoData.holdList);
+      const circleStates = {};
+      for (const circle of demoData.wantToBuy) {
+        if (purchased.has(circle.space))
+          circleStates[circle.space] = "purchased";
+        else if (held.has(circle.space)) circleStates[circle.space] = "held";
+      }
+      this.dm.activeEventDaySession.setActiveEventDay(demoRef, {
+        schemaVersion: 2,
+        source: { type: "csv", fileName: "demo-ui.csv" },
+        sourceGeneration: "demo-ui",
+        circles: demoData.wantToBuy,
+        circleStates,
+        gasOutbox: [],
+        timestamps: { createdAt: now, updatedAt: now, sourceUpdatedAt: now },
+      });
     } else {
       const isRegisteredRef = (ref) => {
         const event = this.dm.eventRegistry?.events.find(
@@ -1052,7 +1067,7 @@ export class App {
         );
         return Boolean(event?.days.some((day) => day.dayId === ref?.dayId));
       };
-      let activeRef = initialRef || this.dm.repository.getLastOpened();
+      let activeRef = initialRef || this.dm.repository.getLastOpenedEventDay();
       if (!activeRef || !isRegisteredRef(activeRef)) {
         const defaultEvent = this.dm.eventRegistry?.events[0];
         if (!defaultEvent || defaultEvent.days.length === 0) {
@@ -2717,8 +2732,8 @@ async function bootstrapApp(existingApp) {
   try {
     ({ registry, registryUrl } = await loadEventRegistryWithUrl());
     const tempStorage = new StorageService();
-    const tempRepo = new EventDayRepository(tempStorage);
-    targetRef = tempRepo.getLastOpened();
+    const tempRepo = new LocalStorageEventDayRepository(tempStorage);
+    targetRef = tempRepo.getLastOpenedEventDay();
 
     const isValidRef =
       targetRef &&

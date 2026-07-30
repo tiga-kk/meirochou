@@ -1,7 +1,7 @@
+import type { EventDayRepository } from "../features/event-day/use-cases/event-day-repository";
 import type { DistanceMatrixRepository } from "../routing/distance-matrix";
 import type { EventDayRef, LocalEventDayState } from "../types/domain";
 import type { DeleteScope } from "../ui/management-view-model";
-import type { EventDayRepository } from "./event-day-repository";
 import type { NavigationSnapshotRepository } from "./navigation-snapshot-repository";
 import type { SourceSettingsService } from "./source-settings-service";
 
@@ -117,7 +117,7 @@ export class StorageDeletionService {
   }
 
   private deleteAllEvents(): StorageDeletionResult {
-    const currentList = this.repository.listForDeletionStrict();
+    const currentList = this.repository.listEventDaysForDeletion();
 
     for (const item of currentList) {
       this.sourceSettings.assertCanMutate(item.ref, "event-day-delete");
@@ -130,7 +130,7 @@ export class StorageDeletionService {
       }),
     );
 
-    this.repository.deleteAllFailureSafe(expected);
+    this.repository.deleteAllEventDays(expected);
 
     for (const item of expected) {
       if (this.matrixRepository) {

@@ -2,9 +2,9 @@
 import { describe, expect, test, vi } from "vitest";
 import { GasApiClient } from "../apps/webapp/js/api/gas-api-client";
 import {
-  EventDayRepository,
+  LocalStorageEventDayRepository,
   StorageWriteError,
-} from "../apps/webapp/js/state/event-day-repository";
+} from "../apps/webapp/js/features/event-day/use-cases/event-day-repository";
 import { GasOutboxService } from "../apps/webapp/js/state/gas-outbox-service";
 import { PurchaseMutationService } from "../apps/webapp/js/state/purchase-mutation-service";
 import { getCircleVisitState } from "../apps/webapp/js/state/storage-schema";
@@ -39,7 +39,7 @@ class MockStorageAdapter implements StorageAdapter {
 function createSetup(adapter = new MockStorageAdapter()) {
   let outboxId = 0;
   const storage = new StorageService(adapter);
-  const repository = new EventDayRepository(storage);
+  const repository = new LocalStorageEventDayRepository(storage);
   const client = new GasApiClient({ fetch: vi.fn() });
   const outbox = new GasOutboxService(repository, client, {
     createId: () => `outbox-${++outboxId}`,

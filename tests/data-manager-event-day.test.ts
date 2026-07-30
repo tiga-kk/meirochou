@@ -77,6 +77,20 @@ const csv = (rows: string): string =>
   `space,priority,isSale,account,tweet,memo\r\n${rows}`;
 
 describe("Phase 2 Task 7 local data service", () => {
+  test("routes legacy actions without an active day through the session", () => {
+    const { manager } = createManager();
+
+    manager.addPurchased("A-01");
+    manager.addHold("B-02");
+
+    expect(manager.activeRef).toEqual({
+      eventId: "legacy-session",
+      dayId: "default",
+    });
+    expect(manager.purchasedList).toEqual(["A-01"]);
+    expect(manager.holdList).toEqual(["B-02"]);
+  });
+
   test("opens only a registered event/day and returns a safe empty state", async () => {
     const { manager } = createManager();
 

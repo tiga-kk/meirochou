@@ -1,9 +1,9 @@
+import type { EventDayRepository } from "../features/event-day/use-cases/event-day-repository";
 import type {
   EventDayRef,
   GasSyncSummary,
   OnlineEventTarget,
 } from "../types/domain";
-import type { EventDayRepository } from "./event-day-repository";
 import type { GasOutboxService } from "./gas-outbox-service";
 
 const SAFE_FAILURE_CATEGORIES = new Set([
@@ -137,7 +137,7 @@ export class GasSyncCoordinator {
     let pending = 0;
     const failures: Array<{ ref: EventDayRef; category: string }> = [];
 
-    const refs = [...this.repository.list()].sort((a, b) => {
+    const refs = [...this.repository.listEventDays()].sort((a, b) => {
       if (a.eventId !== b.eventId) {
         return a.eventId.localeCompare(b.eventId);
       }

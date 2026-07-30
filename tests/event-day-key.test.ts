@@ -5,7 +5,7 @@ import {
   parseDayId,
   parseEventId,
   parseSourceGeneration,
-} from "../apps/webapp/js/data/event-day-key";
+} from "../apps/webapp/js/features/event-day/domain/event-day-key";
 
 test("event/day/source keys are stable and cannot collide", () => {
   assert.equal(

@@ -1,5 +1,5 @@
 import type { GasApiClient } from "../api/gas-api-client";
-import type { EventDayRepository } from "../state/event-day-repository";
+import type { EventDayRepository } from "../features/event-day/use-cases/event-day-repository";
 import type { SourceSettingsService } from "../state/source-settings-service";
 import type {
   Circle,

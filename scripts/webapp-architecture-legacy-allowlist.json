@@ -66,16 +66,6 @@
   },
   {
     "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/data/event-day-key.ts",
-    "imported": "../types/boundary-parsers"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/data/event-day-key.ts",
-    "imported": "../types/domain"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/data/event-registry.ts",
     "imported": "../types/boundary-parsers"
   },
@@ -171,13 +161,18 @@
   },
   {
     "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/state/event-day-repository.ts",
-    "imported": "../types/boundary-parsers"
+    "importer": "apps/webapp/js/features/event-day/domain/event-day-key.ts",
+    "imported": "../../../types/boundary-parsers"
   },
   {
     "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/state/event-day-repository.ts",
-    "imported": "../types/domain"
+    "importer": "apps/webapp/js/features/event-day/use-cases/event-day-repository.ts",
+    "imported": "../../../types/boundary-parsers"
+  },
+  {
+    "ruleId": "deleted-legacy-import",
+    "importer": "apps/webapp/js/features/event-day/use-cases/event-day-repository.ts",
+    "imported": "../../../types/domain"
   },
   {
     "ruleId": "deleted-legacy-import",

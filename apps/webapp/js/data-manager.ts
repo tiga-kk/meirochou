@@ -7,14 +7,22 @@ import {
 } from "./data/event-registry";
 import { GasRefreshService } from "./data/gas-refresh-service";
 import {
-  circleRecordToCircle,
   decodeLegacyCircles,
   decodeLegacyHistory,
   decodeLegacyStringList,
   extractLegacyCircleRows,
 } from "./data/local-state-adapters";
 import { applySourceDiff, diffCircleSources } from "./data/source-diff";
-import { EventDayRepository } from "./state/event-day-repository";
+import {
+  type ActiveEventDayReader,
+  type ActiveEventDaySession,
+  createActiveEventDayReader,
+  createActiveEventDaySession,
+} from "./features/event-day/public-api";
+import {
+  type EventDayRepository,
+  LocalStorageEventDayRepository,
+} from "./features/event-day/use-cases/event-day-repository";
 import { EventDayTransitionService } from "./state/event-day-transition-service";
 import { GasOutboxService } from "./state/gas-outbox-service";
 import { GasSyncCoordinator } from "./state/gas-sync-coordinator";
@@ -68,6 +76,7 @@ export interface LegacyImportPreview {
 }
 
 export interface DataManagerOptions {
+  readonly storage?: StorageService;
   readonly now?: () => Date;
   readonly createSourceGeneration?: () => string;
   readonly createPreviewId?: () => string;
@@ -79,6 +88,8 @@ export interface DataManagerOptions {
   readonly outboxService?: GasOutboxService;
   readonly purchaseMutationService?: PurchaseMutationService;
   readonly syncCoordinator?: GasSyncCoordinator;
+  readonly activeEventDaySession?: ActiveEventDaySession;
+  readonly activeEventDayReader?: ActiveEventDayReader;
 }
 
 interface CsvPreviewRecord extends CsvReplacementPreview {
@@ -148,16 +159,28 @@ export class DataManager {
   readonly outboxService: GasOutboxService;
   readonly purchaseMutationService: PurchaseMutationService;
   readonly syncCoordinator: GasSyncCoordinator;
+  readonly activeEventDaySession: ActiveEventDaySession;
+  readonly activeEventDayReader: ActiveEventDayReader;
   readonly csvPreviews = new Map<string, CsvPreviewRecord>();
 
-  wantToBuy: Circle[] = [];
+  get wantToBuy(): Circle[] {
+    return [...this.activeEventDayReader.getAllCircles()];
+  }
+  get purchasedList(): string[] {
+    return [...this.activeEventDayReader.getPurchasedCircleSpaces()];
+  }
+  get holdList(): string[] {
+    return [...this.activeEventDayReader.getHeldCircleSpaces()];
+  }
+  get activeRef(): EventDayRef | null {
+    return this.activeEventDaySession.getActiveEventDay()?.ref ?? null;
+  }
+  get activeState(): LocalEventDayState | null {
+    return this.activeEventDaySession.getActiveEventDay()?.state ?? null;
+  }
   spreadsheetTitle = "";
-  purchasedList: string[] = [];
-  holdList: string[] = [];
   actionHistory: ActionHistoryEntry[] = [];
   redoStack: ActionHistoryEntry[] = [];
-  activeRef: EventDayRef | null = null;
-  activeState: LocalEventDayState | null = null;
   eventRegistry: EventRegistryV1 | null = null;
 
   private readonly now: () => Date;
@@ -167,9 +190,14 @@ export class DataManager {
   private readonly legacyPreviews = new Map<string, LegacyPreviewRecord>();
 
   constructor(storage?: StorageService, options: DataManagerOptions = {}) {
-    this.storage = storage || new StorageService();
+    this.storage = storage || options.storage || new StorageService();
+    this.activeEventDaySession =
+      options.activeEventDaySession ?? createActiveEventDaySession();
+    this.activeEventDayReader =
+      options.activeEventDayReader ??
+      createActiveEventDayReader(this.activeEventDaySession);
     this.repository =
-      options.repository || new EventDayRepository(this.storage);
+      options.repository || new LocalStorageEventDayRepository(this.storage);
     this.sourceSettings =
       options.sourceSettings || new SourceSettingsService(this.repository);
     this.client = options.client || new GasApiClient();
@@ -285,8 +313,7 @@ export class DataManager {
     ref: EventDayRef,
     state: LocalEventDayState,
   ): LocalEventDayState {
-    this.activeRef = { eventId: ref.eventId, dayId: ref.dayId };
-    this.activeState = state;
+    this.activeEventDaySession.setActiveEventDay(ref, state);
     this.applyStateToMemory(state);
     return state;
   }
@@ -299,17 +326,8 @@ export class DataManager {
     );
   }
 
-  private applyStateToMemory(state: LocalEventDayState): void {
-    this.wantToBuy = state.circles
-      .filter((circle) => !circle.removedFromSource)
-      .map(circleRecordToCircle);
+  private applyStateToMemory(_state: LocalEventDayState): void {
     this.spreadsheetTitle = "";
-    this.purchasedList = Object.entries(state.circleStates)
-      .filter(([_, s]) => s === "purchased")
-      .map(([space]) => space);
-    this.holdList = Object.entries(state.circleStates)
-      .filter(([_, s]) => s === "held")
-      .map(([space]) => space);
     this.actionHistory = [];
     this.redoStack = [];
   }
@@ -317,7 +335,7 @@ export class DataManager {
   private persistState(state: LocalEventDayState): LocalEventDayState {
     if (!this.activeRef) throw new Error("No event/day is open");
     this.repository.save(this.activeRef, state);
-    this.activeState = state;
+    this.activeEventDaySession.replaceActiveEventDayState(state);
     this.applyStateToMemory(state);
     return state;
   }
@@ -337,9 +355,9 @@ export class DataManager {
     const existing = this.repository.load(ref);
     const state = existing || this.createEmptyState();
     if (!existing) {
-      this.repository.saveWithLastOpened(ref, state);
+      this.repository.saveAndRememberLastOpened(ref, state);
     } else {
-      this.repository.setLastOpened(ref);
+      this.repository.rememberLastOpenedEventDay(ref);
     }
     return this.activateCommittedState(ref, state);
   }
@@ -387,7 +405,7 @@ export class DataManager {
     };
     this.repository.save(ref, state);
     if (sameRef(this.activeRef, ref)) {
-      this.activeState = state;
+      this.activeEventDaySession.replaceActiveEventDayState(state);
       this.applyStateToMemory(state);
     }
     return state;
@@ -479,7 +497,7 @@ export class DataManager {
 
     this.csvPreviews.delete(previewId);
     if (sameRef(this.activeRef, preview.ref)) {
-      this.activeState = nextState;
+      this.activeEventDaySession.replaceActiveEventDayState(nextState);
       this.applyStateToMemory(nextState);
     }
     return nextState;
@@ -643,7 +661,7 @@ export class DataManager {
     this.repository.save(target, state);
     this.legacyPreviews.delete(previewId);
     if (sameRef(this.activeRef, target)) {
-      this.activeState = state;
+      this.activeEventDaySession.replaceActiveEventDayState(state);
       this.applyStateToMemory(state);
     }
     return state;
@@ -658,6 +676,33 @@ export class DataManager {
     return this.persistState(update(this.activeState, this.timestamp()));
   }
 
+  /**
+   * Keep legacy local actions usable before an event/day is opened by placing
+   * them in a non-persisted session bucket. The browser flow opens a real ref
+   * before any normal action, so this only serves compatibility callers.
+   */
+  private activateLegacySession(space: string, status: "purchased" | "held") {
+    const ref: EventDayRef = { eventId: "legacy-session", dayId: "default" };
+    const current = this.activeEventDaySession.getActiveEventDay();
+    const circles = current?.state.circles ?? [];
+    const circleStates = { ...(current?.state.circleStates ?? {}) };
+    const hasCircle = circles.some((circle) => circle.space === space);
+    circleStates[space] = status;
+    this.activeEventDaySession.setActiveEventDay(ref, {
+      schemaVersion: 2,
+      source: { type: "csv", fileName: "legacy-session.csv" },
+      sourceGeneration: "legacy-session",
+      circles: hasCircle ? circles : [...circles, { space }],
+      circleStates,
+      gasOutbox: [],
+      timestamps: {
+        createdAt: "1970-01-01T00:00:00.000Z",
+        updatedAt: "1970-01-01T00:00:00.000Z",
+        sourceUpdatedAt: "1970-01-01T00:00:00.000Z",
+      },
+    });
+  }
+
   setPurchased(space: string, purchased: boolean): PurchaseMutationResult {
     if (!this.activeRef) throw new Error("No event/day is open");
     const result = this.purchaseMutationService.setPurchased(
@@ -666,17 +711,19 @@ export class DataManager {
       purchased,
       this.timestamp(),
     );
-    this.activeState = result.state;
+    this.activeEventDaySession.replaceActiveEventDayState(result.state);
     this.applyStateToMemory(result.state);
     return result;
   }
 
   /** Store a local purchase without contacting GAS. */
   addPurchased(space: string, _sheetName = ""): void {
-    if (!this.activeState || !this.activeRef) {
-      if (!this.purchasedList.includes(space)) {
-        this.purchasedList.push(space);
-      }
+    if (
+      !this.activeState ||
+      !this.activeRef ||
+      this.activeRef.eventId === "legacy-session"
+    ) {
+      this.activateLegacySession(space, "purchased");
       return;
     }
     this.setPurchased(space, true);
@@ -684,10 +731,12 @@ export class DataManager {
 
   /** Store a local hold without contacting GAS. */
   addHold(space: string, _sheetName = ""): void {
-    if (!this.activeState || !this.activeRef) {
-      if (!this.holdList.includes(space)) {
-        this.holdList.push(space);
-      }
+    if (
+      !this.activeState ||
+      !this.activeRef ||
+      this.activeRef.eventId === "legacy-session"
+    ) {
+      this.activateLegacySession(space, "held");
       return;
     }
     this.purchaseMutationService.setCircleState(
@@ -698,7 +747,7 @@ export class DataManager {
     );
     const updated = this.repository.load(this.activeRef);
     if (updated) {
-      this.activeState = updated;
+      this.activeEventDaySession.replaceActiveEventDayState(updated);
       this.applyStateToMemory(updated);
     }
   }
@@ -717,8 +766,6 @@ export class DataManager {
   resetAll(): string[] {
     const backup = [...this.purchasedList];
     if (!this.activeState || !this.activeRef) {
-      this.purchasedList = [];
-      this.holdList = [];
       this.actionHistory = [];
       this.redoStack = [];
       return backup;
@@ -727,7 +774,7 @@ export class DataManager {
       this.activeRef,
       this.timestamp(),
     );
-    this.activeState = result.state;
+    this.activeEventDaySession.replaceActiveEventDayState(result.state);
     this.applyStateToMemory(result.state);
     return backup;
   }
@@ -747,7 +794,7 @@ export class DataManager {
   ): LocalEventDayState {
     const state = this.outboxService.discard(ref, ids, now);
     if (sameRef(this.activeRef, ref)) {
-      this.activeState = state;
+      this.activeEventDaySession.replaceActiveEventDayState(state);
       this.applyStateToMemory(state);
     }
     return state;
@@ -756,7 +803,6 @@ export class DataManager {
   /** Clear only local holds and their history entries. */
   resetHold(): void {
     if (!this.activeState || !this.activeRef) {
-      this.holdList = [];
       this.actionHistory = this.actionHistory.filter(
         (entry) => entry.type !== "hold",
       );
@@ -841,7 +887,7 @@ export class DataManager {
     if (this.activeRef) {
       const currentActive = this.repository.load(this.activeRef);
       if (currentActive) {
-        this.activeState = currentActive;
+        this.activeEventDaySession.replaceActiveEventDayState(currentActive);
         this.applyStateToMemory(currentActive);
       }
     }

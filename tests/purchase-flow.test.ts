@@ -2,7 +2,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { App } from "../apps/webapp/js/app";
 import { DataManager } from "../apps/webapp/js/data-manager";
-import { EventDayRepository } from "../apps/webapp/js/state/event-day-repository";
+import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/use-cases/event-day-repository";
 import { getCircleVisitState } from "../apps/webapp/js/state/storage-schema";
 import {
   type StorageAdapter,
