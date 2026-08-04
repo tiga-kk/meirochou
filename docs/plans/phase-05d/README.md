@@ -14,13 +14,14 @@
 
 ## Current execution state
 
-2026-08-04時点で`feature/phase-05d`にはTask 1〜3相当の実装がpush済みである。ただし実装後レビューでfoundation defectsが見つかったため、Task 1〜3は最終承認されていない。
+2026-08-04時点で`feature/phase-05d`にはTask 1〜9相当の実装がある。ただしTask 3.1の専用commit/review証跡がなく、Task 9後も旧facade相当の大きな調整役が残るため、Phase 5Dは完了扱いにしない。
 
 - Task 1: implementation exists; architecture checkerとtest gateに修正が必要
 - Task 2: implementation exists; browser lifecycle Promise、start failure contract、disposeに修正が必要
 - Task 3: implementation exists; EventDayRepositoryのinterface/concrete分離が必要
-- Task 3.1: **NEXT / REQUIRED**
-- Task 4以降: Task 3.1がPASSするまで開始禁止
+- Task 3.1: **REVIEW REQUIRED**
+- Task 4〜9: implementation exists; final review blocked by Task 3.1
+- Task 10: handoff recorded; **BLOCKED**
 
 Task 1〜3を最初から再実装しない。`task-03-1-correct-foundation-review-findings.md`だけを次に実装し、既存実装を修正する。
 
@@ -136,7 +137,7 @@ Task 1 → Task 2 → Task 3 → Task 3.1 → Task 4 → Task 5
        → Task 6 → Task 7 → Task 8 → Task 9 → Task 10
 ```
 
-現在はTask 3.1から始める。Task 3.1のcommitとreviewが完了する前にTask 4のfileを作成・移動しない。
+現在はTask 3.1の修正・reviewから再開する。Task 3.1のcommitとreviewが完了する前にPhase 5Dの完了判定やPhase 5Eを開始しない。
 
 ## Per-task execution rule
 

@@ -1,7 +1,7 @@
 # Current Progress
 
 **更新日:** 2026-08-04
-**現在の段階:** Phase 5C完了。Phase 5D apps内部refactor計画をcurrent treeへ再照合し、命名とTask境界を改訂済み。implementation未着手。
+**現在の段階:** Phase 5D Task 10の検証記録を作成。Task 3.1 review証跡とlegacy責務移行の確認待ち。Phase 5Eは未着手。
 
 ## Current canonical documents
 
@@ -116,14 +116,15 @@ Phase 5Dではtests/docsの全面再配置を行わず、apps内部のpublic own
 - Phase 5C: complete
 - Phase 5D apps design: approved
 - Phase 5D implementation plan: revised and complete
-- Phase 5D implementation: Task 9 complete; Task 10 onward pending
+- Phase 5D implementation: Task 9 complete; Task 10 handoff recorded but BLOCKED
 - Phase 5E tests/docs refactor: planned after Phase 5D handoff
 - Phase 5F visual polish: planned after Phase 5E
 
 ## Next action
 
-1. Task 9のcommitを確認する。
-2. Task 10のentry gateと変更可能ファイルを確認する。
+1. Task 3.1のfoundation修正とreviewを完了する。
+2. Task 4〜9のreview結果を記録する。
+3. Task 10のclean verificationとuser-flow smokeを再実行する。
 
 ## Continuing prohibitions
 

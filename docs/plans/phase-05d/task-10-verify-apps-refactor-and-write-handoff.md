@@ -1,6 +1,6 @@
 # Phase 5D Task 10: Verify Apps Refactor and Write Handoff
 
-**Status:** PLANNED
+**Status:** IMPLEMENTED (handoff recorded; Phase exit gate BLOCKED)
 **Depends on:** Tasks 1、2、3、3.1、4、5、6、7、8、9 reviewed
 **Commit candidate:** `docs(phase-5d): verify apps internal refactor`
 
