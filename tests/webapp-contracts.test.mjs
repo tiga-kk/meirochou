@@ -6,29 +6,27 @@ import {
   isDevDemoEnabled,
 } from "../apps/webapp/js/dev-demo-data.js";
 import { runtimeMapAreaCatalog } from "../apps/webapp/js/features/route-guidance/infrastructure/runtime-map-area-catalog.ts";
+import { formatTargetViewModel } from "../apps/webapp/js/features/route-guidance/ui/format-target-view-model.ts";
+import { buildSpaceFromLocation } from "../apps/webapp/js/features/route-guidance/ui/parse-current-location-form.ts";
 import {
+  buildMapPins,
+  buildMapPointIndex,
+  calculateContainedImageBox,
+  calculateFitTransform,
+  calculateMapPinSize,
+  calculateNativeImageScale,
+  getPinPosition,
   getPinSourceSize,
-  getRouteStartSpaceForMap,
-} from "../apps/webapp/js/map-renderer.js";
+} from "../apps/webapp/js/features/route-guidance/ui/route-map-pin-model.ts";
 import {
   buildRouteOverlaySvg,
   planRoute,
   rankCandidatesByGridDistance,
 } from "../apps/webapp/js/route-planner";
+import { parseSafeExternalUrl as normalizeExternalUrl } from "../apps/webapp/js/shared/browser/parse-safe-external-url.ts";
+import { getRouteStartSpaceForMap } from "../apps/webapp/js/shared/ui/contained-image-layout.ts";
 import { StorageService } from "../apps/webapp/js/state/storage-service.js";
 import { parseMapBundleManifest } from "../apps/webapp/js/types/boundary-parsers";
-import {
-  buildMapPins,
-  buildMapPointIndex,
-  buildSpaceFromLocation,
-  calculateContainedImageBox,
-  calculateFitTransform,
-  calculateMapPinSize,
-  calculateNativeImageScale,
-  formatTargetViewModel,
-  getPinPosition,
-  normalizeExternalUrl,
-} from "../apps/webapp/js/ui/navigation-view-model";
 
 const root = new URL("../", import.meta.url);
 
@@ -78,7 +76,9 @@ test("Phase 2 keeps GAS sale actions outside the local data service", () => {
 
 test("Phase 5C Task 1 removes persistent Undo/Redo controls from the UI", () => {
   const appSource = read("apps/webapp/js/app.js");
-  const modalSource = read("apps/webapp/js/modal-manager.js");
+  const modalSource = read(
+    "apps/webapp/js/features/circle-status/ui/dom-circle-gallery-view.ts",
+  );
   const indexSource = read("apps/webapp/index.html");
 
   assert.doesNotMatch(indexSource, /id=["']btn-(?:undo|redo)["']/);
@@ -1358,7 +1358,9 @@ test("webapp demo image, points, portals, and grid share one coordinate system",
 
 test("webapp navigation map renders the configured map image", () => {
   const html = read("apps/webapp/index.html");
-  const mapRenderer = read("apps/webapp/js/map-renderer.js");
+  const mapRenderer = read(
+    "apps/webapp/js/features/route-guidance/ui/dom-route-map-view.ts",
+  );
 
   assert.match(html, /id="navigation-map-image"/);
   assert.match(mapRenderer, /navigationMapImage/);
@@ -1399,7 +1401,9 @@ test("webapp map rendering avoids a permanently low-resolution transform layer",
 });
 
 test("webapp navigation map loads the configured point index for pins", () => {
-  const mapRenderer = read("apps/webapp/js/map-renderer.js");
+  const mapRenderer = read(
+    "apps/webapp/js/features/route-guidance/ui/dom-route-map-view.ts",
+  );
 
   assert.match(mapRenderer, /loadPointIndex/);
   assert.match(mapRenderer, /fetch\(area\.pointsFile\)/);
@@ -1411,7 +1415,9 @@ test("webapp navigation map loads the configured point index for pins", () => {
 });
 
 test("webapp navigation map load listener is guarded across repeated init calls", () => {
-  const mapRenderer = read("apps/webapp/js/map-renderer.js");
+  const mapRenderer = read(
+    "apps/webapp/js/features/route-guidance/ui/dom-route-map-view.ts",
+  );
 
   assert.match(mapRenderer, /navigationMapImageLoadListenerAttached/);
   assert.match(mapRenderer, /!this\.navigationMapImageLoadListenerAttached/);

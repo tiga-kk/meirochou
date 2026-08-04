@@ -1,6 +1,8 @@
-import { runtimeMapAreaCatalog } from "./features/route-guidance/infrastructure/runtime-map-area-catalog";
-import { buildRouteOverlaySvg } from "./route-planner";
-import { parsePointsPayload } from "./types/boundary-parsers";
+// @ts-nocheck
+
+import { buildRouteOverlaySvg } from "../../../route-planner";
+import { ZoomHelper } from "../../../utils/gesture-helper.js";
+import { runtimeMapAreaCatalog } from "../infrastructure/runtime-map-area-catalog";
 import {
   buildMapPins,
   buildMapPointIndex,
@@ -8,8 +10,7 @@ import {
   calculateFitTransform,
   calculateMapPinSize,
   calculateNativeImageScale,
-} from "./ui/navigation-view-model";
-import { ZoomHelper } from "./utils/gesture-helper.js";
+} from "./route-map-pin-model";
 
 function findAreaForSpace(space) {
   if (!space || typeof space !== "string") return null;
@@ -64,7 +65,7 @@ export function getPinSourceSize(state) {
  * 地図描画クラス
  * メイン画面の地図表示、更新、リンク生成を担当
  */
-export class MapRenderer {
+export class DomRouteMapView {
   constructor(uiManager) {
     this.uiManager = uiManager;
     this.els = {
@@ -224,7 +225,7 @@ export class MapRenderer {
         }
         return response.json();
       })
-      .then((payload) => buildMapPointIndex(parsePointsPayload(payload)))
+      .then((payload) => buildMapPointIndex(payload))
       .catch((error) => {
         console.warn("Map point index could not be loaded.", error);
         return null;

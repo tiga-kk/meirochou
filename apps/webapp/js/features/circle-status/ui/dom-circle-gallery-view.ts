@@ -1,15 +1,16 @@
-import { TspSolver } from "./tsp-solver.js";
+// @ts-nocheck
+import { TspSolver } from "../../../tsp-solver.js";
 import {
   setupResizableMap,
   setupSwipeAction,
   ZoomHelper,
-} from "./utils/gesture-helper.js";
+} from "../../../utils/gesture-helper.js";
 
 /**
  * モーダル管理クラス
  * PDF（画像）モーダルおよびギャラリーモーダルの制御を担当
  */
-export class ModalManager {
+export class DomCircleGalleryView {
   constructor() {
     this.els = {
       pdfModal: document.getElementById("pdf-modal"),

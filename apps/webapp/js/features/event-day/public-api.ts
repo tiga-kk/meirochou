@@ -7,6 +7,7 @@ export type {
   GasDataSource,
   GasOutboxEntry,
   LocalEventDayState,
+  MapPoint,
 } from "./domain/event-day-types";
 export * from "./ui/event-day-selector-controller";
 export * from "./ui/event-day-selector-model";

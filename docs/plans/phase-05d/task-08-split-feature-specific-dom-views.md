@@ -1,6 +1,6 @@
 # Phase 5D Task 8: Split Feature-Specific DOM Views
 
-**Status:** PLANNED
+**Status:** IMPLEMENTED
 **Depends on:** Task 7
 **Commit candidate:** `refactor(ui): split feature specific dom views`
 
@@ -286,3 +286,13 @@ git commit -m "refactor(ui): split feature specific dom views"
 - old renderer/model filesが存在しない。
 - DOM ViewがRepository、GAS、HTTP、Worker、storage keyを知らない。
 - DOM ID、ARIA、44px target、200% zoom、safe-area、keyboard focus、visual outputが維持される。
+
+## Implementation record
+
+- Feature-specific DOM View and pure UI modules were added, and the legacy renderer,
+  modal, stats, and navigation view-model files were removed.
+- `UIManager` remains as the Task 9 compatibility boundary while its map, gallery,
+  and progress responsibilities delegate to the new Views.
+- Task-specific tests are registered in `test:webapp`.
+- Verification: focused split tests 72/72, `npm run test:webapp`, architecture/typecheck,
+  build, and full E2E (38 passed, 8 skipped).

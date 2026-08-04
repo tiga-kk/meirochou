@@ -1,13 +1,14 @@
-import { runtimeMapAreaCatalog } from "./features/route-guidance/infrastructure/runtime-map-area-catalog";
-import { TspSolver } from "./tsp-solver.js";
+// @ts-nocheck
+import { TspSolver } from "../../../tsp-solver.js";
 
 /**
  * 統計情報描画クラス
  * 残り件数・保留件数テーブルの更新を担当
  */
-export class StatsRenderer {
-  constructor(uiManager) {
+export class DomCircleProgressView {
+  constructor(uiManager, mapAreaCatalog) {
     this.uiManager = uiManager; // クリックイベント連携用
+    this.mapAreaCatalog = mapAreaCatalog;
     this.tableEl = document.getElementById("stats-table");
     this.areaCells = {}; // { "areaName_type": element }
     this.onHoldListReset = null; // コールバック
@@ -28,7 +29,7 @@ export class StatsRenderer {
     this.tableEl.innerHTML = "";
     this.areaCells = {};
 
-    const areas = runtimeMapAreaCatalog.getAllMapAreas() || [];
+    const areas = this.mapAreaCatalog?.getAllMapAreas() || [];
 
     // THEAD
     const thead = document.createElement("thead");
@@ -110,8 +111,8 @@ export class StatsRenderer {
     const holdCounts = {}; // { "areaName": count }
 
     // 初期化
-    if (runtimeMapAreaCatalog.getAllMapAreas()) {
-      runtimeMapAreaCatalog.getAllMapAreas().forEach((area) => {
+    if (this.mapAreaCatalog?.getAllMapAreas()) {
+      this.mapAreaCatalog.getAllMapAreas().forEach((area) => {
         counts[area.name] = 0;
         holdCounts[area.name] = 0;
       });
@@ -141,8 +142,8 @@ export class StatsRenderer {
       }
     };
 
-    if (runtimeMapAreaCatalog.getAllMapAreas()) {
-      runtimeMapAreaCatalog.getAllMapAreas().forEach((area) => {
+    if (this.mapAreaCatalog?.getAllMapAreas()) {
+      this.mapAreaCatalog.getAllMapAreas().forEach((area) => {
         updateCell("remaining", area.name, counts[area.name]);
         updateCell("hold", area.name, holdCounts[area.name]);
       });

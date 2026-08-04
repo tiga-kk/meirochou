@@ -93,16 +93,6 @@
   },
   {
     "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/map-renderer.js",
-    "imported": "./types/boundary-parsers"
-  },
-  {
-    "ruleId": "vague-name",
-    "importer": "apps/webapp/js/modal-manager.js",
-    "imported": null
-  },
-  {
-    "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/navigation/navigation-orchestration.ts",
     "imported": "../types/domain"
   },
@@ -185,11 +175,6 @@
   {
     "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/ui/management-session.ts",
-    "imported": "../types/domain"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/ui/navigation-view-model.ts",
     "imported": "../types/domain"
   },
   {

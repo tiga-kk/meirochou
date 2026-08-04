@@ -12,6 +12,7 @@ import {
 } from "./features/event-day/infrastructure/http-map-manifest-loader";
 import { DeleteLocalDataUseCase } from "./features/local-data-deletion/public-api";
 import { runtimeMapAreaCatalog } from "./features/route-guidance/infrastructure/runtime-map-area-catalog";
+import { buildSpaceFromLocation } from "./features/route-guidance/ui/parse-current-location-form";
 import { NavigationOrchestrationService } from "./navigation/navigation-orchestration";
 import { NavigationRuntimeController } from "./navigation/navigation-runtime-controller";
 import {
@@ -33,7 +34,6 @@ import { TspSolver } from "./tsp-solver.js";
 import { parseGridMeta, parsePointsPayload } from "./types/boundary-parsers";
 import { downloadCsv, formatCsvExportFilename } from "./ui/csv-download";
 import { ManagementSession } from "./ui/management-session";
-import { buildSpaceFromLocation } from "./ui/navigation-view-model";
 import { UIManager } from "./ui-manager.js";
 
 function formatSourceApplyError(error) {

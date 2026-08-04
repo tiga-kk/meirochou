@@ -1,9 +1,9 @@
 import { CustomSelect } from "./components/custom-select.js";
+import { DomCircleGalleryView } from "./features/circle-status/ui/dom-circle-gallery-view";
+import { DomCircleProgressView } from "./features/circle-status/ui/dom-circle-progress-view";
 import { runtimeMapAreaCatalog } from "./features/route-guidance/infrastructure/runtime-map-area-catalog";
+import { DomRouteMapView } from "./features/route-guidance/ui/dom-route-map-view";
 import { buildRouteGuidanceScreenModel } from "./features/route-guidance/ui/route-guidance-screen-model";
-import { MapRenderer } from "./map-renderer.js";
-import { ModalManager } from "./modal-manager.js";
-import { StatsRenderer } from "./stats-renderer.js";
 import { TspSolver } from "./tsp-solver.js";
 
 /**
@@ -18,9 +18,9 @@ export class UIManager {
     this.onPreviewRoute = null;
     this.onConfirmRoute = null;
     this.onCancelRoute = null;
-    this.statsRenderer = new StatsRenderer(this);
-    this.modalManager = new ModalManager();
-    this.mapRenderer = new MapRenderer(this);
+    this.statsRenderer = new DomCircleProgressView(this, runtimeMapAreaCatalog);
+    this.modalManager = new DomCircleGalleryView();
+    this.mapRenderer = new DomRouteMapView(this);
 
     this.els = {
       spreadsheetTitle: document.getElementById("spreadsheet-title"),
