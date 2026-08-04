@@ -1,9 +1,9 @@
 # Current Progress
 
-**更新日:** 2026-08-04
-**現在の段階:** Phase 5D Task 10の検証記録を作成。Task 3.1 review証跡とlegacy責務移行の確認待ち。Phase 5Eは未着手。
+**Updated:** 2026-08-05
+**Current stage:** Phase 5D correction planning complete. Task 9.1 is NEXT. Phase 5E is blocked.
 
-## Current canonical documents
+## Canonical documents
 
 - Phase 5C plan: `docs/plans/phase-05c/README.md`
 - Phase 5C handoff: `docs/reviews/phase-05c-handoff.md`
@@ -11,125 +11,84 @@
 - Phase 5D module boundaries: `docs/architecture/webapp-module-boundaries.md`
 - Phase 5D naming rules: `docs/architecture/webapp-naming-guidelines.md`
 - Phase 5D plan: `docs/plans/phase-05d/README.md`
+- Phase 5D current handoff: `docs/reviews/phase-5d-handoff.md`
 
-## Phase 5C completion baseline
+## Phase 5D branch state
 
-Phase 5Cでは次をproduction applicationへ統合した。
+Reviewed branch tip before this docs correction:
 
-- exclusive circle status
-- arbitrary starting location and map-specific session
-- weighted distance matrix Worker and LocalStorage cache
-- distance-to-time conversion
-- time-decayed ALNS
-- 5/10/15 second search time
-- fixed current leg、warm start、progress、cancel
-- arrival、purchase、hold、manual destination
-- route guidance snapshot、reload resume、reset start
-- source/deletion snapshot and matrix invalidation
-- desktop/mobile/keyboard/accessibility E2E
-- C108 four-area desktop/mobile smoke
+```text
+e22eadca73e9b3ece0dc5ae4d5d0fda4b0946066
+```
 
-Phase 5D planning review前のfresh baseline:
+Verified evidence:
 
-- `npm run test:webapp`: 455/455 PASS
-- `npm run check:webapp`: PASS
-- `npm run build:webapp`: PASS
-- Git working tree: clean
-- implementation subagent: not started
+- GitHub Actions run 76: PASS
+- normal tests: 487/487 PASS across 69 files
+- Route Guidance focused tests: 8/8 PASS
+- Phase 5D regression tests: 4/4 PASS
+- architecture check: PASS, 134 source files
+- typecheck/build/build verification: PASS
+- normal Playwright run: 38 passed / 8 expected C108 skips
+- Cloudflare Pages preview: deployed
 
-## Resolved plan inconsistencies
+## Phase 5D review result
 
-implementation reviewで報告された3件をcurrent `main` treeへ照合した。
+Task 10 correctly recorded a BLOCKED handoff. The external review found that Task 9 removed legacy names but left equivalent responsibilities in:
 
-1. Task 3 move source
-   - wrong: `state/event-day-key.ts`
-   - correct: `data/event-day-key.ts`
-2. Task 5/7 config path
-   - wrong: `config.js`
-   - correct: `config.ts`
-3. Task 5/8 route guidance screen model
-   - Task 5が`route-guidance-screen-model.ts`を新規作成
-   - Task 8はold `ui/navigation-view-model.ts`をsame pathへmoveしない
-   - old fileをscreen formatting、current location parsing、map pin model、image layout、safe URLへ分割して削除
+- `comipath-browser-runtime.js`
+- `event-day-data-store.ts`
+- `comipath-dom-coordinator.js`
+- `application-contract-types.ts`
+- `application-boundary-parsers.ts`
 
-Phase READMEとTask文書にexact preflightを追加し、same target pathのCreate/Move重複を禁止した。
+Several feature controllers/use cases exist but are not yet the production owners created by the composition root. Passing CI proves behavior stability, not completion of the architecture goal.
 
-## Naming decisions
+## Correction Tasks
 
-new production namesは一目で責務が分かるものへ統一した。
+1. **Task 9.1 — NEXT:** connect Event Day and Circle Data Source to production.
+2. Task 9.2: connect Route Guidance and Local Data Deletion.
+3. Task 9.3: replace the cross-feature DOM coordinator and add explicit event binding.
+4. Task 9.4: distribute contracts/parsers, delete renamed facades, finalize assembly and semantic checks.
+5. Task 10 rerun: clean verification, C108/human smoke, final handoff.
 
-- `App` → `ComiPathApplication`
-- source management → Circle Data Source
-- storage management → Local Data Deletion
-- navigation runtime → Route Guidance
-- circle state management → Circle Status
-- outbox → Pending GAS Updates（persisted schema fieldを除く）
-- `Config` → `MapAreaCatalog`とowner-specific storage keys
-- `TspSolver` → `DevDemoNearestNeighborOrder`
-- generic `Manager`/`Handler`/`Helper`/`Utils` namesはnew production codeで禁止
-
-cross-feature public entrypointは`index.ts`ではなく`public-api.ts`を使う。
-
-## Phase 5D tasks
-
-1. Lock Current Behavior and Architecture Rules
-2. Separate Browser Startup and Dependency Assembly
-3. Centralize Active Event/Day State
-4. Extract Circle Status and Pending GAS Updates
-5. Extract Route Guidance
-6. Extract Circle Data Source Workflows
-7. Extract Event/Day Switching and Local Data Deletion
-8. Split Feature-Specific DOM Views
-9. Remove Legacy App, Data, UI, and Central Types
-10. Verify Apps Refactor and Write Handoff
-
-Task 4-7はsame legacy filesを段階変更するため並行実装しない。
+Tasks 9.1–9.4 are sequential and require separate commits and reviews.
 
 ## Final Phase 5D targets
 
-- delete `apps/webapp/js/app.js`
-- delete `apps/webapp/js/data-manager.ts`
-- delete `apps/webapp/js/ui-manager.js`
-- delete `apps/webapp/js/config.ts`
-- delete `apps/webapp/js/types/domain.ts`
-- delete `apps/webapp/js/types/boundary-parsers.ts`
-- keep `comipath-application.ts` at 200 physical lines or fewer
-- one active event/day state owner
-- one route guidance runtime state owner
-- no architecture allowlist
-- no cross-feature deep import
-- no vague new production names
-- preserve existing storage、GAS、CSV、route guidance behavior
+- all original legacy paths absent;
+- all renamed semantic facade paths absent;
+- every canonical feature controller production-connected through assembly;
+- `ComiPathApplication` lifecycle only and at most 200 lines;
+- explicit `bind-browser-events.ts` with cleanup;
+- one mutable owner per feature state;
+- no central type/parser god file;
+- no architecture allowlist, deep import, concrete public export, vague name, or semantic facade;
+- characterization through real assembly with repository/Session/View effects;
+- unchanged storage/GAS/CSV/route/map/optimizer behavior;
+- clean verify, E2E, C108 smoke, public audit, Biome and human smoke PASS;
+- final Phase 5D handoff says PASS.
 
 ## Future phases
 
-- Phase 5E: tests and docs structure refactor
-- Phase 5F: broad visual polish
-
-Phase 5Dではtests/docsの全面再配置を行わず、apps内部のpublic ownershipとarchitectureを先に確定する。
+- Phase 5E: tests and docs structure refactor, only after Phase 5D PASS.
+- Phase 5F: broad visual polish, after Phase 5E.
 
 ## Approval status
 
-- Phase 5B/5C shared design: approved
-- Phase 5C ALNS amendment: approved
 - Phase 5B: complete
 - Phase 5C: complete
-- Phase 5D apps design: approved
-- Phase 5D implementation plan: revised and complete
-- Phase 5D implementation: Task 9 complete; Task 10 handoff recorded but BLOCKED
-- Phase 5E tests/docs refactor: planned after Phase 5D handoff
-- Phase 5F visual polish: planned after Phase 5E
-
-## Next action
-
-1. Task 3.1のfoundation修正とreviewを完了する。
-2. Task 4〜9のreview結果を記録する。
-3. Task 10のclean verificationとuser-flow smokeを再実行する。
+- Phase 5D design: approved and corrected
+- Phase 5D initial implementation: CI-green but architecture exit gate BLOCKED
+- Phase 5D correction plan: complete
+- Phase 5D next implementation: Task 9.1
+- Phase 5E: not started
+- Phase 5F: not started
 
 ## Continuing prohibitions
 
-- `/maps/` private working areaをGit管理へ追加しない。
-- original maps、OCR input、Python generator、intermediate imagesをWeb repositoryへ追加しない。
-- real mapsをgeneral unit/E2E fixtureへコピーしない。
-- raw CSV、GAS URL、sheet content、external post body、credentialをartifactへ出さない。
-- Phase 5DでLocalStorage schema、GAS contract、ALNS objective、timing profile、map assetsを変更しない。
+- Do not add `/maps/`, original maps, OCR input, Python generators, or intermediate images to Git.
+- Do not copy real maps into general unit/E2E fixtures.
+- Do not expose raw CSV, GAS URL, sheet content, external post body, credential, or local absolute path.
+- Do not change LocalStorage schema, GAS/CSV contracts, ALNS objective/timing, Dijkstra weights, map assets, or visual design in Phase 5D corrections.
+- Do not merge PR #7 or start Phase 5E until final Task 10 says PASS.

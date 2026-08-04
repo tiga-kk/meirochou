@@ -1,152 +1,127 @@
 # Webapp Module Boundaries
 
-この文書はPhase 5D以降の`apps/webapp/`における依存方向、concrete implementationの公開範囲、runtime state ownershipの正本である。命名は`webapp-naming-guidelines.md`に従う。
+This document is the canonical dependency, concrete-implementation visibility, runtime ownership, and semantic-facade rule set for `apps/webapp/` after Phase 5D.
 
 ## Allowed dependency direction
 
 ```text
 components / feature UI
           ↓
-feature use cases
+feature Controller
           ↓
-feature domain
+feature Use Case
+          ↓
+feature Domain
 
-feature use cases
-          ↓ depend on capability interfaces
-feature infrastructure
-          ↑ implements interfaces
+Use Case ── depends on capability interface
+                         ↑ implemented by
+Infrastructure ──────────┘
 ```
 
-`app/assemble-comipath-application.ts`だけがconcrete infrastructureを生成し、feature間を接続する。
+`app/assemble-comipath-application.ts` is the only module that creates concrete infrastructure and connects features.
 
 ## Directory roles
 
-| Directory | Responsibility | May depend on |
+| Directory | Responsibility | Allowed dependencies |
 |---|---|---|
-| `app/` | browser entrypoint、dependency assembly、global lifecycle | feature public API。assemblyだけはfeature infrastructure |
-| `features/*/domain/` | feature固有型、pure validation、pure state transition、pure algorithm | same feature domain、`shared/domain` |
-| `features/*/use-cases/` | ユーザー操作の処理順序、外部能力interface、runtime state session | same feature domain/use-cases、`shared/domain`、他feature `public-api.ts` |
-| `features/*/infrastructure/` | LocalStorage、GAS、HTTP、Web Worker、browser download | same feature domain、same feature use-case interfaces、`shared/browser` |
-| `features/*/ui/` | Controller、View interface、DOM View、screen model、event parser | same feature domain/use-cases、components、`shared/ui`、他feature `public-api.ts` |
-| `features/*/public-api.ts` | cross-featureで利用可能なdomain type、capability interface、factory-free operation | same feature内のdomain/use-cases/UI contracts |
-| `shared/domain/` | 複数featureで意味が完全に同じpure type/interface | browser APIなし |
-| `shared/browser/` | clock、UUID、URL、download、cancellation等のbrowser implementation | browser API、`shared/domain` |
-| `shared/ui/` | notification、focus、image layout等の汎用UI | DOM、`shared/domain` |
-| `components/` | Lit custom elements | feature UI model/event contract、`shared/ui` |
+| `app/` | browser entrypoint, composition, global lifecycle, explicit browser-event binding | feature public APIs; only assembly may import feature infrastructure |
+| `features/*/domain/` | feature types, pure validation, transitions and algorithms | same feature domain, `shared/domain` |
+| `features/*/use-cases/` | user-operation ordering, capability interfaces, feature runtime Session | same feature domain/use-cases, `shared/domain`, other feature `public-api.ts` |
+| `features/*/infrastructure/` | LocalStorage, GAS, HTTP, Worker, browser download | same feature domain and use-case interfaces, `shared/browser` |
+| `features/*/ui/` | Controller, View interface, DOM View, screen model, custom-event parser | same feature domain/use-cases, components, `shared/ui`, other feature public APIs |
+| `features/*/public-api.ts` | cross-feature domain/capability/controller contracts | same feature contracts only |
+| `shared/domain/` | immutable types/interfaces whose business meaning is identical across features | no browser APIs |
+| `shared/browser/` | browser-specific generic implementations | browser APIs, `shared/domain` |
+| `shared/ui/` | generic notification/focus/image-layout UI | DOM, `shared/domain` |
+| `components/` | Lit elements | feature UI models/events and `shared/ui` |
 
-## Use Case allowlist
+## Use Case import allowlist
 
-Use Case fileは次だけをimportできる。
+A Use Case file may import only:
 
-1. 同じfeatureの`domain/`
-2. 同じfeatureの`use-cases/`
-3. `shared/domain/`
-4. 別featureの`public-api.ts`
-5. type-only importで、上記に属する型
+1. the same feature's `domain/`;
+2. the same feature's `use-cases/`;
+3. `shared/domain/`;
+4. another feature's `public-api.ts`;
+5. type-only imports satisfying the same rules.
 
-次はpath名に`infrastructure`が含まれなくても禁止する。
+It may not access DOM, LocalStorage, `fetch`, Worker, AbortController/AbortSignal, concrete clients/loaders/repositories, components, or feature UI.
 
-- `state/storage-service`
-- `state/storage-schema`
-- `api/gas-api-client`
-- `fetch`
-- `localStorage`
-- `document`
-- `window`
-- `Worker`
-- `AbortController`
-- `AbortSignal`
-- concrete class名が`LocalStorage`、`Http`、`Browser`、`WebWorker`、`Gas*Client`で始まるmodule
+## Repository and client placement
 
-architecture checkerは「import先pathに特定単語があるか」だけでなく、上記allowlistから外れるdependencyを検出する。
-
-## Repository placement
-
-Repository interfaceとconcrete classを同じfileに置かない。
-
-```text
-features/event-day/use-cases/event-day-repository.ts
-  └── EventDayRepository interface only
-
-features/event-day/infrastructure/local-storage-event-day-repository.ts
-  └── LocalStorageEventDayRepository class
-```
-
-同じ規則を全featureへ適用する。
-
-- interface名は保存対象を表す。
-- concrete class名は技術を表す。
-- LocalStorage keyはconcrete infrastructure内のprivate constantにする。
-- schema migration、rollback、runtime parsingもconcrete infrastructureが行う。
-- Use Caseはconcrete classをimportしない。
+- interfaces live under the owning feature `use-cases/`;
+- LocalStorage/HTTP/GAS/Worker/browser implementations live under `infrastructure/`;
+- interface and concrete class do not share a file;
+- storage keys and schema parsing are private to concrete infrastructure;
+- assembly imports concrete paths directly;
+- public APIs do not export concrete infrastructure.
 
 ## Feature public API
 
-`public-api.ts`は別featureへ見せるcontractであり、composition root向けconcrete barrelではない。
+May export:
 
-公開してよいもの:
+- domain types;
+- capability interfaces;
+- Use Case/controller/View contracts required by another feature or app assembly;
+- pure factories that do not create browser/concrete infrastructure.
 
-- domain type
-- capability interface
-- Use Case interface
-- Controller/View contractがcross-feature連携に必要な場合のtype
-- pure factory。ただしfactoryがconcrete browser technologyを生成しない場合のみ
+Must not export:
 
-公開してはいけないもの:
+- LocalStorage, HTTP, GAS, Worker, or browser concrete classes;
+- DOM View concrete classes;
+- storage keys;
+- Worker protocols;
+- same-feature infrastructure barrels.
 
-- `LocalStorageEventDayRepository`
-- `HttpRouteMapAssetsLoader`
-- `WebWorkerRouteOptimizer`
-- `BrowserCircleCsvDownloader`
-- GAS/HTTP client concrete class
-- DOM View concrete class
-- storage key
-- Worker protocol entrypoint
+## Semantic facade prohibition
 
-`assemble-comipath-application.ts`は必要なconcrete classをそのfeatureの`infrastructure/`pathから直接importする。
+Deleting an old filename is not sufficient. A replacement is a forbidden semantic facade when it has one or more of these properties:
 
-## Forbidden imports
+- owns mutable state belonging to two or more canonical features;
+- performs DOM queries/rendering for two or more canonical features;
+- constructs concrete dependencies for multiple features outside assembly;
+- binds unrelated feature events and contains business branches;
+- combines event/day, source, route, status, deletion, Worker, timer, and notification lifecycle;
+- aggregates contracts or parsers whose business owners are different features.
 
-- DomainからDOM、LocalStorage、`fetch`、Worker、Abort API
-- Use CaseからUI、components、concrete infrastructure、browser API
-- feature Aからfeature Bの`public-api.ts`以外
-- componentsからrepository、GAS client、HTTP loader、Worker optimizer
-- `comipath-application.ts`からrouting algorithm、CSV parser、storage key、GAS protocol
-- `shared/`へfeature固有state machineを移すこと
-- deleted legacy fileをproductionまたはtestからimportすること
-- cross-feature importのための`index.ts`
-- 新規file/class名に`Manager`、`Handler`、`Helper`、`Utils`、`Common`を使うこと
+Final prohibited paths include:
+
+- `apps/webapp/js/comipath-browser-runtime.js`
+- `apps/webapp/js/event-day-data-store.ts`
+- `apps/webapp/js/comipath-dom-coordinator.js`
+- `apps/webapp/js/features/event-day/domain/application-contract-types.ts`
+- `apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers.ts`
+
+The checker must also reject equivalent replacements with different names. At minimum, a direct child of `apps/webapp/js/` outside `app/` may not combine state/DOM/lifecycle with internals from multiple canonical features.
 
 ## State ownership
 
 | State | Single owner |
 |---|---|
-| active event/day and active persisted day state | `ActiveEventDaySession` |
+| active event/day and active persisted state | `ActiveEventDaySession` |
 | derived circle lists | `ActiveEventDayReader` |
-| circle status and pending GAS updates | active event/day state's `circleStates` and `gasOutbox` |
-| route target、route、selection、Worker generation | `RouteGuidanceSession` |
-| source draft、preview、request generation | `CircleDataSourceSession` |
-| current cancelable source request | `CircleDataSourceController` or one named request coordinator |
-| UI-only state | corresponding feature View |
-| persistent data | corresponding Repository |
+| circle status and pending GAS updates | active state `circleStates` and `gasOutbox`, changed by Circle Status use cases |
+| route target, route, selection and Worker generation | `RouteGuidanceSession` |
+| source draft, preview and request generation | `CircleDataSourceSession` |
+| current cancelable source request | one Circle Data Source controller/request owner |
+| feature-only transient UI state | corresponding feature View |
+| persisted data | owning Repository implementation |
 
-同じstateを複数classのmutable propertyへ複製しない。
+No state is copied into a root application/runtime facade.
 
-### Pending GAS updates
+## Pending GAS updates
 
-pending GAS updatesの永続正本は既存`LocalEventDayState.gasOutbox`だけである。
+The only persisted source of truth is `LocalEventDayState.gasOutbox`.
 
-- 別のLocalStorage keyを作らない。
-- status変更とoutbox appendは同じnext stateを作り、一回のrepository saveで保存する。
-- save成功後にだけbackground deliveryを要求する。
-- network成功後のremove、失敗後のattempt updateもevent/day stateをrepositoryへ保存する。
-- persisted field名とJSON shapeを変更しない。
+- no second LocalStorage queue/key;
+- status change and outbox append are saved as one next state;
+- background delivery begins only after durable save;
+- success removal and failed-attempt update are persisted;
+- existing field name and JSON shape remain unchanged.
 
 ## Cancellation boundary
 
-Use Case contractへ`AbortController`または`AbortSignal`を露出しない。
-
-browser infrastructureが必要な場合は次のような抽象contractを使う。
+Use Cases and Sessions do not expose AbortController/AbortSignal.
 
 ```ts
 export interface CancelableRequest<T> {
@@ -155,69 +130,57 @@ export interface CancelableRequest<T> {
 }
 ```
 
-HTTP/GAS infrastructureだけが内部でAbortControllerを生成・使用する。Controllerは新しいrequest開始時と`stop()`時に`cancel()`を呼ぶ。SessionへAbortControllerを保存しない。
+Only browser infrastructure uses AbortController internally. The owning controller cancels on replacement, settings close, event/day change, and stop. Stale completions do not update Session, repository, or View.
 
-## Browser lifecycle
+## Browser lifecycle and event binding
 
-browser entrypoint、DOM readiness、application lifecycleのownerを分ける。
+- `browser-entrypoint.ts`: assembly and runner call only;
+- `run-comipath-in-browser.ts`: DOMContentLoaded, pagehide, pending start Promise;
+- `assemble-comipath-application.ts`: all concrete dependency creation;
+- `comipath-application.ts`: controller/background-process start/stop order only;
+- `bind-browser-events.ts`: explicit custom-event/DOM routing and cleanup only.
 
-- `browser-entrypoint.ts`: assemblyとrunner呼出しだけ
-- `run-comipath-in-browser.ts`: DOMContentLoaded、pagehide、pending start Promise
-- `comipath-application.ts`: controller/background process start/stop順序
-- `assemble-comipath-application.ts`: concrete dependency生成
+Contracts:
 
-契約:
+- start/stop are idempotent;
+- stop before DOM readiness settles the pending Promise;
+- startup failure is terminal for the same instance;
+- started resources stop once in reverse ownership order;
+- stop cancels listeners, timers, requests and Workers;
+- stale async continuation does not update state or View;
+- event binder contains no business logic or message formatting.
 
-- `start()`と`stop()`は二重実行してもlistener/processを重複させない。
-- DOM準備前に`stop()`された場合、保留中の`start()` Promiseはresolveまたはdocumented cancellation errorでrejectし、永久pendingにしない。
-- application start失敗はterminalである。同じinstanceをretryしない。
-- start失敗時は所有resourceを一回だけstopする。
-- stop後のasync continuationはstate、repository、Viewを更新しない。
+## Central contract and parser prohibition
 
-## Browser event binding
+A single file must not aggregate types/parsers from several canonical features.
 
-browser event bindingはfeature Controllerまたは`app/bind-browser-events.ts`に限定する。Use CaseはDOM event名とelement IDを知らない。
+- types belong to the feature that defines their business meaning;
+- other features import them through the owner public API;
+- a shared type is allowed only when its meaning is identical in at least two features;
+- parsers belong to the boundary that receives the unknown value;
+- parser errors redact raw CSV cells, GAS URLs, sheet content, external posts, credentials and local paths.
 
-bindしたlistener、timer、coordinator、Worker、cancelable requestはownerの`stop()`または`dispose()`で解除する。再起動でlistenerを二重登録しない。
+Forbidden replacement names include `application-types`, `common-types`, `domain-types`, `boundary-parsers`, `shared-parser`, and equivalent god files.
 
-## Error boundary
+## Testing and enforcement
 
-```text
-Infrastructure error
-        ↓ classify
-Use Case error
-        ↓ map
-Controller message
-        ↓ render
-View
-```
+Every new test is registered in normal `npm run test:webapp`.
 
-raw CSV cell、GAS URL、sheet内容、external post body、credentialをerror、log、snapshotへ含めない。
+Required tests/checker coverage:
 
-## Test and verification boundary
+- Domain/Use Case import allowlist;
+- cross-feature public API rule;
+- concrete public-export prohibition;
+- component infrastructure prohibition;
+- application shell line/responsibility rules;
+- exact original and renamed facade absence;
+- equivalent semantic facade fixtures;
+- central contract/parser fixtures;
+- production composition-root wiring for all canonical controllers;
+- browser event registration and cleanup;
+- characterization through real assembly with fake external boundaries;
+- cancellation and lifecycle Promise settlement.
 
-- 新しいtest fileは作成Task内で`npm run test:webapp`へ登録する。
-- focused testだけ通してTask完了としない。
-- Task 3.1以降、`npm run check:webapp`はarchitecture checkerとtypecheckを両方実行する。
-- architecture fixture testは違反例が実際にFAILすることを検証する。
-- characterization testは検証対象handlerをmockへ置換しない。
-- repository、View、Loader、Clockなどの外部境界だけをfakeにする。
-- cancel、stop、failure時にPromiseがsettleすることをtimeout付きで検証する。
+A characterization test must not mock the handler under test. It verifies repository effects, Session state and View calls.
 
-## Enforcement
-
-`scripts/check-webapp-architecture.mjs`と`tests/architecture-boundaries.test.mjs`を実装上の正本とする。
-
-checkerは少なくとも次を検証する。
-
-- Domain/Use Case allowlist
-- cross-feature `public-api.ts` rule
-- public API concrete export禁止
-- componentsのinfrastructure import禁止
-- application shell責務
-- vague new names
-- deleted legacy import
-- allowlist外の違反
-- `comipath-application.ts` line limit
-
-文書とcheckerが矛盾する場合は実装を停止し、同じTaskで両方を修正する。
+`scripts/check-webapp-architecture.mjs` and `tests/architecture-boundaries.test.mjs` are the executable source of truth. If they conflict with this document, stop and repair both in the same Task.

@@ -9,40 +9,20 @@ Phase 5B: C108 map bundle integration                  COMPLETE
   ↓
 Phase 5C: Circle status, route guidance, ALNS          COMPLETE
   ↓
-Phase 5D: apps/webapp production architecture refactor NEXT
+Phase 5D: apps/webapp production architecture refactor IN CORRECTION
   ↓
-Phase 5E: tests and docs structure refactor             FUTURE
+Phase 5E: tests and docs structure refactor             BLOCKED
   ↓
 Phase 5F: broad visual polish                           FUTURE
 ```
 
-各PhaseはPhase branch、Task別commit、Phaseにつき原則1本のDraft PRで進める。docs-only計画更新はユーザーが明示した場合に限り`main`へ直接commitしてよい。
-
-## Phase 5B
-
-### Goal
-
-C108の4地図を公開可能なSVG、points、grid成果物としてWebappへ統合し、day1/day2から共通利用できる状態にする。
-
-### Status
-
-完了。正本は`docs/plans/phase-05b/`と`docs/reviews/phase-05b-handoff.md`。
-
-## Phase 5C
-
-### Goal
-
-C108の各地図を独立して巡回できるようにし、任意始点、weighted distance matrix、time-decayed ALNS、circle status、route guidance resumeを一貫した状態モデルで提供する。
-
-### Status
-
-完了。正本は`docs/plans/phase-05c/`、ALNS追補、`docs/reviews/phase-05c-handoff.md`。
+Each Phase uses one Phase branch, Task-specific commits, independent Task review, and normally one Draft PR. Do not begin a later Phase before the current exit gate passes.
 
 ## Phase 5D: apps/webapp production architecture refactor
 
 ### Goal
 
-`App`、`DataManager`、`UIManager`、`Config`、central type filesへ集中した責務をfeature別Domain、Use Case、Infrastructure、UIへ段階移行し、legacy filesを削除する。
+Move responsibility from broad application/data/UI/config/type files into canonical feature Domain, Use Case, Infrastructure, Controller and View modules. Delete both original legacy paths and equivalent renamed facades.
 
 ### Canonical features
 
@@ -52,28 +32,39 @@ C108の各地図を独立して巡回できるようにし、任意始点、weig
 - Circle Data Source
 - Local Data Deletion
 
+### Current status
+
+The branch is CI-green and has feature modules, but the initial Task 10 handoff is BLOCKED. Task 9 removed original filenames while leaving equivalent responsibilities in renamed runtime/data/DOM and central contract/parser files.
+
+Correction sequence:
+
+```text
+Task 9.1 → Task 9.2 → Task 9.3 → Task 9.4 → Task 10 rerun
+```
+
+Task 9.1 is NEXT. PR #7 remains Draft and should not merge before the final PASS handoff.
+
 ### Includes
 
-- current behavior characterization
-- architecture and naming checker
-- browser startup and dependency assembly separation
-- active event/day single source of truth
-- circle status and pending GAS updates extraction
-- route guidance extraction
-- CSV/Google Sheets import/export extraction
-- event/day switching and local data deletion extraction
-- feature-specific DOM Views
-- old large UI model split
-- legacy app/data/UI/config/type files deletion
-- clean verification and handoff
+- behavior characterization through the production assembly path;
+- architecture/naming/semantic-facade checker;
+- browser startup, composition, lifecycle and event-binding separation;
+- one active event/day owner;
+- Circle Status and pending GAS update ownership;
+- production-connected Route Guidance;
+- production-connected CSV/Google Sheet source workflows;
+- production-connected event/day switching and local deletion;
+- feature-specific DOM Views;
+- deletion of original and renamed facades;
+- distribution of central contracts/parsers by owner;
+- clean verification and human handoff.
 
 ### Does not include
 
-- `tests/` directory restructuring
-- `docs/` structure restructuring
-- broad visual changes
-- dependency addition
-- persistence/network/optimization contract changes
+- tests/docs directory restructuring;
+- broad visual changes;
+- dependency addition;
+- persistence, GAS, CSV, route, optimization or map contract changes.
 
 ### Canonical documents
 
@@ -81,37 +72,36 @@ C108の各地図を独立して巡回できるようにし、任意始点、weig
 - `docs/architecture/webapp-module-boundaries.md`
 - `docs/architecture/webapp-naming-guidelines.md`
 - `docs/plans/phase-05d/README.md`
+- `docs/reviews/phase-5d-handoff.md`
 
 ## Phase 5E: tests and docs structure refactor
 
 ### Goal
 
-Phase 5Dで確定したfeature ownershipに合わせて`tests/`と`docs/`を整理し、test名、fixture、suite script、current/archive文書の探索性を改善する。
+After Phase 5D ownership is final, reorganize tests and docs for discoverability without changing application behavior.
 
 ### Planned scope
 
-- testsをfeature ownership別に配置
-- unit/integration/E2Eの命名とfixture整理
-- package test scriptsの可読性改善
-- duplicate/obsolete testsの整理
-- docs正本、plan、handoff、archiveのnavigation改善
-- docs内のold terminologyとstale path audit
-- code behaviorを変えない
+- place tests by feature ownership;
+- normalize unit/integration/E2E names;
+- organize fixtures, fakes and test helpers;
+- improve package test-script readability;
+- remove duplicate/obsolete tests only with preserved coverage;
+- improve canonical/plan/handoff/archive navigation;
+- audit stale terminology and paths;
+- preserve all production public APIs and contracts.
 
-詳細TaskはPhase 5D handoff後に作成する。
+Phase 5E may not finish missing production extraction from Phase 5D.
 
 ## Phase 5F: broad visual polish
 
-### Goal
-
-Phase 5Dで確立したfeature-specific ViewsとPhase 5Eで整理したtest/docsを利用し、広範なvisual polishとUI再設計を行う。
-
-詳細TaskはPhase 5E完了後に作成する。
+Use the final feature-specific Views and stable tests to perform broad visual polish and UI redesign. Detailed Tasks are written after Phase 5E.
 
 ## Common gates
 
-- Task文書にない外部挙動を実装しない。
-- TaskごとにTDDとfocused verificationを行う。
-- commit、push、PR、mergeの承認境界を守る。
-- private map source、personal data、external content、credentialをtest artifactへ含めない。
-- Phase Exit Gateが完了するまで次Phaseを開始しない。
+- implement only the selected Task;
+- use TDD and focused verification;
+- keep Task commits separate and independently reviewed;
+- preserve private-map and sensitive-data boundaries;
+- do not confuse passing regression tests with completion of an architecture goal;
+- do not start the next Phase before the current handoff declares PASS.
