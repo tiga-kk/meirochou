@@ -103,7 +103,7 @@ export class DomCircleProgressView {
 
   /**
    * カウントの更新
-   * @param {DataManager} dm
+   * @param {EventDayDataStore} dm
    */
   updateCounts(dm) {
     const unvisited = dm.getUnvisited();

@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { expect, test, vi } from "vitest";
 import productionRegistryJson from "../apps/webapp/events/manifest.json";
+import { parseEventRegistry } from "../apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers";
 import { loadEventRegistry } from "../apps/webapp/js/features/event-day/infrastructure/http-event-registry-loader";
 import {
   loadRuntimeMapBundleManifestFromUrl,
   resolveEventMapManifestUrl,
 } from "../apps/webapp/js/features/event-day/infrastructure/http-map-manifest-loader";
-import { parseEventRegistry } from "../apps/webapp/js/types/boundary-parsers";
 
 const validRegistry = {
   schemaVersion: 1,

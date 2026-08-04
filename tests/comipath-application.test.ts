@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import { createComiPathApplication } from "../apps/webapp/js/app/comipath-application";
-import { App } from "../apps/webapp/js/app.js";
+import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime.js";
 
 describe("ComiPath application shell", () => {
-  it("starts and stops the legacy application exactly once", async () => {
-    const legacy = {
+  it("starts and stops the browser runtime exactly once", async () => {
+    const browserRuntime = {
       startCalls: 0,
       stopCalls: 0,
       async start() {
@@ -15,17 +15,17 @@ describe("ComiPath application shell", () => {
         this.stopCalls++;
       },
     };
-    const app = createComiPathApplication({ legacyApplication: legacy });
+    const app = createComiPathApplication({ browserRuntime });
     await Promise.all([app.start(), app.start()]);
     app.stop();
     app.stop();
-    expect(legacy.startCalls).toBe(1);
-    expect(legacy.stopCalls).toBe(1);
+    expect(browserRuntime.startCalls).toBe(1);
+    expect(browserRuntime.stopCalls).toBe(1);
   });
 
   it("cleans up after a failed start and rejects subsequent start attempts on the same instance", async () => {
     let attempts = 0;
-    const legacy = {
+    const browserRuntime = {
       stopCalls: 0,
       async start() {
         attempts++;
@@ -35,13 +35,13 @@ describe("ComiPath application shell", () => {
         this.stopCalls++;
       },
     };
-    const app = createComiPathApplication({ legacyApplication: legacy });
+    const app = createComiPathApplication({ browserRuntime });
     await expect(app.start()).rejects.toThrow();
-    expect(legacy.stopCalls).toBe(1);
+    expect(browserRuntime.stopCalls).toBe(1);
     await expect(app.start()).rejects.toThrow();
     app.stop();
     expect(attempts).toBe(1);
-    expect(legacy.stopCalls).toBe(1);
+    expect(browserRuntime.stopCalls).toBe(1);
   });
 
   it("settles scheduled work when the legacy application is disposed", async () => {
@@ -55,10 +55,10 @@ describe("ComiPath application shell", () => {
       dm: { disposeSyncCoordinator() {} },
       navigationRuntimeController: {},
       settingsEscapeHandler: null,
-    } as unknown as App;
+    } as unknown as ComiPathBrowserRuntime;
 
     const pending = new Promise<void>((resolve) => {
-      App.prototype.scheduleTimeout.call(
+      ComiPathBrowserRuntime.prototype.scheduleTimeout.call(
         fakeApp,
         () => {},
         60_000,
@@ -69,7 +69,7 @@ describe("ComiPath application shell", () => {
       );
     });
 
-    App.prototype.dispose.call(fakeApp);
+    ComiPathBrowserRuntime.prototype.dispose.call(fakeApp);
     await pending;
     expect(cancelled).toBe(true);
   });

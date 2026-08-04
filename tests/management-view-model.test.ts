@@ -1,4 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import type {
+  EventRegistryV1,
+  GasOutboxEntry,
+  LocalEventDayState,
+  SourceDiff,
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import {
   dispatchManagementEvent,
   type ManagementEventDetailMap,
@@ -10,12 +16,6 @@ import {
   formatSourceDiff,
   formatSourceSummary,
 } from "../apps/webapp/js/shared/ui/management-view-model";
-import type {
-  EventRegistryV1,
-  GasOutboxEntry,
-  LocalEventDayState,
-  SourceDiff,
-} from "../apps/webapp/js/types/domain";
 
 const sampleRegistry: EventRegistryV1 = {
   schemaVersion: 1,

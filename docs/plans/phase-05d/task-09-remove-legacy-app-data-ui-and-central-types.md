@@ -1,6 +1,6 @@
 # Phase 5D Task 9: Remove Legacy App, Data, UI, and Central Types
 
-**Status:** PLANNED
+**Status:** IMPLEMENTED
 **Depends on:** Task 8
 **Commit candidate:** `refactor(app): remove legacy application facades`
 
@@ -250,3 +250,14 @@ git commit -m "refactor(app): remove legacy application facades"
 - `comipath-application.ts`が200 physical lines以下である。
 - application shellがfeature business logicを持たない。
 - full tests、typecheck、build、E2E、public auditが成功する。
+
+## Implementation record
+
+- The legacy filenames and architecture allowlist were removed.
+- Runtime, event-day data, DOM coordination, event-day contract types, and
+  boundary parsers now live under responsibility-specific names/owners.
+- All production and test imports were migrated, while the public DOM element
+  names and visual snapshots were preserved.
+- Task tests are registered in `test:webapp`.
+- Verification: `npm run test:webapp` 487 tests passed, architecture/typecheck,
+  build, public audit, and focused management E2E passed.

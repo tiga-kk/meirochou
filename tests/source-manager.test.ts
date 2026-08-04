@@ -1,14 +1,14 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
-  SourceManager,
-  SourceManagerModel,
-} from "../apps/webapp/js/components/source-manager";
+  CircleDataSourcePanel,
+  CircleDataSourcePanelModel,
+} from "../apps/webapp/js/components/circle-data-source-panel";
 import type { SourceSummaryViewModel } from "../apps/webapp/js/shared/ui/management-view-model";
-import "../apps/webapp/js/components/source-manager";
+import "../apps/webapp/js/components/circle-data-source-panel";
 
-describe("SourceManager Component", () => {
-  let element: SourceManager;
+describe("CircleDataSourcePanel Component", () => {
+  let element: CircleDataSourcePanel;
 
   const sampleCsvSource: SourceSummaryViewModel = {
     typeLabel: "CSV",
@@ -17,7 +17,7 @@ describe("SourceManager Component", () => {
     pendingCount: 0,
   };
 
-  const defaultModel: SourceManagerModel = {
+  const defaultModel: CircleDataSourcePanelModel = {
     activeRef: { eventId: "c104", dayId: "day1" },
     activeRefLabel: "C104 1日目",
     source: sampleCsvSource,
@@ -33,7 +33,7 @@ describe("SourceManager Component", () => {
 
   beforeEach(async () => {
     document.body.innerHTML = "";
-    element = document.createElement("source-manager") as SourceManager;
+    element = document.createElement("source-manager") as CircleDataSourcePanel;
     element.model = defaultModel;
     document.body.appendChild(element);
     await element.updateComplete;

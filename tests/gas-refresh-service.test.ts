@@ -5,19 +5,19 @@ import {
   GasRefreshService,
   StaleGasPreviewError,
 } from "../apps/webapp/js/data/gas-refresh-service";
-import { DataManager } from "../apps/webapp/js/data-manager";
+import { EventDayDataStore } from "../apps/webapp/js/event-day-data-store";
+import type {
+  EventDayRef,
+  EventRegistryV1,
+  GasDataSource,
+  LocalEventDayState,
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
 import { SourceSettingsService } from "../apps/webapp/js/state/source-settings-service";
 import {
   type StorageAdapter,
   StorageService,
 } from "../apps/webapp/js/state/storage-service";
-import type {
-  EventDayRef,
-  EventRegistryV1,
-  GasDataSource,
-  LocalEventDayState,
-} from "../apps/webapp/js/types/domain";
 
 class MockStorageAdapter implements StorageAdapter {
   public map = new Map<string, string>();
@@ -78,7 +78,7 @@ function createTestSetup(adapter = new MockStorageAdapter()) {
     serviceOptions,
   );
 
-  const manager = new DataManager(storage, {
+  const manager = new EventDayDataStore(storage, {
     ...serviceOptions,
     client,
     repository,
@@ -103,7 +103,7 @@ function createTestSetup(adapter = new MockStorageAdapter()) {
   };
 }
 
-describe("Phase 3 Task 4: GasRefreshService and DataManager integration", () => {
+describe("Phase 3 Task 4: GasRefreshService and EventDayDataStore integration", () => {
   test("Step 1: opening cached CSV/GAS states makes zero GET calls", async () => {
     const { manager, client, repository } = createTestSetup();
     const fetchCirclesSpy = vi.spyOn(client, "fetchCircles");

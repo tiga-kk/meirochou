@@ -1,15 +1,15 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { App } from "../apps/webapp/js/app";
-import { DataManager } from "../apps/webapp/js/data-manager";
+import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime";
+import { EventDayDataStore } from "../apps/webapp/js/event-day-data-store";
+import type {
+  EventDayRef,
+  EventRegistryV1,
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import {
   type StorageAdapter,
   StorageService,
 } from "../apps/webapp/js/state/storage-service";
-import type {
-  EventDayRef,
-  EventRegistryV1,
-} from "../apps/webapp/js/types/domain";
 
 class MockStorageAdapter implements StorageAdapter {
   public map = new Map<string, string>();
@@ -44,9 +44,9 @@ function createRegistry(): EventRegistryV1 {
   };
 }
 
-describe("App Source Diff Dialog Integration", () => {
+describe("ComiPathBrowserRuntime Source Diff Dialog Integration", () => {
   let adapter: MockStorageAdapter;
-  let dataManager: DataManager;
+  let dataManager: EventDayDataStore;
 
   beforeEach(() => {
     document.body.innerHTML = `
@@ -98,13 +98,13 @@ describe("App Source Diff Dialog Integration", () => {
 
     adapter = new MockStorageAdapter();
     const storage = new StorageService(adapter);
-    dataManager = new DataManager(storage);
+    dataManager = new EventDayDataStore(storage);
     dataManager.eventRegistry = createRegistry();
   });
 
-  function setupApp(): App {
-    const app = new App();
-    (app as unknown as { dm: DataManager }).dm = dataManager;
+  function setupApp(): ComiPathBrowserRuntime {
+    const app = new ComiPathBrowserRuntime();
+    (app as unknown as { dm: EventDayDataStore }).dm = dataManager;
     app.ui.init(dataManager);
     app.setupEvents();
     return app;

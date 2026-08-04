@@ -1,5 +1,8 @@
-import { parseDayId, parseEventId } from "../types/boundary-parsers";
-import type { EventDayRef } from "../types/domain";
+import type { EventDayRef } from "../features/event-day/domain/application-contract-types";
+import {
+  parseDayId,
+  parseEventId,
+} from "../features/event-day/infrastructure/application-boundary-parsers";
 
 export interface DownloadAdapter {
   createObjectURL(blob: Blob): string;

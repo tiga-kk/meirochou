@@ -1,10 +1,10 @@
 // @vitest-environment node
 import { describe, expect, test } from "vitest";
+import type { GridMeta } from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import {
   type StartSelection,
   snapStartToWalkableCell,
 } from "../apps/webapp/js/navigation/start-selection";
-import type { GridMeta } from "../apps/webapp/js/types/domain";
 
 /**
  * テスト用グリッド (3x3, cellSize=10):

@@ -1,16 +1,16 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import { App } from "../apps/webapp/js/app.js";
+import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime.js";
 import { ChangeCircleStatusUseCase } from "../apps/webapp/js/features/circle-status/use-cases/change-circle-status";
-import { createInitialNavigationState } from "../apps/webapp/js/features/route-guidance/domain/navigation-state";
-import { NavigationOrchestrationService } from "../apps/webapp/js/navigation/navigation-orchestration";
-import { createEmptyEventDayState } from "../apps/webapp/js/state/storage-schema";
 import type {
   CircleRecord,
   EventDayRef,
   LocalEventDayState,
-} from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
+import { createInitialNavigationState } from "../apps/webapp/js/features/route-guidance/domain/navigation-state";
+import { NavigationOrchestrationService } from "../apps/webapp/js/navigation/navigation-orchestration";
 import { dispatchManagementEvent } from "../apps/webapp/js/shared/ui/management-events";
+import { createEmptyEventDayState } from "../apps/webapp/js/state/storage-schema";
 
 const REF: EventDayRef = { eventId: "demo-v1", dayId: "day1" };
 const NOW = "2026-07-28T00:00:00.000Z";
@@ -32,7 +32,7 @@ function createProductionAppFixture() {
     postMessage: vi.fn(),
     terminate: vi.fn(),
   };
-  const app = new App({ alnsWorkerFactory: () => worker });
+  const app = new ComiPathBrowserRuntime({ alnsWorkerFactory: () => worker });
   vi.spyOn(app.dm, "disposeSyncCoordinator");
   return { app, settings, addEventListener, resumeAddEventListener };
 }

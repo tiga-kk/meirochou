@@ -1,7 +1,7 @@
 // @ts-nocheck
 
 import { buildRouteOverlaySvg } from "../../../route-planner";
-import { ZoomHelper } from "../../../utils/gesture-helper.js";
+import { GestureZoomController } from "../../../utils/gesture-zoom-controller.js";
 import { runtimeMapAreaCatalog } from "../infrastructure/runtime-map-area-catalog";
 import {
   buildMapPins,
@@ -104,7 +104,7 @@ export class DomRouteMapView {
       this.els.navigationMapLayer &&
       !this.zoomHelper
     ) {
-      this.zoomHelper = new ZoomHelper(
+      this.zoomHelper = new GestureZoomController(
         this.els.navigationMap,
         this.els.navigationMapLayer,
       );

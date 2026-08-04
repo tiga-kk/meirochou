@@ -3,7 +3,7 @@ import type {
   Circle,
   CircleRecord,
   HistoryEntry,
-} from "../types/domain";
+} from "../features/event-day/domain/application-contract-types";
 
 export interface DecodeResult<T> {
   readonly value: T;

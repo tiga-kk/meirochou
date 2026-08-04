@@ -116,14 +116,14 @@ Phase 5Dではtests/docsの全面再配置を行わず、apps内部のpublic own
 - Phase 5C: complete
 - Phase 5D apps design: approved
 - Phase 5D implementation plan: revised and complete
-- Phase 5D implementation: Task 8 complete; Task 9 onward pending
+- Phase 5D implementation: Task 9 complete; Task 10 onward pending
 - Phase 5E tests/docs refactor: planned after Phase 5D handoff
 - Phase 5F visual polish: planned after Phase 5E
 
 ## Next action
 
-1. Task 8のcommitを確認する。
-2. Task 9のentry gateと変更可能ファイルを確認する。
+1. Task 9のcommitを確認する。
+2. Task 10のentry gateと変更可能ファイルを確認する。
 
 ## Continuing prohibitions
 

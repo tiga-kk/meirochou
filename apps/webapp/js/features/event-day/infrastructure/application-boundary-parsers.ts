@@ -14,7 +14,7 @@ import type {
   OcrPoint,
   OcrPortal,
   PointsPayload,
-} from "./domain";
+} from "../domain/application-contract-types";
 
 export class BoundaryValidationError extends Error {
   readonly path: string;

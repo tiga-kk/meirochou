@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { App } from "../apps/webapp/js/app";
+import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime";
+import type { EventRegistryV1 } from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
 import { StorageService } from "../apps/webapp/js/state/storage-service";
-import type { EventRegistryV1 } from "../apps/webapp/js/types/domain";
 
 const sampleRegistry: EventRegistryV1 = {
   schemaVersion: 1,
@@ -60,13 +60,13 @@ function setupDOM() {
   `;
 }
 
-describe("SourceManager App Orchestration (Task 4 P0)", () => {
-  let app: App;
+describe("CircleDataSourcePanel ComiPathBrowserRuntime Orchestration (Task 4 P0)", () => {
+  let app: ComiPathBrowserRuntime;
 
   beforeEach(async () => {
     setupDOM();
     localStorage.clear();
-    app = new App();
+    app = new ComiPathBrowserRuntime();
     app.dm.eventRegistry = sampleRegistry;
     app.dm.eventRegistryUrl = "/assets/events/manifest.json";
 

@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { runtimeMapAreaCatalog } from "../apps/webapp/js/features/route-guidance/infrastructure/runtime-map-area-catalog";
 import {
   BoundaryValidationError,
   parseEventMapBundleManifest,
@@ -9,7 +8,8 @@ import {
   parseGridMeta,
   parseMapBundleManifest,
   parsePointsPayload,
-} from "../apps/webapp/js/types/boundary-parsers";
+} from "../apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers";
+import { runtimeMapAreaCatalog } from "../apps/webapp/js/features/route-guidance/infrastructure/runtime-map-area-catalog";
 
 const validMapManifest = {
   schemaVersion: 1,

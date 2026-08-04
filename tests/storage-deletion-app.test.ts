@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import { App } from "../apps/webapp/js/app";
+import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime";
 import type {
   EventRegistryV1,
   LocalEventDayState,
-} from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 
 function createSampleRegistry(): EventRegistryV1 {
   return {
@@ -45,9 +45,9 @@ function createSampleState(eventId: string, dayId: string): LocalEventDayState {
   };
 }
 
-describe("App & Storage Deletion Integration", () => {
+describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
   it("handles storage-delete-request for active event-day and falls back to default event/day", async () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.dm.eventRegistry = createSampleRegistry();
 
     const ref1 = { eventId: "c104", dayId: "day1" };
@@ -78,7 +78,7 @@ describe("App & Storage Deletion Integration", () => {
   });
 
   it("does not switch active state when deleting a non-active event-day", async () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.dm.eventRegistry = createSampleRegistry();
 
     const activeRef = { eventId: "c104", dayId: "day1" };
@@ -106,7 +106,7 @@ describe("App & Storage Deletion Integration", () => {
   });
 
   it("handles all-events deletion, clears repository, and reinitializes registry default state", async () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.dm.eventRegistry = createSampleRegistry();
 
     const ref1 = { eventId: "c104", dayId: "day1" };
@@ -140,7 +140,7 @@ describe("App & Storage Deletion Integration", () => {
   });
 
   it("rejects all-events deletion if confirmation text is invalid", async () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.dm.eventRegistry = createSampleRegistry();
 
     const ref1 = { eventId: "c104", dayId: "day1" };

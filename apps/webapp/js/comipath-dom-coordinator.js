@@ -10,7 +10,7 @@ import { TspSolver } from "./tsp-solver.js";
  * UI管理クラス
  * DOM操作、表示更新を担当
  */
-export class UIManager {
+export class ComiPathDomCoordinator {
   constructor() {
     this.dataManager = null;
     this.onSetNextTarget = null; // コールバック

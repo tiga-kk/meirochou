@@ -4,7 +4,7 @@ import type {
   LockedLeg,
   NavigationState,
   RouteEndpointId,
-} from "../types/domain";
+} from "../features/event-day/domain/application-contract-types";
 
 export interface NavigationSnapshot {
   readonly schemaVersion: 1;

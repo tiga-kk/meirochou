@@ -10,10 +10,10 @@ import type {
   EventDayOption,
   OutboxPanelModel,
 } from "../shared/ui/management-view-model";
-import type { SourceManagerModel } from "./source-manager";
+import type { CircleDataSourcePanelModel } from "./circle-data-source-panel";
 import type { StorageDeleteDialogModel } from "./storage-delete-dialog";
 import "./event-day-selector";
-import "./source-manager";
+import "./circle-data-source-panel";
 import "./outbox-panel";
 import "./storage-delete-dialog";
 
@@ -40,7 +40,7 @@ export class ComipathSettings extends LitElement {
   declare eventDayOptions: readonly EventDayOption[];
   declare selectedEventId: string;
   declare selectedDayId: string;
-  declare sourceManagerModel: SourceManagerModel | null;
+  declare sourceManagerModel: CircleDataSourcePanelModel | null;
   declare outboxPanelModel: OutboxPanelModel | null;
   declare deleteOptions: readonly DeleteOptionViewModel[];
   declare deleteDialogModel: StorageDeleteDialogModel | null;

@@ -78,7 +78,7 @@ import type {
   MapBundleManifestV1,
   PurchaseMutationResult,
   SourceDiff,
-} from "./types/domain";
+} from "./features/event-day/domain/application-contract-types";
 
 export interface CsvReplacementPreview {
   readonly previewId: string;
@@ -175,7 +175,7 @@ function sameRef(left: EventDayRef | null, right: EventDayRef): boolean {
 }
 
 /** LocalStorage-backed service for the currently selected event/day. */
-export class DataManager {
+export class EventDayDataStore {
   readonly storage: StorageService;
   readonly repository: EventDayRepository;
   readonly sourceSettings: SourceSettingsService;

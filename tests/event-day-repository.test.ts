@@ -1,4 +1,8 @@
 import { describe, expect, test } from "vitest";
+import type {
+  EventDayRef,
+  LocalEventDayState,
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import {
   LocalStorageEventDayRepository as EventDayRepository,
   StorageWriteError,
@@ -9,10 +13,6 @@ import {
 } from "../apps/webapp/js/state/storage-schema";
 import type { StorageAdapter } from "../apps/webapp/js/state/storage-service";
 import { StorageService } from "../apps/webapp/js/state/storage-service";
-import type {
-  EventDayRef,
-  LocalEventDayState,
-} from "../apps/webapp/js/types/domain";
 
 class MockStorageAdapter implements StorageAdapter {
   public map = new Map<string, string>();

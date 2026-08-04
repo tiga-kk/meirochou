@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import assert from "node:assert/strict";
 import { afterEach, expect, test } from "vitest";
+import type { CircleDataSourcePanelModel } from "../apps/webapp/js/components/circle-data-source-panel";
 import { ComipathSettings } from "../apps/webapp/js/components/comipath-settings";
-import type { SourceManagerModel } from "../apps/webapp/js/components/source-manager";
 import type {
   DeleteOptionViewModel,
   EventDayOption,
@@ -12,7 +12,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-test("settings shell renders event-day-selector and source-manager child components", async () => {
+test("settings shell renders event-day-selector and circle-data-source-panel child components", async () => {
   const element = new ComipathSettings();
   element.open = true;
 
@@ -28,7 +28,7 @@ test("settings shell renders event-day-selector and source-manager child compone
     },
   ];
 
-  const sampleSourceModel: SourceManagerModel = {
+  const sampleSourceModel: CircleDataSourcePanelModel = {
     activeRef: { eventId: "c104", dayId: "day1" },
     activeRefLabel: "C104 1日目",
     source: {

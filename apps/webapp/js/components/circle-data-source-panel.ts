@@ -1,10 +1,10 @@
 import { html, LitElement, type PropertyValues } from "lit";
+import type { EventDayRef } from "../features/event-day/domain/application-contract-types";
 import { dispatchManagementEvent } from "../shared/ui/management-events";
 import type { SourceSummaryViewModel } from "../shared/ui/management-view-model";
-import type { EventDayRef } from "../types/domain";
 
-/** Safe, render-only source-management state supplied by App. */
-export interface SourceManagerModel {
+/** Safe, render-only source-management state supplied by ComiPathBrowserRuntime. */
+export interface CircleDataSourcePanelModel {
   readonly activeRef: EventDayRef | null;
   readonly activeRefLabel: string;
   readonly source: SourceSummaryViewModel;
@@ -28,12 +28,12 @@ function isValidGasWebAppUrl(url: string): boolean {
 }
 
 /** Light-DOM source selector that emits preview requests without persistence. */
-export class SourceManager extends LitElement {
+export class CircleDataSourcePanel extends LitElement {
   static properties = {
     model: { attribute: false },
   };
 
-  declare model: SourceManagerModel | null;
+  declare model: CircleDataSourcePanelModel | null;
 
   private activeTab: "csv" | "gas" = "csv";
   private localGasUrl = "";
@@ -53,7 +53,7 @@ export class SourceManager extends LitElement {
     if (changedProperties.has("model") && this.model) {
       const oldModel = changedProperties.get(
         "model",
-      ) as SourceManagerModel | null;
+      ) as CircleDataSourcePanelModel | null;
       if (!oldModel || oldModel.sourceType !== this.model.sourceType) {
         this.activeTab = this.model.sourceType;
       }
@@ -349,11 +349,11 @@ export class SourceManager extends LitElement {
 }
 
 if (!customElements.get("source-manager")) {
-  customElements.define("source-manager", SourceManager);
+  customElements.define("source-manager", CircleDataSourcePanel);
 }
 
 declare global {
   interface HTMLElementTagNameMap {
-    "source-manager": SourceManager;
+    "source-manager": CircleDataSourcePanel;
   }
 }

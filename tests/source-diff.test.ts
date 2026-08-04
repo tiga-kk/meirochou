@@ -6,7 +6,7 @@ import {
 import type {
   CircleRecord,
   LocalEventDayState,
-} from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 
 describe("source-diff", () => {
   const dummyCircle1: CircleRecord = {

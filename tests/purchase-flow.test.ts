@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, expect, test, vi } from "vitest";
 import { GasApiClient } from "../apps/webapp/js/api/gas-api-client";
-import { App } from "../apps/webapp/js/app";
-import { DataManager } from "../apps/webapp/js/data-manager";
+import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime";
+import { EventDayDataStore } from "../apps/webapp/js/event-day-data-store";
 import { GasPendingUpdateDelivery } from "../apps/webapp/js/features/circle-status/infrastructure/gas-pending-update-delivery";
 import { CircleStatusController } from "../apps/webapp/js/features/circle-status/ui/circle-status-controller";
 import { PendingGasUpdatesController } from "../apps/webapp/js/features/circle-status/ui/pending-gas-updates-controller";
@@ -11,6 +11,12 @@ import { DiscardPendingGasUpdatesUseCase } from "../apps/webapp/js/features/circ
 import { DefaultPendingGasUpdateBackgroundProcess } from "../apps/webapp/js/features/circle-status/use-cases/pending-gas-update-background-process";
 import { SendPendingGasUpdatesUseCase } from "../apps/webapp/js/features/circle-status/use-cases/send-pending-gas-updates";
 import { UndoCircleStatusChangeUseCase } from "../apps/webapp/js/features/circle-status/use-cases/undo-circle-status-change";
+import type {
+  EventDayRef,
+  EventRegistryV1,
+  GasDataSource,
+  LocalEventDayState,
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
 import { createActiveEventDaySession } from "../apps/webapp/js/features/event-day/public-api";
 import { getCircleVisitState } from "../apps/webapp/js/state/storage-schema";
@@ -18,12 +24,6 @@ import {
   type StorageAdapter,
   StorageService,
 } from "../apps/webapp/js/state/storage-service";
-import type {
-  EventDayRef,
-  EventRegistryV1,
-  GasDataSource,
-  LocalEventDayState,
-} from "../apps/webapp/js/types/domain";
 
 class MockStorageAdapter implements StorageAdapter {
   public map = new Map<string, string>();
@@ -97,7 +97,7 @@ function createSetup(adapter = new MockStorageAdapter()) {
     discardPendingGasUpdates,
   );
 
-  const manager = new DataManager(storage, {
+  const manager = new EventDayDataStore(storage, {
     now: () => now,
     repository,
     activeEventDaySession,
@@ -115,7 +115,7 @@ function createSetup(adapter = new MockStorageAdapter()) {
   return { adapter, repository, manager, fetchSpy, getNow: () => now };
 }
 
-describe("Phase 3 Task 5: Integration and App purchase flows", () => {
+describe("Phase 3 Task 5: Integration and ComiPathBrowserRuntime purchase flows", () => {
   const ref: EventDayRef = { eventId: "C108", dayId: "day1" };
   const gasSource: GasDataSource = {
     type: "gas",
@@ -177,7 +177,7 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
     expect(finalSaved?.gasOutbox[0].lastError).toBe("unknown");
   });
 
-  test("Step 3: Storage failure in DataManager/App produces local error without network call", async () => {
+  test("Step 3: Storage failure in EventDayDataStore/ComiPathBrowserRuntime produces local error without network call", async () => {
     const { adapter, repository, manager, fetchSpy } = createSetup();
 
     const gasState: LocalEventDayState = {
@@ -205,7 +205,7 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
     expect(manager.purchasedList).toEqual([]);
   });
 
-  test("Step 3: App reports local save failure instead of success", async () => {
+  test("Step 3: ComiPathBrowserRuntime reports local save failure instead of success", async () => {
     const { adapter, repository, manager } = createSetup();
     repository.save(ref, {
       schemaVersion: 2,
@@ -223,7 +223,7 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
     await manager.openEventDay(ref);
     adapter.failWrites = true;
 
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.dm = manager;
     app.selectionState = "idle";
     app.selectedTarget = { space: "A-01", sheetName: "Day1" };
@@ -243,7 +243,7 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
     expect(manager.purchasedList).toEqual([]);
   });
 
-  test("Step 7: App reports a later GAS failure while keeping local success", async () => {
+  test("Step 7: ComiPathBrowserRuntime reports a later GAS failure while keeping local success", async () => {
     const { repository, manager, fetchSpy } = createSetup();
     repository.save(ref, {
       schemaVersion: 2,
@@ -261,7 +261,7 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
     await manager.openEventDay(ref);
     fetchSpy.mockRejectedValue(new Error("Network connection lost"));
 
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.dm = manager;
     app.selectionState = "idle";
     app.selectedTarget = { space: "A-01", sheetName: "Day1" };
@@ -278,7 +278,7 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
     expect(manager.purchasedList).toEqual(["A-01"]);
   });
 
-  test("Task 6 Step 3: App startup ordering, zero GET calls, non-blocking start", async () => {
+  test("Task 6 Step 3: ComiPathBrowserRuntime startup ordering, zero GET calls, non-blocking start", async () => {
     const { repository, manager, fetchSpy } = createSetup();
     repository.save(ref, {
       schemaVersion: 2,
@@ -294,7 +294,7 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
       },
     });
 
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.dm = manager;
     app.ui.init = vi.fn();
     app.setupEvents = vi.fn();
@@ -305,7 +305,7 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
       ? vi.spyOn(manager.backgroundProcess, "start")
       : null;
 
-    // App opens cached GAS state and starts background sync only after local init
+    // ComiPathBrowserRuntime opens cached GAS state and starts background sync only after local init
     await app.init({ eventId: "C108", areas: [] });
     expect(fetchSpy).not.toHaveBeenCalled();
     if (startSyncSpy) {

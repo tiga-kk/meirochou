@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
+import type { LocalEventDayState } from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import { createActiveEventDayReader } from "../apps/webapp/js/features/event-day/use-cases/active-event-day-reader";
 import { createActiveEventDaySession } from "../apps/webapp/js/features/event-day/use-cases/active-event-day-session";
-import type { LocalEventDayState } from "../apps/webapp/js/types/domain";
 
 const state = (
   circleStates: Record<string, "held" | "purchased">,

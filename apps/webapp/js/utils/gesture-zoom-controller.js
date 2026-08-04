@@ -1,7 +1,7 @@
 /**
  * 高度な画像ズーム（ピンチズーム、パン、慣性、バウンド、PCマウス・ホイール対応）を設定するクラス
  */
-export class ZoomHelper {
+export class GestureZoomController {
   constructor(container, img) {
     this.container = container;
     this.img = img;

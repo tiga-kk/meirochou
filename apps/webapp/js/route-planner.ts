@@ -1,4 +1,3 @@
-import { TspSolver } from "./tsp-solver.js";
 import type {
   Circle,
   GridMeta,
@@ -8,7 +7,8 @@ import type {
   PointsPayload,
   RouteCell,
   RouteResult,
-} from "./types/domain";
+} from "./features/event-day/domain/application-contract-types";
+import { TspSolver } from "./tsp-solver.js";
 
 const GRID_BLOCKED = 0;
 const GRID_CROWDED = 2;

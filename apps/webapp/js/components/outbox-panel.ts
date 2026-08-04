@@ -1,11 +1,11 @@
 import { html, LitElement, type PropertyValues } from "lit";
+import type { EventDayRef } from "../features/event-day/domain/application-contract-types";
 import { dispatchManagementEvent } from "../shared/ui/management-events";
 import type {
   OutboxEntryViewModel,
   OutboxPanelGroupViewModel,
   OutboxPanelModel,
 } from "../shared/ui/management-view-model";
-import type { EventDayRef } from "../types/domain";
 import { DialogFocusController } from "../ui/dialog-focus";
 
 /**

@@ -3,7 +3,7 @@ import {
   parseCircleCsv,
   serializeCircleCsv,
 } from "../apps/webapp/js/features/circle-data-source/public-api";
-import type { CircleRecord } from "../apps/webapp/js/types/domain";
+import type { CircleRecord } from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 
 describe("csv-circle-codec", () => {
   describe("parseCircleCsv", () => {

@@ -7,7 +7,7 @@ import type {
   GasOutboxEntry,
   LocalEventDayState,
   MapPoint,
-} from "../features/event-day/domain/event-day-types";
+} from "./event-day-types";
 
 export type {
   Circle,
@@ -23,7 +23,7 @@ export type {
   LocalEventDayState,
   MapPoint,
   SourceRef,
-} from "../features/event-day/domain/event-day-types";
+} from "./event-day-types";
 
 export interface MapBundleAreaV1 {
   id: string;

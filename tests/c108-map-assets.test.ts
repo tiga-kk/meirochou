@@ -6,7 +6,7 @@ import {
   parseEventMapBundleManifest,
   parseGridMeta,
   parsePointsPayload,
-} from "../apps/webapp/js/types/boundary-parsers";
+} from "../apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers";
 
 const BUNDLE_ROOT = resolve("apps/webapp/map-bundles/C108");
 const AREA_IDS = ["e456", "e7", "s12", "w12"];

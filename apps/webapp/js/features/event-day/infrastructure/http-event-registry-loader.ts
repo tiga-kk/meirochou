@@ -1,5 +1,5 @@
-import { parseEventRegistry } from "../../../types/boundary-parsers";
-import type { EventRegistryV1 } from "../../../types/domain";
+import type { EventRegistryV1 } from "../domain/application-contract-types";
+import { parseEventRegistry } from "./application-boundary-parsers";
 
 export { parseEventRegistry };
 

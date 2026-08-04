@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, test } from "vitest";
-import { App } from "../apps/webapp/js/app.js";
+import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime.js";
 import { NavigationOrchestrationService } from "../apps/webapp/js/navigation/navigation-orchestration";
 import { NavigationRuntimeController } from "../apps/webapp/js/navigation/navigation-runtime-controller";
 import { LocalStorageDistanceMatrixRepository } from "../apps/webapp/js/routing/distance-matrix-repository";
@@ -29,8 +29,8 @@ describe("Phase 5C Task 11: NavigationRuntimeController", () => {
     expect(controller.getMatrixRepo()).toBe(matrixRepo);
   });
 
-  test("App constructor instantiates NavigationRuntimeController and shares single repository instances", () => {
-    const app = new App();
+  test("ComiPathBrowserRuntime constructor instantiates NavigationRuntimeController and shares single repository instances", () => {
+    const app = new ComiPathBrowserRuntime();
     expect(app.navigationRuntimeController).toBeDefined();
     expect(app.snapshotRepository).toBeDefined();
     expect(app.matrixRepository).toBeDefined();

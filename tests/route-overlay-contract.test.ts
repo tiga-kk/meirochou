@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
+import type {
+  GridMeta,
+  PointsPayload,
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import {
   buildRouteOverlaySvg,
   planRoute,
 } from "../apps/webapp/js/route-planner";
-import type { GridMeta, PointsPayload } from "../apps/webapp/js/types/domain";
 
 const fictionalPoints: PointsPayload = {
   version: 1,

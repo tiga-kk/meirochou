@@ -1,4 +1,4 @@
-import type { GridMeta } from "../types/domain";
+import type { GridMeta } from "../features/event-day/domain/application-contract-types";
 
 export interface StartSelection {
   readonly svgX: number;

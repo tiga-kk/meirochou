@@ -1,9 +1,9 @@
-import type { EventDayRepository } from "../features/event-day/use-cases/event-day-repository";
 import type {
   EventDayRef,
   LocalEventDayState,
   ProtectedSourceOperation,
-} from "../types/domain";
+} from "../features/event-day/domain/application-contract-types";
+import type { EventDayRepository } from "../features/event-day/use-cases/event-day-repository";
 import { parseLocalEventDayState } from "./storage-schema";
 
 export class PendingOutboxError extends Error {

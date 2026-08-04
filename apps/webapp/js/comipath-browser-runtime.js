@@ -2,8 +2,16 @@ import "./components/comipath-settings";
 import "./components/navigation-resume-dialog";
 import "./components/source-diff-dialog";
 import { parseGasWebAppUrl } from "./api/gas-api-client";
-import { CsvValidationError, DataManager } from "./data-manager.js";
+import { ComiPathDomCoordinator } from "./comipath-dom-coordinator.js";
 import { createDevDemoData, isDevDemoEnabled } from "./dev-demo-data.js";
+import {
+  CsvValidationError,
+  EventDayDataStore,
+} from "./event-day-data-store.ts";
+import {
+  parseGridMeta,
+  parsePointsPayload,
+} from "./features/event-day/infrastructure/application-boundary-parsers";
 import { loadEventRegistryWithUrl } from "./features/event-day/infrastructure/http-event-registry-loader";
 import {
   loadRuntimeMapBundleManifestFromUrl,
@@ -31,10 +39,8 @@ import {
 } from "./shared/ui/management-view-model";
 import { LocalStorageNavigationSnapshotRepository } from "./state/navigation-snapshot-repository";
 import { TspSolver } from "./tsp-solver.js";
-import { parseGridMeta, parsePointsPayload } from "./types/boundary-parsers";
 import { downloadCsv, formatCsvExportFilename } from "./ui/csv-download";
 import { ManagementSession } from "./ui/management-session";
-import { UIManager } from "./ui-manager.js";
 
 function formatSourceApplyError(error) {
   switch (error?.name) {
@@ -51,7 +57,7 @@ function formatSourceApplyError(error) {
   }
 }
 
-/** Validates an event/day reference at the App's DOM event boundary. */
+/** Validates an event/day reference at the ComiPathBrowserRuntime's DOM event boundary. */
 function isEventDayRef(value) {
   return Boolean(
     value &&
@@ -108,7 +114,7 @@ function areSpacesInSameArea(spaceA, spaceB) {
   return Boolean(areaA && areaB && areaA.id === areaB.id);
 }
 
-/** Accepts only a validated GAS source shape at the App/component boundary. */
+/** Accepts only a validated GAS source shape at the ComiPathBrowserRuntime/component boundary. */
 function safeGasSource(value) {
   if (
     !value ||
@@ -149,13 +155,13 @@ const DEFAULT_NAVIGATION_OPTIMIZATION_TIME_LIMIT_MS = 10000;
 /**
  * アプリケーションのメインコントローラー
  */
-export class App {
+export class ComiPathBrowserRuntime {
   constructor(options = {}) {
     this.started = false;
     this.stopped = false;
     this.ownedWorkers = new Set();
-    this.dm = new DataManager(undefined, options?.dataManagerOptions);
-    this.ui = new UIManager();
+    this.dm = new EventDayDataStore(undefined, options?.dataManagerOptions);
+    this.ui = new ComiPathDomCoordinator();
     this.session = new ManagementSession();
     this.currentTarget = null;
     this.currentRoute = null;
@@ -606,7 +612,7 @@ export class App {
     }
   }
 
-  /** Fetch sheet names for a given GAS Web App URL without persisting the URL. */
+  /** Fetch sheet names for a given GAS Web ComiPathBrowserRuntime URL without persisting the URL. */
   async handleGasSheetsRequest(gasUrl) {
     if (!gasUrl || !this.dm.activeRef || !this.dm.activeState) return;
 
@@ -1120,7 +1126,7 @@ export class App {
     // スタートアップ時に非同期でバックグラウンド同期コーディネーターを起動
     this.dm.startSyncCoordinator();
 
-    // Phase 5C: Load and validate snapshot after DataManager.openEventDay and UIManager.init
+    // Phase 5C: Load and validate snapshot after EventDayDataStore.openEventDay and ComiPathDomCoordinator.init
     if (this.dm.activeRef && this.dm.activeState) {
       const pendingCircleSpaces = this.dm.activeState.circles
         .filter(
@@ -2780,6 +2786,6 @@ async function bootstrapApp(existingApp) {
     return;
   }
 
-  const app = existingApp || new App();
+  const app = existingApp || new ComiPathBrowserRuntime();
   await app.init(manifest, targetRef, { registry, registryUrl });
 }

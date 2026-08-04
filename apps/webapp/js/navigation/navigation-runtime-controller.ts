@@ -1,3 +1,7 @@
+import type {
+  CircleVisitState,
+  NavigationState,
+} from "../features/event-day/domain/application-contract-types";
 import { parseTimeDecayedAlnsWorkerResponse } from "../routing/alns-worker-protocol";
 import type { LocalStorageDistanceMatrixRepository } from "../routing/distance-matrix-repository";
 import {
@@ -5,7 +9,6 @@ import {
   type NavigationSnapshot,
   validateSnapshotForResume,
 } from "../state/navigation-snapshot-repository";
-import type { CircleVisitState, NavigationState } from "../types/domain";
 import type { NavigationOrchestrationService } from "./navigation-orchestration";
 import {
   buildOptimizationProblem,

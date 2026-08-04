@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import type {
+  LocalEventDayState,
+  ProtectedSourceOperation,
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
 import {
   PendingOutboxError,
@@ -6,10 +10,6 @@ import {
   StaleSourceStateError,
 } from "../apps/webapp/js/state/source-settings-service";
 import { StorageService } from "../apps/webapp/js/state/storage-service";
-import type {
-  LocalEventDayState,
-  ProtectedSourceOperation,
-} from "../apps/webapp/js/types/domain";
 
 function createMockStorageService(): StorageService {
   const store = new Map<string, string>();

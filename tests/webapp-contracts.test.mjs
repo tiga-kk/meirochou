@@ -5,6 +5,7 @@ import {
   createDevDemoData,
   isDevDemoEnabled,
 } from "../apps/webapp/js/dev-demo-data.js";
+import { parseMapBundleManifest } from "../apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers";
 import { runtimeMapAreaCatalog } from "../apps/webapp/js/features/route-guidance/infrastructure/runtime-map-area-catalog.ts";
 import { formatTargetViewModel } from "../apps/webapp/js/features/route-guidance/ui/format-target-view-model.ts";
 import { buildSpaceFromLocation } from "../apps/webapp/js/features/route-guidance/ui/parse-current-location-form.ts";
@@ -26,7 +27,6 @@ import {
 import { parseSafeExternalUrl as normalizeExternalUrl } from "../apps/webapp/js/shared/browser/parse-safe-external-url.ts";
 import { getRouteStartSpaceForMap } from "../apps/webapp/js/shared/ui/contained-image-layout.ts";
 import { StorageService } from "../apps/webapp/js/state/storage-service.js";
-import { parseMapBundleManifest } from "../apps/webapp/js/types/boundary-parsers";
 
 const root = new URL("../", import.meta.url);
 
@@ -57,13 +57,13 @@ test("browser entrypoint owns startup side effects", () => {
     html,
     /<script\s+type="module"\s+src="js\/app\/browser-entrypoint\.ts"><\/script>/,
   );
-  const appSource = read("apps/webapp/js/app.js");
+  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
   assert.doesNotMatch(appSource, /DOMContentLoaded/);
 });
 
 // GAS contract tests are restored for Task 4
 test("Phase 2 keeps GAS sale actions outside the local data service", () => {
-  const source = read("apps/webapp/js/data-manager.ts");
+  const source = read("apps/webapp/js/event-day-data-store.ts");
   const gasSource = read("integrations/gas-spreadsheet/src/web-api.js");
 
   assert.doesNotMatch(source, /SyncQueue/);
@@ -75,7 +75,7 @@ test("Phase 2 keeps GAS sale actions outside the local data service", () => {
 });
 
 test("Phase 5C Task 1 removes persistent Undo/Redo controls from the UI", () => {
-  const appSource = read("apps/webapp/js/app.js");
+  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
   const modalSource = read(
     "apps/webapp/js/features/circle-status/ui/dom-circle-gallery-view.ts",
   );
@@ -219,8 +219,8 @@ test("shared webapp and GAS names use lower camel case", () => {
   assert.doesNotMatch(sources, /\bval2\b/);
 });
 
-test("Phase 3 keeps fetch inside GasApiClient and out of DataManager", () => {
-  const dataManagerSource = read("apps/webapp/js/data-manager.ts");
+test("Phase 3 keeps fetch inside GasApiClient and out of EventDayDataStore", () => {
+  const dataManagerSource = read("apps/webapp/js/event-day-data-store.ts");
   const gasClientSource = read("apps/webapp/js/api/gas-api-client.ts");
 
   assert.doesNotMatch(dataManagerSource, /\bfetch\(/);
@@ -229,8 +229,8 @@ test("Phase 3 keeps fetch inside GasApiClient and out of DataManager", () => {
   assert.match(gasClientSource, /async sendSaleUpdate/);
 });
 
-test("Phase 2/3 DataManager storage is separate from the sync outbox", () => {
-  const dataManagerSource = read("apps/webapp/js/data-manager.ts");
+test("Phase 2/3 EventDayDataStore storage is separate from the sync outbox", () => {
+  const dataManagerSource = read("apps/webapp/js/event-day-data-store.ts");
   const storageSource = read("apps/webapp/js/state/storage-service.ts");
   const appendSource = read(
     "apps/webapp/js/features/circle-status/domain/pending-gas-update-state.ts",
@@ -1073,7 +1073,7 @@ test("webapp route exposes the exact OCR points selected for both endpoint pins"
 });
 
 test("webapp next-target search ranks candidates with grid route assets", () => {
-  const appSource = read("apps/webapp/js/app.js");
+  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
 
   assert.match(appSource, /rankCandidatesByGridDistance/);
   assert.match(appSource, /fetch\(area\.gridFile\)/);
@@ -1101,7 +1101,7 @@ test("webapp current location keeps an exact circle number", () => {
 
 test("webapp uses an exact numeric input for the current location", () => {
   const html = read("apps/webapp/index.html");
-  const uiSource = read("apps/webapp/js/ui-manager.js");
+  const uiSource = read("apps/webapp/js/comipath-dom-coordinator.js");
 
   assert.match(
     html,
@@ -1115,7 +1115,7 @@ test("webapp uses an exact numeric input for the current location", () => {
 });
 
 test("webapp routes gallery target changes through navigation orchestration", () => {
-  const appSource = read("apps/webapp/js/app.js");
+  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
   const handler =
     appSource.match(
       /async\s+handleSetNextTarget\(circle\)[\s\S]*?\n\s*}\n\n\s*\/\*\*/,
@@ -1127,7 +1127,7 @@ test("webapp routes gallery target changes through navigation orchestration", ()
 });
 
 test("webapp advances purchased navigation through orchestration", () => {
-  const appSource = read("apps/webapp/js/app.js");
+  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
 
   const purchaseHandler =
     appSource.match(
@@ -1140,8 +1140,8 @@ test("webapp advances purchased navigation through orchestration", () => {
 });
 
 test("webapp opens an empty local event/day on a first visit", () => {
-  const appSource = read("apps/webapp/js/app.js");
-  const uiSource = read("apps/webapp/js/ui-manager.js");
+  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
+  const uiSource = read("apps/webapp/js/comipath-dom-coordinator.js");
 
   assert.match(appSource, /CSVデータ未設定。空のイベント・日程で起動しました/);
   assert.doesNotMatch(appSource, /GAS URLを設定してください/);
@@ -1154,8 +1154,8 @@ test("webapp opens an empty local event/day on a first visit", () => {
 });
 
 test("webapp brings manually opened settings into view", () => {
-  const appSource = read("apps/webapp/js/app.js");
-  const uiSource = read("apps/webapp/js/ui-manager.js");
+  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
+  const uiSource = read("apps/webapp/js/comipath-dom-coordinator.js");
 
   assert.match(
     appSource,
@@ -1260,8 +1260,8 @@ test("webapp target view model exposes the source sheet name", () => {
 
 test("webapp renders spreadsheet and source-sheet titles in compact labels", () => {
   const html = read("apps/webapp/index.html");
-  const dataManagerSource = read("apps/webapp/js/data-manager.ts");
-  const uiSource = read("apps/webapp/js/ui-manager.js");
+  const dataManagerSource = read("apps/webapp/js/event-day-data-store.ts");
+  const uiSource = read("apps/webapp/js/comipath-dom-coordinator.js");
 
   assert.match(html, /id="spreadsheet-title"/);
   assert.match(html, /id="target-sheet-name"/);
@@ -1368,8 +1368,8 @@ test("webapp navigation map renders the configured map image", () => {
   assert.match(mapRenderer, /classList\.remove\(["']hidden["']\)/);
 });
 
-test("webapp validates the map manifest before constructing App", () => {
-  const appSource = read("apps/webapp/js/app.js");
+test("webapp validates the map manifest before constructing ComiPathBrowserRuntime", () => {
+  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
   const loadIndex = appSource.indexOf(
     "await loadRuntimeMapBundleManifestFromUrl",
   );
@@ -1377,7 +1377,10 @@ test("webapp validates the map manifest before constructing App", () => {
     "runtimeMapAreaCatalog.initializeMapAreas",
     loadIndex,
   );
-  const constructIndex = appSource.indexOf("new App()", initializeIndex);
+  const constructIndex = appSource.indexOf(
+    "new ComiPathBrowserRuntime()",
+    initializeIndex,
+  );
 
   assert.ok(loadIndex >= 0);
   assert.ok(initializeIndex > loadIndex);
@@ -1390,7 +1393,7 @@ test("webapp validates the map manifest before constructing App", () => {
 
 test("webapp map rendering avoids a permanently low-resolution transform layer", () => {
   const css = read("apps/webapp/css/target.css");
-  const gestureHelper = read("apps/webapp/js/utils/gesture-helper.js");
+  const gestureHelper = read("apps/webapp/js/utils/gesture-zoom-controller.js");
 
   assert.doesNotMatch(css, /will-change:\s*transform/);
   assert.doesNotMatch(

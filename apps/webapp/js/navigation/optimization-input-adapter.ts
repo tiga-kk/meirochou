@@ -1,10 +1,10 @@
+import type { CircleRecord } from "../features/event-day/domain/application-contract-types";
 import {
   convertDistanceToTravelTime,
   DEFAULT_TIMING_PROFILE,
   type OptimizationTimingProfile,
   type TimeDecayedAlnsProblem,
 } from "../routing/time-decayed-objective";
-import type { CircleRecord } from "../types/domain";
 
 export function resolveServiceTimeSec(
   circle: CircleRecord,

@@ -1,8 +1,11 @@
 import { parseLocalEventDayState } from "../../../state/storage-schema";
 import type { StorageService } from "../../../state/storage-service";
-import { parseDayId, parseEventId } from "../../../types/boundary-parsers";
-import type { EventDayRef, LocalEventDayState } from "../../../types/domain";
+import type {
+  EventDayRef,
+  LocalEventDayState,
+} from "../domain/application-contract-types";
 import type { EventDayRepository } from "../use-cases/event-day-repository";
+import { parseDayId, parseEventId } from "./application-boundary-parsers";
 
 export type StorageRollbackKey = "state" | "index" | "last-opened";
 

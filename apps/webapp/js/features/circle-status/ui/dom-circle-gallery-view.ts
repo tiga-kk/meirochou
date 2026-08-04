@@ -1,10 +1,10 @@
 // @ts-nocheck
 import { TspSolver } from "../../../tsp-solver.js";
 import {
+  GestureZoomController,
   setupResizableMap,
   setupSwipeAction,
-  ZoomHelper,
-} from "../../../utils/gesture-helper.js";
+} from "../../../utils/gesture-zoom-controller.js";
 
 /**
  * モーダル管理クラス
@@ -95,12 +95,18 @@ export class DomCircleGalleryView {
     });
 
     if (this.els.modalImageContainer && this.els.pdfImage) {
-      new ZoomHelper(this.els.modalImageContainer, this.els.pdfImage);
+      new GestureZoomController(
+        this.els.modalImageContainer,
+        this.els.pdfImage,
+      );
     }
 
     // ギャラリーマップのズーム
     if (this.els.galleryMapScroll && this.els.galleryMapImage) {
-      new ZoomHelper(this.els.galleryMapScroll, this.els.galleryMapImage);
+      new GestureZoomController(
+        this.els.galleryMapScroll,
+        this.els.galleryMapImage,
+      );
     }
 
     // ギャラリーマップのリサイズ

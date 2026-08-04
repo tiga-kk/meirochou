@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { App } from "../apps/webapp/js/app";
+import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime";
 import type {
   EventDayRef,
   EventRegistryV1,
   LocalEventDayState,
-} from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import type { DownloadAdapter } from "../apps/webapp/js/ui/csv-download";
 
 function createRegistry(): EventRegistryV1 {
@@ -22,8 +22,8 @@ function createRegistry(): EventRegistryV1 {
   };
 }
 
-describe("App CSV Export Integration", () => {
-  let app: App;
+describe("ComiPathBrowserRuntime CSV Export Integration", () => {
+  let app: ComiPathBrowserRuntime;
   let mockAdapter: DownloadAdapter;
   let clickedUrl: string | null = null;
   let clickedFilename: string | null = null;
@@ -40,7 +40,7 @@ describe("App CSV Export Integration", () => {
       }),
     };
 
-    app = new App();
+    app = new ComiPathBrowserRuntime();
     app.dm.eventRegistry = createRegistry();
     app.downloadAdapter = mockAdapter;
     app.ui.showToast = vi.fn();

@@ -117,9 +117,12 @@ function createFixture() {
   cpSync(publicBundle, outputPublicBundle, { recursive: true });
   writeFileSync(
     join(outputRoot, "index.html"),
-    '<!doctype html><script type="module" src="./assets/app.js"></script>\n',
+    '<!doctype html><script type="module" src="./assets/comipath-browser-runtime.js"></script>\n',
   );
-  writeFileSync(join(outputAssets, "app.js"), "console.log('fixture');\n");
+  writeFileSync(
+    join(outputAssets, "comipath-browser-runtime.js"),
+    "console.log('fixture');\n",
+  );
 
   return root;
 }
@@ -230,7 +233,7 @@ test("rejects a symbolic link in the built artifact", () => {
 
 test("rejects a local absolute path in built text", () => {
   appendFileSync(
-    join(fixtureRoot, "dist/webapp/assets/app.js"),
+    join(fixtureRoot, "dist/webapp/assets/comipath-browser-runtime.js"),
     "const privatePath = '/Users/example/private-map';\n",
   );
 
@@ -242,7 +245,7 @@ test("rejects a local absolute path in built text", () => {
 
 test("rejects a Cloudflare credential assignment in built text", () => {
   appendFileSync(
-    join(fixtureRoot, "dist/webapp/assets/app.js"),
+    join(fixtureRoot, "dist/webapp/assets/comipath-browser-runtime.js"),
     "CLOUDFLARE_API_TOKEN=abcdefghijklmnopqrstuvwxyz123456\n",
   );
 
@@ -254,7 +257,7 @@ test("rejects a Cloudflare credential assignment in built text", () => {
 
 test("rejects a colon-style Cloudflare credential assignment in built text", () => {
   appendFileSync(
-    join(fixtureRoot, "dist/webapp/assets/app.js"),
+    join(fixtureRoot, "dist/webapp/assets/comipath-browser-runtime.js"),
     '\n{ "CF_ACCOUNT_ID": "0123456789abcdef0123456789abcdef" }\n',
   );
 
@@ -267,7 +270,7 @@ test("rejects a colon-style Cloudflare credential assignment in built text", () 
 test("rejects root-relative local assets in built index.html", () => {
   writeFileSync(
     join(fixtureRoot, "dist/webapp/index.html"),
-    '<!doctype html><script src="/assets/app.js"></script>\n',
+    '<!doctype html><script src="/assets/comipath-browser-runtime.js"></script>\n',
   );
 
   assert.throws(

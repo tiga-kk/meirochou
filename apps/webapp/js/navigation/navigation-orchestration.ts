@@ -1,10 +1,10 @@
-import type { NavigationState } from "../features/route-guidance/domain/navigation-state";
 import type {
   CircleRecord,
   ConfirmedPosition,
   LockedLeg,
   RouteEndpointId,
-} from "../types/domain";
+} from "../features/event-day/domain/application-contract-types";
+import type { NavigationState } from "../features/route-guidance/domain/navigation-state";
 
 export interface StartNavigationInput {
   readonly navState: NavigationState;

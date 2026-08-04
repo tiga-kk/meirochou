@@ -4,7 +4,7 @@ export interface StartableApplication {
 }
 
 export interface ComiPathApplicationDependencies {
-  readonly legacyApplication: StartableApplication;
+  readonly browserRuntime: StartableApplication;
 }
 
 /** Application shell owning only lifecycle delegation. */
@@ -23,20 +23,20 @@ export function createComiPathApplication(
       if (startPromise) return startPromise;
       if (started) return Promise.resolve();
       started = true;
-      startPromise = Promise.resolve(
-        dependencies.legacyApplication.start(),
-      ).catch((error: unknown) => {
-        startError = error;
-        stopped = true;
-        dependencies.legacyApplication.stop();
-        throw error;
-      });
+      startPromise = Promise.resolve(dependencies.browserRuntime.start()).catch(
+        (error: unknown) => {
+          startError = error;
+          stopped = true;
+          dependencies.browserRuntime.stop();
+          throw error;
+        },
+      );
       return startPromise;
     },
     stop(): void {
       if (stopped) return;
       stopped = true;
-      dependencies.legacyApplication.stop();
+      dependencies.browserRuntime.stop();
     },
   };
 }

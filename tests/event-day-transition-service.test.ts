@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import type {
+  EventRegistryV1,
+  MapBundleManifestV1,
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import {
   loadMapBundleManifestFromUrl,
   resolveEventMapManifestUrl,
@@ -12,10 +16,6 @@ import {
   type PreparedEventDayTransition,
 } from "../apps/webapp/js/features/event-day/use-cases/switch-event-day";
 import { StorageService } from "../apps/webapp/js/state/storage-service";
-import type {
-  EventRegistryV1,
-  MapBundleManifestV1,
-} from "../apps/webapp/js/types/domain";
 
 const registryUrl = "http://localhost:5173/assets/events/manifest.json";
 

@@ -1,17 +1,17 @@
 // @vitest-environment happy-dom
 import { describe, expect, test, vi } from "vitest";
-import { App } from "../apps/webapp/js/app";
-import { DataManager } from "../apps/webapp/js/data-manager";
+import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime";
+import { EventDayDataStore } from "../apps/webapp/js/event-day-data-store";
+import type {
+  EventDayRef,
+  EventRegistryV1,
+  LocalEventDayState,
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import { getCircleVisitState } from "../apps/webapp/js/state/storage-schema";
 import {
   type StorageAdapter,
   StorageService,
 } from "../apps/webapp/js/state/storage-service";
-import type {
-  EventDayRef,
-  EventRegistryV1,
-  LocalEventDayState,
-} from "../apps/webapp/js/types/domain";
 
 class MockStorageAdapter implements StorageAdapter {
   public map = new Map<string, string>();
@@ -50,13 +50,13 @@ function createRegistry(): EventRegistryV1 {
 
 function createManager(adapter = new MockStorageAdapter()): {
   adapter: MockStorageAdapter;
-  manager: DataManager;
+  manager: EventDayDataStore;
 } {
   let now = new Date("2026-07-21T07:45:00.000Z");
   let generation = 0;
   let preview = 0;
   const storage = new StorageService(adapter);
-  const manager = new DataManager(storage, {
+  const manager = new EventDayDataStore(storage, {
     now: () => now,
     createSourceGeneration: () => `generation-${++generation}`,
     createPreviewId: () => `preview-${++preview}`,
@@ -355,7 +355,7 @@ describe("Phase 2 Task 7 local data service", () => {
       "day1.csv",
       csv("A-01,1,,,,\r\nA-02,2,,,,\r\n"),
     );
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.dm = manager;
     app.searchNext = vi.fn();
     app.ui.init = vi.fn();

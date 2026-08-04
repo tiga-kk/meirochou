@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import { App } from "../apps/webapp/js/app";
-import { StorageService } from "../apps/webapp/js/state/storage-service";
+import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime";
 import type {
   EventRegistryV1,
   LocalEventDayState,
-} from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
+import { StorageService } from "../apps/webapp/js/state/storage-service";
 
 function _createMockStorage(): StorageService {
   const store = new Map<string, string>();
@@ -77,9 +77,9 @@ function createSampleGasState(
   };
 }
 
-describe("App & OutboxPanel Integration", () => {
+describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
   it("does not repaint settings after retry completion becomes stale", async () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     const ref = { eventId: "c104", dayId: "day1" };
     let resolveRetry: (summary: {
       processedRefs: number;
@@ -110,8 +110,8 @@ describe("App & OutboxPanel Integration", () => {
     expect(updateSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects forged retry and discard event details at the App boundary", async () => {
-    const app = new App();
+  it("rejects forged retry and discard event details at the ComiPathBrowserRuntime boundary", async () => {
+    const app = new ComiPathBrowserRuntime();
     const retrySpy = vi.spyOn(app.dm.pendingGasUpdatesController, "retryAll");
     const discardSpy = vi.spyOn(
       app.dm.pendingGasUpdatesController,
@@ -132,7 +132,7 @@ describe("App & OutboxPanel Integration", () => {
   });
 
   it("delegates retry request to pendingGasUpdatesController and updates management models", async () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.dm.eventRegistry = createSampleRegistry();
 
     const ref = { eventId: "c104", dayId: "day1" };
@@ -153,7 +153,7 @@ describe("App & OutboxPanel Integration", () => {
   });
 
   it("handles discard request with exact confirmation text and updates repository", async () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.dm.eventRegistry = createSampleRegistry();
 
     const ref = { eventId: "c104", dayId: "day1" };
@@ -183,7 +183,7 @@ describe("App & OutboxPanel Integration", () => {
   });
 
   it("rejects discard request if confirmation text does not match", async () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.dm.eventRegistry = createSampleRegistry();
 
     const ref = { eventId: "c104", dayId: "day1" };
@@ -209,7 +209,7 @@ describe("App & OutboxPanel Integration", () => {
   });
 
   it("maintains model coherence across outbox panel, event-day options, and delete options from the same snapshot", async () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     const registry = createSampleRegistry();
     app.dm.eventRegistry = registry;
 

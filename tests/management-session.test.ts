@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { EventDayRef } from "../apps/webapp/js/types/domain";
+import type { EventDayRef } from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import {
   type ActiveSourcePreview,
   ManagementSession,

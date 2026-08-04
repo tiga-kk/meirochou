@@ -1,4 +1,4 @@
-import { App } from "../app.js";
+import { ComiPathBrowserRuntime } from "../comipath-browser-runtime.js";
 import { GasPendingUpdateDelivery } from "../features/circle-status/infrastructure/gas-pending-update-delivery";
 import { CircleStatusController } from "../features/circle-status/ui/circle-status-controller";
 import { PendingGasUpdatesController } from "../features/circle-status/ui/pending-gas-updates-controller";
@@ -24,7 +24,7 @@ export interface AssembleComiPathApplicationOptions {
   readonly createAlnsWorker?: () => Worker;
 }
 
-/** Composition root for the temporary legacy application. */
+/** Composition root for the browser runtime and feature infrastructure. */
 export function assembleComiPathApplication(
   options: AssembleComiPathApplicationOptions,
 ): StartableApplication {
@@ -68,7 +68,7 @@ export function assembleComiPathApplication(
     discardPendingGasUpdates,
   );
 
-  const legacyApplication = new App({
+  const browserRuntime = new ComiPathBrowserRuntime({
     alnsWorkerFactory: options.createAlnsWorker,
     dataManagerOptions: {
       storage,
@@ -81,14 +81,14 @@ export function assembleComiPathApplication(
     },
   });
   return createComiPathApplication({
-    legacyApplication: {
+    browserRuntime: {
       start: () => {
         backgroundProcess.start();
-        return legacyApplication.start();
+        return browserRuntime.start();
       },
       stop: () => {
         backgroundProcess.stop();
-        legacyApplication.dispose();
+        browserRuntime.dispose();
       },
     },
   });

@@ -1,4 +1,4 @@
-import type { EventDayRef } from "../types/domain";
+import type { EventDayRef } from "../features/event-day/domain/application-contract-types";
 
 export type ManagementBusyLane =
   | "transition"
@@ -48,7 +48,7 @@ function freezePreview(preview: ActiveSourcePreview): ActiveSourcePreview {
 }
 
 /**
- * Pure App-owned session state for managing in-flight requests, abort controllers,
+ * Pure ComiPathBrowserRuntime-owned session state for managing in-flight requests, abort controllers,
  * busy lanes, and preview lifecycle without importing repositories or services.
  */
 export class ManagementSession {
