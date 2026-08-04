@@ -29,6 +29,11 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Verify pinned toolchain
+        run: |
+          test "$(node --version)" = "v22.14.0"
+          test "$(npm --version)" = "10.9.2"
+          test "$(npx playwright --version)" = "Version 1.61.1"
       - name: Verify unit contracts, types, build, and map assets
         run: npm run verify:webapp
       - name: Run mobile Chromium E2E
