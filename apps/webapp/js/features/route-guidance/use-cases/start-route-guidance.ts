@@ -21,13 +21,10 @@ export class StartRouteGuidanceUseCase {
 
   async execute(input: StartRouteGuidanceInput): Promise<void> {
     const firstCircle = input.pendingCircles[0] ?? null;
-    if (!input.startPosition.areaId) {
-      throw new Error("Route guidance requires a map area");
-    }
     const area = firstCircle
       ? this.mapAreaCatalog.findMapAreaForCircleSpace(firstCircle.space)
       : null;
-    const areaId = input.startPosition.areaId || area?.areaId;
+    const areaId = input.startPosition.areaId || area?.areaId || null;
     if (!areaId) {
       throw new Error("No map area is available for the starting position");
     }

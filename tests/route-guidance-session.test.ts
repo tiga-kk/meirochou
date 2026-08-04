@@ -48,6 +48,10 @@ describe("RouteGuidanceSession", () => {
     expect(snapshots.length).toBe(1);
     expect(snapshots[0].selectionStatus).toBe("ready");
     expect(snapshots[0].currentDestination?.space).toBe("A01");
+    expect(Object.isFrozen(snapshots[0].navigationState)).toBe(true);
+    expect(Object.isFrozen(snapshots[0].navigationState.provisionalOrder)).toBe(
+      true,
+    );
 
     session.clear();
     expect(snapshots.length).toBe(2);

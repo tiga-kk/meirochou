@@ -47,4 +47,36 @@ describe("ResumeRouteGuidanceUseCase", () => {
     expect(resumed).toBe(true);
     expect(session.replaceSnapshot).toHaveBeenCalled();
   });
+
+  it("clears a snapshot whose target no longer exists in the active source", async () => {
+    const snapshotRepo = {
+      loadSnapshot: vi.fn(() => ({
+        eventId: "c108",
+        dayId: "day1",
+        mapAreaId: "e456",
+        startPosition: {
+          areaId: "e456",
+          gridIndex: 10,
+          svgX: 1,
+          svgY: 2,
+          source: "manual-start",
+        },
+        targetSpace: "A01",
+        visitedSpaces: [],
+      })),
+      deleteSnapshot: vi.fn(),
+    };
+
+    const resumed = await new ResumeRouteGuidanceUseCase(
+      { replaceSnapshot: vi.fn() } as any,
+      snapshotRepo as any,
+      { loadMapAssets: vi.fn(async () => ({})) } as any,
+    ).execute({
+      eventDay: { eventId: "c108", dayId: "day1" },
+      circles: [],
+    });
+
+    expect(resumed).toBe(false);
+    expect(snapshotRepo.deleteSnapshot).toHaveBeenCalledOnce();
+  });
 });

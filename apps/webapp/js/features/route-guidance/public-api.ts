@@ -1,6 +1,7 @@
 export * from "./domain/map-area";
 export * from "./domain/route-guidance-types";
 export * from "./ui/route-guidance-controller";
+export * from "./ui/route-guidance-screen-model";
 export * from "./use-cases/apply-optimized-route-order";
 export * from "./use-cases/change-destination";
 export * from "./use-cases/finish-current-circle";

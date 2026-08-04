@@ -31,6 +31,10 @@ export class ResumeRouteGuidanceUseCase {
 
     const currentDestination =
       input.circles.find((c) => c.space === saved.targetSpace) ?? null;
+    if (saved.targetSpace !== null && currentDestination === null) {
+      this.snapshotRepo.deleteSnapshot(input.eventDay);
+      return false;
+    }
     const navState = {
       stage: "navigating" as const,
       areaId: saved.mapAreaId,

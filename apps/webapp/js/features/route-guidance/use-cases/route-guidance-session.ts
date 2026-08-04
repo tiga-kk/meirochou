@@ -15,6 +15,34 @@ function createInitialSnapshot(): RouteGuidanceSessionSnapshot {
   };
 }
 
+function freezeSnapshot(
+  snapshot: RouteGuidanceSessionSnapshot,
+): RouteGuidanceSessionSnapshot {
+  const navigationState = snapshot.navigationState
+    ? Object.freeze({
+        ...snapshot.navigationState,
+        provisionalOrder: Object.freeze([
+          ...snapshot.navigationState.provisionalOrder,
+        ]),
+        bestOrder: Object.freeze([...snapshot.navigationState.bestOrder]),
+      })
+    : null;
+  const freezeRoute = (route: RouteGuidanceSessionSnapshot["currentRoute"]) =>
+    route
+      ? Object.freeze({
+          ...route,
+          path: Object.freeze([...route.path]),
+        })
+      : null;
+
+  return Object.freeze({
+    ...snapshot,
+    navigationState,
+    currentRoute: freezeRoute(snapshot.currentRoute),
+    selectedRoute: freezeRoute(snapshot.selectedRoute),
+  });
+}
+
 export function createRouteGuidanceSession(): RouteGuidanceSession {
   let current: RouteGuidanceSessionSnapshot = createInitialSnapshot();
   const listeners = new Set<(snapshot: RouteGuidanceSessionSnapshot) => void>();
@@ -27,7 +55,7 @@ export function createRouteGuidanceSession(): RouteGuidanceSession {
   return {
     getSnapshot: () => current,
     replaceSnapshot(snapshot) {
-      current = Object.freeze({ ...snapshot });
+      current = freezeSnapshot(snapshot);
       notify();
     },
     clear() {

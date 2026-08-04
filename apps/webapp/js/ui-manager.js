@@ -1,10 +1,10 @@
 import { CustomSelect } from "./components/custom-select.js";
 import { Config } from "./config.js";
+import { buildRouteGuidanceScreenModel } from "./features/route-guidance/ui/route-guidance-screen-model";
 import { MapRenderer } from "./map-renderer.js";
 import { ModalManager } from "./modal-manager.js";
 import { StatsRenderer } from "./stats-renderer.js";
 import { TspSolver } from "./tsp-solver.js";
-import { formatTargetViewModel } from "./ui/navigation-view-model";
 
 /**
  * UI管理クラス
@@ -259,11 +259,11 @@ export class UIManager {
       return;
     }
 
-    const currentViewModel = formatTargetViewModel(
-      currentTarget,
+    const currentViewModel = buildRouteGuidanceScreenModel({
+      currentDestination: currentTarget,
+      nextDestination: nextTarget,
       startSpace,
-      nextTarget,
-    );
+    });
     const detailTarget = selectedTarget || currentTarget;
     const isPreview = detailTarget.space !== currentTarget.space;
     const distanceLabel =
@@ -335,7 +335,11 @@ export class UIManager {
     nextTarget = null,
     options = {},
   ) {
-    const viewModel = formatTargetViewModel(target, startSpace, nextTarget);
+    const viewModel = buildRouteGuidanceScreenModel({
+      currentDestination: target,
+      nextDestination: nextTarget,
+      startSpace,
+    });
 
     if (this.els.targetStatusLabel) {
       this.els.targetStatusLabel.textContent =

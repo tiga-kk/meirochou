@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import type { MapAreaCatalog } from "../apps/webapp/js/features/route-guidance/domain/map-area";
+import type { RouteGuidanceSession } from "../apps/webapp/js/features/route-guidance/domain/route-guidance-types";
+import type { RouteGuidanceSnapshotRepository } from "../apps/webapp/js/features/route-guidance/use-cases/route-guidance-snapshot-repository";
+import type { RouteMapAssetsLoader } from "../apps/webapp/js/features/route-guidance/use-cases/route-map-assets-loader";
 import { StartRouteGuidanceUseCase } from "../apps/webapp/js/features/route-guidance/use-cases/start-route-guidance";
 
 describe("StartRouteGuidanceUseCase", () => {
@@ -53,5 +57,34 @@ describe("StartRouteGuidanceUseCase", () => {
 
     expect(session.replaceSnapshot).toHaveBeenCalled();
     expect(snapshotRepo.saveSnapshot).toHaveBeenCalled();
+  });
+
+  it("uses the catalog area when the start position has no area id", async () => {
+    const session = { replaceSnapshot: vi.fn() };
+    const mapAreaCatalog = {
+      findMapAreaForCircleSpace: vi.fn(() => ({ areaId: "e456" })),
+    };
+    const assetsLoader = { loadMapAssets: vi.fn(async () => ({})) };
+    const snapshotRepo = { saveSnapshot: vi.fn() };
+
+    await expect(
+      new StartRouteGuidanceUseCase(
+        session as unknown as RouteGuidanceSession,
+        mapAreaCatalog as unknown as MapAreaCatalog,
+        assetsLoader as unknown as RouteMapAssetsLoader,
+        snapshotRepo as unknown as RouteGuidanceSnapshotRepository,
+      ).execute({
+        eventDay: { eventId: "c108", dayId: "day1" },
+        startPosition: {
+          areaId: "",
+          gridIndex: 10,
+          svgX: 1,
+          svgY: 2,
+          source: "manual-start",
+        },
+        pendingCircles: [{ space: "A01" }],
+      }),
+    ).resolves.toBeUndefined();
+    expect(session.replaceSnapshot).toHaveBeenCalled();
   });
 });
