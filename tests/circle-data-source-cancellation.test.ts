@@ -1,34 +1,36 @@
 import { describe, expect, it, vi } from "vitest";
 import { CircleDataSourceController } from "../apps/webapp/js/features/circle-data-source/ui/circle-data-source-controller";
+import type { CancelableRequest } from "../apps/webapp/js/features/circle-data-source/use-cases/cancelable-request";
+import { createCircleDataSourceSession } from "../apps/webapp/js/features/circle-data-source/use-cases/circle-data-source-session";
+import type { GoogleSheetCircleClient } from "../apps/webapp/js/features/circle-data-source/use-cases/google-sheet-circle-client";
 
 describe("CircleDataSourceController", () => {
-  it("manages requests and cancels inflight requests on stop", () => {
-    const client = {
-      startLoadingSheetNames: vi.fn(() => {
-        let canceled = false;
-        return {
-          result: new Promise((res) => {}),
-          cancel() { canceled = true; },
-          isCanceled: () => canceled,
-        };
+  it("cancels an in-flight request on stop and ignores its result", async () => {
+    let resolveRequest: ((value: readonly string[]) => void) | undefined;
+    let cancelCount = 0;
+    const request: CancelableRequest<readonly string[]> = {
+      result: new Promise((resolve) => {
+        resolveRequest = resolve;
       }),
+      cancel: () => {
+        cancelCount += 1;
+      },
     };
-
-    const session = {
-      beginRequest: vi.fn(() => 1),
-      isCurrentRequest: vi.fn(() => true),
-      setBusy: vi.fn(),
-      setError: vi.fn(),
-      subscribe: vi.fn(() => () => {}),
+    const client: GoogleSheetCircleClient = {
+      startLoadingSheetNames: vi.fn(() => request),
+      startLoadingCircles: vi.fn(() => request),
     };
+    const session = createCircleDataSourceSession();
+    const controller = new CircleDataSourceController({ client, session });
 
-    const controller = new CircleDataSourceController({
-      client: client as any,
-      session: session as any,
-    } as any);
-
-    controller.loadGoogleSheetNames("https://script.google.com/macros/s/test/exec");
+    const loading = controller.loadGoogleSheetNames(
+      "https://script.google.com/macros/s/test/exec",
+    );
     controller.stop();
-    expect(session.setBusy).toHaveBeenCalled();
+    resolveRequest?.(["day1"]);
+    await loading;
+
+    expect(cancelCount).toBe(1);
+    expect(session.getSnapshot().sheetNames).toEqual([]);
   });
 });

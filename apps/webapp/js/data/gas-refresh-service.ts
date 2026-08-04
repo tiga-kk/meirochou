@@ -1,4 +1,8 @@
 import type { GasApiClient } from "../api/gas-api-client";
+import {
+  applySourceDiff,
+  diffCircleSources,
+} from "../features/circle-data-source/public-api";
 import type { EventDayRepository } from "../features/event-day/use-cases/event-day-repository";
 import type { SourceSettingsService } from "../state/source-settings-service";
 import type {
@@ -10,7 +14,6 @@ import type {
   LocalEventDayState,
   ProtectedSourceOperation,
 } from "../types/domain";
-import { applySourceDiff, diffCircleSources } from "../features/circle-data-source/public-api";
 import { fingerprintSourceSnapshot } from "./source-snapshot";
 
 /** Configure clock, identifiers, and preview lifetime for GAS previews. */

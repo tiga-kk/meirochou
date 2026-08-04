@@ -1,4 +1,7 @@
-import type { CircleRecord, LocalEventDayState } from "../../event-day/public-api";
+import type {
+  CircleRecord,
+  LocalEventDayState,
+} from "../../event-day/public-api";
 import type { SourceDiff } from "./circle-data-source-types";
 
 /**

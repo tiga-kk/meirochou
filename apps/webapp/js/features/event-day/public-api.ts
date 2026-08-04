@@ -4,6 +4,7 @@ export type {
   CircleRecord,
   CircleStatus,
   EventDayRef,
+  GasDataSource,
   GasOutboxEntry,
   LocalEventDayState,
 } from "./domain/event-day-types";

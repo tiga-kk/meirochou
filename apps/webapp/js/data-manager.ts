@@ -1,6 +1,5 @@
 import { GasApiClient } from "./api/gas-api-client";
 import { Config } from "./config.js";
-import { parseCircleCsv, serializeCircleCsv } from "./features/circle-data-source/public-api";
 import {
   type LoadedEventRegistry,
   loadEventRegistryWithUrl,
@@ -12,7 +11,12 @@ import {
   decodeLegacyStringList,
   extractLegacyCircleRows,
 } from "./data/local-state-adapters";
-import { applySourceDiff, diffCircleSources } from "./features/circle-data-source/public-api";
+import {
+  applySourceDiff,
+  diffCircleSources,
+  parseCircleCsv,
+  serializeCircleCsv,
+} from "./features/circle-data-source/public-api";
 import { GasPendingUpdateDelivery } from "./features/circle-status/infrastructure/gas-pending-update-delivery";
 import type {
   CircleStatusControllerPort,

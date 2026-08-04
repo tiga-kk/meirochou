@@ -1,5 +1,9 @@
 import type { CircleRecord } from "../../event-day/public-api";
 
 export interface CircleCsvDownloader {
-  downloadCirclesAsCsv(filename: string, circles: readonly CircleRecord[]): void;
+  downloadCirclesAsCsv(
+    filename: string,
+    circles: readonly CircleRecord[],
+    purchased?: ReadonlySet<string>,
+  ): void;
 }

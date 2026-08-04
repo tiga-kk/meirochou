@@ -43,17 +43,37 @@ function createInitialSnapshot(): CircleDataSourceSessionSnapshot {
 
 export function createCircleDataSourceSession(): CircleDataSourceSession {
   let current = createInitialSnapshot();
-  const listeners = new Set<(snapshot: CircleDataSourceSessionSnapshot) => void>();
+  const listeners = new Set<
+    (snapshot: CircleDataSourceSessionSnapshot) => void
+  >();
+
+  const snapshot = (): CircleDataSourceSessionSnapshot =>
+    Object.freeze({
+      ...current,
+      sheetNames: Object.freeze([...current.sheetNames]),
+      preview: current.preview
+        ? Object.freeze({
+            ...current.preview,
+            ref: Object.freeze({ ...current.preview.ref }),
+            newCircles: Object.freeze([...current.preview.newCircles]),
+          })
+        : null,
+    });
 
   const notify = (): void => {
-    const snap = Object.freeze({ ...current });
+    const snap = snapshot();
     for (const listener of listeners) listener(snap);
   };
 
   return {
-    getSnapshot: () => current,
+    getSnapshot: snapshot,
     beginRequest() {
-      current = { ...current, requestGeneration: current.requestGeneration + 1, busy: true, errorCode: null };
+      current = {
+        ...current,
+        requestGeneration: current.requestGeneration + 1,
+        busy: true,
+        errorCode: null,
+      };
       notify();
       return current.requestGeneration;
     },
@@ -69,7 +89,11 @@ export function createCircleDataSourceSession(): CircleDataSourceSession {
       notify();
     },
     setSheetNames(sheetNames) {
-      current = { ...current, sheetNames: Object.freeze([...sheetNames]), busy: false };
+      current = {
+        ...current,
+        sheetNames: Object.freeze([...sheetNames]),
+        busy: false,
+      };
       notify();
     },
     setPreview(preview) {
