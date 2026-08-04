@@ -1,12 +1,12 @@
 import {
   parseEventMapBundleManifest,
   parseMapBundleManifest,
-} from "./types/boundary-parsers";
+} from "../../../types/boundary-parsers";
 import type {
   EventMapBundleManifest,
   EventRegistryEntryV1,
   MapBundleManifestV1,
-} from "./types/domain";
+} from "../../../types/domain";
 
 const MAP_MANIFEST_PATH = "./assets/maps/manifest.json";
 

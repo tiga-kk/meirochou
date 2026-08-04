@@ -62,13 +62,13 @@
 
   {
     "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/data/event-registry.ts",
-    "imported": "../types/boundary-parsers"
+    "importer": "apps/webapp/js/features/event-day/infrastructure/http-event-registry-loader.ts",
+    "imported": "../../../types/boundary-parsers"
   },
   {
     "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/data/event-registry.ts",
-    "imported": "../types/domain"
+    "importer": "apps/webapp/js/features/event-day/infrastructure/http-event-registry-loader.ts",
+    "imported": "../../../types/domain"
   },
   {
     "ruleId": "deleted-legacy-import",
@@ -98,13 +98,13 @@
   },
   {
     "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/map-manifest-loader.ts",
-    "imported": "./types/boundary-parsers"
+    "importer": "apps/webapp/js/features/event-day/infrastructure/http-map-manifest-loader.ts",
+    "imported": "../../../types/boundary-parsers"
   },
   {
     "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/map-manifest-loader.ts",
-    "imported": "./types/domain"
+    "importer": "apps/webapp/js/features/event-day/infrastructure/http-map-manifest-loader.ts",
+    "imported": "../../../types/domain"
   },
   {
     "ruleId": "deleted-legacy-import",

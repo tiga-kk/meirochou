@@ -3,14 +3,14 @@ import "./components/navigation-resume-dialog";
 import "./components/source-diff-dialog";
 import { parseGasWebAppUrl } from "./api/gas-api-client";
 import { Config } from "./config.js";
-import { loadEventRegistryWithUrl } from "./data/event-registry";
 import { CsvValidationError, DataManager } from "./data-manager.js";
 import { createDevDemoData, isDevDemoEnabled } from "./dev-demo-data.js";
+import { loadEventRegistryWithUrl } from "./features/event-day/infrastructure/http-event-registry-loader";
 import {
   loadRuntimeMapBundleManifestFromUrl,
   renderMapBootstrapError,
   resolveEventMapManifestUrl,
-} from "./map-manifest-loader";
+} from "./features/event-day/infrastructure/http-map-manifest-loader";
 import { NavigationOrchestrationService } from "./navigation/navigation-orchestration";
 import { NavigationRuntimeController } from "./navigation/navigation-runtime-controller";
 import {

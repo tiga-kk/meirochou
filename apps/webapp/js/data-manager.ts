@@ -1,9 +1,5 @@
 import { GasApiClient } from "./api/gas-api-client";
 import { Config } from "./config.js";
-import {
-  type LoadedEventRegistry,
-  loadEventRegistryWithUrl,
-} from "./data/event-registry";
 import { GasRefreshService } from "./data/gas-refresh-service";
 import {
   decodeLegacyCircles,
@@ -30,6 +26,10 @@ import { DiscardPendingGasUpdatesUseCase } from "./features/circle-status/use-ca
 import { DefaultPendingGasUpdateBackgroundProcess } from "./features/circle-status/use-cases/pending-gas-update-background-process";
 import { SendPendingGasUpdatesUseCase } from "./features/circle-status/use-cases/send-pending-gas-updates";
 import { UndoCircleStatusChangeUseCase } from "./features/circle-status/use-cases/undo-circle-status-change";
+import {
+  type LoadedEventRegistry,
+  loadEventRegistryWithUrl,
+} from "./features/event-day/infrastructure/http-event-registry-loader";
 import { LocalStorageEventDayRepository } from "./features/event-day/infrastructure/local-storage-event-day-repository";
 import type { EventDayRepository } from "./features/event-day/public-api";
 import {

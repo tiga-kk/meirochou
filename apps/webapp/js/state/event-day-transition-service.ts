@@ -1,8 +1,8 @@
-import type { EventDayRepository } from "../features/event-day/use-cases/event-day-repository";
 import {
   loadRuntimeMapBundleManifestFromUrl,
   resolveEventMapManifestUrl,
-} from "../map-manifest-loader";
+} from "../features/event-day/infrastructure/http-map-manifest-loader";
+import type { EventDayRepository } from "../features/event-day/use-cases/event-day-repository";
 import type {
   EventDayRef,
   EventRegistryEntryV1,
