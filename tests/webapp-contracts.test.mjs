@@ -232,15 +232,20 @@ test("Phase 3 keeps fetch inside GasApiClient and out of DataManager", () => {
 test("Phase 2/3 DataManager storage is separate from the sync outbox", () => {
   const dataManagerSource = read("apps/webapp/js/data-manager.ts");
   const storageSource = read("apps/webapp/js/state/storage-service.ts");
-  const outboxSource = read("apps/webapp/js/state/gas-outbox-service.ts");
+  const appendSource = read(
+    "apps/webapp/js/features/circle-status/domain/pending-gas-update-state.ts",
+  );
+  const sendSource = read(
+    "apps/webapp/js/features/circle-status/use-cases/send-pending-gas-updates.ts",
+  );
 
   assert.match(dataManagerSource, /new StorageService\(/);
   assert.doesNotMatch(dataManagerSource, /SyncQueue/);
   assert.doesNotMatch(dataManagerSource, /localStorage\./);
   assert.match(storageSource, /localStorage/);
   assert.match(storageSource, /getStorage/);
-  assert.match(outboxSource, /append/);
-  assert.match(outboxSource, /process/);
+  assert.match(appendSource, /append/);
+  assert.match(sendSource, /deliver/);
 });
 
 test("webapp storage falls back when localStorage is unavailable", () => {

@@ -252,6 +252,26 @@ function featureName(filePath) {
   return match?.[1] ?? null;
 }
 
+function isAllowedUseCaseDependency(importer, resolvedImport, importedFeature) {
+  if (!resolvedImport) return false;
+  const feature = featureName(importer);
+  if (!feature) return false;
+  if (
+    new RegExp(`(?:^|/)features/${feature}/(?:domain|use-cases)/`).test(
+      resolvedImport,
+    )
+  ) {
+    return true;
+  }
+  if (/(?:^|\/)shared\/domain\//.test(resolvedImport)) return true;
+  return Boolean(
+    importedFeature &&
+      importedFeature !== feature &&
+      (resolvedImport.endsWith("/public-api.ts") ||
+        resolvedImport.endsWith("/public-api")),
+  );
+}
+
 function isLegacyPath(filePath) {
   return [...LEGACY_FILES].some(
     (legacy) =>
@@ -363,6 +383,21 @@ export function scanWebappArchitecture(options = {}) {
     );
     const importerIsComponent = /(?:^|\/)components\//.test(importer);
     const importerIsApp = /(?:^|\/)app\//.test(importer);
+
+    if (importer.endsWith("/public-api.ts")) {
+      const concreteExport = stripComments(source).match(
+        /\b(?:LocalStorage|Http|Browser|WebWorker|Gas\w*Client)\w*\b/,
+      );
+      if (concreteExport) {
+        addViolation(
+          violations,
+          "public-api-exports-concrete-infrastructure",
+          importer,
+          null,
+          "Public API cannot export concrete infrastructure",
+        );
+      }
+    }
 
     if (filePath.endsWith("/app/comipath-application.ts")) {
       const lineCount = source.split("\n").length;
@@ -513,19 +548,35 @@ export function scanWebappArchitecture(options = {}) {
       }
       if (
         importerIsUseCase &&
-        /(^|\/)(infrastructure|ui|components)(\/|$)/.test(dependencyPath)
+        !isAllowedUseCaseDependency(importer, resolvedImport, importedFeature)
       ) {
         const ruleId = /(^|\/)ui(\/|$)|(^|\/)components(\/|$)/.test(
           dependencyPath,
         )
           ? "use-case-imports-ui"
-          : "use-case-imports-infrastructure";
+          : /(^|\/)infrastructure(\/|$)/.test(dependencyPath)
+            ? "use-case-imports-infrastructure"
+            : "use-case-imports-concrete-module";
         addViolation(
           violations,
           ruleId,
           importer,
           imported,
           "Use cases depend on contracts, not UI or concrete infrastructure",
+        );
+      }
+      if (
+        importer.endsWith("/public-api.ts") &&
+        /(^|\/)infrastructure(\/|$)|(?:local-storage|gas-pending-update-delivery|http-|web-worker-)/.test(
+          lowerImport,
+        )
+      ) {
+        addViolation(
+          violations,
+          "public-api-exports-concrete-infrastructure",
+          importer,
+          imported,
+          "Public API cannot export concrete infrastructure",
         );
       }
       if (

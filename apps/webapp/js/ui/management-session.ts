@@ -135,4 +135,11 @@ export class ManagementSession {
     this.onEventDayChange();
     this.busyLanes.clear();
   }
+
+  stop(): void {
+    this.abortGasRequest();
+    this.clearPreview();
+    this.busyLanes.clear();
+    this.nextRequestToken();
+  }
 }

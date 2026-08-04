@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   LocalStorageEventDayRepository as EventDayRepository,
   StorageWriteError,
-} from "../apps/webapp/js/features/event-day/use-cases/event-day-repository";
+} from "../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
 import {
   createEmptyEventDayState,
   StorageSchemaError,
@@ -82,7 +82,7 @@ describe("EventDayRepository", () => {
     expect(repository.load(ref2)).toEqual(state2);
 
     // list contains both
-    expect(repository.list()).toEqual([ref1, ref2]);
+    expect(repository.listEventDays()).toEqual([ref1, ref2]);
 
     // namespace checks in adapter
     expect(adapter.map.has("comipath:v1:C108:day1:state")).toBe(true);
@@ -151,10 +151,10 @@ describe("EventDayRepository", () => {
 
     const ref: EventDayRef = { eventId: "C108", dayId: "day1" };
 
-    expect(repository.getLastOpened()).toBeNull();
+    expect(repository.getLastOpenedEventDay()).toBeNull();
 
-    repository.setLastOpened(ref);
-    expect(repository.getLastOpened()).toEqual(ref);
+    repository.rememberLastOpenedEventDay(ref);
+    expect(repository.getLastOpenedEventDay()).toEqual(ref);
   });
 
   test("deletes event/day state and updates list index", () => {
@@ -171,12 +171,12 @@ describe("EventDayRepository", () => {
     repository.save(ref1, state1);
     repository.save(ref2, state2);
 
-    expect(repository.list()).toEqual([ref1, ref2]);
+    expect(repository.listEventDays()).toEqual([ref1, ref2]);
 
-    repository.deleteState(ref1);
+    repository.deleteEventDay(ref1);
     expect(repository.load(ref1)).toBeNull();
     expect(repository.load(ref2)).toEqual(state2);
-    expect(repository.list()).toEqual([ref2]);
+    expect(repository.listEventDays()).toEqual([ref2]);
     expect(adapter.map.has("comipath:v1:C108:day1:state")).toBe(false);
   });
 
@@ -210,7 +210,7 @@ describe("EventDayRepository", () => {
     // Save initially works
     repository.save(ref, state);
     expect(repository.load(ref)).toEqual(state);
-    expect(repository.list()).toEqual([ref]);
+    expect(repository.listEventDays()).toEqual([ref]);
 
     // Make setItem throw on subsequent save
     adapter.shouldFail = true;
@@ -227,7 +227,7 @@ describe("EventDayRepository", () => {
     expect(repository.load(ref)).toEqual(state);
 
     // 2. Index should still contain the ref (and not be corrupted or cleared)
-    expect(repository.list()).toEqual([ref]);
+    expect(repository.listEventDays()).toEqual([ref]);
   });
 
   test("transactional rollback: does not add new ref to index if save fails on initial save", () => {
@@ -243,7 +243,7 @@ describe("EventDayRepository", () => {
 
     // Verify ref was not added to the index
     adapter.shouldFail = false;
-    expect(repository.list()).toEqual([]);
+    expect(repository.listEventDays()).toEqual([]);
     expect(repository.load(ref)).toBeNull();
   });
 
@@ -287,7 +287,7 @@ describe("EventDayRepository", () => {
     adapter.setItem("comipath:v1:last-opened", "{invalid json");
 
     // getLastOpened should return null instead of throwing
-    expect(repository.getLastOpened()).toBeNull();
+    expect(repository.getLastOpenedEventDay()).toBeNull();
   });
 
   test("getLastOpened ignores identifiers outside the storage-key contract", () => {
@@ -299,7 +299,7 @@ describe("EventDayRepository", () => {
       JSON.stringify({ eventId: "C108", dayId: "day1:alternate" }),
     );
 
-    expect(repository.getLastOpened()).toBeNull();
+    expect(repository.getLastOpenedEventDay()).toBeNull();
   });
 
   test("save() rollback: attempts to restore index key even if state key rollback throws an error", () => {
@@ -314,7 +314,7 @@ describe("EventDayRepository", () => {
 
     // Save ref1 first
     repository.save(ref1, state1);
-    expect(repository.list()).toEqual([ref1]);
+    expect(repository.listEventDays()).toEqual([ref1]);
 
     const calls: string[] = [];
     adapter.onSetItem = (key, value) => {
@@ -353,7 +353,7 @@ describe("EventDayRepository", () => {
     const state1 = createEmptyEventDayState(validCsvSource, "g-001", validNow);
 
     repository.save(ref1, state1);
-    expect(repository.list()).toEqual([ref1]);
+    expect(repository.listEventDays()).toEqual([ref1]);
 
     const calls: string[] = [];
     adapter.onSetItem = (key, value) => {
@@ -372,7 +372,7 @@ describe("EventDayRepository", () => {
     };
 
     // Attempt to delete ref1, which should trigger the error on INDEX_KEY update, then rollback
-    expect(() => repository.deleteState(ref1)).toThrow(StorageWriteError);
+    expect(() => repository.deleteEventDay(ref1)).toThrow(StorageWriteError);
 
     // Verify index rollback was still executed
     // It should have tried to set INDEX_KEY back to original index representation
@@ -388,7 +388,7 @@ describe("EventDayRepository", () => {
 
     // 1. Corrupt index (not array)
     adapter.setItem(INDEX_KEY, "invalid json");
-    expect(() => repository.listForDeletionStrict()).toThrow();
+    expect(() => repository.listEventDaysForDeletion()).toThrow();
 
     // 2. Duplicate refs in index
     adapter.map.clear();
@@ -404,7 +404,7 @@ describe("EventDayRepository", () => {
         { eventId: "c104", dayId: "day1" },
       ]),
     );
-    expect(() => repository.listForDeletionStrict()).toThrow(/duplicate/i);
+    expect(() => repository.listEventDaysForDeletion()).toThrow(/duplicate/i);
 
     // 3. Missing state for indexed ref
     adapter.map.clear();
@@ -412,7 +412,9 @@ describe("EventDayRepository", () => {
       INDEX_KEY,
       JSON.stringify([{ eventId: "c104", dayId: "day1" }]),
     );
-    expect(() => repository.listForDeletionStrict()).toThrow(/missing state/i);
+    expect(() => repository.listEventDaysForDeletion()).toThrow(
+      /missing state/i,
+    );
   });
 
   test("deleteAllFailureSafe preflights generations and rolls back all keys on failure", () => {
@@ -424,27 +426,27 @@ describe("EventDayRepository", () => {
     const state1 = createEmptyEventDayState(validCsvSource, "g-001", validNow);
     const state2 = createEmptyEventDayState(validCsvSource, "g-002", validNow);
 
-    repository.saveWithLastOpened(ref1, state1);
+    repository.saveAndRememberLastOpened(ref1, state1);
     repository.save(ref2, state2);
 
     // Mismatched generation preflight failure
     expect(() =>
-      repository.deleteAllFailureSafe([
+      repository.deleteAllEventDays([
         { ref: ref1, sourceGeneration: "g-001" },
         { ref: ref2, sourceGeneration: "g-changed" },
       ]),
     ).toThrow(/generation/i);
 
     // Safe deletion success
-    repository.deleteAllFailureSafe([
+    repository.deleteAllEventDays([
       { ref: ref1, sourceGeneration: "g-001" },
       { ref: ref2, sourceGeneration: "g-002" },
     ]);
 
-    expect(repository.list()).toEqual([]);
+    expect(repository.listEventDays()).toEqual([]);
     expect(repository.load(ref1)).toBeNull();
     expect(repository.load(ref2)).toBeNull();
-    expect(repository.getLastOpened()).toBeNull();
+    expect(repository.getLastOpenedEventDay()).toBeNull();
   });
 
   test("exposes the event-day repository contract under feature names", () => {

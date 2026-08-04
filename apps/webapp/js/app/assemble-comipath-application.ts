@@ -1,8 +1,16 @@
 import { App } from "../app.js";
+import { GasPendingUpdateDelivery } from "../features/circle-status/infrastructure/gas-pending-update-delivery";
+import { CircleStatusController } from "../features/circle-status/ui/circle-status-controller";
+import { PendingGasUpdatesController } from "../features/circle-status/ui/pending-gas-updates-controller";
+import { ChangeCircleStatusUseCase } from "../features/circle-status/use-cases/change-circle-status";
+import { DiscardPendingGasUpdatesUseCase } from "../features/circle-status/use-cases/discard-pending-gas-updates";
+import { DefaultPendingGasUpdateBackgroundProcess } from "../features/circle-status/use-cases/pending-gas-update-background-process";
+import { SendPendingGasUpdatesUseCase } from "../features/circle-status/use-cases/send-pending-gas-updates";
+import { UndoCircleStatusChangeUseCase } from "../features/circle-status/use-cases/undo-circle-status-change";
+import { LocalStorageEventDayRepository } from "../features/event-day/infrastructure/local-storage-event-day-repository";
 import {
   createActiveEventDayReader,
   createActiveEventDaySession,
-  LocalStorageEventDayRepository,
 } from "../features/event-day/public-api";
 import { StorageService } from "../state/storage-service";
 import {
@@ -28,6 +36,38 @@ export function assembleComiPathApplication(
   const activeEventDayReader = createActiveEventDayReader(
     activeEventDaySession,
   );
+  const delivery = new GasPendingUpdateDelivery();
+  const sendPendingGasUpdates = new SendPendingGasUpdatesUseCase(
+    repository,
+    activeEventDaySession,
+    delivery,
+  );
+  const discardPendingGasUpdates = new DiscardPendingGasUpdatesUseCase(
+    repository,
+    activeEventDaySession,
+  );
+  const backgroundProcess = new DefaultPendingGasUpdateBackgroundProcess(
+    sendPendingGasUpdates,
+    options.window,
+  );
+  const changeCircleStatus = new ChangeCircleStatusUseCase(
+    repository,
+    activeEventDaySession,
+    backgroundProcess,
+  );
+  const undoCircleStatus = new UndoCircleStatusChangeUseCase(
+    repository,
+    activeEventDaySession,
+  );
+  const circleStatusController = new CircleStatusController(
+    changeCircleStatus,
+    undoCircleStatus,
+  );
+  const pendingGasUpdatesController = new PendingGasUpdatesController(
+    sendPendingGasUpdates,
+    discardPendingGasUpdates,
+  );
+
   const legacyApplication = new App({
     alnsWorkerFactory: options.createAlnsWorker,
     dataManagerOptions: {
@@ -35,12 +75,21 @@ export function assembleComiPathApplication(
       repository,
       activeEventDaySession,
       activeEventDayReader,
+      circleStatusController,
+      pendingGasUpdatesController,
+      backgroundProcess,
     },
   });
   return createComiPathApplication({
     legacyApplication: {
-      start: () => legacyApplication.start(),
-      stop: () => legacyApplication.dispose(),
+      start: () => {
+        backgroundProcess.start();
+        return legacyApplication.start();
+      },
+      stop: () => {
+        backgroundProcess.stop();
+        legacyApplication.dispose();
+      },
     },
   });
 }

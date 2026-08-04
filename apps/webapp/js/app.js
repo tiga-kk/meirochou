@@ -6,7 +6,6 @@ import { Config } from "./config.js";
 import { loadEventRegistryWithUrl } from "./data/event-registry";
 import { CsvValidationError, DataManager } from "./data-manager.js";
 import { createDevDemoData, isDevDemoEnabled } from "./dev-demo-data.js";
-import { LocalStorageEventDayRepository } from "./features/event-day/public-api";
 import {
   loadRuntimeMapBundleManifestFromUrl,
   renderMapBootstrapError,
@@ -23,7 +22,6 @@ import { distancesFromStartToEndpoints } from "./routing/distance-matrix";
 import { LocalStorageDistanceMatrixRepository } from "./routing/distance-matrix-repository";
 import { LocalStorageNavigationSnapshotRepository } from "./state/navigation-snapshot-repository";
 import { StorageDeletionService } from "./state/storage-deletion-service";
-import { StorageService } from "./state/storage-service";
 import { TspSolver } from "./tsp-solver.js";
 import { parseGridMeta, parsePointsPayload } from "./types/boundary-parsers";
 import { downloadCsv, formatCsvExportFilename } from "./ui/csv-download";
@@ -270,7 +268,7 @@ export class App {
   updateManagementModels() {
     if (!this.dm.eventRegistry) return;
     const states = this.dm.repository
-      .list()
+      .listEventDays()
       .map((ref) => ({
         ref,
         state: this.dm.repository.load(ref),
@@ -760,7 +758,7 @@ export class App {
     ) {
       return;
     }
-    const ref = detail.ref || null;
+    const ref = detail.ref || undefined;
     const requestToken = this.session.nextRequestToken();
     this.session.setBusy("outbox-retry", true);
     this.outboxResultMessage = "";
@@ -768,24 +766,14 @@ export class App {
     this.updateManagementModels();
 
     try {
-      const summary = await this.dm.syncCoordinator.retry(ref);
+      const processed = this.dm.pendingGasUpdatesController
+        ? await this.dm.pendingGasUpdatesController.retryAll(ref)
+        : 0;
       if (!this.session.isLatestRequestToken(requestToken)) return;
       this.session.setBusy("outbox-retry", false);
 
-      if (summary.sent > 0 && summary.pending === 0) {
-        this.ui.showToast(`GAS同期完了 (${summary.sent}件送信)`);
-        this.outboxResultMessage = `送信完了 (${summary.sent}件)`;
-      } else if (summary.sent > 0 && summary.pending > 0) {
-        this.ui.showToast(
-          `一部送信完了 (${summary.sent}件送信 / 残り${summary.pending}件)`,
-          "warning",
-        );
-        this.outboxResultMessage = `一部送信完了 (${summary.sent}件送信 / 残り${summary.pending}件)`;
-      } else if (summary.failures.length > 0) {
-        this.ui.showToast("GAS同期に失敗しました", "error");
-        this.outboxErrorMessage =
-          "再送に失敗しました。時間をおいて再試行してください。";
-      }
+      this.ui.showToast(`GAS同期完了 (${processed}件送信)`);
+      this.outboxResultMessage = `送信完了 (${processed}件)`;
     } catch (_error) {
       if (!this.session.isLatestRequestToken(requestToken)) return;
       this.session.setBusy("outbox-retry", false);
@@ -1161,6 +1149,9 @@ export class App {
   dispose() {
     if (this.stopped) return;
     this.stopped = true;
+    this.transitionToken += 1;
+    this.selectionToken += 1;
+    this.managementSession?.stop();
     this.dm.disposeSyncCoordinator();
     for (const remove of this.ownedEventListeners.splice(0)) remove();
     for (const timer of this.ownedTimers) clearTimeout(timer);
@@ -2731,9 +2722,7 @@ async function bootstrapApp(existingApp) {
   let targetRef;
   try {
     ({ registry, registryUrl } = await loadEventRegistryWithUrl());
-    const tempStorage = new StorageService();
-    const tempRepo = new LocalStorageEventDayRepository(tempStorage);
-    targetRef = tempRepo.getLastOpenedEventDay();
+    targetRef = existingApp.dm.repository.getLastOpenedEventDay();
 
     const isValidRef =
       targetRef &&

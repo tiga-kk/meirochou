@@ -13,6 +13,7 @@ export function runComiPathInBrowser(
   let stopped = false;
   let startPromise: Promise<void> | null = null;
   let pendingReadyHandler: (() => void) | null = null;
+  let resolvePendingReady: (() => void) | null = null;
   const onPageHide = () => stop();
 
   const begin = async (): Promise<void> => {
@@ -27,11 +28,14 @@ export function runComiPathInBrowser(
   };
 
   const start = (): Promise<void> => {
+    if (stopped) return Promise.resolve();
     if (browser.document.readyState !== "loading") return begin();
     if (startPromise) return startPromise;
     startPromise = new Promise<void>((resolve, reject) => {
+      resolvePendingReady = resolve;
       const handleReady = () => {
         pendingReadyHandler = null;
+        resolvePendingReady = null;
         void begin().then(resolve).catch(reject);
       };
       pendingReadyHandler = handleReady;
@@ -51,6 +55,10 @@ export function runComiPathInBrowser(
         pendingReadyHandler,
       );
       pendingReadyHandler = null;
+    }
+    if (resolvePendingReady) {
+      resolvePendingReady();
+      resolvePendingReady = null;
     }
     browser.window.removeEventListener("pagehide", onPageHide);
     application.stop();

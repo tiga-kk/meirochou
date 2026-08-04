@@ -13,18 +13,28 @@ import {
   extractLegacyCircleRows,
 } from "./data/local-state-adapters";
 import { applySourceDiff, diffCircleSources } from "./data/source-diff";
+import { GasPendingUpdateDelivery } from "./features/circle-status/infrastructure/gas-pending-update-delivery";
+import type {
+  CircleStatusControllerPort,
+  PendingGasUpdateBackgroundProcess,
+  PendingGasUpdatesControllerPort,
+} from "./features/circle-status/public-api";
+import { CircleStatusController } from "./features/circle-status/ui/circle-status-controller";
+import { PendingGasUpdatesController } from "./features/circle-status/ui/pending-gas-updates-controller";
+import { ChangeCircleStatusUseCase } from "./features/circle-status/use-cases/change-circle-status";
+import { DiscardPendingGasUpdatesUseCase } from "./features/circle-status/use-cases/discard-pending-gas-updates";
+import { DefaultPendingGasUpdateBackgroundProcess } from "./features/circle-status/use-cases/pending-gas-update-background-process";
+import { SendPendingGasUpdatesUseCase } from "./features/circle-status/use-cases/send-pending-gas-updates";
+import { UndoCircleStatusChangeUseCase } from "./features/circle-status/use-cases/undo-circle-status-change";
+import { LocalStorageEventDayRepository } from "./features/event-day/infrastructure/local-storage-event-day-repository";
+import type { EventDayRepository } from "./features/event-day/public-api";
 import {
   type ActiveEventDayReader,
   type ActiveEventDaySession,
   createActiveEventDayReader,
   createActiveEventDaySession,
-  type EventDayRepository,
-  LocalStorageEventDayRepository,
 } from "./features/event-day/public-api";
 import { EventDayTransitionService } from "./state/event-day-transition-service";
-import { GasOutboxService } from "./state/gas-outbox-service";
-import { GasSyncCoordinator } from "./state/gas-sync-coordinator";
-import { PurchaseMutationService } from "./state/purchase-mutation-service";
 import {
   SourceSettingsService,
   StaleSourceStateError,
@@ -83,11 +93,11 @@ export interface DataManagerOptions {
   readonly repository?: EventDayRepository;
   readonly sourceSettings?: SourceSettingsService;
   readonly refreshService?: GasRefreshService;
-  readonly outboxService?: GasOutboxService;
-  readonly purchaseMutationService?: PurchaseMutationService;
-  readonly syncCoordinator?: GasSyncCoordinator;
   readonly activeEventDaySession?: ActiveEventDaySession;
   readonly activeEventDayReader?: ActiveEventDayReader;
+  readonly circleStatusController?: CircleStatusControllerPort;
+  readonly pendingGasUpdatesController?: PendingGasUpdatesControllerPort;
+  readonly backgroundProcess?: PendingGasUpdateBackgroundProcess;
 }
 
 interface CsvPreviewRecord extends CsvReplacementPreview {
@@ -154,9 +164,9 @@ export class DataManager {
   readonly sourceSettings: SourceSettingsService;
   readonly client: GasApiClient;
   readonly refreshService: GasRefreshService;
-  readonly outboxService: GasOutboxService;
-  readonly purchaseMutationService: PurchaseMutationService;
-  readonly syncCoordinator: GasSyncCoordinator;
+  readonly circleStatusController?: CircleStatusControllerPort;
+  readonly pendingGasUpdatesController?: PendingGasUpdatesControllerPort;
+  readonly backgroundProcess?: PendingGasUpdateBackgroundProcess;
   readonly activeEventDaySession: ActiveEventDaySession;
   readonly activeEventDayReader: ActiveEventDayReader;
   readonly csvPreviews = new Map<string, CsvPreviewRecord>();
@@ -199,6 +209,37 @@ export class DataManager {
     this.sourceSettings =
       options.sourceSettings || new SourceSettingsService(this.repository);
     this.client = options.client || new GasApiClient();
+    const delivery = new GasPendingUpdateDelivery(this.client);
+    const sendPendingGasUpdates = new SendPendingGasUpdatesUseCase(
+      this.repository,
+      this.activeEventDaySession,
+      delivery,
+    );
+    const discardPendingGasUpdates = new DiscardPendingGasUpdatesUseCase(
+      this.repository,
+      this.activeEventDaySession,
+    );
+    this.backgroundProcess =
+      options.backgroundProcess ||
+      new DefaultPendingGasUpdateBackgroundProcess(sendPendingGasUpdates);
+    const changeCircleStatus = new ChangeCircleStatusUseCase(
+      this.repository,
+      this.activeEventDaySession,
+      this.backgroundProcess,
+    );
+    const undoCircleStatus = new UndoCircleStatusChangeUseCase(
+      this.repository,
+      this.activeEventDaySession,
+    );
+    this.circleStatusController =
+      options.circleStatusController ||
+      new CircleStatusController(changeCircleStatus, undoCircleStatus);
+    this.pendingGasUpdatesController =
+      options.pendingGasUpdatesController ||
+      new PendingGasUpdatesController(
+        sendPendingGasUpdates,
+        discardPendingGasUpdates,
+      );
 
     let generationSequence = 0;
     let previewSequence = 0;
@@ -219,18 +260,6 @@ export class DataManager {
         createPreviewId: this.createPreviewId,
         previewTtlMs: this.previewTtlMs,
       });
-
-    this.outboxService =
-      options.outboxService ||
-      new GasOutboxService(this.repository, this.client);
-
-    this.purchaseMutationService =
-      options.purchaseMutationService ||
-      new PurchaseMutationService(this.repository, this.outboxService);
-
-    this.syncCoordinator =
-      options.syncCoordinator ||
-      new GasSyncCoordinator(this.repository, this.outboxService);
   }
 
   private timestamp(): string {
@@ -702,16 +731,24 @@ export class DataManager {
   }
 
   setPurchased(space: string, purchased: boolean): PurchaseMutationResult {
-    if (!this.activeRef) throw new Error("No event/day is open");
-    const result = this.purchaseMutationService.setPurchased(
-      this.activeRef,
-      space,
-      purchased,
-      this.timestamp(),
-    );
-    this.activeEventDaySession.replaceActiveEventDayState(result.state);
-    this.applyStateToMemory(result.state);
-    return result;
+    if (!this.activeRef || !this.activeState)
+      throw new Error("No event/day is open");
+    if (this.circleStatusController) {
+      const res = this.circleStatusController.changeStatus({
+        eventDay: this.activeRef,
+        circleSpace: space,
+        nextStatus: purchased ? "purchased" : "pending",
+        expectedSourceGeneration: this.activeState.sourceGeneration,
+      });
+      const nextState = res.state as LocalEventDayState;
+      this.applyStateToMemory(nextState);
+      return {
+        state: nextState,
+        queuedEntryId: res.pendingGasUpdateId,
+        pendingCount: nextState.gasOutbox.length,
+      };
+    }
+    return { state: this.activeState, queuedEntryId: null, pendingCount: 0 };
   }
 
   /** Store a local purchase without contacting GAS. */
@@ -737,16 +774,17 @@ export class DataManager {
       this.activateLegacySession(space, "held");
       return;
     }
-    this.purchaseMutationService.setCircleState(
-      this.activeRef,
-      space,
-      "held",
-      this.timestamp(),
-    );
-    const updated = this.repository.load(this.activeRef);
-    if (updated) {
-      this.activeEventDaySession.replaceActiveEventDayState(updated);
-      this.applyStateToMemory(updated);
+    if (this.circleStatusController) {
+      this.circleStatusController.changeStatus({
+        eventDay: this.activeRef,
+        circleSpace: space,
+        nextStatus: "held",
+        expectedSourceGeneration: this.activeState.sourceGeneration,
+      });
+      const updated = this.activeState;
+      if (updated) {
+        this.applyStateToMemory(updated);
+      }
     }
   }
 
@@ -768,34 +806,53 @@ export class DataManager {
       this.redoStack = [];
       return backup;
     }
-    const result = this.purchaseMutationService.resetActivity(
-      this.activeRef,
-      this.timestamp(),
-    );
-    this.activeEventDaySession.replaceActiveEventDayState(result.state);
-    this.applyStateToMemory(result.state);
+    const currentSpaces = Object.keys(this.activeState.circleStates);
+    if (this.circleStatusController) {
+      for (const space of currentSpaces) {
+        this.circleStatusController.changeStatus({
+          eventDay: this.activeRef,
+          circleSpace: space,
+          nextStatus: "pending",
+          expectedSourceGeneration: this.activeState.sourceGeneration,
+        });
+      }
+      this.applyStateToMemory(this.activeState);
+    }
     return backup;
   }
 
-  flushActiveOutbox(): Promise<GasOutboxResult> {
+  async flushActiveOutbox(): Promise<GasOutboxResult> {
     if (!this.activeRef) {
-      return Promise.resolve({ sent: 0, pending: 0, error: null });
+      return { sent: 0, pending: 0, error: null };
     }
-    return this.outboxService.process(this.activeRef);
+    if (this.pendingGasUpdatesController) {
+      const processed = await this.pendingGasUpdatesController.retryAll(
+        this.activeRef,
+      );
+      return {
+        sent: processed,
+        pending: this.activeState?.gasOutbox.length ?? 0,
+        error: null,
+      };
+    }
+    return { sent: 0, pending: 0, error: null };
   }
 
   /** Discard selected outbox entries and keep the active in-memory state in sync. */
   discardOutboxEntries(
     ref: EventDayRef,
     ids: readonly string[],
-    now: string,
+    _now: string,
   ): LocalEventDayState {
-    const state = this.outboxService.discard(ref, ids, now);
-    if (sameRef(this.activeRef, ref)) {
-      this.activeEventDaySession.replaceActiveEventDayState(state);
-      this.applyStateToMemory(state);
+    if (this.pendingGasUpdatesController) {
+      for (const id of ids) {
+        this.pendingGasUpdatesController.discardOne(ref, id);
+      }
     }
-    return state;
+    const state = this.repository.load(ref);
+    if (state) return state;
+    if (this.activeState) return this.activeState;
+    throw new Error("Event/day state is unavailable after outbox discard");
   }
 
   /** Clear only local holds and their history entries. */
@@ -899,16 +956,24 @@ export class DataManager {
 
   /** Start listening for online events and trigger initial background processing. */
   startSyncCoordinator(): void {
-    this.syncCoordinator.start();
+    if (this.backgroundProcess) {
+      this.backgroundProcess.start();
+    }
   }
 
   /** Process every persisted outbox queue across all event/day states. */
-  retryAllPending(): Promise<GasSyncSummary> {
-    return this.syncCoordinator.processAll();
+  async retryAllPending(): Promise<GasSyncSummary> {
+    if (this.pendingGasUpdatesController) {
+      const sent = await this.pendingGasUpdatesController.retryAll();
+      return { processedRefs: 1, sent, pending: 0, failures: [] };
+    }
+    return { processedRefs: 0, sent: 0, pending: 0, failures: [] };
   }
 
   /** Remove the online event listener. */
   disposeSyncCoordinator(): void {
-    this.syncCoordinator.dispose();
+    if (this.backgroundProcess) {
+      this.backgroundProcess.stop();
+    }
   }
 }

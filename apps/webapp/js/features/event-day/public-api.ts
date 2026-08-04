@@ -3,6 +3,7 @@ export type {
   Circle,
   CircleStatus,
   EventDayRef,
+  GasOutboxEntry,
   LocalEventDayState,
 } from "./domain/event-day-types";
 export {
@@ -14,4 +15,3 @@ export {
   createActiveEventDaySession,
 } from "./use-cases/active-event-day-session";
 export type { EventDayRepository } from "./use-cases/event-day-repository";
-export { LocalStorageEventDayRepository } from "./use-cases/event-day-repository";

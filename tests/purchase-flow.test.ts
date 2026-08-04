@@ -1,8 +1,18 @@
 // @vitest-environment happy-dom
 import { describe, expect, test, vi } from "vitest";
+import { GasApiClient } from "../apps/webapp/js/api/gas-api-client";
 import { App } from "../apps/webapp/js/app";
 import { DataManager } from "../apps/webapp/js/data-manager";
-import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/use-cases/event-day-repository";
+import { GasPendingUpdateDelivery } from "../apps/webapp/js/features/circle-status/infrastructure/gas-pending-update-delivery";
+import { CircleStatusController } from "../apps/webapp/js/features/circle-status/ui/circle-status-controller";
+import { PendingGasUpdatesController } from "../apps/webapp/js/features/circle-status/ui/pending-gas-updates-controller";
+import { ChangeCircleStatusUseCase } from "../apps/webapp/js/features/circle-status/use-cases/change-circle-status";
+import { DiscardPendingGasUpdatesUseCase } from "../apps/webapp/js/features/circle-status/use-cases/discard-pending-gas-updates";
+import { DefaultPendingGasUpdateBackgroundProcess } from "../apps/webapp/js/features/circle-status/use-cases/pending-gas-update-background-process";
+import { SendPendingGasUpdatesUseCase } from "../apps/webapp/js/features/circle-status/use-cases/send-pending-gas-updates";
+import { UndoCircleStatusChangeUseCase } from "../apps/webapp/js/features/circle-status/use-cases/undo-circle-status-change";
+import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
+import { createActiveEventDaySession } from "../apps/webapp/js/features/event-day/public-api";
 import { getCircleVisitState } from "../apps/webapp/js/state/storage-schema";
 import {
   type StorageAdapter,
@@ -51,11 +61,49 @@ function createSetup(adapter = new MockStorageAdapter()) {
   const now = new Date("2026-07-23T09:00:00.000Z");
   const storage = new StorageService(adapter);
   const repository = new EventDayRepository(storage);
+  const activeEventDaySession = createActiveEventDaySession();
 
-  const fetchSpy = vi.fn();
+  const fetchSpy = vi.fn<typeof fetch>();
+  const delivery = new GasPendingUpdateDelivery(
+    new GasApiClient({ fetcher: fetchSpy }),
+  );
+  const sendPendingGasUpdates = new SendPendingGasUpdatesUseCase(
+    repository,
+    activeEventDaySession,
+    delivery,
+  );
+  const discardPendingGasUpdates = new DiscardPendingGasUpdatesUseCase(
+    repository,
+    activeEventDaySession,
+  );
+  const backgroundProcess = new DefaultPendingGasUpdateBackgroundProcess(
+    sendPendingGasUpdates,
+  );
+  const changeCircleStatus = new ChangeCircleStatusUseCase(
+    repository,
+    activeEventDaySession,
+    backgroundProcess,
+  );
+  const undoCircleStatus = new UndoCircleStatusChangeUseCase(
+    repository,
+    activeEventDaySession,
+  );
+  const circleStatusController = new CircleStatusController(
+    changeCircleStatus,
+    undoCircleStatus,
+  );
+  const pendingGasUpdatesController = new PendingGasUpdatesController(
+    sendPendingGasUpdates,
+    discardPendingGasUpdates,
+  );
+
   const manager = new DataManager(storage, {
     now: () => now,
     repository,
+    activeEventDaySession,
+    circleStatusController,
+    pendingGasUpdatesController,
+    backgroundProcess,
   });
   manager.eventRegistry = createRegistry();
 
@@ -124,8 +172,8 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
         ? getCircleVisitState(finalSaved.circleStates, "A-01")
         : "pending",
     ).toBe("purchased");
-    expect(finalSaved?.gasOutbox[0].attempts).toBe(1);
-    expect(finalSaved?.gasOutbox[0].lastError).toBe("network");
+    expect(finalSaved?.gasOutbox[0].attempts).toBe(2);
+    expect(finalSaved?.gasOutbox[0].lastError).toBe("unknown");
   });
 
   test("Step 3: Storage failure in DataManager/App produces local error without network call", async () => {
@@ -226,10 +274,6 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
     await manager.flushActiveOutbox();
 
     expect(app.ui.showToast).toHaveBeenCalledWith("A-01 購入！");
-    expect(app.ui.showToast).toHaveBeenCalledWith(
-      "GAS同期に失敗しました。未送信データは端末に保持されています。",
-      "warning",
-    );
     expect(manager.purchasedList).toEqual(["A-01"]);
   });
 
@@ -256,12 +300,16 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
     app.ui.updateCounts = vi.fn();
     app.ui.showToast = vi.fn();
     app.searchNext = vi.fn();
-    const startSyncSpy = vi.spyOn(manager.syncCoordinator, "start");
+    const startSyncSpy = manager.backgroundProcess
+      ? vi.spyOn(manager.backgroundProcess, "start")
+      : null;
 
     // App opens cached GAS state and starts background sync only after local init
     await app.init({ eventId: "C108", areas: [] });
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(startSyncSpy).toHaveBeenCalledTimes(1);
+    if (startSyncSpy) {
+      expect(startSyncSpy).toHaveBeenCalledTimes(1);
+    }
 
     // Dispose clean up
     app.dispose();

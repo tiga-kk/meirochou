@@ -53,7 +53,7 @@ describe("App & Storage Deletion Integration", () => {
     const ref1 = { eventId: "c104", dayId: "day1" };
     const ref2 = { eventId: "c104", dayId: "day2" };
 
-    app.dm.repository.saveWithLastOpened(
+    app.dm.repository.saveAndRememberLastOpened(
       ref1,
       createSampleState("c104", "day1"),
     );
@@ -83,7 +83,7 @@ describe("App & Storage Deletion Integration", () => {
 
     const activeRef = { eventId: "c104", dayId: "day1" };
     const deletedRef = { eventId: "c104", dayId: "day2" };
-    app.dm.repository.saveWithLastOpened(
+    app.dm.repository.saveAndRememberLastOpened(
       activeRef,
       createSampleState("c104", "day1"),
     );
@@ -112,7 +112,7 @@ describe("App & Storage Deletion Integration", () => {
     const ref1 = { eventId: "c104", dayId: "day1" };
     const ref2 = { eventId: "c104", dayId: "day2" };
 
-    app.dm.repository.saveWithLastOpened(
+    app.dm.repository.saveAndRememberLastOpened(
       ref1,
       createSampleState("c104", "day1"),
     );
@@ -132,7 +132,7 @@ describe("App & Storage Deletion Integration", () => {
       confirmation: "全イベントを削除",
     });
 
-    expect(app.dm.repository.list()).toHaveLength(0);
+    expect(app.dm.repository.listEventDays()).toHaveLength(0);
     expect(transitionSpy).toHaveBeenCalledWith({
       eventId: "c104",
       dayId: "day1",
@@ -155,6 +155,6 @@ describe("App & Storage Deletion Integration", () => {
       confirmation: "全イベントを削除 ",
     });
 
-    expect(app.dm.repository.list()).toHaveLength(1);
+    expect(app.dm.repository.listEventDays()).toHaveLength(1);
   });
 });

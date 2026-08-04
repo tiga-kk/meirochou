@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/use-cases/event-day-repository";
+import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
 import {
   PendingOutboxError,
   SourceSettingsService,
@@ -390,7 +390,7 @@ describe("SourceSettingsService generation & guarded save invariants", () => {
 
     setFailWrites(false);
     expect(repo.load(ref)).toEqual(state);
-    expect(repo.list()).toEqual([ref]);
+    expect(repo.listEventDays()).toEqual([ref]);
   });
 
   it("successfully performs guarded save for valid CSV replacement", () => {
@@ -501,6 +501,6 @@ describe("SourceSettingsService deleteEventDay", () => {
 
     setFailWrites(false);
     expect(repo.load(ref)).toEqual(state);
-    expect(repo.list()).toEqual([ref]);
+    expect(repo.listEventDays()).toEqual([ref]);
   });
 });

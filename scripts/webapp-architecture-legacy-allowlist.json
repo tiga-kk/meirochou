@@ -166,32 +166,17 @@
   },
   {
     "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/features/event-day/use-cases/event-day-repository.ts",
+    "importer": "apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository.ts",
     "imported": "../../../types/boundary-parsers"
   },
   {
     "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/features/event-day/use-cases/event-day-repository.ts",
+    "importer": "apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository.ts",
     "imported": "../../../types/domain"
   },
   {
     "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/state/event-day-transition-service.ts",
-    "imported": "../types/domain"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/state/gas-outbox-service.ts",
-    "imported": "../types/boundary-parsers"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/state/gas-outbox-service.ts",
-    "imported": "../types/domain"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/state/gas-sync-coordinator.ts",
     "imported": "../types/domain"
   },
   {
@@ -204,11 +189,7 @@
     "importer": "apps/webapp/js/state/navigation-state.ts",
     "imported": "../types/domain"
   },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/state/purchase-mutation-service.ts",
-    "imported": "../types/domain"
-  },
+
   {
     "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/state/source-settings-service.ts",

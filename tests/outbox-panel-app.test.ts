@@ -87,10 +87,10 @@ describe("App & OutboxPanel Integration", () => {
       pending: number;
       failures: never[];
     }) => void = () => {};
-    vi.spyOn(app.dm.syncCoordinator, "retry").mockImplementation(
+    vi.spyOn(app.dm.pendingGasUpdatesController, "retryAll").mockImplementation(
       () =>
         new Promise((resolve) => {
-          resolveRetry = resolve;
+          resolveRetry = (s) => resolve(s.sent);
         }),
     );
     const updateSpy = vi
@@ -112,8 +112,11 @@ describe("App & OutboxPanel Integration", () => {
 
   it("rejects forged retry and discard event details at the App boundary", async () => {
     const app = new App();
-    const retrySpy = vi.spyOn(app.dm.syncCoordinator, "retry");
-    const discardSpy = vi.spyOn(app.dm.outboxService, "discard");
+    const retrySpy = vi.spyOn(app.dm.pendingGasUpdatesController, "retryAll");
+    const discardSpy = vi.spyOn(
+      app.dm.pendingGasUpdatesController,
+      "discardOne",
+    );
 
     await app.handleGasRetryRequest({
       ref: { eventId: 123, dayId: "day1" },
@@ -128,7 +131,7 @@ describe("App & OutboxPanel Integration", () => {
     expect(discardSpy).not.toHaveBeenCalled();
   });
 
-  it("delegates retry request to syncCoordinator and updates management models", async () => {
+  it("delegates retry request to pendingGasUpdatesController and updates management models", async () => {
     const app = new App();
     app.dm.eventRegistry = createSampleRegistry();
 
@@ -141,13 +144,8 @@ describe("App & OutboxPanel Integration", () => {
     );
 
     const retrySpy = vi
-      .spyOn(app.dm.syncCoordinator, "retry")
-      .mockResolvedValue({
-        processedRefs: 1,
-        sent: 1,
-        pending: 0,
-        failures: [],
-      });
+      .spyOn(app.dm.pendingGasUpdatesController, "retryAll")
+      .mockResolvedValue(1);
 
     await app.handleGasRetryRequest({ ref });
 
@@ -167,7 +165,10 @@ describe("App & OutboxPanel Integration", () => {
         createSampleGasState(ref.eventId, ref.dayId),
     );
 
-    const discardSpy = vi.spyOn(app.dm.outboxService, "discard");
+    const discardSpy = vi.spyOn(
+      app.dm.pendingGasUpdatesController,
+      "discardOne",
+    );
 
     await app.handleGasDiscardRequest({
       ref,
@@ -175,11 +176,7 @@ describe("App & OutboxPanel Integration", () => {
       confirmation: "未送信を破棄",
     });
 
-    expect(discardSpy).toHaveBeenCalledWith(
-      ref,
-      [`outbox-c104-day1-1`],
-      expect.any(String),
-    );
+    expect(discardSpy).toHaveBeenCalledWith(ref, `outbox-c104-day1-1`);
 
     const updated = app.dm.repository.load(ref);
     expect(updated?.gasOutbox).toHaveLength(0);
@@ -197,7 +194,10 @@ describe("App & OutboxPanel Integration", () => {
         createSampleGasState(ref.eventId, ref.dayId),
     );
 
-    const discardSpy = vi.spyOn(app.dm.outboxService, "discard");
+    const discardSpy = vi.spyOn(
+      app.dm.pendingGasUpdatesController,
+      "discardOne",
+    );
 
     await app.handleGasDiscardRequest({
       ref,
@@ -227,7 +227,7 @@ describe("App & OutboxPanel Integration", () => {
 
     // Verify outbox model counts match selector pending counts
     const stateList = app.dm.repository
-      .list()
+      .listEventDays()
       .map((r) => {
         const s = app.dm.repository.load(r);
         return s ? { ref: r, state: s } : null;

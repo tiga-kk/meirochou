@@ -6,7 +6,7 @@ import {
   StaleGasPreviewError,
 } from "../apps/webapp/js/data/gas-refresh-service";
 import { DataManager } from "../apps/webapp/js/data-manager";
-import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/use-cases/event-day-repository";
+import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
 import { SourceSettingsService } from "../apps/webapp/js/state/source-settings-service";
 import {
   type StorageAdapter,

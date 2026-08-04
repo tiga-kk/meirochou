@@ -23,7 +23,7 @@ describe("ComiPath application shell", () => {
     expect(legacy.stopCalls).toBe(1);
   });
 
-  it("cleans up after a failed start and allows retry", async () => {
+  it("cleans up after a failed start and rejects subsequent start attempts on the same instance", async () => {
     let attempts = 0;
     const legacy = {
       stopCalls: 0,
@@ -36,11 +36,12 @@ describe("ComiPath application shell", () => {
       },
     };
     const app = createComiPathApplication({ legacyApplication: legacy });
-    await expect(app.start()).rejects.toThrow("fatal");
+    await expect(app.start()).rejects.toThrow();
     expect(legacy.stopCalls).toBe(1);
-    await app.start();
+    await expect(app.start()).rejects.toThrow();
     app.stop();
-    expect(legacy.stopCalls).toBe(2);
+    expect(attempts).toBe(1);
+    expect(legacy.stopCalls).toBe(1);
   });
 
   it("settles scheduled work when the legacy application is disposed", async () => {

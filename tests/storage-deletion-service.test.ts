@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/use-cases/event-day-repository";
+import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
 import type { StoredDistanceMatrix } from "../apps/webapp/js/routing/distance-matrix";
 import { LocalStorageDistanceMatrixRepository } from "../apps/webapp/js/routing/distance-matrix-repository";
 import { LocalStorageNavigationSnapshotRepository } from "../apps/webapp/js/state/navigation-snapshot-repository";
@@ -247,9 +247,9 @@ describe("StorageDeletionService", () => {
     );
 
     const ref = { eventId: "c104", dayId: "day1" };
-    repo.saveWithLastOpened(ref, createSampleState(ref, 0));
+    repo.saveAndRememberLastOpened(ref, createSampleState(ref, 0));
 
-    expect(repo.getLastOpened()).toEqual(ref);
+    expect(repo.getLastOpenedEventDay()).toEqual(ref);
 
     const result = service.delete(
       { type: "event-day", ref },
@@ -258,7 +258,7 @@ describe("StorageDeletionService", () => {
 
     expect(result.deletedRefs).toEqual([ref]);
     expect(repo.load(ref)).toBeNull();
-    expect(repo.getLastOpened()).toBeNull();
+    expect(repo.getLastOpenedEventDay()).toBeNull();
   });
 
   it("preflights all indexed refs for all-events scope and aborts completely if any ref has pending outbox", () => {
@@ -298,7 +298,7 @@ describe("StorageDeletionService", () => {
     const ref1 = { eventId: "c104", dayId: "day1" };
     const ref2 = { eventId: "c104", dayId: "day2" };
 
-    repo.saveWithLastOpened(ref1, createSampleState(ref1, 0));
+    repo.saveAndRememberLastOpened(ref1, createSampleState(ref1, 0));
     repo.save(ref2, createSampleState(ref2, 0));
 
     const result = service.delete(
@@ -308,8 +308,8 @@ describe("StorageDeletionService", () => {
 
     expect(result.deletedRefs).toHaveLength(2);
     expect(result.activeRefDeleted).toBe(true);
-    expect(repo.list()).toHaveLength(0);
-    expect(repo.getLastOpened()).toBeNull();
+    expect(repo.listEventDays()).toHaveLength(0);
+    expect(repo.getLastOpenedEventDay()).toBeNull();
   });
 
   it("clears only the navigation snapshot during activity reset", () => {

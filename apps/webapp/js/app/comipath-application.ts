@@ -14,18 +14,20 @@ export function createComiPathApplication(
   let started = false;
   let stopped = false;
   let startPromise: Promise<void> | null = null;
+  let startError: unknown = null;
 
   return {
     start(): Promise<void> {
-      if (stopped) return Promise.resolve();
+      if (stopped) return Promise.reject(new Error("Application is stopped"));
+      if (startError) return Promise.reject(startError);
       if (startPromise) return startPromise;
       if (started) return Promise.resolve();
       started = true;
       startPromise = Promise.resolve(
         dependencies.legacyApplication.start(),
       ).catch((error: unknown) => {
-        started = false;
-        startPromise = null;
+        startError = error;
+        stopped = true;
         dependencies.legacyApplication.stop();
         throw error;
       });

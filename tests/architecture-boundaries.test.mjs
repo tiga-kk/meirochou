@@ -36,6 +36,50 @@ describe("webapp architecture boundaries", () => {
     );
   });
 
+  it("rejects use cases importing concrete storage modules directly", () => {
+    const result = scanFixture({
+      "features/example/use-cases/read.ts":
+        'import { StorageService } from "../../../state/storage-service";',
+    });
+
+    expect(result.violations.map((item) => item.ruleId)).toContain(
+      "use-case-imports-concrete-module",
+    );
+  });
+
+  it("rejects a use case import outside the allowed dependency directories", () => {
+    const result = scanFixture({
+      "features/example/use-cases/read.ts":
+        'import { parse } from "../../../data/legacy-parser";',
+    });
+
+    expect(result.violations.map((item) => item.ruleId)).toContain(
+      "use-case-imports-concrete-module",
+    );
+  });
+
+  it("rejects public API exporting concrete infrastructure", () => {
+    const result = scanFixture({
+      "features/example/public-api.ts":
+        'export { LocalStorageExampleRepository } from "./infrastructure/local-storage-example-repository";',
+    });
+
+    expect(result.violations.map((item) => item.ruleId)).toContain(
+      "public-api-exports-concrete-infrastructure",
+    );
+  });
+
+  it("rejects concrete infrastructure names even when the path is generic", () => {
+    const result = scanFixture({
+      "features/example/public-api.ts":
+        'export { LocalStorageExampleRepository } from "./repository";',
+    });
+
+    expect(result.violations.map((item) => item.ruleId)).toContain(
+      "public-api-exports-concrete-infrastructure",
+    );
+  });
+
   it("rejects vague new names", () => {
     const result = scanFixture({
       "features/event-day/use-cases/event-day-manager.ts":

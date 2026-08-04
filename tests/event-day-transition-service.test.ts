@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   LocalStorageEventDayRepository as EventDayRepository,
   StorageWriteError,
-} from "../apps/webapp/js/features/event-day/use-cases/event-day-repository";
+} from "../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
 import {
   loadMapBundleManifestFromUrl,
   resolveEventMapManifestUrl,
@@ -260,7 +260,7 @@ describe("EventDayTransitionService prepare", () => {
 
     // Zero side effects before commit
     expect(repo.load(ref)).toBeNull();
-    expect(repo.getLastOpened()).toBeNull();
+    expect(repo.getLastOpenedEventDay()).toBeNull();
   });
 
   it("reuses current manifest for same-event day switch without fetching again", async () => {
@@ -463,7 +463,7 @@ describe("EventDayTransitionService commit & rollback", () => {
     expect(committed).toEqual(prepared.state);
 
     expect(repo.load(prepared.ref)).toEqual(prepared.state);
-    expect(repo.getLastOpened()).toEqual(prepared.ref);
+    expect(repo.getLastOpenedEventDay()).toEqual(prepared.ref);
   });
 
   it("rolls back storage on save or last-opened failure during commit", () => {
@@ -495,7 +495,7 @@ describe("EventDayTransitionService commit & rollback", () => {
         sourceUpdatedAt: "2026-07-23T00:00:00Z",
       },
     });
-    repo.setLastOpened(initialRef);
+    repo.rememberLastOpenedEventDay(initialRef);
 
     // Mock storage to fail on next setItem
     vi.spyOn(storageService, "setJson").mockImplementation((key: string) => {
@@ -530,7 +530,7 @@ describe("EventDayTransitionService commit & rollback", () => {
     expect(() => service.commit(prepared)).toThrow(StorageWriteError);
 
     // Previous state and last-opened remain intact
-    expect(repo.getLastOpened()).toEqual(initialRef);
+    expect(repo.getLastOpenedEventDay()).toEqual(initialRef);
     expect(repo.load({ eventId: "c105", dayId: "day1" })).toBeNull();
   });
 });

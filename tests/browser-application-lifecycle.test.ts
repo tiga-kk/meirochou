@@ -28,7 +28,12 @@ describe("browser application lifecycle", () => {
     document.dispatchEvent(new Event("DOMContentLoaded"));
     expect(app.start).not.toHaveBeenCalled();
     expect(app.stop).toHaveBeenCalledOnce();
-    await Promise.race([pending, Promise.resolve()]);
+    await expect(
+      Promise.race([
+        pending.then(() => "settled"),
+        new Promise((resolve) => setTimeout(() => resolve("timeout"), 50)),
+      ]),
+    ).resolves.toBe("settled");
   });
 
   it("cleans up when application start fails", async () => {

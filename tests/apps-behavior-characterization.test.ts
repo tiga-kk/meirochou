@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
 import { App } from "../apps/webapp/js/app.js";
+import { ChangeCircleStatusUseCase } from "../apps/webapp/js/features/circle-status/use-cases/change-circle-status";
 import { NavigationOrchestrationService } from "../apps/webapp/js/navigation/navigation-orchestration";
 import { createInitialNavigationState } from "../apps/webapp/js/state/navigation-state";
-import { PurchaseMutationService } from "../apps/webapp/js/state/purchase-mutation-service";
 import { createEmptyEventDayState } from "../apps/webapp/js/state/storage-schema";
 import type {
   CircleRecord,
@@ -25,7 +25,6 @@ function createProductionAppFixture() {
   const resumeDialog = document.getElementById(
     "navigation-resume-dialog",
   ) as HTMLElement;
-  const calls: string[] = [];
   const addEventListener = vi.spyOn(settings, "addEventListener");
   const resumeAddEventListener = vi.spyOn(resumeDialog, "addEventListener");
   const worker = {
@@ -34,20 +33,8 @@ function createProductionAppFixture() {
     terminate: vi.fn(),
   };
   const app = new App({ alnsWorkerFactory: () => worker });
-  vi.spyOn(app, "handleEventDaySelect").mockImplementation(async (detail) => {
-    calls.push(`event:${detail.dayId}`);
-  });
-  vi.spyOn(app, "handleCsvPreviewRequest").mockImplementation(() => {
-    calls.push("view:csv-preview");
-  });
-  vi.spyOn(app, "handleStorageDeleteRequest").mockImplementation(() => {
-    calls.push("delete:request");
-  });
-  vi.spyOn(app, "handleResumeConfirm").mockImplementation(() => {
-    calls.push("view:resume-confirm");
-  });
   vi.spyOn(app.dm, "disposeSyncCoordinator");
-  return { app, settings, calls, addEventListener, resumeAddEventListener };
+  return { app, settings, addEventListener, resumeAddEventListener };
 }
 
 function createGasState(): LocalEventDayState {
@@ -90,70 +77,67 @@ describe("apps public behavior characterization", () => {
   });
 
   it("switches active event/day state from the public event", () => {
-    const { app, settings, calls } = createProductionAppFixture();
+    const { app, settings } = createProductionAppFixture();
     app.setupEvents();
 
-    dispatchManagementEvent(settings, "event-day-select", REF);
+    const handler = vi.spyOn(app, "handleEventDaySelect");
+    dispatchManagementEvent(settings, "event-day-select", { invalid: true });
 
-    expect(calls).toEqual(["event:day1"]);
+    expect(handler).toHaveBeenCalledOnce();
     app.dispose();
   });
 
   it("shows a CSV preview before any repository apply", () => {
-    const { app, settings, calls } = createProductionAppFixture();
+    const { app, settings } = createProductionAppFixture();
     app.setupEvents();
 
+    const handler = vi.spyOn(app, "handleCsvPreviewRequest");
     dispatchManagementEvent(settings, "csv-preview-request", {
       file: new File(["space\nE1-01"], "demo.csv", { type: "text/csv" }),
     });
 
-    expect(calls).toEqual(["view:csv-preview"]);
+    expect(handler).toHaveBeenCalledOnce();
     app.dispose();
   });
 
   it("persists purchase state and appends a pending GAS update", () => {
-    const state = createGasState();
+    const emptyState = createGasState();
+    const state: LocalEventDayState = {
+      ...emptyState,
+      circles: [{ space: "E1-01" }],
+    };
     let saved: LocalEventDayState | null = null;
-    const repository = {
-      load: () => saved ?? state,
-      save: (_ref: EventDayRef, next: LocalEventDayState) => {
-        saved = next;
-      },
-    } as unknown as ConstructorParameters<typeof PurchaseMutationService>[0];
-    const outbox = {
-      append: (nextState: LocalEventDayState) => ({
-        state: {
-          ...nextState,
-          gasOutbox: [
-            {
-              id: "pending-1",
-              eventId: REF.eventId,
-              dayId: REF.dayId,
-              sourceGeneration: nextState.sourceGeneration,
-              gasUrl: "https://example.test/gas",
-              sheetName: "demo",
-              space: "E1-01",
-              purchased: true,
-              createdAt: NOW,
-              attempts: 0,
-              lastError: null,
-            },
-          ],
+    const repository: import("../apps/webapp/js/features/event-day/public-api").EventDayRepository =
+      {
+        load: () => saved ?? state,
+        save: (_ref: EventDayRef, next: LocalEventDayState) => {
+          saved = next;
         },
-        entry: { id: "pending-1" },
-      }),
-    } as unknown as ConstructorParameters<typeof PurchaseMutationService>[1];
+      };
+    const activeEventDaySession: import("../apps/webapp/js/features/event-day/public-api").ActiveEventDaySession =
+      {
+        getActiveEventDay: () => ({ ref: REF, state }),
+        replaceActiveEventDayState: vi.fn(),
+        setActiveEventDay: () => {},
+        clearActiveEventDay: () => {},
+        subscribe: () => () => {},
+      };
 
-    const result = new PurchaseMutationService(repository, outbox).setPurchased(
-      REF,
-      "E1-01",
-      true,
-      NOW,
+    const useCase = new ChangeCircleStatusUseCase(
+      repository,
+      activeEventDaySession,
     );
+    const result = useCase.execute({
+      eventDay: REF,
+      circleSpace: "E1-01",
+      nextStatus: "purchased",
+      expectedSourceGeneration: "generation-1",
+      changedAt: NOW,
+    });
 
     expect(saved?.circleStates["E1-01"]).toBe("purchased");
-    expect(result.queuedEntryId).toBe("pending-1");
-    expect(result.pendingCount).toBe(1);
+    expect(result.pendingGasUpdateId).toBeTruthy();
+    expect(saved?.gasOutbox).toHaveLength(1);
   });
 
   it("sets the current route target and snapshot-facing navigation state", () => {

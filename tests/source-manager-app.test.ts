@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../apps/webapp/js/app";
-import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/use-cases/event-day-repository";
+import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
 import { StorageService } from "../apps/webapp/js/state/storage-service";
 import type { EventRegistryV1 } from "../apps/webapp/js/types/domain";
 
