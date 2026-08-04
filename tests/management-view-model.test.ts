@@ -1,21 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
-import type {
-  EventRegistryV1,
-  GasOutboxEntry,
-  LocalEventDayState,
-  SourceDiff,
-} from "../apps/webapp/js/types/domain";
 import {
   dispatchManagementEvent,
   type ManagementEventDetailMap,
-} from "../apps/webapp/js/ui/management-events";
+} from "../apps/webapp/js/shared/ui/management-events";
 import {
   buildDeleteOptions,
   buildEventDayOptions,
   formatOutbox,
   formatSourceDiff,
   formatSourceSummary,
-} from "../apps/webapp/js/ui/management-view-model";
+} from "../apps/webapp/js/shared/ui/management-view-model";
+import type {
+  EventRegistryV1,
+  GasOutboxEntry,
+  LocalEventDayState,
+  SourceDiff,
+} from "../apps/webapp/js/types/domain";
 
 const sampleRegistry: EventRegistryV1 = {
   schemaVersion: 1,

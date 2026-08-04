@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "vitest";
-import { Config } from "../apps/webapp/js/config.js";
 import {
   createDevDemoData,
   isDevDemoEnabled,
 } from "../apps/webapp/js/dev-demo-data.js";
+import { runtimeMapAreaCatalog } from "../apps/webapp/js/features/route-guidance/infrastructure/runtime-map-area-catalog.ts";
 import {
   getPinSourceSize,
   getRouteStartSpaceForMap,
@@ -51,7 +51,7 @@ const mapManifest = parseMapBundleManifest(
   rawMapManifest,
   "https://example.test/assets/maps/manifest.json",
 );
-Config.initializeAreas(mapManifest.areas);
+runtimeMapAreaCatalog.initializeMapAreas(mapManifest.areas);
 
 test("browser entrypoint owns startup side effects", () => {
   const html = read("apps/webapp/index.html");
@@ -674,7 +674,7 @@ test("webapp route start marker is kept only when start and target share a map a
 });
 
 test("webapp area config exposes grid route assets for each map", () => {
-  Config.AREAS.forEach((area) => {
+  runtimeMapAreaCatalog.getAllMapAreas().forEach((area) => {
     assert.match(
       area.gridMetaFile,
       new RegExp(`assets/maps/${area.id}/grid-meta\\.json$`),
@@ -1282,10 +1282,10 @@ test("webapp typography uses mincho as the primary UI font", () => {
 
 test("webapp map manifest references one complete fictional bundle per area", () => {
   assert.deepEqual(
-    Config.AREAS.map((area) => area.id),
+    runtimeMapAreaCatalog.getAllMapAreas().map((area) => area.id),
     ["demo-east", "demo-west"],
   );
-  Config.AREAS.forEach((area) => {
+  runtimeMapAreaCatalog.getAllMapAreas().forEach((area) => {
     assert.equal(area.mapId, area.id);
     assert.equal(
       area.mapFile,
@@ -1310,7 +1310,7 @@ test("webapp map manifest references one complete fictional bundle per area", ()
 });
 
 test("webapp demo image, points, portals, and grid share one coordinate system", () => {
-  Config.AREAS.forEach((area) => {
+  runtimeMapAreaCatalog.getAllMapAreas().forEach((area) => {
     const assetBase = `apps/webapp/map-bundles/demo-v1/${area.id}`;
     const webImagePath = `${assetBase}/source.png`;
     const points = JSON.parse(read(`${assetBase}/points.json`));
@@ -1372,7 +1372,7 @@ test("webapp validates the map manifest before constructing App", () => {
     "await loadRuntimeMapBundleManifestFromUrl",
   );
   const initializeIndex = appSource.indexOf(
-    "Config.initializeAreas",
+    "runtimeMapAreaCatalog.initializeMapAreas",
     loadIndex,
   );
   const constructIndex = appSource.indexOf("new App()", initializeIndex);

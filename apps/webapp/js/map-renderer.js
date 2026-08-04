@@ -1,4 +1,4 @@
-import { Config } from "./config.js";
+import { runtimeMapAreaCatalog } from "./features/route-guidance/infrastructure/runtime-map-area-catalog";
 import { buildRouteOverlaySvg } from "./route-planner";
 import { parsePointsPayload } from "./types/boundary-parsers";
 import {
@@ -21,7 +21,7 @@ function findAreaForSpace(space) {
   const labelChar = cleanedSpace[1];
 
   return (
-    Config.AREAS.find((area) => {
+    runtimeMapAreaCatalog.getAllMapAreas().find((area) => {
       const prefixMatch = area.prefixes.includes(prefixChar);
       return prefixMatch && area.labels.includes(labelChar);
     }) || null

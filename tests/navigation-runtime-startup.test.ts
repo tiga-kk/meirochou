@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { App } from "../apps/webapp/js/app.js";
-import { Config } from "../apps/webapp/js/config.js";
+import { runtimeMapAreaCatalog } from "../apps/webapp/js/features/route-guidance/infrastructure/runtime-map-area-catalog";
 
 describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", () => {
   beforeEach(() => {
@@ -319,7 +319,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       savedAt: "2026-07-27T00:00:00.000Z",
     };
 
-    Config.initializeAreas([
+    runtimeMapAreaCatalog.initializeMapAreas([
       { id: "east", name: "東ホール", prefixes: ["東"], labels: ["A"] },
     ]);
 
@@ -509,7 +509,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       savedAt: "2026-07-27T00:00:00.000Z",
     };
 
-    Config.replaceAreas([
+    runtimeMapAreaCatalog.replaceMapAreas([
       { id: "e456", name: "東ホール", prefixes: ["東"], labels: ["A"] },
     ]);
 
@@ -747,7 +747,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       <div id="toast"></div>
     `;
 
-    Config.replaceAreas([
+    runtimeMapAreaCatalog.replaceMapAreas([
       {
         id: "e456",
         mapId: "m1",
@@ -838,7 +838,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
     app.ui.showToast = vi.fn();
     app.ui.showNavigation = vi.fn();
 
-    Config.replaceAreas([
+    runtimeMapAreaCatalog.replaceMapAreas([
       {
         id: "e456",
         mapId: "m-e456",
@@ -1199,7 +1199,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
   });
 
   test("purchase advances through arrival and purchase orchestration without searchNext", async () => {
-    Config.replaceAreas([
+    runtimeMapAreaCatalog.replaceMapAreas([
       {
         id: "east",
         mapId: "east-map",
@@ -1457,7 +1457,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       <div id="toast"></div>
     `;
 
-    Config.replaceAreas([
+    runtimeMapAreaCatalog.replaceMapAreas([
       {
         id: "e456",
         mapId: "m1",

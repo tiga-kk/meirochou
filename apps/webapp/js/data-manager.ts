@@ -1,5 +1,4 @@
 import { GasApiClient } from "./api/gas-api-client";
-import { Config } from "./config.js";
 import { GasRefreshService } from "./data/gas-refresh-service";
 import {
   decodeLegacyCircles,
@@ -26,10 +25,15 @@ import { DiscardPendingGasUpdatesUseCase } from "./features/circle-status/use-ca
 import { DefaultPendingGasUpdateBackgroundProcess } from "./features/circle-status/use-cases/pending-gas-update-background-process";
 import { SendPendingGasUpdatesUseCase } from "./features/circle-status/use-cases/send-pending-gas-updates";
 import { UndoCircleStatusChangeUseCase } from "./features/circle-status/use-cases/undo-circle-status-change";
+import type { MapBundleManifest } from "./features/event-day/domain/event-day-contracts";
 import {
   type LoadedEventRegistry,
   loadEventRegistryWithUrl,
 } from "./features/event-day/infrastructure/http-event-registry-loader";
+import {
+  loadRuntimeMapBundleManifestFromUrl,
+  resolveEventMapManifestUrl,
+} from "./features/event-day/infrastructure/http-map-manifest-loader";
 import { LocalStorageEventDayRepository } from "./features/event-day/infrastructure/local-storage-event-day-repository";
 import type { EventDayRepository } from "./features/event-day/public-api";
 import {
@@ -38,7 +42,7 @@ import {
   createActiveEventDayReader,
   createActiveEventDaySession,
 } from "./features/event-day/public-api";
-import { EventDayTransitionService } from "./state/event-day-transition-service";
+import { SwitchEventDayUseCase } from "./features/event-day/use-cases/switch-event-day";
 import {
   SourceSettingsService,
   StaleSourceStateError,
@@ -48,6 +52,15 @@ import {
   getCircleVisitState,
 } from "./state/storage-schema";
 import { StorageService } from "./state/storage-service.js";
+
+const LEGACY_STORAGE_KEYS = Object.freeze({
+  DATA: "comiketData",
+  PURCHASED: "purchasedList",
+  HOLD: "holdList",
+  HISTORY: "actionHistory",
+  REDO_STACK: "redoStack",
+});
+
 import type {
   ActionHistoryEntry,
   ActionType,
@@ -291,7 +304,7 @@ export class DataManager {
   }
 
   eventRegistryUrl: string | null = null;
-  transitionService: EventDayTransitionService | null = null;
+  transitionService: SwitchEventDayUseCase | null = null;
 
   private async ensureRegistry(): Promise<LoadedEventRegistry> {
     if (this.eventRegistry && this.eventRegistryUrl) {
@@ -324,17 +337,29 @@ export class DataManager {
   /** Create the event-scoped transition service after registry loading. */
   getTransitionService(
     currentManifest?: MapBundleManifestV1 | null,
-  ): EventDayTransitionService {
+  ): SwitchEventDayUseCase {
     if (!this.eventRegistry || !this.eventRegistryUrl) {
       throw new Error(
         "Registry must be loaded before accessing transition service",
       );
     }
-    this.transitionService = new EventDayTransitionService(
+    const registryUrl = this.eventRegistryUrl;
+    this.transitionService = new SwitchEventDayUseCase(
       this.repository,
       this.eventRegistryUrl,
       this.eventRegistry,
-      { currentManifest },
+      {
+        currentManifest: currentManifest as
+          | MapBundleManifest
+          | null
+          | undefined,
+        loadManifest: (event, signal) =>
+          loadRuntimeMapBundleManifestFromUrl(
+            resolveEventMapManifestUrl(registryUrl, event),
+            event.eventId,
+            { signal },
+          ) as unknown as Promise<MapBundleManifest>,
+      },
     );
     return this.transitionService;
   }
@@ -568,7 +593,7 @@ export class DataManager {
     this.requireRegistered(target);
     const issues: string[] = [];
     const data =
-      this.readLegacyJson(Config.STORAGE_KEYS.DATA, issues) ||
+      this.readLegacyJson(LEGACY_STORAGE_KEYS.DATA, issues) ||
       this.readLegacyJson("comipath:v1:circles", issues);
     const extracted =
       data === null ? { value: [], issues: [] } : extractLegacyCircleRows(data);
@@ -586,16 +611,16 @@ export class DataManager {
       return decoded.value;
     };
     const purchased = decodeList(
-      Config.STORAGE_KEYS.PURCHASED,
+      LEGACY_STORAGE_KEYS.PURCHASED,
       "comipath:v1:purchased",
     );
-    const hold = decodeList(Config.STORAGE_KEYS.HOLD, "comipath:v1:hold");
+    const hold = decodeList(LEGACY_STORAGE_KEYS.HOLD, "comipath:v1:hold");
     const now = this.timestamp();
     const historyRaw =
-      this.readLegacyJson(Config.STORAGE_KEYS.HISTORY, issues) ??
+      this.readLegacyJson(LEGACY_STORAGE_KEYS.HISTORY, issues) ??
       this.readLegacyJson("comipath:v1:history", issues);
     const redoRaw =
-      this.readLegacyJson(Config.STORAGE_KEYS.REDO_STACK, issues) ??
+      this.readLegacyJson(LEGACY_STORAGE_KEYS.REDO_STACK, issues) ??
       this.readLegacyJson("comipath:v1:redo_stack", issues);
     const history =
       historyRaw === null

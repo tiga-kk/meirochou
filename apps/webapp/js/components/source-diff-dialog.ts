@@ -1,7 +1,7 @@
 import { html, LitElement, type PropertyValues } from "lit";
+import { dispatchManagementEvent } from "../shared/ui/management-events";
+import type { SourceDiffViewModel } from "../shared/ui/management-view-model";
 import { DialogFocusController } from "../ui/dialog-focus";
-import { dispatchManagementEvent } from "../ui/management-events";
-import type { SourceDiffViewModel } from "../ui/management-view-model";
 
 export interface SourceDiffDialogModel {
   readonly open: boolean;

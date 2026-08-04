@@ -8,9 +8,9 @@ import {
   StorageWriteError,
 } from "../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
 import {
-  EventDayTransitionService,
+  SwitchEventDayUseCase as EventDayTransitionService,
   type PreparedEventDayTransition,
-} from "../apps/webapp/js/state/event-day-transition-service";
+} from "../apps/webapp/js/features/event-day/use-cases/switch-event-day";
 import { StorageService } from "../apps/webapp/js/state/storage-service";
 import type {
   EventRegistryV1,

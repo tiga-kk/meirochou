@@ -1,4 +1,4 @@
-import { Config } from "./config.js";
+import { runtimeMapAreaCatalog } from "./features/route-guidance/infrastructure/runtime-map-area-catalog";
 import { TspSolver } from "./tsp-solver.js";
 
 /**
@@ -28,7 +28,7 @@ export class StatsRenderer {
     this.tableEl.innerHTML = "";
     this.areaCells = {};
 
-    const areas = Config.AREAS || []; // フォールバック対応は省略（Config修正済み前提）
+    const areas = runtimeMapAreaCatalog.getAllMapAreas() || [];
 
     // THEAD
     const thead = document.createElement("thead");
@@ -110,8 +110,8 @@ export class StatsRenderer {
     const holdCounts = {}; // { "areaName": count }
 
     // 初期化
-    if (Config.AREAS) {
-      Config.AREAS.forEach((area) => {
+    if (runtimeMapAreaCatalog.getAllMapAreas()) {
+      runtimeMapAreaCatalog.getAllMapAreas().forEach((area) => {
         counts[area.name] = 0;
         holdCounts[area.name] = 0;
       });
@@ -141,8 +141,8 @@ export class StatsRenderer {
       }
     };
 
-    if (Config.AREAS) {
-      Config.AREAS.forEach((area) => {
+    if (runtimeMapAreaCatalog.getAllMapAreas()) {
+      runtimeMapAreaCatalog.getAllMapAreas().forEach((area) => {
         updateCell("remaining", area.name, counts[area.name]);
         updateCell("hold", area.name, holdCounts[area.name]);
       });

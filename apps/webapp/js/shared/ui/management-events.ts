@@ -1,4 +1,7 @@
-import type { EventDayRef, GasDataSource } from "../types/domain";
+import type {
+  EventDayRef,
+  GasDataSource,
+} from "../../features/event-day/public-api";
 
 /** A user-selected source file or a GAS source draft that is not persisted yet. */
 export type DataSourceDraft =

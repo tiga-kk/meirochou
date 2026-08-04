@@ -2,7 +2,6 @@ import "./components/comipath-settings";
 import "./components/navigation-resume-dialog";
 import "./components/source-diff-dialog";
 import { parseGasWebAppUrl } from "./api/gas-api-client";
-import { Config } from "./config.js";
 import { CsvValidationError, DataManager } from "./data-manager.js";
 import { createDevDemoData, isDevDemoEnabled } from "./dev-demo-data.js";
 import { loadEventRegistryWithUrl } from "./features/event-day/infrastructure/http-event-registry-loader";
@@ -11,6 +10,8 @@ import {
   renderMapBootstrapError,
   resolveEventMapManifestUrl,
 } from "./features/event-day/infrastructure/http-map-manifest-loader";
+import { DeleteLocalDataUseCase } from "./features/local-data-deletion/public-api";
+import { runtimeMapAreaCatalog } from "./features/route-guidance/infrastructure/runtime-map-area-catalog";
 import { NavigationOrchestrationService } from "./navigation/navigation-orchestration";
 import { NavigationRuntimeController } from "./navigation/navigation-runtime-controller";
 import {
@@ -20,19 +21,18 @@ import {
 } from "./route-planner";
 import { distancesFromStartToEndpoints } from "./routing/distance-matrix";
 import { LocalStorageDistanceMatrixRepository } from "./routing/distance-matrix-repository";
-import { LocalStorageNavigationSnapshotRepository } from "./state/navigation-snapshot-repository";
-import { StorageDeletionService } from "./state/storage-deletion-service";
-import { TspSolver } from "./tsp-solver.js";
-import { parseGridMeta, parsePointsPayload } from "./types/boundary-parsers";
-import { downloadCsv, formatCsvExportFilename } from "./ui/csv-download";
-import { ManagementSession } from "./ui/management-session";
 import {
   buildDeleteOptions,
   buildEventDayOptions,
   buildOutboxPanelModel,
   formatSourceDiff,
   formatSourceSummary,
-} from "./ui/management-view-model";
+} from "./shared/ui/management-view-model";
+import { LocalStorageNavigationSnapshotRepository } from "./state/navigation-snapshot-repository";
+import { TspSolver } from "./tsp-solver.js";
+import { parseGridMeta, parsePointsPayload } from "./types/boundary-parsers";
+import { downloadCsv, formatCsvExportFilename } from "./ui/csv-download";
+import { ManagementSession } from "./ui/management-session";
 import { buildSpaceFromLocation } from "./ui/navigation-view-model";
 import { UIManager } from "./ui-manager.js";
 
@@ -93,10 +93,12 @@ function findAreaForSpace(space) {
   const labelChar = cleanedSpace[1];
 
   return (
-    Config.AREAS.find(
-      (area) =>
-        area.prefixes.includes(prefixChar) && area.labels.includes(labelChar),
-    ) || null
+    runtimeMapAreaCatalog
+      .getAllMapAreas()
+      .find(
+        (area) =>
+          area.prefixes.includes(prefixChar) && area.labels.includes(labelChar),
+      ) || null
   );
 }
 
@@ -251,16 +253,24 @@ export class App {
     }
   }
 
-  get storageDeletionService() {
-    return new StorageDeletionService(
+  get localDataDeletionUseCase() {
+    return new DeleteLocalDataUseCase(
       this.dm.repository,
-      this.dm.sourceSettings,
-      () =>
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `gen-${Date.now()}`,
-      this.matrixRepository,
-      this.snapshotRepository,
+      {
+        deleteActivitySnapshot: (ref) =>
+          this.snapshotRepository.clear(ref.eventId, ref.dayId),
+        deleteAllRouteData: (ref) => {
+          this.matrixRepository.deleteByEventDay(ref.eventId, ref.dayId);
+          this.snapshotRepository.clear(ref.eventId, ref.dayId);
+        },
+      },
+      {
+        now: () => new Date().toISOString(),
+        createSourceGeneration: () =>
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `gen-${Date.now()}`,
+      },
     );
   }
 
@@ -828,20 +838,24 @@ export class App {
     this.deleteErrorMessage = "";
     this.updateManagementModels();
 
-    const now = new Date().toISOString();
     try {
-      const result = this.storageDeletionService.delete(scope, now);
+      const deletionScope =
+        scope.type === "all-events"
+          ? { kind: "all-event-days" }
+          : {
+              kind: scope.type === "circles" ? "circle-source" : scope.type,
+              eventDay: scope.ref,
+            };
+      await this.localDataDeletionUseCase.execute(deletionScope);
       if (!this.session.isLatestRequestToken(token)) return;
 
       this.session.setBusy("storage-delete", false);
       this.activeDeleteScope = null;
 
       const activeRefDeleted =
-        scope.type === "all-events"
-          ? activeRefBeforeDelete !== null
-          : result.deletedRefs.some((ref) =>
-              sameEventDayRef(ref, activeRefBeforeDelete),
-            );
+        scope.type === "all-events" ||
+        (scope.type === "event-day" &&
+          sameEventDayRef(scope.ref, activeRefBeforeDelete));
       const activeRefSourceDeleted =
         scope.type === "circles" &&
         sameEventDayRef(scope.ref, activeRefBeforeDelete);
@@ -973,7 +987,7 @@ export class App {
 
       const committedState = transitionService.commit(prepared);
       this.currentManifest = prepared.manifest;
-      Config.replaceAreas(prepared.manifest.areas);
+      runtimeMapAreaCatalog.replaceMapAreas(prepared.manifest.areas);
 
       this.dm.activateCommittedState(prepared.ref, committedState);
 
@@ -1402,9 +1416,9 @@ export class App {
     try {
       const lockedFrom = currentNavigationState.lockedFirstLeg?.from;
       if (lockedFrom?.type === "start") {
-        const area = Config.AREAS.find(
-          (candidate) => candidate.id === lockedFrom.areaId,
-        );
+        const area = runtimeMapAreaCatalog
+          .getAllMapAreas()
+          .find((candidate) => candidate.id === lockedFrom.areaId);
         const assets = area ? await this.loadGridRouteAssets(area) : null;
         if (assets) {
           route = planRouteFromGridIndex(
@@ -1470,7 +1484,9 @@ export class App {
 
   readCurrentSpace() {
     const areaId = document.getElementById("loc-ewsn").value;
-    const area = Config.AREAS.find((candidate) => candidate.id === areaId);
+    const area = runtimeMapAreaCatalog
+      .getAllMapAreas()
+      .find((candidate) => candidate.id === areaId);
     const currentSpace = buildSpaceFromLocation({
       areaName: area?.prefixes[0] || "",
       label: document.getElementById("loc-label").value,
@@ -1549,7 +1565,9 @@ export class App {
     if (btnOpenGallery) {
       btnOpenGallery.onclick = () => {
         const areaId = document.getElementById("loc-ewsn").value;
-        const area = Config.AREAS.find((candidate) => candidate.id === areaId);
+        const area = runtimeMapAreaCatalog
+          .getAllMapAreas()
+          .find((candidate) => candidate.id === areaId);
         this.ui.showGallery(area?.name || areaId, false);
       };
     }
@@ -2108,9 +2126,9 @@ export class App {
 
     if (type === "purchase" && this.navigationState) {
       const activeState = this.navigationState;
-      const area = Config.AREAS.find(
-        (candidate) => candidate.id === activeState.areaId,
-      );
+      const area = runtimeMapAreaCatalog
+        .getAllMapAreas()
+        .find((candidate) => candidate.id === activeState.areaId);
       const assets = area ? await this.loadGridRouteAssets(area) : null;
       const arrivedGridIndex = assets
         ? this.findPointPortalIndex(
@@ -2184,9 +2202,9 @@ export class App {
         if (lockedFrom?.type === "circle") {
           route = await this.planGridRoute(lockedFrom.space, nextTargetSpace);
         } else if (lockedFrom?.type === "start") {
-          const area = Config.AREAS.find(
-            (candidate) => candidate.id === lockedFrom.areaId,
-          );
+          const area = runtimeMapAreaCatalog
+            .getAllMapAreas()
+            .find((candidate) => candidate.id === lockedFrom.areaId);
           const assets = area ? await this.loadGridRouteAssets(area) : null;
           if (assets) {
             route = planRouteFromGridIndex(
@@ -2262,9 +2280,9 @@ export class App {
     let route = null;
     try {
       if (lockedFrom?.type === "start") {
-        const area = Config.AREAS.find(
-          (candidate) => candidate.id === lockedFrom.areaId,
-        );
+        const area = runtimeMapAreaCatalog
+          .getAllMapAreas()
+          .find((candidate) => candidate.id === lockedFrom.areaId);
         const assets = area ? await this.loadGridRouteAssets(area) : null;
         if (assets) {
           route = planRouteFromGridIndex(
@@ -2392,9 +2410,13 @@ export class App {
     let route = null;
     if (lockedLeg?.from) {
       if (lockedLeg.from.type === "start") {
-        const area = Config.AREAS.find((a) => a.id === lockedLeg.from.areaId) ||
+        const area = runtimeMapAreaCatalog
+          .getAllMapAreas()
+          .find((a) => a.id === lockedLeg.from.areaId) ||
           findAreaForSpace(targetCircle.space) ||
-          Config.AREAS[0] || { id: lockedLeg.from.areaId };
+          runtimeMapAreaCatalog.getAllMapAreas()[0] || {
+            id: lockedLeg.from.areaId,
+          };
         const assets = area ? await this.loadGridRouteAssets(area) : null;
         if (assets) {
           route = planRouteFromGridIndex(
@@ -2520,7 +2542,9 @@ export class App {
 
     const startArea =
       lockedLeg?.from?.type === "start"
-        ? Config.AREAS.find((a) => a.id === lockedLeg.from.areaId) ||
+        ? runtimeMapAreaCatalog
+            .getAllMapAreas()
+            .find((a) => a.id === lockedLeg.from.areaId) ||
           findAreaForSpace(targetCircle.space)
         : lockedLeg?.from?.type === "circle"
           ? findAreaForSpace(lockedLeg.from.space)
@@ -2749,7 +2773,7 @@ async function bootstrapApp(existingApp) {
       manifestUrl,
       event.eventId,
     );
-    Config.initializeAreas(manifest.areas);
+    runtimeMapAreaCatalog.initializeMapAreas(manifest.areas);
   } catch (error) {
     console.error("Map bundle initialization failed.", error);
     renderMapBootstrapError(document, error);

@@ -1,10 +1,10 @@
 import { html, LitElement, type PropertyValues } from "lit";
-import { DialogFocusController } from "../ui/dialog-focus";
-import { dispatchManagementEvent } from "../ui/management-events";
+import { dispatchManagementEvent } from "../shared/ui/management-events";
 import type {
   DeleteOptionViewModel,
   DeleteScope,
-} from "../ui/management-view-model";
+} from "../shared/ui/management-view-model";
+import { DialogFocusController } from "../ui/dialog-focus";
 
 export interface StorageDeleteDialogModel {
   readonly open: boolean;

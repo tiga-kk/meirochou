@@ -4,7 +4,7 @@ import type {
   SourceManager,
   SourceManagerModel,
 } from "../apps/webapp/js/components/source-manager";
-import type { SourceSummaryViewModel } from "../apps/webapp/js/ui/management-view-model";
+import type { SourceSummaryViewModel } from "../apps/webapp/js/shared/ui/management-view-model";
 import "../apps/webapp/js/components/source-manager";
 
 describe("SourceManager Component", () => {

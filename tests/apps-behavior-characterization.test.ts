@@ -10,7 +10,7 @@ import type {
   EventDayRef,
   LocalEventDayState,
 } from "../apps/webapp/js/types/domain";
-import { dispatchManagementEvent } from "../apps/webapp/js/ui/management-events";
+import { dispatchManagementEvent } from "../apps/webapp/js/shared/ui/management-events";
 
 const REF: EventDayRef = { eventId: "demo-v1", dayId: "day1" };
 const NOW = "2026-07-28T00:00:00.000Z";

@@ -1,6 +1,6 @@
 # Phase 5D Task 7: Extract Event/Day Switching and Local Data Deletion
 
-**Status:** PLANNED
+**Status:** IMPLEMENTED
 **Depends on:** Task 6
 **Commit candidate:** `refactor(event-day): extract switching and local data deletion`
 
@@ -255,6 +255,8 @@ git commit -m "refactor(event-day): extract switching and local data deletion"
 ```
 
 ## Acceptance criteria
+
+実装結果: Event Day switch/deleteのfeature Use Case化、Configと旧generic serviceの削除、MapAreaCatalogへの移行、shared UI model/event移動を完了。`npm run test:webapp` (65 files / 481 tests)、architecture/typecheck、build、E2E (38 passed / 8 skipped) を確認済み。
 
 - modify/delete対象が`config.ts`である。
 - `config.ts`、generic management model/event filesが存在しない。

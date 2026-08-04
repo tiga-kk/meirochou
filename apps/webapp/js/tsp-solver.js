@@ -1,4 +1,4 @@
-import { Config } from "./config.js";
+import { runtimeMapAreaCatalog } from "./features/route-guidance/infrastructure/runtime-map-area-catalog";
 
 /**
  * 経路計算ロジッククラス
@@ -33,9 +33,9 @@ export class TspSolver {
 
     let hallGroup = "";
 
-    // Config.AREAS を使用して動的に判定
-    if (Config.AREAS) {
-      for (const area of Config.AREAS) {
+    // Runtime MapAreaCatalog を使用して動的に判定
+    if (runtimeMapAreaCatalog.getAllMapAreas()) {
+      for (const area of runtimeMapAreaCatalog.getAllMapAreas()) {
         // prefixが一致するか
         const prefixMatch = area.prefixes
           ? area.prefixes.includes(prefixChar)

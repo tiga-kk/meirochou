@@ -4,7 +4,7 @@ import type {
   SourceDiffDialog,
   SourceDiffDialogModel,
 } from "../apps/webapp/js/components/source-diff-dialog";
-import type { SourceDiffViewModel } from "../apps/webapp/js/ui/management-view-model";
+import type { SourceDiffViewModel } from "../apps/webapp/js/shared/ui/management-view-model";
 import "../apps/webapp/js/components/source-diff-dialog";
 
 function createDummyDiff(): SourceDiffViewModel {

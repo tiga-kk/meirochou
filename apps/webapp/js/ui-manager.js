@@ -1,5 +1,5 @@
 import { CustomSelect } from "./components/custom-select.js";
-import { Config } from "./config.js";
+import { runtimeMapAreaCatalog } from "./features/route-guidance/infrastructure/runtime-map-area-catalog";
 import { buildRouteGuidanceScreenModel } from "./features/route-guidance/ui/route-guidance-screen-model";
 import { MapRenderer } from "./map-renderer.js";
 import { ModalManager } from "./modal-manager.js";
@@ -114,10 +114,10 @@ export class UIManager {
     // 統計情報の初期化
     this.statsRenderer.init();
 
-    // セレクトボックス初期化 (EWSN) - Config.AREASを使用
+    // セレクトボックス初期化 (EWSN) - Runtime MapAreaCatalogを使用
     this.els.locEwsn.innerHTML = "";
-    if (Config.AREAS) {
-      Config.AREAS.forEach((area) => {
+    if (runtimeMapAreaCatalog.getAllMapAreas()) {
+      runtimeMapAreaCatalog.getAllMapAreas().forEach((area) => {
         const opt = document.createElement("option");
         opt.value = area.id;
         opt.textContent = area.name;
@@ -188,10 +188,12 @@ export class UIManager {
     const selected = this.els.locEwsn.value;
     this.els.locLabel.innerHTML = "";
 
-    // Config.AREASから該当エリアを検索
+    // Runtime MapAreaCatalogから該当エリアを検索
     let labels = [];
-    if (Config.AREAS) {
-      const area = Config.AREAS.find((a) => a.id === selected);
+    if (runtimeMapAreaCatalog.getAllMapAreas()) {
+      const area = runtimeMapAreaCatalog
+        .getAllMapAreas()
+        .find((a) => a.id === selected);
       if (area) {
         labels = area.labels;
       }
@@ -211,9 +213,9 @@ export class UIManager {
 
   /** Reflect the selected manifest area in the compact field header. */
   updateAreaHeader() {
-    const area = Config.AREAS.find(
-      (candidate) => candidate.id === this.els.locEwsn.value,
-    );
+    const area = runtimeMapAreaCatalog
+      .getAllMapAreas()
+      .find((candidate) => candidate.id === this.els.locEwsn.value);
     if (!area) return;
     this.els.headerAreaMark.textContent = area.prefixes.join("/");
     this.els.headerAreaTitle.textContent = area.name;

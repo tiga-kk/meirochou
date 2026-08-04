@@ -17,11 +17,6 @@
   {
     "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/app.js",
-    "imported": "./config.js"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/app.js",
     "imported": "./data-manager.js"
   },
   {
@@ -54,11 +49,6 @@
     "importer": "apps/webapp/js/components/source-manager.ts",
     "imported": "../types/domain"
   },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/config.ts",
-    "imported": "./types/domain"
-  },
 
   {
     "ruleId": "deleted-legacy-import",
@@ -89,11 +79,6 @@
   {
     "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/data-manager.ts",
-    "imported": "./config.js"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/data-manager.ts",
     "imported": "./types/domain"
   },
   {
@@ -105,11 +90,6 @@
     "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/features/event-day/infrastructure/http-map-manifest-loader.ts",
     "imported": "../../../types/domain"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/map-renderer.js",
-    "imported": "./config.js"
   },
   {
     "ruleId": "deleted-legacy-import",
@@ -163,11 +143,6 @@
   },
   {
     "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/state/event-day-transition-service.ts",
-    "imported": "../types/domain"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/state/navigation-snapshot-repository.ts",
     "imported": "../types/domain"
   },
@@ -179,11 +154,6 @@
   },
   {
     "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/state/storage-deletion-service.ts",
-    "imported": "../types/domain"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/state/storage-schema.ts",
     "imported": "../types/boundary-parsers"
   },
@@ -191,16 +161,6 @@
     "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/state/storage-schema.ts",
     "imported": "../types/domain"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/stats-renderer.js",
-    "imported": "./config.js"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/tsp-solver.js",
-    "imported": "./config.js"
   },
   {
     "ruleId": "deleted-legacy-import",
@@ -224,28 +184,13 @@
   },
   {
     "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/ui/management-events.ts",
-    "imported": "../types/domain"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/ui/management-session.ts",
-    "imported": "../types/domain"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/ui/management-view-model.ts",
     "imported": "../types/domain"
   },
   {
     "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/ui/navigation-view-model.ts",
     "imported": "../types/domain"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/ui-manager.js",
-    "imported": "./config.js"
   },
   {
     "ruleId": "vague-name",

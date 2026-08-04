@@ -4,12 +4,12 @@ import {
   type AlnsSearchTimeLimitMs,
   DEFAULT_SEARCH_TIME_LIMIT_MS,
 } from "../routing/time-decayed-objective";
-import { dispatchManagementEvent } from "../ui/management-events";
+import { dispatchManagementEvent } from "../shared/ui/management-events";
 import type {
   DeleteOptionViewModel,
   EventDayOption,
   OutboxPanelModel,
-} from "../ui/management-view-model";
+} from "../shared/ui/management-view-model";
 import type { SourceManagerModel } from "./source-manager";
 import type { StorageDeleteDialogModel } from "./storage-delete-dialog";
 import "./event-day-selector";

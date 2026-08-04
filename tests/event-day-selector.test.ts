@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "../apps/webapp/js/components/event-day-selector";
 import type { EventDaySelector } from "../apps/webapp/js/components/event-day-selector";
-import type { EventDayOption } from "../apps/webapp/js/ui/management-view-model";
+import type { EventDayOption } from "../apps/webapp/js/shared/ui/management-view-model";
 
 const sampleOptions: readonly EventDayOption[] = [
   {

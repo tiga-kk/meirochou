@@ -1,11 +1,11 @@
+import type { SourceDiff } from "../../features/circle-data-source/public-api";
+import type { EventRegistry as EventRegistryV1 } from "../../features/event-day/domain/event-day-contracts";
 import type {
   CircleRecord,
   EventDayRef,
-  EventRegistryV1,
   GasOutboxEntry,
   LocalEventDayState,
-  SourceDiff,
-} from "../types/domain";
+} from "../../features/event-day/public-api";
 import type { DeleteScope } from "./management-events";
 
 export type { DeleteScope };

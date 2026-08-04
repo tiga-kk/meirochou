@@ -6,7 +6,7 @@ import type { SourceManagerModel } from "../apps/webapp/js/components/source-man
 import type {
   DeleteOptionViewModel,
   EventDayOption,
-} from "../apps/webapp/js/ui/management-view-model";
+} from "../apps/webapp/js/shared/ui/management-view-model";
 
 afterEach(() => {
   document.body.innerHTML = "";

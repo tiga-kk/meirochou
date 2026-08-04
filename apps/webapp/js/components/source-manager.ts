@@ -1,7 +1,7 @@
 import { html, LitElement, type PropertyValues } from "lit";
+import { dispatchManagementEvent } from "../shared/ui/management-events";
+import type { SourceSummaryViewModel } from "../shared/ui/management-view-model";
 import type { EventDayRef } from "../types/domain";
-import { dispatchManagementEvent } from "../ui/management-events";
-import type { SourceSummaryViewModel } from "../ui/management-view-model";
 
 /** Safe, render-only source-management state supplied by App. */
 export interface SourceManagerModel {
