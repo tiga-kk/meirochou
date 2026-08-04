@@ -1,4 +1,4 @@
-import type { NavigationState } from "../state/navigation-state";
+import type { NavigationState } from "../features/route-guidance/domain/navigation-state";
 import type {
   CircleRecord,
   ConfirmedPosition,

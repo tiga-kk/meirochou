@@ -4,7 +4,7 @@ import type {
   NavigationStage,
   NavigationState,
   RouteEndpointId,
-} from "../types/domain";
+} from "./route-guidance-types";
 
 export type {
   ConfirmedPosition,

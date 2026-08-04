@@ -2,8 +2,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { App } from "../apps/webapp/js/app.js";
 import { ChangeCircleStatusUseCase } from "../apps/webapp/js/features/circle-status/use-cases/change-circle-status";
+import { createInitialNavigationState } from "../apps/webapp/js/features/route-guidance/domain/navigation-state";
 import { NavigationOrchestrationService } from "../apps/webapp/js/navigation/navigation-orchestration";
-import { createInitialNavigationState } from "../apps/webapp/js/state/navigation-state";
 import { createEmptyEventDayState } from "../apps/webapp/js/state/storage-schema";
 import type {
   CircleRecord,

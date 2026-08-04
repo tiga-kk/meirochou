@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   type ConfirmedPosition,
   NavigationStateMachine,
-} from "../apps/webapp/js/state/navigation-state";
+} from "../apps/webapp/js/features/route-guidance/domain/navigation-state";
 
 describe("Phase 5C Task 2: Navigation State Machine", () => {
   const startPos: ConfirmedPosition = {

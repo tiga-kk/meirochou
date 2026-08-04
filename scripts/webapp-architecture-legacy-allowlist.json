@@ -156,11 +156,6 @@
   },
   {
     "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/state/circle-state-undo-service.ts",
-    "imported": "../types/domain"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/features/event-day/domain/event-day-key.ts",
     "imported": "../../../types/boundary-parsers"
   },
@@ -182,11 +177,6 @@
   {
     "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/state/navigation-snapshot-repository.ts",
-    "imported": "../types/domain"
-  },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/state/navigation-state.ts",
     "imported": "../types/domain"
   },
 

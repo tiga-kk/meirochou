@@ -1,7 +1,7 @@
 import {
   createInitialNavigationState,
   type NavigationState,
-} from "../state/navigation-state";
+} from "../features/route-guidance/domain/navigation-state";
 
 /** エリアごとの一時的なナビゲーションセッション。サークル訪問状態とは独立。 */
 export interface MapSession {

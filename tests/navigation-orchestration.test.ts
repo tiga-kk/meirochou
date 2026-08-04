@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, test } from "vitest";
+import { createInitialNavigationState } from "../apps/webapp/js/features/route-guidance/domain/navigation-state";
 import { NavigationOrchestrationService } from "../apps/webapp/js/navigation/navigation-orchestration";
-import { createInitialNavigationState } from "../apps/webapp/js/state/navigation-state";
 import type {
   CircleRecord,
   ConfirmedPosition,
