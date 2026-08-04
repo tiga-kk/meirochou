@@ -1,6 +1,7 @@
 export type {
   ActiveEventDaySnapshot,
   Circle,
+  CircleRecord,
   CircleStatus,
   EventDayRef,
   GasOutboxEntry,

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applySourceDiff,
   diffCircleSources,
-} from "../apps/webapp/js/data/source-diff";
+} from "../apps/webapp/js/features/circle-data-source/public-api";
 import type {
   CircleRecord,
   LocalEventDayState,

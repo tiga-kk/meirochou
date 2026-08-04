@@ -59,11 +59,7 @@
     "importer": "apps/webapp/js/config.ts",
     "imported": "./types/domain"
   },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/data/csv-circle-codec.ts",
-    "imported": "../types/domain"
-  },
+
   {
     "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/data/event-registry.ts",
@@ -84,11 +80,7 @@
     "importer": "apps/webapp/js/data/local-state-adapters.ts",
     "imported": "../types/domain"
   },
-  {
-    "ruleId": "deleted-legacy-import",
-    "importer": "apps/webapp/js/data/source-diff.ts",
-    "imported": "../types/domain"
-  },
+
   {
     "ruleId": "deleted-legacy-import",
     "importer": "apps/webapp/js/data/source-snapshot.ts",

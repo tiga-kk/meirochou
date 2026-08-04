@@ -1,8 +1,5 @@
-import type {
-  CircleRecord,
-  LocalEventDayState,
-  SourceDiff,
-} from "../types/domain";
+import type { CircleRecord, LocalEventDayState } from "../../event-day/public-api";
+import type { SourceDiff } from "./circle-data-source-types";
 
 /**
  * Calculates a pure diff between current active circles and incoming new ones.

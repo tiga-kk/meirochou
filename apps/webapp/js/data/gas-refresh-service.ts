@@ -10,7 +10,7 @@ import type {
   LocalEventDayState,
   ProtectedSourceOperation,
 } from "../types/domain";
-import { applySourceDiff, diffCircleSources } from "./source-diff";
+import { applySourceDiff, diffCircleSources } from "../features/circle-data-source/public-api";
 import { fingerprintSourceSnapshot } from "./source-snapshot";
 
 /** Configure clock, identifiers, and preview lifetime for GAS previews. */

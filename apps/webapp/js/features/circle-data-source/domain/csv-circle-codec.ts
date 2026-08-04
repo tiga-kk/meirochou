@@ -1,4 +1,5 @@
-import type { CircleRecord, CsvImportResult, CsvIssue } from "../types/domain";
+import type { CircleRecord } from "../../event-day/public-api";
+import type { CsvImportResult, CsvIssue } from "./circle-data-source-types";
 
 /**
  * Parses raw CSV text into a structured array of fields and line numbers.
