@@ -10,6 +10,7 @@ export class DefaultPendingGasUpdateBackgroundProcess
   implements PendingGasUpdateBackgroundProcess
 {
   private stopped = false;
+  private started = false;
   private isProcessing = false;
   private pendingRequest = false;
 
@@ -19,7 +20,8 @@ export class DefaultPendingGasUpdateBackgroundProcess
   ) {}
 
   start(): void {
-    if (this.stopped) return;
+    if (this.stopped || this.started) return;
+    this.started = true;
     this.sendUseCase.start();
     if (
       this.windowObj &&

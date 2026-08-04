@@ -1039,7 +1039,7 @@ export class App {
           circleStates[circle.space] = "purchased";
         else if (held.has(circle.space)) circleStates[circle.space] = "held";
       }
-      this.dm.activeEventDaySession.setActiveEventDay(demoRef, {
+      const demoState = {
         schemaVersion: 2,
         source: { type: "csv", fileName: "demo-ui.csv" },
         sourceGeneration: "demo-ui",
@@ -1047,7 +1047,9 @@ export class App {
         circleStates,
         gasOutbox: [],
         timestamps: { createdAt: now, updatedAt: now, sourceUpdatedAt: now },
-      });
+      };
+      this.dm.repository.save(demoRef, demoState);
+      this.dm.activeEventDaySession.setActiveEventDay(demoRef, demoState);
     } else {
       const isRegisteredRef = (ref) => {
         const event = this.dm.eventRegistry?.events.find(

@@ -829,10 +829,11 @@ export class DataManager {
       const processed = await this.pendingGasUpdatesController.retryAll(
         this.activeRef,
       );
+      const pending = this.activeState?.gasOutbox.length ?? 0;
       return {
         sent: processed,
-        pending: this.activeState?.gasOutbox.length ?? 0,
-        error: null,
+        pending,
+        error: pending > 0 ? new Error("Pending GAS updates remain") : null,
       };
     }
     return { sent: 0, pending: 0, error: null };

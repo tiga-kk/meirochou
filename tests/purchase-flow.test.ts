@@ -172,7 +172,8 @@ describe("Phase 3 Task 5: Integration and App purchase flows", () => {
         ? getCircleVisitState(finalSaved.circleStates, "A-01")
         : "pending",
     ).toBe("purchased");
-    expect(finalSaved?.gasOutbox[0].attempts).toBe(2);
+    // The foreground flush shares the background process's in-flight attempt.
+    expect(finalSaved?.gasOutbox[0].attempts).toBe(1);
     expect(finalSaved?.gasOutbox[0].lastError).toBe("unknown");
   });
 

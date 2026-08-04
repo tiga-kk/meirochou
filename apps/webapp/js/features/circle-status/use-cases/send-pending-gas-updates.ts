@@ -36,6 +36,8 @@ export interface SendPendingGasUpdatesInput {
 
 export class SendPendingGasUpdatesUseCase {
   private stopped = false;
+  private activeExecution: Promise<{ readonly processedCount: number }> | null =
+    null;
 
   constructor(
     private readonly repository: EventDayRepository,
@@ -51,8 +53,23 @@ export class SendPendingGasUpdatesUseCase {
     this.stopped = true;
   }
 
-  async execute(
+  execute(
     input: SendPendingGasUpdatesInput = {},
+  ): Promise<{ readonly processedCount: number }> {
+    if (this.activeExecution) return this.activeExecution;
+    const execution = this.executePending(input);
+    let trackedExecution: Promise<{ readonly processedCount: number }>;
+    trackedExecution = execution.finally(() => {
+      if (this.activeExecution === trackedExecution) {
+        this.activeExecution = null;
+      }
+    });
+    this.activeExecution = trackedExecution;
+    return trackedExecution;
+  }
+
+  private async executePending(
+    input: SendPendingGasUpdatesInput,
   ): Promise<{ readonly processedCount: number }> {
     const refs = input.eventDay
       ? [input.eventDay]

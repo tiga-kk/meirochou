@@ -12,6 +12,70 @@ const REF: EventDayRef = { eventId: "c108", dayId: "day1" };
 const NOW = "2026-08-04T00:00:00.000Z";
 
 describe("SendPendingGasUpdatesUseCase", () => {
+  it("shares an in-flight send between background and foreground callers", async () => {
+    let resolveDelivery: (() => void) | undefined;
+    const delivery = {
+      deliver: vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveDelivery = resolve;
+          }),
+      ),
+    };
+    const initialState = createEmptyEventDayState(
+      { type: "gas", gasUrl: "https://example.test/gas", sheetName: "demo" },
+      "gen-1",
+      NOW,
+    );
+    let currentState: LocalEventDayState = {
+      ...initialState,
+      gasOutbox: [
+        {
+          id: "entry-1",
+          eventId: REF.eventId,
+          dayId: REF.dayId,
+          sourceGeneration: "gen-1",
+          gasUrl: "https://example.test/gas",
+          sheetName: "demo",
+          space: "A01",
+          purchased: true,
+          createdAt: NOW,
+          attempts: 0,
+          lastError: null,
+        },
+      ],
+    };
+    const repository: EventDayRepository = {
+      listEventDays: () => [REF],
+      load: () => currentState,
+      save: (_ref, next) => {
+        currentState = next;
+      },
+    };
+    const session: ActiveEventDaySession = {
+      getActiveEventDay: () => ({ ref: REF, state: currentState }),
+      replaceActiveEventDayState: () => {},
+      setActiveEventDay: () => {},
+      clearActiveEventDay: () => {},
+      subscribe: () => () => {},
+    };
+    const useCase = new SendPendingGasUpdatesUseCase(
+      repository,
+      session,
+      delivery,
+    );
+    useCase.start();
+
+    const first = useCase.execute();
+    const second = useCase.execute();
+    expect(delivery.deliver).toHaveBeenCalledOnce();
+
+    resolveDelivery?.();
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { processedCount: 1 },
+      { processedCount: 1 },
+    ]);
+  });
   it("sends pending GAS update, removes it from outbox on success, and updates active session", async () => {
     const initialState = createEmptyEventDayState(
       { type: "gas", gasUrl: "https://example.test/gas", sheetName: "demo" },
