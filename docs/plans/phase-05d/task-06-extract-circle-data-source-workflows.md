@@ -1,18 +1,32 @@
 # Phase 5D Task 6: Extract Circle Data Source Workflows
 
 **Status:** PLANNED
-**Depends on:** Task 5
+**Depends on:** Task 5 reviewed
 **Commit candidate:** `refactor(circle-data-source): extract import and export workflows`
 
 ## Goal
 
-CSV/Googleスプレッドシートのsheet一覧取得、preview、apply、cancel、refresh、source diff、CSV exportをCircle Data Source featureへ移す。pending GAS updateの再送・破棄はCircle Status featureに残し、責務を混ぜない。
+CSV/Googleスプレッドシートのsheet一覧取得、preview、apply、cancel、refresh、source diff、CSV exportをCircle Data Source featureへ移す。
+
+pending GAS updatesの再送・破棄はCircle Status featureに残す。Use CaseとSessionへAbortController/AbortSignalを持ち込まず、browser cancellationはInfrastructureが隠蔽する。
+
+## Non-goals
+
+- pending GAS updatesの送信・破棄
+- LocalStorage schema変更
+- GAS API contract変更
+- route guidance algorithm変更
+- browser Abort APIをUse Case contractへ公開
+- generic `SourceService`または`RequestManager`の作成
 
 ## Files
 
 ### Create
 
 - `apps/webapp/js/features/circle-data-source/domain/circle-data-source-types.ts`
+- `apps/webapp/js/features/circle-data-source/domain/csv-circle-codec.ts`
+- `apps/webapp/js/features/circle-data-source/domain/circle-source-diff.ts`
+- `apps/webapp/js/features/circle-data-source/use-cases/cancelable-request.ts`
 - `apps/webapp/js/features/circle-data-source/use-cases/preview-csv-import.ts`
 - `apps/webapp/js/features/circle-data-source/use-cases/load-google-sheet-names.ts`
 - `apps/webapp/js/features/circle-data-source/use-cases/preview-google-sheet-import.ts`
@@ -21,111 +35,107 @@ CSV/Googleスプレッドシートのsheet一覧取得、preview、apply、cance
 - `apps/webapp/js/features/circle-data-source/use-cases/export-circles-to-csv.ts`
 - `apps/webapp/js/features/circle-data-source/use-cases/google-sheet-circle-client.ts`
 - `apps/webapp/js/features/circle-data-source/use-cases/circle-csv-downloader.ts`
+- `apps/webapp/js/features/circle-data-source/use-cases/circle-data-source-session.ts`
 - `apps/webapp/js/features/circle-data-source/ui/circle-data-source-controller.ts`
 - `apps/webapp/js/features/circle-data-source/ui/circle-data-source-view.ts`
 - `apps/webapp/js/features/circle-data-source/ui/circle-data-source-panel-model.ts`
 - `apps/webapp/js/features/circle-data-source/ui/circle-data-preview-dialog-model.ts`
+- `apps/webapp/js/features/circle-data-source/infrastructure/gas-google-sheet-circle-client.ts`
+- `apps/webapp/js/features/circle-data-source/infrastructure/browser-circle-csv-downloader.ts`
 - `apps/webapp/js/features/circle-data-source/public-api.ts`
 - `tests/circle-data-source-use-cases.test.ts`
+- `tests/circle-data-source-cancellation.test.ts`
 - `tests/circle-data-source-controller.test.ts`
 
-### Move and rename
+### Move or refactor then delete
 
 - `apps/webapp/js/data/csv-circle-codec.ts`
-  → `apps/webapp/js/features/circle-data-source/domain/csv-circle-codec.ts`
 - `apps/webapp/js/data/source-diff.ts`
-  → `apps/webapp/js/features/circle-data-source/domain/circle-source-diff.ts`
-- `apps/webapp/js/api/gas-api-client.ts`
-  → `apps/webapp/js/features/circle-data-source/infrastructure/gas-google-sheet-circle-client.ts`
-- `apps/webapp/js/ui/management-session.ts`
-  → `apps/webapp/js/features/circle-data-source/use-cases/circle-data-source-session.ts`
-- `apps/webapp/js/ui/csv-download.ts`
-  → `apps/webapp/js/features/circle-data-source/infrastructure/browser-circle-csv-downloader.ts`
-
-### Refactor and delete old implementation
-
 - `apps/webapp/js/data/gas-refresh-service.ts`
-  - preview initial/replacement/refresh logicをGoogle Sheet Use Casesへ分割
-  - old generic service fileを削除
-- `apps/webapp/js/ui/management-view-model.ts`
-  - source summaryとsource diff model/functionsをnew UI model filesへ移す
-  - event-day/delete responsibilitiesだけを一時残す
-- `apps/webapp/js/ui/management-events.ts`
-  - CSV/GAS/source preview/export event detailをfeature UIへ移す
-  - event-day/delete eventsだけを一時残す
+- `apps/webapp/js/api/gas-api-client.ts`
+- `apps/webapp/js/ui/management-session.ts`
+- `apps/webapp/js/ui/csv-download.ts`
+
+Task 3.1で`ManagementSession`へ追加したglobal lifecycle部分は、Circle Data Source Session/Controllerへ必要なstateだけ移す。source以外のbusy stateを無理に同featureへ移さない。
 
 ### Modify
 
 - `apps/webapp/js/app.js`
 - `apps/webapp/js/data-manager.ts`
 - `apps/webapp/js/app/assemble-comipath-application.ts`
-- `apps/webapp/js/components/source-manager.ts`
-- `apps/webapp/js/components/source-diff-dialog.ts`
-- `apps/webapp/js/components/comipath-settings.ts`
-- `tests/csv-circle-codec.test.ts`
-- `tests/source-diff.test.ts`
-- `tests/gas-api-client.test.ts`
-- `tests/gas-refresh-service.test.ts`
-- `tests/source-manager.test.ts`
-- `tests/source-manager-app.test.ts`
-- `tests/source-diff-dialog.test.ts`
-- `tests/source-diff-app.test.ts`
-- `tests/csv-download.test.ts`
-- `tests/csv-download-app.test.ts`
+- source-related components
+- source-related tests
+- `scripts/check-webapp-architecture.mjs`
 - `scripts/webapp-architecture-legacy-allowlist.json`
+- `package.json`
 
 ## Preflight
 
 ```bash
+git status --short --branch
+
 test -e apps/webapp/js/data/csv-circle-codec.ts
 test -e apps/webapp/js/data/source-diff.ts
 test -e apps/webapp/js/data/gas-refresh-service.ts
 test -e apps/webapp/js/api/gas-api-client.ts
 test -e apps/webapp/js/ui/management-session.ts
-test -e apps/webapp/js/ui/management-view-model.ts
-test -e apps/webapp/js/ui/management-events.ts
-test -e apps/webapp/js/ui/csv-download.ts
 test ! -e apps/webapp/js/features/circle-data-source/ui/circle-data-source-controller.ts
+
+npm run test:webapp
+npm run check:webapp
+npm run build:webapp
 ```
 
-## Interfaces
+## Final contracts
+
+```ts
+export interface CancelableRequest<T> {
+  readonly result: Promise<T>;
+  cancel(): void;
+}
+```
+
+```ts
+export interface GoogleSheetCircleClient {
+  startLoadingSheetNames(webAppUrl: string): CancelableRequest<
+    readonly string[]
+  >;
+
+  startLoadingCircles(
+    source: GoogleSheetCircleSource,
+  ): CancelableRequest<readonly CircleRecord[]>;
+}
+```
+
+```ts
+export interface CircleDataSourceSessionSnapshot {
+  readonly requestGeneration: number;
+  readonly draftWebAppUrl: string;
+  readonly selectedSheetName: string;
+  readonly sheetNames: readonly string[];
+  readonly preview: CircleDataPreview | null;
+  readonly busy: boolean;
+  readonly errorCode: CircleDataSourceErrorCode | null;
+}
+```
 
 ```ts
 export interface CircleDataSourceSession {
   getSnapshot(): CircleDataSourceSessionSnapshot;
-  startRequest(): number;
-  isCurrentRequest(requestId: number): boolean;
-  setAbortController(controller: AbortController | null): void;
+  beginRequest(): number;
+  isCurrentRequest(generation: number): boolean;
+  updateDraft(input: CircleDataSourceDraftUpdate): void;
   setPreview(preview: CircleDataPreview | null): void;
-  resetDraft(): void;
+  setBusy(busy: boolean): void;
+  setError(errorCode: CircleDataSourceErrorCode | null): void;
+  reset(): void;
   subscribe(
     listener: (snapshot: CircleDataSourceSessionSnapshot) => void,
   ): () => void;
 }
 ```
 
-```ts
-export interface GoogleSheetCircleClient {
-  loadSheetNames(
-    webAppUrl: string,
-    signal: AbortSignal,
-  ): Promise<readonly string[]>;
-
-  loadCircles(
-    source: GoogleSheetCircleSource,
-    signal: AbortSignal,
-  ): Promise<readonly CircleRecord[]>;
-}
-```
-
-```ts
-export interface CircleCsvDownloader {
-  downloadCsv(input: {
-    readonly csvText: string;
-    readonly fileName: string;
-  }): void;
-}
-```
+Sessionはserializable/cloneable stateだけを持つ。AbortController、AbortSignal、File、Response、HTMLElementを保存しない。
 
 ```ts
 export interface CircleDataSourceController {
@@ -140,125 +150,197 @@ export interface CircleDataSourceController {
 }
 ```
 
-source apply後はRoute Guidance featureのpublic contractを呼ぶ。
+Controllerはcurrent `CancelableRequest`を一つだけ所有する。new request、event/day switch、settings close、`stop()`で`cancel()`する。
 
-```ts
-export interface RouteGuidanceSourceInvalidation {
-  invalidateAfterCircleSourceChange(eventDay: EventDayRef): void;
-}
-```
+## Data flow
+
+### Google Sheet request
+
+1. Controllerがunknown inputをparseする。
+2. Sessionでnew request generationを発行する。
+3. Clientの`startLoading...()`を呼ぶ。
+4. Controllerがreturned cancelable requestをcurrent ownerとして保持する。
+5. `result`完了時にgenerationとstopped stateを確認する。
+6. current requestだけSession/Viewを更新する。
+7. stale/cancelled resultは何も更新しない。
+
+Infrastructure内部だけがAbortControllerを生成する。
+
+### Preview apply
+
+1. preview IDとactive event/day/source generationを検証する。
+2. previewがexpiredでないことを確認する。
+3. next `LocalEventDayState`を作る。
+4. EventDayRepositoryへsaveする。
+5. active event/dayならSessionをreplaceする。
+6. save成功後にRoute Guidance invalidation capabilityを一回呼ぶ。
+7. previewをclearし、Viewを更新する。
+
+save失敗時にactive session、route guidance、View success stateを更新しない。
 
 ## TDD procedure
 
-- [ ] **Step 1: CSV importのRED testを書く**
+- [ ] **Step 1: CSV RED testsを書く**
 
-extension、5MB limit、runtime validation issue、preview expiry、source generation stale check、apply前非永続化を検証する。
+- extension
+- 5MB limit
+- required headers
+- sanitized validation issue
+- preview expiry
+- source generation stale
+- apply前はrepository save 0
+- cancelはrepository save 0
 
-- [ ] **Step 2: Google Sheet importのRED testを書く**
+- [ ] **Step 2: Google Sheet RED testsを書く**
 
-URL parse、sheet list、AbortController、request ID stale rejection、initial/replacement/refresh mode判定を検証する。
+- URL runtime parse
+- sheet list
+- initial/replacement/refresh mode
+- request generation stale rejection
+- cancel calls underlying request once
+- cancelled request result does not update Session/View
+- raw GAS URL/body is not exposed in error
 
-- [ ] **Step 3: apply/cancel/exportのRED testを書く**
+- [ ] **Step 3: cancellation boundary testを書く**
 
-apply後にactive session更新とroute guidance invalidationが一回行われ、cancelではpersistしないことを検証する。CSV export file名とdownload callも固定する。
+```ts
+it("keeps browser abort APIs out of use cases", () => {
+  const files = readUseCaseSources("features/circle-data-source/use-cases");
+  expect(files).not.toMatch(/AbortController|AbortSignal/);
+});
+```
 
-- [ ] **Step 4: ControllerのRED testを書く**
+client fakeは`CancelableRequest`を返す。testでAbortControllerをfake Use Caseへ渡さない。
 
-unknown custom event detail、busy state、safe error model、dialog open/close、focus return、stop時abortをfake Viewで検証する。
+- [ ] **Step 4: apply/export RED testsを書く**
 
-- [ ] **Step 5: REDを確認する**
+- durable save後にactive session update
+- route guidance invalidationはsave後一回
+- save failureではinvalidation 0
+- export file name
+- download capability call
+- no direct DOM/Blob/URL use in Use Case
+
+- [ ] **Step 5: Controller RED testsを書く**
+
+unknown input、busy/error、dialog、focus、event/day switch、settings close、stop、stale callbackをfake Viewで検証する。
+
+- [ ] **Step 6: REDを確認する**
 
 ```bash
-npx vitest run --root . tests/circle-data-source-use-cases.test.ts \
+npx vitest run --root . \
+  tests/circle-data-source-use-cases.test.ts \
+  tests/circle-data-source-cancellation.test.ts \
   tests/circle-data-source-controller.test.ts
 ```
 
-- [ ] **Step 6: pure CSV/diff codeをmoveする**
+- [ ] **Step 7: pure CSV/diff modulesをmoveする**
 
-CSV parserとsource diff algorithmの意味を変更しない。`source-diff.ts`を対象が分かる`circle-source-diff.ts`へrenameする。
+algorithm/serialized outputを変更しない。mechanical moveとlogic refactorを別diff blockで行う。
 
-- [ ] **Step 7: sessionを明確なruntime state ownerへする**
+- [ ] **Step 8: Sessionを実装する**
 
-draft URL、selected sheet、sheet names、preview、request ID、AbortController、busy/error/resultを`CircleDataSourceSession`だけが保持する。
+clone/freezeしたsnapshotを返す。request generation、draft、preview、busy、安全なerror codeだけを保持する。
 
-- [ ] **Step 8: GAS clientとbrowser downloaderをconcrete implementationへする**
+- [ ] **Step 9: Google client infrastructureを実装する**
 
-Use Caseは`fetch`、`document`、Blob、URL objectを直接使わない。
+`GasGoogleSheetCircleClient`内部でAbortControllerを生成し、`CancelableRequest`として返す。URL parse、fetch、response parsing、safe error classificationを所有する。
 
-- [ ] **Step 9: generic refresh serviceをUse Caseへ分解する**
+- [ ] **Step 10: browser downloaderを実装する**
 
-initial/replacement/refreshをone broad service methodに隠さず、preview Use Case内の明示的branchとtyped resultにする。
+`BrowserCircleCsvDownloader`だけがBlob、URL、anchor clickを使用する。Use Caseは`CircleCsvDownloader` interfaceだけを呼ぶ。
 
-- [ ] **Step 10: Controllerをproduction eventsへ接続する**
+- [ ] **Step 11: broad refresh serviceをUse Casesへ分解する**
 
-CSV preview、sheet names、Google Sheet preview、apply、cancel、CSV exportをnew Controllerへbindする。
+initial/replacement/refreshの判定条件をtyped pure functionまたは明示的Use Case branchにする。generic mode stringをUI入力から信用しない。
 
-- [ ] **Step 11: pending GAS update eventsを受け取らないことを確認する**
+- [ ] **Step 12: Controllerをproduction eventsへ接続する**
 
-retry/discardはTask 4の`PendingGasUpdatesController`が継続して所有する。Circle Data Source Controllerへ戻さない。
+CSV preview、sheet names、Google Sheet preview、apply、cancel、exportをbindする。retry/discard eventsを受け取らない。
 
-- [ ] **Step 12: source apply後のcross-feature notificationを接続する**
+- [ ] **Step 13: source apply後cross-feature callを接続する**
 
-`RouteGuidanceSourceInvalidation`だけをimportし、snapshot/distance matrix concrete repositoryを直接importしない。
+route guidanceのpublic capabilityだけをimportする。snapshot/distance matrix concrete repositoryを直接importしない。
 
-- [ ] **Step 13: DataManager compatibility methodsをdelegationへ変更する**
+- [ ] **Step 14: DataManager/management filesを縮小する**
 
-preview/import/export methodのproduction callerを0にする。test compatibility methodが必要な間はnew Use Caseへ委譲し、session stateをDataManagerに複製しない。
+source production callerをnew Use Cases/Controllerへ移す。test compatibility delegationはTask 9までに削除する。AbortControllerをDataManagerへ移さない。
 
-- [ ] **Step 14: generic management filesを縮小する**
+- [ ] **Step 15: old filesを削除する**
 
-source-related types/functions/eventsを削除し、event-day/deleteだけを残す。
+全import更新後、old codec/diff/refresh/client/session/download filesを削除する。old path shimを作らない。
 
-- [ ] **Step 15: allowlistを縮小する**
+- [ ] **Step 16: test scriptとarchitecture checkerを更新する**
 
-App/DataManagerのCSV、GAS import、download、source session依存を削除する。
+新しいtestsを`test:webapp`へ登録する。Use CaseのAbort API、fetch、DOM、concrete client importをarchitecture checkerで拒否する。
 
-- [ ] **Step 16: focused verificationを実行する**
+- [ ] **Step 17: focused verificationを実行する**
 
 ```bash
-npx vitest run --root . tests/circle-data-source-use-cases.test.ts \
+npx vitest run --root . \
+  tests/circle-data-source-use-cases.test.ts \
+  tests/circle-data-source-cancellation.test.ts \
   tests/circle-data-source-controller.test.ts \
-  tests/csv-circle-codec.test.ts tests/source-diff.test.ts \
-  tests/gas-api-client.test.ts tests/gas-refresh-service.test.ts \
-  tests/source-manager.test.ts tests/source-manager-app.test.ts \
-  tests/source-diff-dialog.test.ts tests/source-diff-app.test.ts \
-  tests/csv-download.test.ts tests/csv-download-app.test.ts
+  tests/csv-circle-codec.test.ts \
+  tests/source-diff.test.ts \
+  tests/gas-api-client.test.ts \
+  tests/gas-refresh-service.test.ts \
+  tests/source-manager.test.ts \
+  tests/source-manager-app.test.ts \
+  tests/source-diff-dialog.test.ts \
+  tests/source-diff-app.test.ts \
+  tests/csv-download.test.ts \
+  tests/csv-download-app.test.ts
+
 node scripts/check-webapp-architecture.mjs
 ```
 
-- [ ] **Step 17: regressionを実行する**
+- [ ] **Step 18: regressionを実行する**
 
 ```bash
 npm run test:webapp
 npm run check:webapp
 npm run build:webapp
-npx playwright test tests/e2e/navigation-keyboard.spec.ts
+npx playwright test --grep "CSV|Google Sheet|source"
 git diff --check
 ```
 
-- [ ] **Step 18: commit**
+- [ ] **Step 19: self-reviewする**
 
 ```bash
-git add -A apps/webapp/js/features/circle-data-source \
-  apps/webapp/js/data/csv-circle-codec.ts \
-  apps/webapp/js/data/source-diff.ts \
-  apps/webapp/js/data/gas-refresh-service.ts \
-  apps/webapp/js/api/gas-api-client.ts \
-  apps/webapp/js/ui/management-session.ts \
-  apps/webapp/js/ui/management-view-model.ts \
-  apps/webapp/js/ui/management-events.ts \
-  apps/webapp/js/ui/csv-download.ts \
-  apps/webapp/js/app.js apps/webapp/js/data-manager.ts \
-  apps/webapp/js/app apps/webapp/js/components tests \
-  scripts/webapp-architecture-legacy-allowlist.json
+rg 'AbortController|AbortSignal|fetch|document|window|Blob' \
+  apps/webapp/js/features/circle-data-source/use-cases
+rg 'GasGoogleSheetCircleClient|BrowserCircleCsvDownloader' \
+  apps/webapp/js/features/circle-data-source/public-api.ts
+```
+
+Expected: both searches have no result.
+
+- [ ] **Step 20: commit**
+
+```bash
+git add -A \
+  apps/webapp/js/features/circle-data-source \
+  apps/webapp/js/data \
+  apps/webapp/js/api \
+  apps/webapp/js/ui \
+  apps/webapp/js/app.js \
+  apps/webapp/js/data-manager.ts \
+  apps/webapp/js/app \
+  apps/webapp/js/components \
+  tests scripts package.json
+
 git commit -m "refactor(circle-data-source): extract import and export workflows"
 ```
 
 ## Acceptance criteria
 
-- AppがCSV/Google Sheet preview/apply/exportの処理順序を持たない。
-- DataManagerがsource request runtime stateを保持しない。
-- Use CaseがHTTP、DOM、download APIを直接使わない。
-- pending GAS update retry/discardがCircle Status featureに残る。
-- stale request、abort、redaction、preview expiry、source generation behaviorが維持される。
-- source変更後のroute guidance invalidationがpublic contract経由である。
+- source draft/preview/request generationのmutable正本が一つである。
+- Use Case/SessionにAbortController、AbortSignal、fetch、DOMがない。
+- concrete Google clientとCSV downloaderがInfrastructureにある。
+- public APIがconcrete infrastructureをexportしない。
+- stop/new request/event-day switchでcurrent requestがcancelされる。
+- cancelled/stale resultがSession、repository、Viewを更新しない。
+- apply後のactive session更新とroute invalidationがdurable save後だけ行われる。
+- pending GAS updates責務がCircle Statusへ残る。
+- new testsが通常`test:webapp`で実行される。
