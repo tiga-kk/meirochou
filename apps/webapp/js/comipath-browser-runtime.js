@@ -166,8 +166,22 @@ export class ComiPathBrowserRuntime {
     this.session = Object.assign(baseSession, {
       isBusy: (_kind) => baseSession.getSnapshot().busy,
       nextRequestToken: () => ++tokenSeq,
+      beginSourceRequest: () => ++tokenSeq,
+      isLatestRequestToken: (token) => token === tokenSeq,
       setActivePreview: (preview) => baseSession.setPreview(preview),
+      getActivePreview: () => baseSession.getSnapshot().preview,
+      clearPreview: () => baseSession.setPreview(null),
+      setGasAbortController: (_ctrl) => {},
+      onEventDayChange: () => {
+        ++tokenSeq;
+        baseSession.setPreview(null);
+      },
+      onSettingsClose: () => {
+        ++tokenSeq;
+        baseSession.setPreview(null);
+      },
     });
+    this.ui = new ComiPathDomCoordinator();
     this.currentTarget = null;
     this.currentRoute = null;
     this.currentStartSpace = "";
@@ -186,21 +200,18 @@ export class ComiPathBrowserRuntime {
     this.optimizationTimeLimitMs =
       DEFAULT_NAVIGATION_OPTIMIZATION_TIME_LIMIT_MS;
     this.navigationState = null;
-
     this.draftGasUrl = "";
     this.selectedSheetName = "";
     this.fetchedSheetNames = [];
     this.sourceErrorMessage = "";
     this.outboxResultMessage = "";
     this.outboxErrorMessage = "";
-
     this.activeDeleteScope = null;
     this.deleteErrorMessage = "";
     this.settingsEscapeHandler = null;
     this.ownedEventListeners = [];
     this.ownedTimers = new Set();
     this.ownedTimerCancels = new Map();
-
     this.downloadAdapter = {
       createObjectURL: (blob) => URL.createObjectURL(blob),
       revokeObjectURL: (url) => URL.revokeObjectURL(url),
@@ -233,6 +244,10 @@ export class ComiPathBrowserRuntime {
         return worker;
       },
     });
+  }
+
+  showToast(message, type) {
+    this.ui?.showToast?.(message, type);
   }
 
   addOwnedEventListener(target, type, listener, options) {
@@ -803,7 +818,7 @@ export class ComiPathBrowserRuntime {
     } finally {
       if (this.session.isLatestRequestToken(requestToken)) {
         this.updateManagementModels();
-        this.ui.updateCounts(this.dm);
+        this.ui?.updateCounts?.(this.dm);
       }
     }
   }
@@ -945,7 +960,7 @@ export class ComiPathBrowserRuntime {
       this.ui.showToast("破棄エラー", "error");
     } finally {
       this.updateManagementModels();
-      this.ui.updateCounts(this.dm);
+      this.ui?.updateCounts?.(this.dm);
     }
   }
 

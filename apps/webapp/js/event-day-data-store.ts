@@ -148,6 +148,13 @@ export class StaleCsvPreviewError extends Error {
   }
 }
 
+export class StaleSourceStateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StaleSourceStateError";
+  }
+}
+
 export class LegacyImportError extends Error {
   constructor(message: string) {
     super(message);
@@ -171,12 +178,6 @@ function sameRef(left: EventDayRef | null, right: EventDayRef): boolean {
 }
 
 /** LocalStorage-backed service for the currently selected event/day. */
-export class StaleSourceStateError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "StaleSourceStateError";
-  }
-}
 
 export class EventDayDataStore {
   readonly storage: StorageService;
@@ -227,8 +228,25 @@ export class EventDayDataStore {
     this.repository =
       options.repository || new LocalStorageEventDayRepository(this.storage);
     this.sourceSettings = options.sourceSettings || {
-      saveGuarded: ({ nextState, ref }: any) => {
-        if (ref) this.repository.save(ref, nextState);
+      saveGuarded: ({ nextState, ref, expectedSourceGeneration }: any) => {
+        if (ref) {
+          const current = this.repository.load(ref);
+          if (
+            current &&
+            expectedSourceGeneration &&
+            current.sourceGeneration !== expectedSourceGeneration
+          ) {
+            throw new StaleSourceStateError(
+              "CSV preview source generation is stale",
+            );
+          }
+          if (current && current.gasOutbox && current.gasOutbox.length > 0) {
+            throw new Error(
+              `blocked by ${current.gasOutbox.length} pending outbox entries`,
+            );
+          }
+          this.repository.save(ref, nextState);
+        }
         return nextState;
       },
     };
