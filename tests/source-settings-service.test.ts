@@ -91,4 +91,45 @@ describe("LocalStorageCircleDataSourceSettings", () => {
       });
     }).not.toThrow();
   });
+
+  it("saves and loads whitespace in gasUrl and selectedSheetName as string", () => {
+    settingsService.save({
+      gasUrl: "https://script.google.com/macros/s/test/exec",
+      selectedSheetName: "Day1",
+    });
+    const loaded = settingsService.load();
+    expect(loaded.gasUrl).toBe("https://script.google.com/macros/s/test/exec");
+    expect(loaded.selectedSheetName).toBe("Day1");
+  });
+
+  it("overwrites existing settings cleanly when saved multiple times", () => {
+    settingsService.save({ gasUrl: "https://first.com", selectedSheetName: "Day1" });
+    settingsService.save({ gasUrl: "https://second.com", selectedSheetName: "Day2" });
+
+    const loaded = settingsService.load();
+    expect(loaded.gasUrl).toBe("https://second.com");
+    expect(loaded.selectedSheetName).toBe("Day2");
+  });
+
+  it("saves single property update cleanly", () => {
+    settingsService.save({ gasUrl: "https://first.com" });
+    const loaded = settingsService.load();
+    expect(loaded.gasUrl).toBe("https://first.com");
+    expect(loaded.selectedSheetName).toBeUndefined();
+  });
+
+  it("loads undefined for properties omitted when empty strings or missing fields are saved", () => {
+    settingsService.save({ gasUrl: "", selectedSheetName: "" });
+
+    const loaded = settingsService.load();
+    expect(loaded.gasUrl).toBe("");
+    expect(loaded.selectedSheetName).toBe("");
+  });
+
+  it("handles empty object save gracefully and returns empty properties on load", () => {
+    settingsService.save({});
+    const loaded = settingsService.load();
+    expect(loaded.gasUrl).toBeUndefined();
+    expect(loaded.selectedSheetName).toBeUndefined();
+  });
 });

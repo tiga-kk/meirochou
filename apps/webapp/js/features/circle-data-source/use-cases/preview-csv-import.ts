@@ -1,11 +1,10 @@
-import { diffCircleSources } from "../domain/circle-source-diff";
-import { parseCircleCsv } from "../domain/csv-circle-codec";
-import type { CircleDataPreview } from "../domain/circle-data-source-types";
 import type {
   EventDayRef,
-  EventDayRepository,
   LocalEventDayState,
 } from "../../event-day/public-api";
+import type { CircleDataPreview } from "../domain/circle-data-source-types";
+import { diffCircleSources } from "../domain/circle-source-diff";
+import { parseCircleCsv } from "../domain/csv-circle-codec";
 
 export interface PreviewCsvImportInput {
   readonly eventDay: EventDayRef;
@@ -54,8 +53,12 @@ export class PreviewCsvImportUseCase {
     const preview: CircleDataPreview = Object.freeze({
       previewId: createPreviewId(),
       ref: Object.freeze({ ...input.eventDay }),
-      mode: state.circles.length === 0 ? ("initial" as const) : ("replacement" as const),
+      mode:
+        state.circles.length === 0
+          ? ("initial" as const)
+          : ("replacement" as const),
       expectedSourceGeneration: state.sourceGeneration,
+      source: { type: "csv" as const, fileName: input.fileName },
       diff: diffCircleSources(state.circles, result.circles),
       newCircles: Object.freeze([...result.circles]),
       fetchedAt: new Date(nowMs).toISOString(),

@@ -1,4 +1,8 @@
-import type { CircleRecord, EventDayRef } from "../../event-day/public-api";
+import type {
+  CircleRecord,
+  DataSource,
+  EventDayRef,
+} from "../../event-day/public-api";
 
 export type DataSourceType = "csv" | "gas";
 
@@ -39,6 +43,7 @@ export interface CircleDataPreview {
   readonly expectedSourceGeneration: string;
   readonly diff: SourceDiff;
   readonly newCircles: readonly CircleRecord[];
+  readonly source?: DataSource;
   readonly fetchedAt: string;
   readonly expiresAt: string;
 }

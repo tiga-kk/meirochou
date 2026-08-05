@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  createCircleDataSourceSession,
   type CircleDataPreview,
+  createCircleDataSourceSession,
 } from "../apps/webapp/js/features/circle-data-source/public-api";
 
 describe("CircleDataSourceSession & Management Session State", () => {
@@ -18,7 +18,9 @@ describe("CircleDataSourceSession & Management Session State", () => {
 
   it("stores draft web app url and sheet name immutably", () => {
     const session = createCircleDataSourceSession();
-    session.updateDraft({ draftWebAppUrl: "https://script.google.com/macros/s/test/exec" });
+    session.updateDraft({
+      draftWebAppUrl: "https://script.google.com/macros/s/test/exec",
+    });
     expect(session.getSnapshot().draftWebAppUrl).toBe(
       "https://script.google.com/macros/s/test/exec",
     );
@@ -37,7 +39,13 @@ describe("CircleDataSourceSession & Management Session State", () => {
       ref: Object.freeze({ eventId: "c104", dayId: "day1" }),
       mode: "initial",
       expectedSourceGeneration: "gen_1",
-      diff: Object.freeze({ added: [], updated: [], removed: [], countsLabel: "" }),
+      source: { type: "csv", fileName: "test.csv" },
+      diff: Object.freeze({
+        added: [],
+        updated: [],
+        removed: [],
+        countsLabel: "",
+      }),
       newCircles: Object.freeze([]),
       fetchedAt: "2026-08-05T00:00:00.000Z",
       expiresAt: "2026-08-05T01:00:00.000Z",
@@ -55,7 +63,10 @@ describe("CircleDataSourceSession & Management Session State", () => {
   it("resets session state on reset() call", () => {
     const session = createCircleDataSourceSession();
     session.setBusy(true);
-    session.updateDraft({ draftWebAppUrl: "https://example.com", selectedSheetName: "Sheet1" });
+    session.updateDraft({
+      draftWebAppUrl: "https://example.com",
+      selectedSheetName: "Sheet1",
+    });
     session.setSheetNames(["Sheet1"]);
 
     session.reset();
@@ -66,5 +77,33 @@ describe("CircleDataSourceSession & Management Session State", () => {
     expect(snapshot.selectedSheetName).toBe("");
     expect(snapshot.sheetNames).toEqual([]);
     expect(snapshot.preview).toBeNull();
+  });
+
+  it("generates monotonically increasing request generation and validates current request token", () => {
+    const session = createCircleDataSourceSession();
+    const gen1 = session.beginRequest();
+    expect(session.isCurrentRequest(gen1)).toBe(true);
+
+    const gen2 = session.beginRequest();
+    expect(gen2).toBeGreaterThan(gen1);
+    expect(session.isCurrentRequest(gen1)).toBe(false);
+    expect(session.isCurrentRequest(gen2)).toBe(true);
+  });
+
+  it("notifies subscribers on state mutations and supports unsubscribe", () => {
+    const session = createCircleDataSourceSession();
+    const notifications: number[] = [];
+    const unsubscribe = session.subscribe((snap) => {
+      notifications.push(snap.requestGeneration);
+    });
+
+    session.beginRequest();
+    session.setBusy(false);
+
+    expect(notifications).toHaveLength(2);
+
+    unsubscribe();
+    session.beginRequest();
+    expect(notifications).toHaveLength(2); // No new notifications after unsubscribe
   });
 });

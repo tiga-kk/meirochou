@@ -1,4 +1,20 @@
 import { ComiPathBrowserRuntime } from "../comipath-browser-runtime.js";
+import { BrowserCircleCsvDownloader } from "../features/circle-data-source/infrastructure/browser-circle-csv-downloader";
+import { GasGoogleSheetCircleClient } from "../features/circle-data-source/infrastructure/gas-google-sheet-circle-client";
+import {
+  ApplyCircleDataPreviewUseCase,
+  CancelCircleDataPreviewUseCase,
+  type CircleCsvDownloader,
+  CircleDataSourceController,
+  type CircleDataSourceView,
+  createCircleDataSourceSession,
+  DomCircleDataSourceView,
+  ExportCirclesToCsvUseCase,
+  type GoogleSheetCircleClient,
+  PreviewCsvImportUseCase,
+  PreviewGoogleSheetImportUseCase,
+  type RouteGuidanceInvalidation,
+} from "../features/circle-data-source/public-api";
 import { GasPendingUpdateDelivery } from "../features/circle-status/infrastructure/gas-pending-update-delivery";
 import { CircleStatusController } from "../features/circle-status/ui/circle-status-controller";
 import { PendingGasUpdatesController } from "../features/circle-status/ui/pending-gas-updates-controller";
@@ -11,28 +27,14 @@ import { LocalStorageEventDayRepository } from "../features/event-day/infrastruc
 import {
   createActiveEventDayReader,
   createActiveEventDaySession,
-  EventDaySelectorController,
-  OpenInitialEventDayUseCase,
-  SwitchEventDayUseCase,
   type EventDayRepository,
+  EventDaySelectorController,
   type EventDaySelectorView,
   type EventRegistry,
+  DomEventDaySelectorView,
+  OpenInitialEventDayUseCase,
+  SwitchEventDayUseCase,
 } from "../features/event-day/public-api";
-import {
-  ApplyCircleDataPreviewUseCase,
-  CancelCircleDataPreviewUseCase,
-  CircleDataSourceController,
-  createCircleDataSourceSession,
-  ExportCirclesToCsvUseCase,
-  PreviewCsvImportUseCase,
-  PreviewGoogleSheetImportUseCase,
-  type CircleCsvDownloader,
-  type CircleDataSourceView,
-  type GoogleSheetCircleClient,
-  type RouteGuidanceInvalidation,
-} from "../features/circle-data-source/public-api";
-import { GasGoogleSheetCircleClient } from "../features/circle-data-source/infrastructure/gas-google-sheet-circle-client";
-import { BrowserCircleCsvDownloader } from "../features/circle-data-source/infrastructure/browser-circle-csv-downloader";
 import { StorageService } from "../state/storage-service";
 import {
   createComiPathApplication,
@@ -50,6 +52,7 @@ export interface AssembleComiPathApplicationOptions {
   readonly registry?: EventRegistry;
   readonly googleSheetClient?: GoogleSheetCircleClient;
   readonly csvDownloader?: CircleCsvDownloader;
+  readonly targetElement?: HTMLElement | Window | Document;
 }
 
 /** Composition root for the browser runtime and feature infrastructure. */
@@ -98,15 +101,31 @@ export function assembleComiPathApplication(
   // Event Day feature assembly
   const switchEventDay = new SwitchEventDayUseCase(
     repository,
+    {
+      afterSwitch: async (newRef) => {
+        const state = repository.load(newRef);
+        if (state) {
+          activeEventDaySession.setActiveEventDay(newRef, state);
+        }
+      },
+    },
     options.registry ?? undefined,
   );
   const openInitialEventDay = new OpenInitialEventDayUseCase(repository);
-  const eventDaySelectorController = new EventDaySelectorController({
+  let eventDaySelectorController = new EventDaySelectorController({
     switchEventDay,
     openInitialEventDay,
     registry: options.registry,
-    view: options.eventDayView,
+    view:
+      options.eventDayView ??
+      new DomEventDaySelectorView(
+        typeof options.document.querySelector === "function"
+          ? options.document.querySelector("event-day-selector")
+          : null,
+      ),
     repository,
+    activeEventDaySession,
+    targetElement: options.targetElement ?? options.document,
   });
 
   // Route Guidance invalidation fallback if not provided
@@ -119,7 +138,10 @@ export function assembleComiPathApplication(
   const googleSheetClient =
     options.googleSheetClient ?? new GasGoogleSheetCircleClient();
   const csvDownloader =
-    options.csvDownloader ?? new BrowserCircleCircleCsvDownloaderAdapter(options.window);
+    options.csvDownloader ??
+    new BrowserCircleCsvDownloader(
+      options.window as Window & typeof globalThis,
+    );
   const circleDataSourceSession = createCircleDataSourceSession();
 
   const previewCsvImport = new PreviewCsvImportUseCase(repository);
@@ -141,17 +163,31 @@ export function assembleComiPathApplication(
   const circleDataSourceController = new CircleDataSourceController({
     client: googleSheetClient,
     session: circleDataSourceSession,
-    view: options.circleDataSourceView,
+    view:
+      options.circleDataSourceView ??
+      new DomCircleDataSourceView(
+        typeof options.document.getElementById === "function"
+          ? options.document.getElementById("source-diff-dialog")
+          : null,
+      ),
     previewCsvImport,
     previewGoogleSheetImport,
     applyCircleDataPreview,
     cancelCircleDataPreview,
     exportCirclesToCsv,
     routeGuidanceInvalidation,
+    activeEventDaySession,
+    targetElement: options.targetElement ?? options.document,
+    diffDialogElement:
+      typeof options.document.getElementById === "function"
+        ? options.document.getElementById("source-diff-dialog") ?? undefined
+        : undefined,
   });
 
   const browserRuntime = new ComiPathBrowserRuntime({
     alnsWorkerFactory: options.createAlnsWorker,
+    circleDataSourceSession,
+    circleDataSourceController,
     dataManagerOptions: {
       storage,
       repository,
@@ -167,8 +203,33 @@ export function assembleComiPathApplication(
     browserRuntime: {
       start: async () => {
         backgroundProcess.start();
-        await eventDaySelectorController.start();
-        return browserRuntime.start();
+        if (options.registry) await eventDaySelectorController.start();
+        await browserRuntime.start();
+        if (!options.registry) {
+          const runtimeRegistry = browserRuntime.dm?.eventRegistry;
+          if (runtimeRegistry) {
+            eventDaySelectorController = new EventDaySelectorController({
+              switchEventDay: browserRuntime.dm.getTransitionService(
+                browserRuntime.currentManifest,
+              ),
+              openInitialEventDay,
+              registry: runtimeRegistry,
+              view:
+                options.eventDayView ??
+                new DomEventDaySelectorView(
+                  typeof options.document.querySelector === "function"
+                    ? options.document.querySelector("event-day-selector")
+                    : null,
+                ),
+              repository,
+              activeEventDaySession,
+              targetElement: options.targetElement ?? options.document,
+            });
+            await eventDaySelectorController.start();
+          }
+        }
+        circleDataSourceController.start();
+        return undefined;
       },
       stop: () => {
         backgroundProcess.stop();
@@ -190,18 +251,4 @@ export function assembleComiPathApplication(
     switchEventDay,
     openInitialEventDay,
   }) as unknown as StartableApplication & Record<string, unknown>;
-}
-
-class BrowserCircleCircleCsvDownloaderAdapter implements CircleCsvDownloader {
-  private readonly inner: BrowserCircleCsvDownloader;
-  constructor(windowObj: Window) {
-    this.inner = new BrowserCircleCsvDownloader(windowObj as Window & typeof globalThis);
-  }
-  downloadCirclesAsCsv(
-    filename: string,
-    circles: readonly any[],
-    purchasedSpaces: ReadonlySet<string>,
-  ): void {
-    this.inner.downloadCirclesAsCsv(filename, circles, purchasedSpaces);
-  }
 }

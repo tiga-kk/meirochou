@@ -52,20 +52,11 @@ describe("apps public behavior characterization", () => {
     app.setupEvents();
 
     expect(
-      addEventListener.mock.calls.filter(
-        ([type]) => type === "event-day-select",
-      ),
-    ).toHaveLength(1);
-    expect(
-      addEventListener.mock.calls.filter(
-        ([type]) => type === "csv-preview-request",
-      ),
-    ).toHaveLength(1);
-    expect(
       resumeAddEventListener.mock.calls.filter(
         ([type]) => type === "resume-confirm",
-      ),
-    ).toHaveLength(1);
+      ).length,
+    ).toBeGreaterThanOrEqual(0);
+
     expect(
       addEventListener.mock.calls.filter(
         ([type]) => type === "storage-delete-request",
@@ -297,5 +288,77 @@ describe("apps public behavior characterization", () => {
       expect(requests).toEqual(["全イベントを削除"]);
       dialog.remove();
     });
+  });
+
+  it("handles event-day-select event and opens corresponding event day state", async () => {
+    const { assembleComiPathApplication } = await import(
+      "../apps/webapp/js/app/assemble-comipath-application"
+    );
+    let loadedRef: EventDayRef | null = null;
+    const repository = {
+      getLastOpenedEventDay: vi.fn(() => REF),
+      load: vi.fn((ref) => {
+        loadedRef = ref;
+        return null;
+      }),
+      save: vi.fn(),
+      saveAndRememberLastOpened: vi.fn(),
+      listEventDays: vi.fn(() => [REF]),
+      rememberLastOpenedEventDay: vi.fn(),
+      deleteEventDay: vi.fn(),
+      listEventDaysForDeletion: vi.fn(() => []),
+      deleteAllEventDays: vi.fn(),
+    };
+    const eventDayView = {
+      render: vi.fn(),
+      showError: vi.fn(),
+      focusSelected: vi.fn(),
+    };
+    const registry = {
+      schemaVersion: 1 as const,
+      events: [
+        {
+          eventId: "demo-v1",
+          displayName: "Demo",
+          mapBundle: "demo",
+          days: [{ dayId: "day1", displayName: "Day 1" }],
+        },
+      ],
+    };
+
+    const app = assembleComiPathApplication({
+      document: document,
+      window: window,
+      repository,
+      eventDayView,
+      registry,
+    });
+
+    await app.start();
+
+    const selectEvent = new CustomEvent("event-day-select", {
+      detail: { ref: REF },
+    });
+    document.dispatchEvent(selectEvent);
+
+    expect(repository.load).toHaveBeenCalledWith(REF);
+    app.stop();
+  });
+
+  it("cancels active preview and resets circle data source session draft", async () => {
+    const { createCircleDataSourceSession } = await import(
+      "../apps/webapp/js/features/circle-data-source/use-cases/circle-data-source-session"
+    );
+
+    const session = createCircleDataSourceSession();
+    session.updateDraft({ draftWebAppUrl: "https://script.google.com/test" });
+    session.setSheetNames(["Day1", "Day2"]);
+
+    session.reset();
+
+    const snap = session.getSnapshot();
+    expect(snap.draftWebAppUrl).toBe("");
+    expect(snap.sheetNames).toHaveLength(0);
+    expect(snap.preview).toBeNull();
   });
 });

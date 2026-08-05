@@ -2,6 +2,13 @@
 import { describe, expect, test, vi } from "vitest";
 import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime";
 import { EventDayDataStore } from "../apps/webapp/js/event-day-data-store";
+import {
+  ApplyCircleDataPreviewUseCase,
+  type CircleDataPreview,
+  ExportCirclesToCsvUseCase,
+  PreviewCsvImportUseCase,
+  serializeCircleCsv,
+} from "../apps/webapp/js/features/circle-data-source/public-api";
 import type {
   EventDayRef,
   EventRegistryV1,
@@ -50,19 +57,120 @@ function createRegistry(): EventRegistryV1 {
 
 function createManager(adapter = new MockStorageAdapter()): {
   adapter: MockStorageAdapter;
-  manager: EventDayDataStore;
+  manager: EventDayDataStore & {
+    previewCsvReplacement: (
+      ref: EventDayRef,
+      fileName: string,
+      text: string,
+    ) => Promise<
+      CircleDataPreview & {
+        fileName: string;
+        incomingHash: string;
+        text: string;
+      }
+    >;
+    applyCsvReplacement: (previewId: string) => Promise<LocalEventDayState>;
+    cancelCsvPreview: (previewId: string) => void;
+    exportCsv: (ref: EventDayRef) => string;
+    csvPreviews: Map<
+      string,
+      CircleDataPreview & {
+        fileName: string;
+        incomingHash: string;
+        text: string;
+      }
+    >;
+  };
 } {
   let now = new Date("2026-07-21T07:45:00.000Z");
   let generation = 0;
-  let preview = 0;
   const storage = new StorageService(adapter);
   const manager = new EventDayDataStore(storage, {
     now: () => now,
     createSourceGeneration: () => `generation-${++generation}`,
-    createPreviewId: () => `preview-${++preview}`,
-    previewTtlMs: 1_000,
   });
   manager.eventRegistry = createRegistry();
+
+  const previews = new Map<
+    string,
+    CircleDataPreview & { fileName: string; incomingHash: string; text: string }
+  >();
+  const hash = (text: string): string => {
+    let value = 0x811c9dc5;
+    for (const character of text) {
+      value ^= character.charCodeAt(0);
+      value = Math.imul(value, 0x01000193);
+    }
+    return (value >>> 0).toString(16).padStart(8, "0");
+  };
+  let previewSequence = 0;
+  const previewUseCase = new PreviewCsvImportUseCase(manager.repository, {
+    now: () => now.toISOString(),
+    createPreviewId: () => `preview-${++previewSequence}`,
+    previewTtlMs: 1_000,
+  });
+  const applyUseCase = new ApplyCircleDataPreviewUseCase(
+    manager.repository,
+    manager.activeEventDaySession,
+    { invalidateAfterCircleSourceChange: vi.fn() },
+    {
+      now: () => now.toISOString(),
+      createSourceGeneration: () => `generation-${++generation}`,
+    },
+  );
+  const sourceManager = manager as EventDayDataStore & {
+    previewCsvReplacement: (
+      ref: EventDayRef,
+      fileName: string,
+      text: string,
+    ) => Promise<
+      CircleDataPreview & {
+        fileName: string;
+        incomingHash: string;
+        text: string;
+      }
+    >;
+    applyCsvReplacement: (previewId: string) => Promise<LocalEventDayState>;
+    cancelCsvPreview: (previewId: string) => void;
+    exportCsv: (ref: EventDayRef) => string;
+    csvPreviews: Map<
+      string,
+      CircleDataPreview & {
+        fileName: string;
+        incomingHash: string;
+        text: string;
+      }
+    >;
+  };
+  sourceManager.csvPreviews = previews;
+  sourceManager.previewCsvReplacement = async (ref, fileName, text) => {
+    const preview = previewUseCase.execute({ eventDay: ref, fileName, text });
+    const record = { ...preview, fileName, incomingHash: hash(text), text };
+    previews.set(preview.previewId, record);
+    return record;
+  };
+  sourceManager.applyCsvReplacement = async (previewId) => {
+    const preview = previews.get(previewId);
+    if (!preview) throw new Error("CSV preview is missing or already applied");
+    if (hash(preview.text) !== preview.incomingHash) {
+      throw new Error("CSV preview hash mismatch");
+    }
+    const result = await applyUseCase.execute({ previewId, preview });
+    previews.delete(previewId);
+    return result;
+  };
+  sourceManager.cancelCsvPreview = (previewId) => {
+    previews.delete(previewId);
+  };
+  sourceManager.exportCsv = (ref) => {
+    let result = "";
+    new ExportCirclesToCsvUseCase(manager.repository, {
+      downloadCirclesAsCsv: (_filename, circles, purchasedSpaces) => {
+        result = serializeCircleCsv(circles, purchasedSpaces);
+      },
+    }).execute({ eventDay: ref });
+    return result;
+  };
 
   Object.defineProperty(manager, "advanceTime", {
     value: (milliseconds: number) => {
@@ -70,13 +178,74 @@ function createManager(adapter = new MockStorageAdapter()): {
     },
   });
 
-  return { adapter, manager };
+  return { adapter, manager: sourceManager };
 }
 
 const csv = (rows: string): string =>
   `space,priority,isSale,account,tweet,memo\r\n${rows}`;
 
 describe("Phase 2 Task 7 local data service", () => {
+  test("transition service activates the shared session after commit", async () => {
+    const { manager } = createManager();
+    manager.eventRegistry = {
+      schemaVersion: 1,
+      events: [
+        {
+          eventId: "demo-v1",
+          displayName: "Demo Event",
+          mapBundle: "../maps/demo-v1/manifest.json",
+          days: [
+            { dayId: "day1", displayName: "Day 1" },
+            { dayId: "day2", displayName: "Day 2" },
+          ],
+        },
+      ],
+    };
+    manager.eventRegistryUrl =
+      "https://example.test/assets/events/manifest.json";
+    await manager.openEventDay({ eventId: "demo-v1", dayId: "day1" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            schemaVersion: 1,
+            eventId: "demo-v1",
+            displayName: "Demo Event",
+            bundleVersion: "demo-v1",
+            areas: [
+              {
+                id: "east",
+                mapId: "east",
+                name: "East",
+                prefixes: ["E"],
+                labels: ["A"],
+                mapFile: "map.png",
+                pointsFile: "points.json",
+                gridMetaFile: "grid.json",
+                gridFile: "grid.bin",
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+    try {
+      await manager.getTransitionService().execute({
+        eventId: "demo-v1",
+        dayId: "day2",
+      });
+
+      expect(manager.activeRef).toEqual({ eventId: "demo-v1", dayId: "day2" });
+    expect(manager.activeState).toEqual(
+        manager.repository.load({ eventId: "demo-v1", dayId: "day2" }),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   test("routes legacy actions without an active day through the session", () => {
     const { manager } = createManager();
 
@@ -166,7 +335,7 @@ describe("Phase 2 Task 7 local data service", () => {
     expect(preview.fileName).toBe("replacement.csv");
     expect(preview.diff.updated[0]?.after.priority).toBe(2);
 
-    const applied = manager.applyCsvReplacement(preview.previewId);
+    const applied = await manager.applyCsvReplacement(preview.previewId);
     expect(applied.source).toEqual({
       type: "csv",
       fileName: "replacement.csv",
@@ -177,9 +346,9 @@ describe("Phase 2 Task 7 local data service", () => {
       "A-01",
       "B-01",
     ]);
-    expect(() => manager.applyCsvReplacement(preview.previewId)).toThrow(
-      "CSV preview is missing or already applied",
-    );
+    await expect(
+      manager.applyCsvReplacement(preview.previewId),
+    ).rejects.toThrow("CSV preview is missing or already applied");
   });
 
   test("rejects stale, expired, and tampered previews without changing state", async () => {
@@ -196,9 +365,9 @@ describe("Phase 2 Task 7 local data service", () => {
     (
       manager as unknown as { advanceTime: (milliseconds: number) => void }
     ).advanceTime(1_001);
-    expect(() => manager.applyCsvReplacement(expired.previewId)).toThrow(
-      "CSV preview has expired",
-    );
+    await expect(
+      manager.applyCsvReplacement(expired.previewId),
+    ).rejects.toThrow("CSV preview has expired");
 
     const tampered = await manager.previewCsvReplacement(
       ref,
@@ -213,9 +382,9 @@ describe("Phase 2 Task 7 local data service", () => {
     const stored = previews.get(tampered.previewId);
     if (!stored) throw new Error("test preview was not stored");
     stored.text = csv("D-01,1,,,,\r\n");
-    expect(() => manager.applyCsvReplacement(tampered.previewId)).toThrow(
-      "CSV preview hash mismatch",
-    );
+    await expect(
+      manager.applyCsvReplacement(tampered.previewId),
+    ).rejects.toThrow("CSV preview hash mismatch");
 
     const stale = await manager.previewCsvReplacement(
       ref,
@@ -227,9 +396,9 @@ describe("Phase 2 Task 7 local data service", () => {
       "new.csv",
       csv("F-01,1,,,,\r\n"),
     );
-    manager.applyCsvReplacement(fresh.previewId);
+    await manager.applyCsvReplacement(fresh.previewId);
     const current = manager.repository.load(ref) as LocalEventDayState;
-    expect(() => manager.applyCsvReplacement(stale.previewId)).toThrow(
+    await expect(manager.applyCsvReplacement(stale.previewId)).rejects.toThrow(
       "CSV preview source generation is stale",
     );
     expect(current.sourceGeneration).toBe("generation-3");
@@ -415,7 +584,7 @@ describe("Phase 2 Task 7 local data service", () => {
       csv("A-01,2,,,,\r\n"),
     );
 
-    const applied = manager.applyCsvReplacement(preview.previewId);
+    const applied = await manager.applyCsvReplacement(preview.previewId);
 
     expect(applied.source).toEqual({ type: "csv", fileName: "from_gas.csv" });
     expect(applied.sourceGeneration).toBe("generation-2");
@@ -475,16 +644,16 @@ describe("Phase 2 Task 7 local data service", () => {
     };
     manager.repository.save(ref, stateWithOutbox);
 
-    expect(() => manager.applyCsvReplacement(preview.previewId)).toThrow(
-      "blocked by 1 pending outbox entries",
-    );
+    await expect(
+      manager.applyCsvReplacement(preview.previewId),
+    ).rejects.toThrow("blocked by 1 pending outbox entries");
 
     // State is unchanged
     expect(manager.repository.load(ref)?.source.type).toBe("gas");
 
     // Clear outbox and confirm preview is still usable
     manager.repository.save(ref, initialGasState);
-    const applied = manager.applyCsvReplacement(preview.previewId);
+    const applied = await manager.applyCsvReplacement(preview.previewId);
     expect(applied.source.type).toBe("csv");
   });
 
@@ -504,9 +673,9 @@ describe("Phase 2 Task 7 local data service", () => {
     manager.cancelCsvPreview(preview.previewId);
 
     expect(manager.csvPreviews.has(preview.previewId)).toBe(false);
-    expect(() => manager.applyCsvReplacement(preview.previewId)).toThrow(
-      "CSV preview is missing or already applied",
-    );
+    await expect(
+      manager.applyCsvReplacement(preview.previewId),
+    ).rejects.toThrow("CSV preview is missing or already applied");
   });
 
   test("exportCsv exports active circles only, derives isSale from purchased truth, preserves formula text, and causes no state mutation", async () => {

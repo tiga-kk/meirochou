@@ -163,6 +163,48 @@ describe("CircleDataSourcePanel Component", () => {
     expect(element.querySelector("#gas-sheet-select")).toBeNull();
   });
 
+  it("keeps dirty GAS inputs when a busy model rerender supplies empty values", async () => {
+    const initialUrl =
+      "https://script.google.com/macros/s/AKfycbx_INITIAL/exec";
+    element.model = {
+      ...defaultModel,
+      sourceType: "gas",
+      gasUrlInput: initialUrl,
+      sheetNames: ["配置シート1"],
+      selectedSheetName: "配置シート1",
+    };
+    await element.updateComplete;
+
+    const urlInput = element.querySelector<HTMLInputElement>("#gas-url-input");
+    const sheetSelect = element.querySelector<HTMLSelectElement>(
+      "#gas-sheet-select",
+    );
+    expect(urlInput).not.toBeNull();
+    expect(sheetSelect).not.toBeNull();
+    if (!urlInput || !sheetSelect) return;
+
+    const draftUrl = "https://script.google.com/macros/s/AKfycbx_DRAFT/exec";
+    urlInput.value = draftUrl;
+    urlInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await element.updateComplete;
+    sheetSelect.value = "配置シート1";
+    sheetSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await element.updateComplete;
+
+    element.model = {
+      ...element.model,
+      busy: true,
+      gasUrlInput: "",
+      selectedSheetName: "",
+      sheetNames: [],
+    };
+    await element.updateComplete;
+
+    expect(element.querySelector<HTMLInputElement>("#gas-url-input")?.value).toBe(
+      draftUrl,
+    );
+  });
+
   it("dispatches gas-preview-request when sheet is selected and preview button clicked", async () => {
     const validUrl =
       "https://script.google.com/macros/s/AKfycbx_TEST_DEPLOYMENT_ID/exec";

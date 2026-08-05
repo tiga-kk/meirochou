@@ -208,4 +208,162 @@ describe("Google Sheet Data Source Use Cases (GAS Refresh)", () => {
       expiresAt: "2026-08-05T01:00:00.000Z",
     })).not.toThrow();
   });
+
+  it("handles expired preview error during preview apply when expiresAt is in the past", async () => {
+    const ref: EventDayRef = { eventId: "c104", dayId: "day1" };
+    const initialState: LocalEventDayState = {
+      schemaVersion: 2,
+      source: { type: "gas", gasUrl: "https://script.google.com/macros/s/test/exec", sheetName: "Day1" },
+      sourceGeneration: "gen-1",
+      circles: [{ space: "東A01a", priority: 1 }],
+      circleStates: {},
+      gasOutbox: [],
+      timestamps: {
+        createdAt: "2026-07-25T00:00:00.000Z",
+        updatedAt: "2026-07-25T00:00:00.000Z",
+        sourceUpdatedAt: "2026-07-25T00:00:00.000Z",
+      },
+    };
+    repository.save(ref, initialState);
+    session.setActiveEventDay(ref, initialState);
+
+    const applyUseCase = new ApplyCircleDataPreviewUseCase(repository, session, {
+      invalidateAfterCircleSourceChange: vi.fn(),
+    });
+
+    const expiredPreview = {
+      previewId: "expired_p1",
+      ref,
+      mode: "refresh" as const,
+      expectedSourceGeneration: "gen-1",
+      diff: { added: [], updated: [], removed: [], countsLabel: "" },
+      newCircles: [{ space: "東A01a", priority: 1 }],
+      fetchedAt: "2026-07-25T00:00:00.000Z",
+      expiresAt: "2026-07-25T00:00:01.000Z", // Past date
+    };
+
+    await expect(
+      applyUseCase.execute({ previewId: "expired_p1", preview: expiredPreview }),
+    ).rejects.toThrow(/expired/i);
+  });
+
+  it("rejects preview apply when expected source generation mismatches current state", async () => {
+    const ref: EventDayRef = { eventId: "c104", dayId: "day1" };
+    const initialState: LocalEventDayState = {
+      schemaVersion: 2,
+      source: { type: "gas", gasUrl: "https://script.google.com/macros/s/test/exec", sheetName: "Day1" },
+      sourceGeneration: "gen-2", // Current is gen-2
+      circles: [{ space: "東A01a", priority: 1 }],
+      circleStates: {},
+      gasOutbox: [],
+      timestamps: {
+        createdAt: "2026-07-25T00:00:00.000Z",
+        updatedAt: "2026-07-25T00:00:00.000Z",
+        sourceUpdatedAt: "2026-07-25T00:00:00.000Z",
+      },
+    };
+    repository.save(ref, initialState);
+    session.setActiveEventDay(ref, initialState);
+
+    const applyUseCase = new ApplyCircleDataPreviewUseCase(repository, session, {
+      invalidateAfterCircleSourceChange: vi.fn(),
+    });
+
+    const stalePreview = {
+      previewId: "stale_p1",
+      ref,
+      mode: "refresh" as const,
+      expectedSourceGeneration: "gen-1", // Mismatched gen-1
+      diff: { added: [], updated: [], removed: [], countsLabel: "" },
+      newCircles: [{ space: "東A01a", priority: 1 }],
+      fetchedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 60000).toISOString(),
+    };
+
+    await expect(
+      applyUseCase.execute({ previewId: "stale_p1", preview: stalePreview }),
+    ).rejects.toThrow();
+  });
+
+  it("preserves held and purchased circle states when refresh preview is applied", async () => {
+    const ref: EventDayRef = { eventId: "c104", dayId: "day1" };
+    const initialState: LocalEventDayState = {
+      schemaVersion: 2,
+      source: { type: "gas", gasUrl: "https://script.google.com/macros/s/test/exec", sheetName: "Day1" },
+      sourceGeneration: "gen-1",
+      circles: [
+        { space: "東A01a", priority: 1 },
+        { space: "東A02b", priority: 2 },
+      ],
+      circleStates: { 東A01a: "purchased", 東A02b: "held" },
+      gasOutbox: [],
+      timestamps: {
+        createdAt: "2026-07-25T00:00:00.000Z",
+        updatedAt: "2026-07-25T00:00:00.000Z",
+        sourceUpdatedAt: "2026-07-25T00:00:00.000Z",
+      },
+    };
+    repository.save(ref, initialState);
+    session.setActiveEventDay(ref, initialState);
+
+    const applyUseCase = new ApplyCircleDataPreviewUseCase(repository, session, {
+      invalidateAfterCircleSourceChange: vi.fn(),
+    });
+
+    const preview = {
+      previewId: "p_preserve",
+      ref,
+      mode: "refresh" as const,
+      expectedSourceGeneration: "gen-1",
+      diff: { added: [], updated: [{ space: "東A01a", priority: 5 }], removed: [], countsLabel: "" },
+      newCircles: [
+        { space: "東A01a", priority: 5 },
+        { space: "東A02b", priority: 2 },
+      ],
+      fetchedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 60000).toISOString(),
+    };
+
+    const appliedState = await applyUseCase.execute({ previewId: "p_preserve", preview });
+
+    expect(appliedState.circleStates["東A01a"]).toBe("purchased");
+    expect(appliedState.circleStates["東A02b"]).toBe("held");
+  });
+
+  it("assigns a new unique source generation upon preview apply", async () => {
+    const ref: EventDayRef = { eventId: "c104", dayId: "day1" };
+    const initialState: LocalEventDayState = {
+      schemaVersion: 2,
+      source: { type: "gas", gasUrl: "https://script.google.com/macros/s/test/exec", sheetName: "Day1" },
+      sourceGeneration: "gen-1",
+      circles: [{ space: "東A01a", priority: 1 }],
+      circleStates: {},
+      gasOutbox: [],
+      timestamps: {
+        createdAt: "2026-07-25T00:00:00.000Z",
+        updatedAt: "2026-07-25T00:00:00.000Z",
+        sourceUpdatedAt: "2026-07-25T00:00:00.000Z",
+      },
+    };
+    repository.save(ref, initialState);
+    session.setActiveEventDay(ref, initialState);
+
+    const applyUseCase = new ApplyCircleDataPreviewUseCase(repository, session, {
+      invalidateAfterCircleSourceChange: vi.fn(),
+    });
+
+    const preview = {
+      previewId: "p_gen",
+      ref,
+      mode: "refresh" as const,
+      expectedSourceGeneration: "gen-1",
+      diff: { added: [], updated: [], removed: [], countsLabel: "" },
+      newCircles: [{ space: "東A01a", priority: 1 }],
+      fetchedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 60000).toISOString(),
+    };
+
+    const appliedState = await applyUseCase.execute({ previewId: "p_gen", preview });
+    expect(appliedState.sourceGeneration).not.toBe("gen-1");
+  });
 });

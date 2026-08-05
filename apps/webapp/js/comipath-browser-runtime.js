@@ -1,14 +1,10 @@
 import "./components/comipath-settings";
 import "./components/navigation-resume-dialog";
 import "./components/source-diff-dialog";
-import { createCircleDataSourceSession } from "./features/circle-data-source/public-api";
-import { parseGasWebAppUrl } from "./api/gas-api-client";
 import { ComiPathDomCoordinator } from "./comipath-dom-coordinator.js";
 import { createDevDemoData, isDevDemoEnabled } from "./dev-demo-data.js";
-import {
-  CsvValidationError,
-  EventDayDataStore,
-} from "./event-day-data-store.ts";
+import { EventDayDataStore } from "./event-day-data-store.ts";
+import { createCircleDataSourceSession } from "./features/circle-data-source/public-api";
 import {
   parseGridMeta,
   parsePointsPayload,
@@ -35,27 +31,10 @@ import {
   buildDeleteOptions,
   buildEventDayOptions,
   buildOutboxPanelModel,
-  formatSourceDiff,
   formatSourceSummary,
 } from "./shared/ui/management-view-model";
 import { LocalStorageNavigationSnapshotRepository } from "./state/navigation-snapshot-repository";
 import { TspSolver } from "./tsp-solver.js";
-
-
-function formatSourceApplyError(error) {
-  switch (error?.name) {
-    case "StaleCsvPreviewError":
-    case "StaleGasPreviewError":
-    case "StaleSourceStateError":
-      return "プレビューが古くなっています。最新のソースを読み込んで再試行してください。";
-    case "PendingOutboxError":
-      return "未送信の操作があるため適用できません。同期完了後に再試行してください。";
-    case "StorageWriteError":
-      return "保存に失敗しました。空き容量やブラウザ設定を確認して再試行してください。";
-    default:
-      return "ソースデータの適用に失敗しました。最新のプレビューを取得して再試行してください。";
-  }
-}
 
 /** Validates an event/day reference at the ComiPathBrowserRuntime's DOM event boundary. */
 function isEventDayRef(value) {
@@ -114,42 +93,6 @@ function areSpacesInSameArea(spaceA, spaceB) {
   return Boolean(areaA && areaB && areaA.id === areaB.id);
 }
 
-/** Accepts only a validated GAS source shape at the ComiPathBrowserRuntime/component boundary. */
-function safeGasSource(value) {
-  if (
-    !value ||
-    typeof value !== "object" ||
-    value.type !== "gas" ||
-    typeof value.gasUrl !== "string" ||
-    typeof value.sheetName !== "string" ||
-    value.sheetName.trim() === ""
-  ) {
-    return null;
-  }
-
-  try {
-    return {
-      type: "gas",
-      gasUrl: parseGasWebAppUrl(value.gasUrl),
-      sheetName: value.sheetName,
-    };
-  } catch {
-    return null;
-  }
-}
-
-/** Redacts CSV cell-bearing parser messages before showing them in the UI. */
-function formatCsvIssue(message) {
-  if (message === "Missing required field: space") return message;
-  if (message === "Invalid priority value: must be a number") return message;
-  if (message.startsWith("Missing required header column")) {
-    return "Missing required header column";
-  }
-  if (message.startsWith("Duplicate space:")) return "Duplicate space";
-  if (message.startsWith("Syntax error:")) return "CSV syntax error";
-  return "Invalid CSV data";
-}
-
 const DEFAULT_NAVIGATION_OPTIMIZATION_TIME_LIMIT_MS = 10000;
 
 /**
@@ -161,27 +104,79 @@ export class ComiPathBrowserRuntime {
     this.stopped = false;
     this.ownedWorkers = new Set();
     this.dm = new EventDayDataStore(undefined, options?.dataManagerOptions);
-    const baseSession = createCircleDataSourceSession();
+    const baseSession =
+      options?.circleDataSourceSession ?? createCircleDataSourceSession();
+    this.circleDataSourceController =
+      options?.circleDataSourceController ?? null;
     let tokenSeq = 0;
+    const busyLanes = new Set();
+    let gasAbortController = null;
+    const rawSetBusy = baseSession.setBusy.bind(baseSession);
+
     this.session = Object.assign(baseSession, {
-      isBusy: (_kind) => baseSession.getSnapshot().busy,
+      setBusy: (lane, busy) => {
+        if (typeof lane === "boolean") {
+          busyLanes.clear();
+          if (lane) busyLanes.add("default");
+          rawSetBusy(lane);
+          return;
+        }
+        if (busy) {
+          busyLanes.add(lane);
+        } else {
+          busyLanes.delete(lane);
+        }
+        rawSetBusy(busyLanes.size > 0);
+      },
+      isBusy: (lane) => {
+        if (!lane) return baseSession.getSnapshot().busy;
+        return busyLanes.has(lane);
+      },
+      isAnyBusy: () => busyLanes.size > 0 || baseSession.getSnapshot().busy,
       nextRequestToken: () => ++tokenSeq,
-      beginSourceRequest: () => ++tokenSeq,
+      beginSourceRequest: () => {
+        this.session.abortGasRequest();
+        this.session.clearPreview();
+        this.session.setBusy("source-request", true);
+        return ++tokenSeq;
+      },
       isLatestRequestToken: (token) => token === tokenSeq,
+      setGasAbortController: (ctrl) => {
+        gasAbortController = ctrl;
+      },
+      getGasAbortController: () => gasAbortController,
+      abortGasRequest: () => {
+        if (gasAbortController) {
+          gasAbortController.abort();
+          gasAbortController = null;
+        }
+      },
       setActivePreview: (preview) => baseSession.setPreview(preview),
       getActivePreview: () => baseSession.getSnapshot().preview,
       clearPreview: () => baseSession.setPreview(null),
-      setGasAbortController: (_ctrl) => {},
       onEventDayChange: () => {
         ++tokenSeq;
-        baseSession.setPreview(null);
+        this.session.abortGasRequest();
+        this.session.clearPreview();
+        this.session.setBusy("source-request", false);
       },
       onSettingsClose: () => {
-        ++tokenSeq;
-        baseSession.setPreview(null);
+        this.session.onEventDayChange();
+        busyLanes.clear();
+        baseSession.setBusy(false);
       },
     });
     this.ui = new ComiPathDomCoordinator();
+    this.dm.activeEventDaySession.subscribe(() => {
+      if (this.ui) {
+        this.updateManagementModels();
+        this.ui.updateCounts?.(this.dm);
+      }
+    });
+    baseSession.subscribe(() => {
+      if (this.ui && !this.suppressSessionModelUpdates)
+        this.updateManagementModels();
+    });
     this.currentTarget = null;
     this.currentRoute = null;
     this.currentStartSpace = "";
@@ -200,12 +195,10 @@ export class ComiPathBrowserRuntime {
     this.optimizationTimeLimitMs =
       DEFAULT_NAVIGATION_OPTIMIZATION_TIME_LIMIT_MS;
     this.navigationState = null;
-    this.draftGasUrl = "";
-    this.selectedSheetName = "";
-    this.fetchedSheetNames = [];
     this.sourceErrorMessage = "";
     this.outboxResultMessage = "";
     this.outboxErrorMessage = "";
+    this.suppressSessionModelUpdates = false;
     this.activeDeleteScope = null;
     this.deleteErrorMessage = "";
     this.settingsEscapeHandler = null;
@@ -251,10 +244,12 @@ export class ComiPathBrowserRuntime {
   }
 
   addOwnedEventListener(target, type, listener, options) {
-    target.addEventListener(type, listener, options);
-    this.ownedEventListeners.push(() =>
-      target.removeEventListener(type, listener),
-    );
+    if (target && typeof target.addEventListener === "function") {
+      target.addEventListener(type, listener, options);
+      this.ownedEventListeners.push(() =>
+        target.removeEventListener(type, listener),
+      );
+    }
   }
 
   scheduleTimeout(callback, delay, onCancel) {
@@ -343,6 +338,7 @@ export class ComiPathBrowserRuntime {
       ? activeState.circles.filter((circle) => !circle.removedFromSource).length
       : 0;
     const canExportCsv = activeCircleCount > 0;
+    const sourceSessionSnapshot = this.session.getSnapshot();
 
     const sourceManagerModel = {
       activeRef: activeRef ? { ...activeRef } : null,
@@ -350,20 +346,19 @@ export class ComiPathBrowserRuntime {
       source: sourceSummary,
       sourceType,
       gasUrlInput:
-        this.draftGasUrl ||
+        sourceSessionSnapshot.draftWebAppUrl ||
         (activeState?.source.type === "gas" ? activeState.source.gasUrl : ""),
       selectedSheetName:
-        this.selectedSheetName ||
-        (activeState?.source.type === "gas"
-          ? activeState.source.sheetName
-          : ""),
-      sheetNames: this.fetchedSheetNames || [],
+        sourceSessionSnapshot.selectedSheetName ||
+        (activeState?.source.type === "gas" ? activeState.source.sheetName : ""),
+      sheetNames: sourceSessionSnapshot.sheetNames,
       pendingCount,
       canExportCsv,
       busy:
         this.session.isBusy("source-request") ||
         this.session.isBusy("transition"),
-      errorMessage: this.sourceErrorMessage || "",
+      errorMessage:
+        this.session.getSnapshot().errorMessage || this.sourceErrorMessage || "",
     };
 
     const outboxPanelModel = buildOutboxPanelModel(
@@ -455,333 +450,10 @@ export class ComiPathBrowserRuntime {
   clearActivePreviewIfAny() {
     const activePreview = this.session.getActivePreview();
     if (activePreview) {
-      if (activePreview.kind === "csv") {
-        this.dm.cancelCsvPreview(activePreview.previewId);
-      } else {
-        this.dm.cancelGasPreview(activePreview.previewId);
-      }
+      this.circleDataSourceController?.cancelPreview(activePreview.previewId);
+      this.session.setPreview(null);
     }
     this.closeSourceDiffDialog();
-  }
-
-  async handleSourcePreviewApply(previewId) {
-    const activePreview = this.session.getActivePreview();
-    if (!activePreview || activePreview.previewId !== previewId) return;
-
-    if (
-      !this.dm.activeRef ||
-      this.dm.activeRef.eventId !== activePreview.ref.eventId ||
-      this.dm.activeRef.dayId !== activePreview.ref.dayId
-    ) {
-      this.handleSourcePreviewCancel();
-      return;
-    }
-
-    this.session.setBusy("preview-apply", true);
-    const dialog = document.getElementById("source-diff-dialog");
-    if (dialog?.model) {
-      dialog.model = { ...dialog.model, busy: true, errorMessage: "" };
-    }
-
-    try {
-      if (activePreview.kind === "csv") {
-        this.dm.applyCsvReplacement(previewId);
-      } else {
-        this.dm.applyGasPreview(previewId);
-      }
-
-      const changedRef = { ...activePreview.ref };
-      this.invalidateNavigationForSourceChange(changedRef);
-
-      this.session.clearPreview();
-      this.session.setBusy("preview-apply", false);
-      this.closeSourceDiffDialog();
-      this.updateManagementModels();
-      this.ui.updateCounts(this.dm);
-      if (this.dm.wantToBuy.length > 0) {
-        this.searchNext("", false);
-      } else {
-        this.ui.showTarget(null);
-      }
-      this.ui.showToast("ソースデータを適用しました");
-    } catch (err) {
-      this.session.setBusy("preview-apply", false);
-      const errorMessage = formatSourceApplyError(err);
-      if (dialog?.model) {
-        dialog.model = { ...dialog.model, busy: false, errorMessage };
-      }
-    }
-  }
-
-  handleSourcePreviewCancel() {
-    this.clearActivePreviewIfAny();
-    if (this.navigationState) this.saveNavigationSnapshot();
-    this.session.clearPreview();
-    this.updateManagementModels();
-  }
-
-  /** Handle CSV file preview request without saving or applying. */
-  async handleCsvPreviewRequest(file) {
-    if (
-      !file ||
-      typeof file.name !== "string" ||
-      !/\.csv$/i.test(file.name) ||
-      typeof file.size !== "number" ||
-      file.size < 0 ||
-      !this.dm.activeRef ||
-      !this.dm.activeState
-    ) {
-      this.sourceErrorMessage = "拡張子が .csv のファイルを選択してください。";
-      this.updateManagementModels();
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      this.sourceErrorMessage = "ファイルサイズは5MB以下にしてください。";
-      this.updateManagementModels();
-      return;
-    }
-
-    const token = this.session.beginSourceRequest();
-    const activeRef = { ...this.dm.activeRef };
-    const expectedGeneration = this.dm.activeState.sourceGeneration;
-
-    try {
-      const text = await file.text();
-      if (
-        !this.session.isLatestRequestToken(token) ||
-        !this.dm.activeRef ||
-        this.dm.activeRef.eventId !== activeRef.eventId ||
-        this.dm.activeRef.dayId !== activeRef.dayId ||
-        this.dm.activeState?.sourceGeneration !== expectedGeneration
-      ) {
-        return;
-      }
-
-      const preview = await this.dm.previewCsvReplacement(
-        activeRef,
-        file.name,
-        text,
-      );
-
-      if (
-        !this.session.isLatestRequestToken(token) ||
-        !this.dm.activeRef ||
-        this.dm.activeRef.eventId !== activeRef.eventId ||
-        this.dm.activeRef.dayId !== activeRef.dayId ||
-        this.dm.activeState?.sourceGeneration !== expectedGeneration
-      ) {
-        return;
-      }
-
-      this.session.setActivePreview({
-        kind: "csv",
-        ref: activeRef,
-        previewId: preview.previewId,
-        expectedSourceGeneration: expectedGeneration,
-      });
-      this.sourceErrorMessage = "";
-      this.updateManagementModels();
-      this.openSourceDiffDialog(file.name, formatSourceDiff(preview.diff));
-    } catch (err) {
-      if (!this.session.isLatestRequestToken(token)) return;
-      if (err instanceof CsvValidationError) {
-        const issuesSummary = err.issues
-          .map(
-            (i) => `[${i.row}行目 ${i.column}列] ${formatCsvIssue(i.message)}`,
-          )
-          .join("; ");
-        this.sourceErrorMessage = `CSVデータの検証エラー: ${issuesSummary}`;
-      } else {
-        this.sourceErrorMessage = "CSVプレビューの生成に失敗しました。";
-      }
-      this.updateManagementModels();
-    } finally {
-      if (this.session.isLatestRequestToken(token)) {
-        this.session.setBusy("source-request", false);
-        this.session.setGasAbortController(null);
-        this.updateManagementModels();
-      }
-    }
-  }
-
-  /** Export active event/day state as a downloadable CSV. */
-  handleCsvExportRequest(ref) {
-    if (
-      !isEventDayRef(ref) ||
-      !this.dm.activeRef ||
-      !sameEventDayRef(ref, this.dm.activeRef) ||
-      !this.dm.activeState
-    ) {
-      return;
-    }
-    const activeCirclesCount = this.dm.activeState.circles.filter(
-      (circle) => !circle.removedFromSource,
-    ).length;
-    if (activeCirclesCount === 0) return;
-
-    try {
-      const csv = this.dm.exportCsv(this.dm.activeRef);
-      const filename = formatCsvExportFilename(this.dm.activeRef, new Date());
-      downloadCsv(csv, filename, this.downloadAdapter);
-      this.ui.showToast("CSVをダウンロードしました");
-    } catch (_err) {
-      this.sourceErrorMessage = "CSVのエクスポートに失敗しました。";
-      this.updateManagementModels();
-      this.ui.showToast("CSVエクスポートエラー", "error");
-    }
-  }
-
-  /** Fetch sheet names for a given GAS Web ComiPathBrowserRuntime URL without persisting the URL. */
-  async handleGasSheetsRequest(gasUrl) {
-    if (!gasUrl || !this.dm.activeRef || !this.dm.activeState) return;
-
-    let normalizedUrl;
-    try {
-      normalizedUrl = parseGasWebAppUrl(gasUrl);
-    } catch {
-      this.sourceErrorMessage =
-        "有効なGoogle Apps ScriptのWebApp URLを入力してください。";
-      this.updateManagementModels();
-      return;
-    }
-
-    const token = this.session.beginSourceRequest();
-    const activeRef = { ...this.dm.activeRef };
-    const expectedGeneration = this.dm.activeState.sourceGeneration;
-    const controller = new AbortController();
-
-    this.session.setGasAbortController(controller);
-    this.draftGasUrl = normalizedUrl;
-    this.sourceErrorMessage = "";
-    this.updateManagementModels();
-
-    try {
-      const res = await this.dm.client.fetchSheetList(
-        normalizedUrl,
-        controller.signal,
-      );
-      if (
-        !this.session.isLatestRequestToken(token) ||
-        !this.dm.activeRef ||
-        this.dm.activeRef.eventId !== activeRef.eventId ||
-        this.dm.activeRef.dayId !== activeRef.dayId ||
-        this.dm.activeState?.sourceGeneration !== expectedGeneration
-      ) {
-        return;
-      }
-
-      this.fetchedSheetNames = res.sheets || [];
-      this.selectedSheetName = this.fetchedSheetNames[0] || "";
-      this.sourceErrorMessage = "";
-    } catch (_err) {
-      if (!this.session.isLatestRequestToken(token)) return;
-      this.fetchedSheetNames = [];
-      this.selectedSheetName = "";
-      this.sourceErrorMessage =
-        "スプレッドシート一覧の取得に失敗しました。URLを確認してください。";
-    } finally {
-      if (this.session.isLatestRequestToken(token)) {
-        this.session.setBusy("source-request", false);
-        this.session.setGasAbortController(null);
-        this.updateManagementModels();
-      }
-    }
-  }
-
-  /** Stage a GAS preview for initial import, replacement, or refresh. */
-  async handleGasPreviewRequest(source, requestedMode) {
-    void requestedMode;
-    const normalizedSource = safeGasSource(source);
-    if (!normalizedSource || !this.dm.activeRef || !this.dm.activeState) {
-      this.sourceErrorMessage =
-        "有効なWebApp URLとシート名を指定してください。";
-      this.updateManagementModels();
-      return;
-    }
-
-    const activeState = this.dm.activeState;
-    const activeRef = { ...this.dm.activeRef };
-    const expectedGeneration = activeState.sourceGeneration;
-
-    // Validate mode against persisted source
-    let validatedMode = "replacement";
-    if (
-      activeState.source.type === "csv" &&
-      activeState.source.fileName === "empty.csv" &&
-      activeState.circles.length === 0
-    ) {
-      validatedMode = "initial";
-    } else if (
-      activeState.source.type === "gas" &&
-      activeState.source.gasUrl === normalizedSource.gasUrl &&
-      activeState.source.sheetName === normalizedSource.sheetName
-    ) {
-      validatedMode = "refresh";
-    } else {
-      validatedMode = "replacement";
-    }
-
-    const token = this.session.beginSourceRequest();
-    const controller = new AbortController();
-
-    this.session.setGasAbortController(controller);
-    this.sourceErrorMessage = "";
-    this.updateManagementModels();
-
-    try {
-      let preview;
-      if (validatedMode === "initial") {
-        preview = await this.dm.refreshService.previewInitialImport(
-          activeRef,
-          normalizedSource,
-          controller.signal,
-        );
-      } else if (validatedMode === "replacement") {
-        preview = await this.dm.refreshService.previewReplacement(
-          activeRef,
-          normalizedSource,
-          controller.signal,
-        );
-      } else {
-        preview = await this.dm.refreshService.previewRefresh(
-          activeRef,
-          controller.signal,
-        );
-      }
-
-      if (
-        !this.session.isLatestRequestToken(token) ||
-        !this.dm.activeRef ||
-        this.dm.activeRef.eventId !== activeRef.eventId ||
-        this.dm.activeRef.dayId !== activeRef.dayId ||
-        this.dm.activeState?.sourceGeneration !== expectedGeneration
-      ) {
-        return;
-      }
-
-      this.session.setActivePreview({
-        kind: "gas",
-        ref: activeRef,
-        previewId: preview.previewId,
-        mode: validatedMode,
-        expectedSourceGeneration: expectedGeneration,
-      });
-      this.sourceErrorMessage = "";
-      this.openSourceDiffDialog(
-        normalizedSource.sheetName,
-        formatSourceDiff(preview.diff),
-      );
-    } catch (_err) {
-      if (!this.session.isLatestRequestToken(token)) return;
-      this.sourceErrorMessage = "GASプレビューの取得に失敗しました。";
-    } finally {
-      if (this.session.isLatestRequestToken(token)) {
-        this.session.setBusy("source-request", false);
-        this.session.setGasAbortController(null);
-        this.updateManagementModels();
-      }
-    }
   }
 
   /** Delegates outbox retry requests to the GasSyncCoordinator. */
@@ -795,6 +467,7 @@ export class ComiPathBrowserRuntime {
       return;
     }
     const ref = detail.ref || undefined;
+    this.suppressSessionModelUpdates = true;
     const requestToken = this.session.nextRequestToken();
     this.session.setBusy("outbox-retry", true);
     this.outboxResultMessage = "";
@@ -816,6 +489,7 @@ export class ComiPathBrowserRuntime {
       this.outboxErrorMessage = "再送処理中にエラーが発生しました。";
       this.ui.showToast("再送エラー", "error");
     } finally {
+      this.suppressSessionModelUpdates = false;
       if (this.session.isLatestRequestToken(requestToken)) {
         this.updateManagementModels();
         this.ui?.updateCounts?.(this.dm);
@@ -892,14 +566,17 @@ export class ComiPathBrowserRuntime {
         this.dm.activeEventDaySession.clearActiveEventDay();
 
         const remainingList = this.dm.repository.listEventDays();
-        if (remainingList.length > 0) {
-          await this.handleEventDaySelect(remainingList[0]);
-        } else {
-          const defaultRef = {
-            eventId: this.dm.eventRegistry.events[0].eventId,
-            dayId: this.dm.eventRegistry.events[0].days[0].dayId,
-          };
-          await this.handleEventDaySelect(defaultRef);
+        const nextRef =
+          remainingList.length > 0
+            ? remainingList[0]
+            : {
+                eventId: this.dm.eventRegistry.events[0].eventId,
+                dayId: this.dm.eventRegistry.events[0].days[0].dayId,
+              };
+        const nextState = this.dm.repository.load(nextRef);
+        if (nextState) {
+          this.dm.repository.rememberLastOpenedEventDay(nextRef);
+          this.dm.activeEventDaySession.setActiveEventDay(nextRef, nextState);
         }
 
         if (!this.dm.activeRef) {
@@ -961,96 +638,6 @@ export class ComiPathBrowserRuntime {
     } finally {
       this.updateManagementModels();
       this.ui?.updateCounts?.(this.dm);
-    }
-  }
-
-  /** Prepare and atomically commit a registry-approved event/day transition. */
-  async handleEventDaySelect(ref) {
-    if (
-      !ref ||
-      typeof ref !== "object" ||
-      typeof ref.eventId !== "string" ||
-      typeof ref.dayId !== "string"
-    ) {
-      return;
-    }
-
-    const event = this.dm.eventRegistry?.events.find(
-      (candidate) => candidate.eventId === ref.eventId,
-    );
-    if (!event?.days.some((day) => day.dayId === ref.dayId)) return;
-
-    const focusTarget = document.activeElement;
-    if (
-      this.isTransitioning ||
-      (this.dm.activeRef &&
-        this.dm.activeRef.eventId === ref.eventId &&
-        this.dm.activeRef.dayId === ref.dayId)
-    ) {
-      return;
-    }
-
-    if (this.navigationState) this.saveNavigationSnapshot();
-    this.clearActivePreviewIfAny();
-    this.session.onEventDayChange();
-    this.draftGasUrl = "";
-    this.selectedSheetName = "";
-    this.fetchedSheetNames = [];
-    this.sourceErrorMessage = "";
-
-    const token = ++this.transitionToken;
-    this.isTransitioning = true;
-    this.session.setBusy("transition", true);
-    this.ui.setSettingsBusy(true);
-    this.ui.setSettingsError("");
-
-    try {
-      const transitionService = this.dm.getTransitionService(
-        this.currentManifest,
-      );
-      const prepared = await transitionService.prepare(ref);
-      if (token !== this.transitionToken) return;
-
-      const committedState = transitionService.commit(prepared);
-      this.currentManifest = prepared.manifest;
-      runtimeMapAreaCatalog.replaceMapAreas(prepared.manifest.areas);
-
-      this.dm.activateCommittedState(prepared.ref, committedState);
-
-      this.resetNavigationRuntimeState();
-      this.selectionState = "idle";
-      this.selectionMessage = "";
-      this.routeAssetsCache.clear();
-
-      this.ui.updateAreaHeader();
-      this.ui.updateCounts(this.dm);
-      this.updateManagementModels();
-
-      if (this.dm.wantToBuy.length > 0) {
-        await this.searchNext("", false);
-      } else {
-        this.ui.showTarget(null);
-      }
-
-      this.ui.showToast(
-        `${prepared.event.displayName} ${prepared.ref.dayId} へ切り替えました`,
-      );
-    } catch (error) {
-      if (token !== this.transitionToken) return;
-      console.error("Event/Day transition failed:", error);
-      this.updateManagementModels();
-      this.ui.setSettingsError(
-        "イベント・日程の切り替えに失敗しました。以前の表示を維持しています。",
-      );
-      this.ui.showToast("切り替えに失敗しました", "error");
-    } finally {
-      if (token === this.transitionToken) {
-        this.isTransitioning = false;
-        this.session.setBusy("transition", false);
-        this.ui.setSettingsBusy(false);
-        this.updateManagementModels();
-        if (focusTarget instanceof HTMLElement) focusTarget.focus();
-      }
     }
   }
 
@@ -1567,9 +1154,6 @@ export class ComiPathBrowserRuntime {
       if (!isOpen) {
         this.clearActivePreviewIfAny();
         this.session.onSettingsClose();
-        this.draftGasUrl = "";
-        this.selectedSheetName = "";
-        this.fetchedSheetNames = [];
         this.sourceErrorMessage = "";
         this.outboxResultMessage = "";
         this.outboxErrorMessage = "";
@@ -1599,25 +1183,6 @@ export class ComiPathBrowserRuntime {
     }
 
     const settings = this.ui.els.settingsArea;
-    this.addOwnedEventListener(settings, "event-day-select", (e) => {
-      this.handleEventDaySelect(e.detail);
-    });
-
-    this.addOwnedEventListener(settings, "csv-preview-request", (e) => {
-      this.handleCsvPreviewRequest(e.detail.file);
-    });
-
-    this.addOwnedEventListener(settings, "csv-export-request", (e) => {
-      this.handleCsvExportRequest(e.detail.ref);
-    });
-
-    this.addOwnedEventListener(settings, "gas-sheets-request", (e) => {
-      this.handleGasSheetsRequest(e.detail.gasUrl);
-    });
-
-    this.addOwnedEventListener(settings, "gas-preview-request", (e) => {
-      this.handleGasPreviewRequest(e.detail.source, e.detail.mode);
-    });
 
     this.addOwnedEventListener(settings, "gas-retry-request", (e) => {
       this.handleGasRetryRequest(e.detail);
@@ -1650,16 +1215,6 @@ export class ComiPathBrowserRuntime {
     this.addOwnedEventListener(settings, "storage-delete-cancel", () => {
       this.handleDeleteDialogCancel();
     });
-
-    const diffDialog = document.getElementById("source-diff-dialog");
-    if (diffDialog) {
-      this.addOwnedEventListener(diffDialog, "source-preview-apply", (e) => {
-        this.handleSourcePreviewApply(e.detail.previewId);
-      });
-      this.addOwnedEventListener(diffDialog, "source-preview-cancel", () => {
-        this.handleSourcePreviewCancel();
-      });
-    }
 
     const resumeDialog = document.getElementById("navigation-resume-dialog");
     if (resumeDialog) {

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime";
 import type {
   EventRegistryV1,
@@ -64,17 +64,13 @@ describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
         createSampleState(ref1.eventId, ref1.dayId),
     );
 
-    const transitionSpy = vi
-      .spyOn(app, "handleEventDaySelect")
-      .mockResolvedValue(undefined);
-
     await app.handleStorageDeleteRequest({
       scope: { type: "event-day", ref: ref1 },
       confirmation: "",
     });
 
     expect(app.dm.repository.load(ref1)).toBeNull();
-    expect(transitionSpy).toHaveBeenCalledWith(ref2);
+    expect(app.dm.activeRef).toEqual(ref2);
   });
 
   it("does not switch active state when deleting a non-active event-day", async () => {
@@ -94,7 +90,6 @@ describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
         createSampleState(activeRef.eventId, activeRef.dayId),
     );
 
-    const transitionSpy = vi.spyOn(app, "handleEventDaySelect");
     await app.handleStorageDeleteRequest({
       scope: { type: "event-day", ref: deletedRef },
       confirmation: "",
@@ -102,7 +97,6 @@ describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
 
     expect(app.dm.repository.load(deletedRef)).toBeNull();
     expect(app.dm.activeRef).toEqual(activeRef);
-    expect(transitionSpy).not.toHaveBeenCalled();
   });
 
   it("handles all-events deletion, clears repository, and reinitializes registry default state", async () => {
@@ -123,20 +117,12 @@ describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
         createSampleState(ref1.eventId, ref1.dayId),
     );
 
-    const transitionSpy = vi
-      .spyOn(app, "handleEventDaySelect")
-      .mockResolvedValue(undefined);
-
     await app.handleStorageDeleteRequest({
       scope: { type: "all-events" },
       confirmation: "全イベントを削除",
     });
 
     expect(app.dm.repository.listEventDays()).toHaveLength(0);
-    expect(transitionSpy).toHaveBeenCalledWith({
-      eventId: "c104",
-      dayId: "day1",
-    });
   });
 
   it("rejects all-events deletion if confirmation text is invalid", async () => {

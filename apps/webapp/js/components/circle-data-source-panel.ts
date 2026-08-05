@@ -27,6 +27,18 @@ function isValidGasWebAppUrl(url: string): boolean {
   );
 }
 
+function sameEventDay(
+  left: EventDayRef | null,
+  right: EventDayRef | null,
+): boolean {
+  return Boolean(
+    left &&
+      right &&
+      left.eventId === right.eventId &&
+      left.dayId === right.dayId,
+  );
+}
+
 /** Light-DOM source selector that emits preview requests without persistence. */
 export class CircleDataSourcePanel extends LitElement {
   static properties = {
@@ -38,6 +50,8 @@ export class CircleDataSourcePanel extends LitElement {
   private activeTab: "csv" | "gas" = "csv";
   private localGasUrl = "";
   private localSheetName = "";
+  private gasUrlDirty = false;
+  private sheetNameDirty = false;
   private localError = "";
 
   constructor() {
@@ -57,10 +71,25 @@ export class CircleDataSourcePanel extends LitElement {
       if (!oldModel || oldModel.sourceType !== this.model.sourceType) {
         this.activeTab = this.model.sourceType;
       }
-      if (this.model.gasUrlInput !== undefined) {
+      const eventDayChanged =
+        !oldModel || !sameEventDay(oldModel.activeRef, this.model.activeRef);
+      const sourceChanged =
+        !oldModel || oldModel.sourceType !== this.model.sourceType;
+      if (eventDayChanged || sourceChanged) {
+        this.localGasUrl = this.model.gasUrlInput;
+        this.gasUrlDirty = false;
+      }
+      if (!this.gasUrlDirty && oldModel?.gasUrlInput !== this.model.gasUrlInput) {
         this.localGasUrl = this.model.gasUrlInput;
       }
-      if (this.model.selectedSheetName !== undefined) {
+      if (eventDayChanged || sourceChanged) {
+        this.localSheetName = this.model.selectedSheetName;
+        this.sheetNameDirty = false;
+      }
+      if (
+        !this.sheetNameDirty &&
+        oldModel?.selectedSheetName !== this.model.selectedSheetName
+      ) {
         this.localSheetName = this.model.selectedSheetName;
       }
     }
@@ -107,6 +136,8 @@ export class CircleDataSourcePanel extends LitElement {
     const input = e.target as HTMLInputElement;
     this.localGasUrl = input.value;
     this.localSheetName = "";
+    this.gasUrlDirty = true;
+    this.sheetNameDirty = false;
     this.localError = "";
     this.requestUpdate();
   }
@@ -129,6 +160,7 @@ export class CircleDataSourcePanel extends LitElement {
   private handleSheetSelect(e: Event): void {
     const select = e.target as HTMLSelectElement;
     this.localSheetName = select.value;
+    this.sheetNameDirty = true;
     this.localError = "";
     this.requestUpdate();
   }

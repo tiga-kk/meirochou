@@ -1,10 +1,10 @@
-import { applySourceDiff } from "../domain/circle-source-diff";
-import type { CircleDataPreview } from "../domain/circle-data-source-types";
 import type {
   ActiveEventDaySession,
   EventDayRef,
   LocalEventDayState,
 } from "../../event-day/public-api";
+import type { CircleDataPreview } from "../domain/circle-data-source-types";
+import { applySourceDiff } from "../domain/circle-source-diff";
 import type { RouteGuidanceInvalidation } from "./route-guidance-invalidation";
 
 export interface ApplyCircleDataPreviewRepository {
@@ -22,6 +22,14 @@ export class StalePreviewError extends Error {
     super(message);
     this.name = "StalePreviewError";
     Object.setPrototypeOf(this, StalePreviewError.prototype);
+  }
+}
+
+export class PendingOutboxError extends Error {
+  constructor(count: number) {
+    super(`blocked by ${count} pending outbox entries`);
+    this.name = "PendingOutboxError";
+    Object.setPrototypeOf(this, PendingOutboxError.prototype);
   }
 }
 
@@ -49,7 +57,9 @@ export class ApplyCircleDataPreviewUseCase {
     } = {},
   ) {}
 
-  async execute(input: ApplyCircleDataPreviewInput): Promise<LocalEventDayState> {
+  async execute(
+    input: ApplyCircleDataPreviewInput,
+  ): Promise<LocalEventDayState> {
     const now = this.options.now ?? (() => new Date().toISOString());
     const createSourceGeneration =
       this.options.createSourceGeneration ??
@@ -61,6 +71,9 @@ export class ApplyCircleDataPreviewUseCase {
     const current = this.repository.load(preview.ref);
     if (!current) {
       throw new StalePreviewError("CSV preview source state is missing");
+    }
+    if (current.gasOutbox.length > 0) {
+      throw new PendingOutboxError(current.gasOutbox.length);
     }
 
     // Step 2: Reject stale generation or expired preview
@@ -79,10 +92,8 @@ export class ApplyCircleDataPreviewUseCase {
     // Build the next state with new source generation
     const nextState: LocalEventDayState = {
       ...merged,
-      source: { type: "csv", fileName: this.extractFileName(preview) },
+      source: { ...(preview.source ?? current.source) },
       sourceGeneration: createSourceGeneration(),
-      circleStates: current.circleStates,
-      gasOutbox: [],
       timestamps: {
         createdAt: current.timestamps.createdAt,
         updatedAt: applyTimestamp,
@@ -123,12 +134,5 @@ export class ApplyCircleDataPreviewUseCase {
     const candidateMs = Date.parse(candidate);
     if (candidateMs > currentMax) return candidate;
     return new Date(currentMax + 1).toISOString();
-  }
-
-  private extractFileName(preview: CircleDataPreview): string {
-    // The preview does not carry fileName directly in CircleDataPreview.
-    // We use a placeholder; callers that need a specific filename should extend.
-    // In practice, the controller passes this via the preview creation.
-    return "circles.csv";
   }
 }

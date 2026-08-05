@@ -42,6 +42,7 @@ describe("ComiPathBrowserRuntime & CircleDataSource CSV Export Integration", () 
 
     app = new ComiPathBrowserRuntime();
     app.dm.eventRegistry = createRegistry();
+    app.dm.eventRegistryUrl = "http://localhost/assets/events/manifest.json";
   });
 
   it("exports active event day CSV via BrowserCircleCsvDownloader on request", async () => {
@@ -109,5 +110,60 @@ describe("ComiPathBrowserRuntime & CircleDataSource CSV Export Integration", () 
     const useCase = new ExportCirclesToCsvUseCase(app.dm.repository, downloader);
 
     expect(() => useCase.execute({ eventDay: ref })).toThrow("Event day state not found");
+  });
+
+  it("triggers CSV export for active event day using ExportCirclesToCsvUseCase and BrowserCircleCsvDownloader", async () => {
+    const ref: EventDayRef = { eventId: "c104", dayId: "day1" };
+    const sampleState: LocalEventDayState = {
+      schemaVersion: 1,
+      source: { type: "csv", fileName: "test.csv" },
+      sourceGeneration: "gen-1",
+      circles: [{ space: "東A01a", priority: 1 }],
+      purchased: ["東A01a"],
+      hold: [],
+      history: [],
+      redo: [],
+      gasOutbox: [],
+      timestamps: {
+        createdAt: "2026-07-25T00:00:00.000Z",
+        updatedAt: "2026-07-25T00:00:00.000Z",
+        sourceUpdatedAt: "2026-07-25T00:00:00.000Z",
+      },
+    };
+    app.dm.repository.save(ref, sampleState);
+    await app.dm.openEventDay(ref);
+
+    const downloader = new BrowserCircleCsvDownloader(window);
+    const exportUseCase = new ExportCirclesToCsvUseCase(app.dm.repository, downloader);
+
+    expect(() => exportUseCase.execute({ eventDay: ref })).not.toThrow();
+    expect(window.URL.createObjectURL).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles active event day with empty circles array during CSV export", async () => {
+    const ref: EventDayRef = { eventId: "c104", dayId: "day1" };
+    const emptyState: LocalEventDayState = {
+      schemaVersion: 1,
+      source: { type: "csv", fileName: "empty.csv" },
+      sourceGeneration: "gen-1",
+      circles: [],
+      purchased: [],
+      hold: [],
+      history: [],
+      redo: [],
+      gasOutbox: [],
+      timestamps: {
+        createdAt: "2026-07-25T00:00:00.000Z",
+        updatedAt: "2026-07-25T00:00:00.000Z",
+        sourceUpdatedAt: "2026-07-25T00:00:00.000Z",
+      },
+    };
+    app.dm.repository.save(ref, emptyState);
+
+    const downloader = new BrowserCircleCsvDownloader(window);
+    const useCase = new ExportCirclesToCsvUseCase(app.dm.repository, downloader);
+
+    expect(() => useCase.execute({ eventDay: ref })).not.toThrow();
+    expect(window.URL.createObjectURL).toHaveBeenCalledTimes(1);
   });
 });

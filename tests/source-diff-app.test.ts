@@ -64,46 +64,118 @@ describe("Circle Data Source Diff & Preview Dialog Integration", () => {
     await app.dm.openEventDay(ref);
   });
 
-  it("stages and applies a valid CSV preview when handleCsvPreviewRequest is triggered", async () => {
+  it("stages and applies a valid CSV preview when PreviewCsvImportUseCase is triggered", async () => {
     const csvContent = "space,priority\n東1-A01a,10";
-    const csvFile = new File([csvContent], "test.csv", { type: "text/csv" });
-    Object.defineProperty(csvFile, "text", {
-      value: async () => csvContent,
+    const ref: EventDayRef = { eventId: "C108", dayId: "day1" };
+
+    const { PreviewCsvImportUseCase } = await import(
+      "../apps/webapp/js/features/circle-data-source/use-cases/preview-csv-import"
+    );
+    const useCase = new PreviewCsvImportUseCase(repo);
+    const preview = useCase.execute({
+      eventDay: ref,
+      fileName: "test.csv",
+      text: csvContent,
     });
 
-    await app.handleCsvPreviewRequest(csvFile);
-
-    const activePreview = app.session.getActivePreview?.() ?? null;
-    expect(app.sourceErrorMessage).toBe("");
-
-    // State in repository remains unchanged until apply is triggered
-    const ref: EventDayRef = { eventId: "C108", dayId: "day1" };
+    expect(preview.previewId).toBeDefined();
     expect(repo.load(ref)?.circles).toHaveLength(0);
   });
 
   it("clears preview when event/day selection changes", async () => {
-    const csvContent = "space,priority\n東1-A01a,10";
-    const csvFile = new File([csvContent], "test.csv", { type: "text/csv" });
-    Object.defineProperty(csvFile, "text", {
-      value: async () => csvContent,
+    const session = app.circleDataSourceSession ?? app.session;
+    session.setPreview({
+      previewId: "prev-1",
+      ref: { eventId: "C108", dayId: "day1" },
+      mode: "initial",
+      expectedSourceGeneration: "gen-1",
+      diff: { added: [], updated: [], removed: [], unchanged: [] },
+      newCircles: [],
+      fetchedAt: new Date().toISOString(),
+      expiresAt: new Date().toISOString(),
     });
-
-    await app.handleCsvPreviewRequest(csvFile);
 
     app.session.onEventDayChange();
     expect(app.session.getActivePreview?.() ?? null).toBeNull();
   });
 
   it("clears preview when settings panel is closed", async () => {
-    const csvContent = "space,priority\n東1-A01a,10";
-    const csvFile = new File([csvContent], "test.csv", { type: "text/csv" });
-    Object.defineProperty(csvFile, "text", {
-      value: async () => csvContent,
+    const session = app.circleDataSourceSession ?? app.session;
+    session.setPreview({
+      previewId: "prev-1",
+      ref: { eventId: "C108", dayId: "day1" },
+      mode: "initial",
+      expectedSourceGeneration: "gen-1",
+      diff: { added: [], updated: [], removed: [], unchanged: [] },
+      newCircles: [],
+      fetchedAt: new Date().toISOString(),
+      expiresAt: new Date().toISOString(),
     });
-
-    await app.handleCsvPreviewRequest(csvFile);
 
     app.session.onSettingsClose();
     expect(app.session.getActivePreview?.() ?? null).toBeNull();
+  });
+
+  it("cancels active preview via CancelCircleDataPreviewUseCase", async () => {
+    const { CancelCircleDataPreviewUseCase } = await import(
+      "../apps/webapp/js/features/circle-data-source/use-cases/cancel-circle-data-preview"
+    );
+    const cancelUseCase = new CancelCircleDataPreviewUseCase();
+    expect(() =>
+      cancelUseCase.execute({
+        previewId: "prev_1",
+        ref: { eventId: "C108", dayId: "day1" },
+        mode: "initial",
+        expectedSourceGeneration: "gen_1",
+        diff: { added: [], updated: [], removed: [], countsLabel: "" },
+        newCircles: [],
+        fetchedAt: new Date().toISOString(),
+        expiresAt: new Date().toISOString(),
+      }),
+    ).not.toThrow();
+  });
+
+  it("handles error when ApplyCircleDataPreviewUseCase fails on stale generation", async () => {
+    const { ApplyCircleDataPreviewUseCase } = await import(
+      "../apps/webapp/js/features/circle-data-source/use-cases/apply-circle-data-preview"
+    );
+    const mockRepo = {
+      load: () => ({
+        schemaVersion: 2 as const,
+        source: { type: "csv" as const, fileName: "existing.csv" },
+        sourceGeneration: "gen_2", // mismatched
+        circles: [],
+        circleStates: {},
+        gasOutbox: [],
+        timestamps: { createdAt: "", updatedAt: "", sourceUpdatedAt: "" },
+      }),
+      save: vi.fn(),
+    };
+    const mockSession = {
+      getActiveEventDay: () => null,
+      replaceActiveEventDayState: vi.fn(),
+    };
+    const mockInvalidation = { invalidateAfterCircleSourceChange: vi.fn() };
+
+    const useCase = new ApplyCircleDataPreviewUseCase(
+      mockRepo as any,
+      mockSession as any,
+      mockInvalidation,
+    );
+
+    const stalePreview = {
+      previewId: "p1",
+      ref: { eventId: "C108", dayId: "day1" },
+      mode: "initial" as const,
+      expectedSourceGeneration: "gen_1",
+      diff: { added: [], updated: [], removed: [], countsLabel: "" },
+      newCircles: [],
+      fetchedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 10000).toISOString(),
+    };
+
+    await expect(
+      useCase.execute({ previewId: "p1", preview: stalePreview }),
+    ).rejects.toThrow();
   });
 });

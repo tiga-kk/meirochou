@@ -1,18 +1,20 @@
+export type { EventRegistry } from "./domain/event-day-contracts";
 export type {
   ActiveEventDaySnapshot,
   Circle,
   CircleRecord,
   CircleStatus,
+  DataSource,
   EventDayRef,
   GasDataSource,
   GasOutboxEntry,
   LocalEventDayState,
   MapPoint,
 } from "./domain/event-day-types";
-export type { EventRegistry } from "./domain/event-day-contracts";
 export * from "./ui/event-day-selector-controller";
 export * from "./ui/event-day-selector-model";
 export * from "./ui/event-day-selector-view";
+export * from "./ui/dom-event-day-selector-view";
 export {
   type ActiveEventDayReader,
   createActiveEventDayReader,

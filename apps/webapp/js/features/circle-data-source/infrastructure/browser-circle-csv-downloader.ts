@@ -13,12 +13,18 @@ export class BrowserCircleCsvDownloader implements CircleCsvDownloader {
     const csvContent = serializeCircleCsv(circles, purchasedSpaces);
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = this.windowObj.URL.createObjectURL(blob);
-    const link = this.windowObj.document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    this.windowObj.document.body.appendChild(link);
-    link.click();
-    this.windowObj.document.body.removeChild(link);
-    this.windowObj.URL.revokeObjectURL(url);
+    try {
+      const link = this.windowObj.document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      this.windowObj.document.body.appendChild(link);
+      try {
+        link.click();
+      } finally {
+        this.windowObj.document.body.removeChild(link);
+      }
+    } finally {
+      this.windowObj.URL.revokeObjectURL(url);
+    }
   }
 }

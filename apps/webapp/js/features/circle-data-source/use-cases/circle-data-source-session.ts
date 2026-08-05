@@ -47,14 +47,20 @@ export function createCircleDataSourceSession(): CircleDataSourceSession {
     (snapshot: CircleDataSourceSessionSnapshot) => void
   >();
 
-  const snapshot = (): CircleDataSourceSessionSnapshot =>
+  const snapshot = (): CircleDataSourceSessionSnapshot & {
+    errorMessage: string | null;
+  } =>
     Object.freeze({
       ...current,
+      errorMessage: current.errorCode ? String(current.errorCode) : null,
       sheetNames: Object.freeze([...current.sheetNames]),
       preview: current.preview
         ? Object.freeze({
             ...current.preview,
             ref: Object.freeze({ ...current.preview.ref }),
+            ...(current.preview.source
+              ? { source: Object.freeze({ ...current.preview.source }) }
+              : {}),
             newCircles: Object.freeze([...(current.preview.newCircles ?? [])]),
           })
         : null,

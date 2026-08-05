@@ -5,21 +5,7 @@ import {
   decodeLegacyStringList,
   extractLegacyCircleRows,
 } from "./data/local-state-adapters";
-import {
-  applySourceDiff,
-  diffCircleSources,
-  parseCircleCsv,
-  serializeCircleCsv,
-} from "./features/circle-data-source/public-api";
-import { LocalStorageCircleDataSourceSettings as SourceSettingsService } from "./features/circle-data-source/infrastructure/local-storage-circle-data-source-settings";
-import {
-  createActiveEventDayReader,
-  createActiveEventDaySession,
-  type ActiveEventDayReader,
-  type ActiveEventDaySession,
-  type EventDayRepository,
-} from "./features/event-day/public-api";
-import { LocalStorageEventDayRepository } from "./features/event-day/infrastructure/local-storage-event-day-repository";
+import { parseCircleCsv } from "./features/circle-data-source/public-api";
 import { GasPendingUpdateDelivery } from "./features/circle-status/infrastructure/gas-pending-update-delivery";
 import type {
   CircleStatusControllerPort,
@@ -33,7 +19,6 @@ import { DiscardPendingGasUpdatesUseCase } from "./features/circle-status/use-ca
 import { DefaultPendingGasUpdateBackgroundProcess } from "./features/circle-status/use-cases/pending-gas-update-background-process";
 import { SendPendingGasUpdatesUseCase } from "./features/circle-status/use-cases/send-pending-gas-updates";
 import { UndoCircleStatusChangeUseCase } from "./features/circle-status/use-cases/undo-circle-status-change";
-import { SwitchEventDayUseCase } from "./features/event-day/use-cases/switch-event-day";
 import type { MapBundleManifest } from "./features/event-day/domain/event-day-contracts";
 import {
   type LoadedEventRegistry,
@@ -43,6 +28,15 @@ import {
   loadRuntimeMapBundleManifestFromUrl,
   resolveEventMapManifestUrl,
 } from "./features/event-day/infrastructure/http-map-manifest-loader";
+import { LocalStorageEventDayRepository } from "./features/event-day/infrastructure/local-storage-event-day-repository";
+import {
+  type ActiveEventDayReader,
+  type ActiveEventDaySession,
+  createActiveEventDayReader,
+  createActiveEventDaySession,
+  type EventDayRepository,
+} from "./features/event-day/public-api";
+import { SwitchEventDayUseCase } from "./features/event-day/use-cases/switch-event-day";
 import {
   createEmptyEventDayState,
   getCircleVisitState,
@@ -65,26 +59,13 @@ import type {
   CsvIssue,
   EventDayRef,
   EventRegistryV1,
-  GasDataSource,
   GasOutboxResult,
-  GasRefreshPreview,
   GasSyncSummary,
   HistoryEntry,
   LocalEventDayState,
   MapBundleManifestV1,
   PurchaseMutationResult,
-  SourceDiff,
 } from "./features/event-day/domain/application-contract-types";
-
-export interface CsvReplacementPreview {
-  readonly previewId: string;
-  readonly ref: EventDayRef;
-  readonly expectedSourceGeneration: string;
-  readonly incomingHash: string;
-  readonly fileName: string;
-  readonly diff: SourceDiff;
-  readonly expiresAt: string;
-}
 
 export interface LegacyImportPreview {
   readonly previewId: string;
@@ -100,22 +81,13 @@ export interface DataManagerOptions {
   readonly storage?: StorageService;
   readonly now?: () => Date;
   readonly createSourceGeneration?: () => string;
-  readonly createPreviewId?: () => string;
-  readonly previewTtlMs?: number;
   readonly client?: GasApiClient;
   readonly repository?: EventDayRepository;
-  readonly sourceSettings?: { saveGuarded: (args: any) => LocalEventDayState };
-  readonly refreshService?: any;
   readonly activeEventDaySession?: ActiveEventDaySession;
   readonly activeEventDayReader?: ActiveEventDayReader;
   readonly circleStatusController?: CircleStatusControllerPort;
   readonly pendingGasUpdatesController?: PendingGasUpdatesControllerPort;
   readonly backgroundProcess?: PendingGasUpdateBackgroundProcess;
-}
-
-interface CsvPreviewRecord extends CsvReplacementPreview {
-  readonly text: string;
-  readonly circles: readonly CircleRecord[];
 }
 
 interface LegacyPreviewRecord {
@@ -141,34 +113,11 @@ export class CsvValidationError extends Error {
   }
 }
 
-export class StaleCsvPreviewError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "StaleCsvPreviewError";
-  }
-}
-
-export class StaleSourceStateError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "StaleSourceStateError";
-  }
-}
-
 export class LegacyImportError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "LegacyImportError";
   }
-}
-
-function hashText(text: string): string {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < text.length; index += 1) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 function sameRef(left: EventDayRef | null, right: EventDayRef): boolean {
@@ -182,15 +131,12 @@ function sameRef(left: EventDayRef | null, right: EventDayRef): boolean {
 export class EventDayDataStore {
   readonly storage: StorageService;
   readonly repository: EventDayRepository;
-  readonly sourceSettings: { saveGuarded: (args: any) => LocalEventDayState };
   readonly client: GasApiClient;
-  readonly refreshService?: any;
   readonly circleStatusController?: CircleStatusControllerPort;
   readonly pendingGasUpdatesController?: PendingGasUpdatesControllerPort;
   readonly backgroundProcess?: PendingGasUpdateBackgroundProcess;
   readonly activeEventDaySession: ActiveEventDaySession;
   readonly activeEventDayReader: ActiveEventDayReader;
-  readonly csvPreviews = new Map<string, CsvPreviewRecord>();
 
   get wantToBuy(): Circle[] {
     return [...this.activeEventDayReader.getAllCircles()];
@@ -214,8 +160,6 @@ export class EventDayDataStore {
 
   private readonly now: () => Date;
   private readonly createSourceGeneration: () => string;
-  private readonly createPreviewId: () => string;
-  private readonly previewTtlMs: number;
   private readonly legacyPreviews = new Map<string, LegacyPreviewRecord>();
 
   constructor(storage?: StorageService, options: DataManagerOptions = {}) {
@@ -227,29 +171,6 @@ export class EventDayDataStore {
       createActiveEventDayReader(this.activeEventDaySession);
     this.repository =
       options.repository || new LocalStorageEventDayRepository(this.storage);
-    this.sourceSettings = options.sourceSettings || {
-      saveGuarded: ({ nextState, ref, expectedSourceGeneration }: any) => {
-        if (ref) {
-          const current = this.repository.load(ref);
-          if (
-            current &&
-            expectedSourceGeneration &&
-            current.sourceGeneration !== expectedSourceGeneration
-          ) {
-            throw new StaleSourceStateError(
-              "CSV preview source generation is stale",
-            );
-          }
-          if (current && current.gasOutbox && current.gasOutbox.length > 0) {
-            throw new Error(
-              `blocked by ${current.gasOutbox.length} pending outbox entries`,
-            );
-          }
-          this.repository.save(ref, nextState);
-        }
-        return nextState;
-      },
-    };
     this.client = options.client || new GasApiClient();
     const delivery = new GasPendingUpdateDelivery(this.client);
     const sendPendingGasUpdates = new SendPendingGasUpdatesUseCase(
@@ -284,32 +205,14 @@ export class EventDayDataStore {
       );
 
     let generationSequence = 0;
-    let previewSequence = 0;
     this.now = options.now || (() => new Date());
     this.createSourceGeneration =
       options.createSourceGeneration ||
       (() => `source-${Date.now()}-${generationSequence++}`);
-    this.createPreviewId =
-      options.createPreviewId ||
-      (() => `csv-preview-${Date.now()}-${previewSequence++}`);
-    this.previewTtlMs = options.previewTtlMs ?? 5 * 60 * 1000;
-
-    this.refreshService = options.refreshService as any;
   }
 
   private timestamp(): string {
     return this.now().toISOString();
-  }
-
-  private sourceApplyTimestamp(current: LocalEventDayState): string {
-    const candidate = this.timestamp();
-    const currentTimestamp = Math.max(
-      Date.parse(current.timestamps.updatedAt),
-      Date.parse(current.timestamps.sourceUpdatedAt),
-    );
-    const candidateTimestamp = Date.parse(candidate);
-    if (candidateTimestamp > currentTimestamp) return candidate;
-    return new Date(currentTimestamp + 1).toISOString();
   }
 
   private requireRegistered(ref: EventDayRef): void {
@@ -364,7 +267,14 @@ export class EventDayDataStore {
     const registryUrl = this.eventRegistryUrl;
     this.transitionService = new SwitchEventDayUseCase(
       this.repository,
-      this.eventRegistryUrl,
+      {
+        afterSwitch: async (newRef) => {
+          const state = this.repository.load(newRef);
+          if (state) {
+            this.activateCommittedState(newRef, state);
+          }
+        },
+      },
       this.eventRegistry,
       {
         currentManifest: currentManifest as
@@ -492,109 +402,6 @@ export class EventDayDataStore {
     text: string,
   ): Promise<LocalEventDayState> {
     return this.importInitialCsv(ref, fileName, text);
-  }
-
-  /** Create a short-lived, source-generation-bound CSV replacement preview. */
-  async previewCsvReplacement(
-    ref: EventDayRef,
-    fileName: string,
-    text: string,
-  ): Promise<CsvReplacementPreview> {
-    await this.ensureRegistry();
-    this.requireRegistered(ref);
-    const state = this.repository.load(ref);
-    if (!state)
-      throw new Error("Open the event/day before previewing a CSV replacement");
-    const circles = this.parseCsv(text);
-    const createdAt = this.now().getTime();
-    const preview: CsvPreviewRecord = {
-      previewId: this.createPreviewId(),
-      ref: { eventId: ref.eventId, dayId: ref.dayId },
-      expectedSourceGeneration: state.sourceGeneration,
-      incomingHash: hashText(text),
-      fileName,
-      diff: diffCircleSources(state.circles, circles),
-      expiresAt: new Date(createdAt + this.previewTtlMs).toISOString(),
-      text,
-      circles,
-    };
-    this.csvPreviews.set(preview.previewId, preview);
-    return preview;
-  }
-
-  /** Apply a preview only if its source generation, hash, and expiry still match. */
-  applyCsvReplacement(previewId: string): LocalEventDayState {
-    const preview = this.csvPreviews.get(previewId);
-    if (!preview)
-      throw new StaleCsvPreviewError(
-        "CSV preview is missing or already applied",
-      );
-    if (this.now().getTime() >= Date.parse(preview.expiresAt)) {
-      throw new StaleCsvPreviewError("CSV preview has expired");
-    }
-    if (hashText(preview.text) !== preview.incomingHash) {
-      throw new StaleCsvPreviewError("CSV preview hash mismatch");
-    }
-
-    const current = this.repository.load(preview.ref);
-    if (!current) {
-      throw new StaleCsvPreviewError("CSV preview source state is missing");
-    }
-
-    const now = this.sourceApplyTimestamp(current);
-    const merged = applySourceDiff(current, preview.circles, now);
-    const operation =
-      current.source.type === "gas" ? "source-type-change" : "csv-replacement";
-
-    const nextStateDraft: LocalEventDayState = {
-      ...merged,
-      source: { type: "csv", fileName: preview.fileName },
-      sourceGeneration: this.createSourceGeneration(),
-    };
-
-    let nextState: LocalEventDayState;
-    try {
-      nextState = this.sourceSettings.saveGuarded({
-        ref: preview.ref,
-        operation,
-        expectedSourceGeneration: preview.expectedSourceGeneration,
-        nextState: nextStateDraft,
-      });
-    } catch (err: unknown) {
-      if (err instanceof StaleSourceStateError) {
-        throw new StaleCsvPreviewError(
-          "CSV preview source generation is stale",
-        );
-      }
-      throw err;
-    }
-
-    this.csvPreviews.delete(previewId);
-    if (sameRef(this.activeRef, preview.ref)) {
-      this.activeEventDaySession.replaceActiveEventDayState(nextState);
-      this.applyStateToMemory(nextState);
-    }
-    return nextState;
-  }
-
-  /** Cancel a CSV preview without changing persisted state. */
-  cancelCsvPreview(previewId: string): void {
-    this.csvPreviews.delete(previewId);
-  }
-
-  /** Export the validated local snapshot, excluding source rows removed from source. */
-  exportCsv(ref: EventDayRef): string {
-    const state = this.repository.load(ref);
-    if (!state) throw new Error("Event day state not found");
-    const activeCircles = state.circles.filter(
-      (circle) => !circle.removedFromSource,
-    );
-    const purchasedSet = new Set(
-      Object.entries(state.circleStates)
-        .filter(([_, s]) => s === "purchased")
-        .map(([space]) => space),
-    );
-    return serializeCircleCsv(activeCircles, purchasedSet);
   }
 
   private readLegacyJson(key: string, issues: string[]): unknown {
@@ -955,51 +762,6 @@ export class EventDayDataStore {
         !this.purchasedList.includes(circle.space) &&
         !this.holdList.includes(circle.space),
     );
-  }
-
-  /** Create an explicit preview for the first GAS import into an empty day. */
-  async previewInitialGasImport(
-    ref: EventDayRef,
-    source: GasDataSource,
-  ): Promise<GasRefreshPreview> {
-    await this.ensureRegistry();
-    this.requireRegistered(ref);
-    return this.refreshService.previewInitialImport(ref, source);
-  }
-
-  /** Create an explicit preview for replacing the configured GAS source. */
-  async previewGasSourceReplacement(
-    ref: EventDayRef,
-    source: GasDataSource,
-  ): Promise<GasRefreshPreview> {
-    await this.ensureRegistry();
-    this.requireRegistered(ref);
-    return this.refreshService.previewReplacement(ref, source);
-  }
-
-  /** Create an explicit preview for refreshing the configured GAS source. */
-  async previewGasRefresh(ref: EventDayRef): Promise<GasRefreshPreview> {
-    await this.ensureRegistry();
-    this.requireRegistered(ref);
-    return this.refreshService.previewRefresh(ref);
-  }
-
-  /** Apply a GAS preview and refresh in-memory state when its ref is active. */
-  applyGasPreview(previewId: string): LocalEventDayState {
-    const applied = this.refreshService.applyPreview(previewId);
-    if (this.activeRef) {
-      const currentActive = this.repository.load(this.activeRef);
-      if (currentActive) {
-        this.activeEventDaySession.replaceActiveEventDayState(currentActive);
-        this.applyStateToMemory(currentActive);
-      }
-    }
-    return applied;
-  }
-
-  /** Cancel a GAS preview without changing persisted state. */
-  cancelGasPreview(previewId: string): void {
-    this.refreshService.cancelPreview(previewId);
   }
 
   /** Start listening for online events and trigger initial background processing. */

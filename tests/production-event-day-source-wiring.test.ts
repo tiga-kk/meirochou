@@ -1,23 +1,15 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import type { EventDayRepository } from "../apps/webapp/js/features/event-day/public-api";
+import { assembleComiPathApplication } from "../apps/webapp/js/app/assemble-comipath-application";
+import type { CircleDataPreview } from "../apps/webapp/js/features/circle-data-source/public-api";
+import type { CircleDataSourceView } from "../apps/webapp/js/features/circle-data-source/ui/circle-data-source-view";
+import type { RouteGuidanceInvalidation } from "../apps/webapp/js/features/circle-data-source/use-cases/route-guidance-invalidation";
 import type {
   EventDayRef,
+  EventDayRepository,
   LocalEventDayState,
 } from "../apps/webapp/js/features/event-day/public-api";
-import type {
-  CancelableRequest,
-  GoogleSheetCircleClient,
-} from "../apps/webapp/js/features/circle-data-source/public-api";
-import type { RouteGuidanceInvalidation } from "../apps/webapp/js/features/circle-data-source/use-cases/route-guidance-invalidation";
 import type { EventDaySelectorView } from "../apps/webapp/js/features/event-day/ui/event-day-selector-view";
-import type { CircleDataSourceView } from "../apps/webapp/js/features/circle-data-source/ui/circle-data-source-view";
-import {
-  EventDaySelectorController,
-  type EventDaySelectorControllerDependencies,
-} from "../apps/webapp/js/features/event-day/ui/event-day-selector-controller";
-import { SwitchEventDayUseCase } from "../apps/webapp/js/features/event-day/use-cases/switch-event-day";
-import { OpenInitialEventDayUseCase } from "../apps/webapp/js/features/event-day/use-cases/open-initial-event-day";
 
 const REF: EventDayRef = { eventId: "demo-v1", dayId: "day1" };
 
@@ -98,109 +90,72 @@ function createFakeRouteGuidanceInvalidation(): RouteGuidanceInvalidation & {
 }
 
 describe("production event day and circle data source wiring", () => {
-  it("EventDaySelectorController start() calls getLastOpenedEventDay and renders view", async () => {
-    const repository = createFakeRepository();
-    const eventDayView = createFakeEventDayView();
-
-    // This tests that the controller's start() loads the registry and renders the view.
-    // Currently the controller does NOT have a start() method or registry/view injection - this test should fail.
-    const deps: EventDaySelectorControllerDependencies = {
-      switchEventDay: { execute: vi.fn(async () => {}) },
-      openInitialEventDay: new OpenInitialEventDayUseCase(repository),
-      registry: REGISTRY,
-      view: eventDayView,
-      repository,
-    };
-    const controller = new EventDaySelectorController(deps);
-
-    // start() does not exist yet - this will fail at compile/runtime
-    await (controller as any).start();
-
-    expect(repository.getLastOpenedEventDay).toHaveBeenCalled();
-    expect(eventDayView.render).toHaveBeenCalled();
-  });
-
-  it("CircleDataSourceController preview flows to showPreview with previewId", async () => {
-    const repository = createFakeRepository();
-    const circleDataSourceView = createFakeCircleDataSourceView();
-    const routeGuidanceInvalidation = createFakeRouteGuidanceInvalidation();
-
-    // CircleDataSourceController currently has no previewCsvImport or applyCircleDataPreview.
-    // These use cases don't exist yet. This test should fail.
-    const { CircleDataSourceController } = await import(
-      "../apps/webapp/js/features/circle-data-source/ui/circle-data-source-controller"
-    );
-
-    const previewCsvImport = {
-      execute: vi.fn((_input: unknown) => ({
-        previewId: "test-preview-id",
-        ref: REF,
-        mode: "replacement" as const,
-        expectedSourceGeneration: "gen-1",
-        diff: { added: [], updated: [], removed: [], unchanged: [] },
-        newCircles: [],
-        fetchedAt: "2026-01-01T00:00:00.000Z",
-        expiresAt: "2099-01-01T00:00:00.000Z",
-      })),
-    };
-
-    const { createCircleDataSourceSession } = await import(
-      "../apps/webapp/js/features/circle-data-source/use-cases/circle-data-source-session"
-    );
-    const session = createCircleDataSourceSession();
-    const client = {
-      startLoadingSheetNames: vi.fn(() => ({
-        result: Promise.resolve([]),
-        cancel: vi.fn(),
-      })),
-      startLoadingCircles: vi.fn(() => ({
-        result: Promise.resolve([]),
-        cancel: vi.fn(),
-      })),
-    };
-
-    const controller = new CircleDataSourceController({
-      client,
-      session,
-      previewCsvImport,
-      view: circleDataSourceView,
-      repository,
-      routeGuidanceInvalidation,
-    } as any);
-
-    // handleCsvFile does not exist yet - this tests the future public API
-    await (controller as any).handleCsvFile(REF, "demo.csv", "space,priority\nE1-01,1");
-
-    expect(circleDataSourceView.showPreview).toHaveBeenCalledWith(
-      expect.objectContaining({ previewId: expect.any(String) }),
-    );
-  });
-
-  it("assembly connects both controllers (route invalidation called after apply)", async () => {
-    // This test proves the full wiring. Currently assembleComiPathApplication
-    // does not create EventDaySelectorController or CircleDataSourceController.
-    // The test verifies the contract exists at the assembly level.
-    const { assembleComiPathApplication } = await import(
-      "../apps/webapp/js/app/assemble-comipath-application"
-    );
+  it("assembles application, starts controllers, and routes public view events to use cases", async () => {
     const repository = createFakeRepository();
     const eventDayView = createFakeEventDayView();
     const circleDataSourceView = createFakeCircleDataSourceView();
     const routeGuidanceInvalidation = createFakeRouteGuidanceInvalidation();
 
-    // These parameters are not currently accepted by assembleComiPathApplication
+    const targetElement = document.createElement("div");
+    const diffDialogElement = document.createElement("div");
+    diffDialogElement.id = "source-diff-dialog";
+    document.body.appendChild(targetElement);
+    document.body.appendChild(diffDialogElement);
+
     const app = assembleComiPathApplication({
-      document: document,
-      window: window,
+      document,
+      window,
       repository,
       eventDayView,
       circleDataSourceView,
       routeGuidanceInvalidation,
       registry: REGISTRY,
-    } as any);
+      targetElement,
+    });
 
-    // previewCsvImport and applyCircleDataPreview do not exist on StartableApplication
-    expect((app as any).previewCsvImport).toBeDefined();
-    expect((app as any).applyCircleDataPreview).toBeDefined();
+    await app.start();
+
+    // Verification step 1: getLastOpenedEventDay & render called
+    expect(repository.getLastOpenedEventDay).toHaveBeenCalled();
+    expect(eventDayView.render).toHaveBeenCalled();
+
+    // Verification step 2: CSV preview request via public DOM event triggers showPreview
+    const csvFile = new File(["space,priority\nE1-01,1"], "test.csv", {
+      type: "text/csv",
+    });
+    const previewEvent = new CustomEvent("csv-preview-request", {
+      detail: { file: csvFile, ref: REF },
+      bubbles: true,
+    });
+    targetElement.dispatchEvent(previewEvent);
+
+    // Wait for async processing
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(circleDataSourceView.showPreview).toHaveBeenCalledWith(
+      expect.objectContaining({ previewId: expect.any(String) }),
+    );
+
+    // Get the previewId from showPreview call
+    const previewCall = circleDataSourceView.showPreview.mock.calls[0];
+    if (!previewCall) throw new Error("Circle preview was not rendered");
+    const previewId = (previewCall[0] as CircleDataPreview).previewId;
+
+    // Verification step 3: source-preview-apply triggers route guidance invalidation
+    const applyEvent = new CustomEvent("source-preview-apply", {
+      detail: { previewId },
+      bubbles: true,
+    });
+    diffDialogElement.dispatchEvent(applyEvent);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(
+      routeGuidanceInvalidation.invalidateAfterCircleSourceChange,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({ eventId: "demo-v1", dayId: "day1" }),
+    );
+
+    app.stop();
   });
 });

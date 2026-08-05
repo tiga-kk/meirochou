@@ -109,7 +109,11 @@ export class SwitchEventDayUseCase implements SwitchEventDayOperation {
     const registryCandidate =
       typeof second === "object" && second !== null && "events" in second
         ? second
-        : null;
+        : typeof third === "object" &&
+            third !== null &&
+            "events" in third
+          ? third
+          : null;
     this.registry = oldStyle ? (third as EventRegistry) : registryCandidate;
     const collaboratorCandidate =
       typeof second === "object" && second !== null && !("events" in second)
@@ -119,7 +123,7 @@ export class SwitchEventDayUseCase implements SwitchEventDayOperation {
       !oldStyle && collaboratorCandidate ? collaboratorCandidate : {};
     const resolvedOptions = oldStyle
       ? options
-      : !oldStyle && !this.registry
+      : !oldStyle && !registryCandidate
         ? (third as SwitchEventDayOptions)
         : options;
     this.currentManifest = resolvedOptions.currentManifest ?? null;

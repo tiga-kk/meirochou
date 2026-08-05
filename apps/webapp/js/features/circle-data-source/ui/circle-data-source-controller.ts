@@ -1,22 +1,23 @@
 import type {
+  ActiveEventDaySession,
   CircleRecord,
   EventDayRef,
   GasDataSource,
 } from "../../event-day/public-api";
 import type { CircleDataPreview } from "../domain/circle-data-source-types";
+import type { ApplyCircleDataPreviewUseCase } from "../use-cases/apply-circle-data-preview";
+import type { CancelCircleDataPreviewUseCase } from "../use-cases/cancel-circle-data-preview";
 import type { CancelableRequest } from "../use-cases/cancelable-request";
 import type { CircleDataSourceSession } from "../use-cases/circle-data-source-session";
+import type { ExportCirclesToCsvUseCase } from "../use-cases/export-circles-to-csv";
 import type {
   GoogleSheetCircleClient,
   GoogleSheetCircleSource,
 } from "../use-cases/google-sheet-circle-client";
-import type { CircleDataSourceView } from "./dom-circle-data-source-view";
 import type { PreviewCsvImportUseCase } from "../use-cases/preview-csv-import";
 import type { PreviewGoogleSheetImportUseCase } from "../use-cases/preview-google-sheet-import";
-import type { ApplyCircleDataPreviewUseCase } from "../use-cases/apply-circle-data-preview";
-import type { CancelCircleDataPreviewUseCase } from "../use-cases/cancel-circle-data-preview";
-import type { ExportCirclesToCsvUseCase } from "../use-cases/export-circles-to-csv";
 import type { RouteGuidanceInvalidation } from "../use-cases/route-guidance-invalidation";
+import type { CircleDataSourceView } from "./dom-circle-data-source-view";
 
 export interface CircleDataSourceControllerDependencies {
   readonly client: GoogleSheetCircleClient;
@@ -28,6 +29,9 @@ export interface CircleDataSourceControllerDependencies {
   readonly cancelCircleDataPreview?: CancelCircleDataPreviewUseCase;
   readonly exportCirclesToCsv?: ExportCirclesToCsvUseCase;
   readonly routeGuidanceInvalidation?: RouteGuidanceInvalidation;
+  readonly activeEventDaySession?: ActiveEventDaySession;
+  readonly targetElement?: HTMLElement | Window | Document;
+  readonly diffDialogElement?: HTMLElement | Window | Document;
 }
 
 function parseGasUrl(value: unknown): string {
@@ -67,9 +71,134 @@ export class CircleDataSourceController {
   private currentRequest: CancelableRequest<unknown> | null = null;
   private requestSequence = 0;
   private stopped = false;
-  private readonly previews = new Map<string, CircleDataPreview>();
+  private started = false;
+  private activeEventDayUnsubscribe: (() => void) | null = null;
+  private activeEventDayKey: string | null = null;
+  private listeners: Array<{
+    target: HTMLElement | Window | Document;
+    type: string;
+    handler: (e: Event) => void;
+  }> = [];
 
   constructor(private readonly deps: CircleDataSourceControllerDependencies) {}
+
+  start(): void {
+    if (this.started) return;
+    this.started = true;
+    this.stopped = false;
+
+    const activeEventDaySession = this.deps.activeEventDaySession;
+    if (activeEventDaySession) {
+      const active = activeEventDaySession.getActiveEventDay();
+      this.activeEventDayKey = active
+        ? `${active.ref.eventId}\u0000${active.ref.dayId}`
+        : null;
+      this.activeEventDayUnsubscribe = activeEventDaySession.subscribe(
+        (snapshot) => {
+          const nextKey = snapshot
+            ? `${snapshot.ref.eventId}\u0000${snapshot.ref.dayId}`
+            : null;
+          if (nextKey === this.activeEventDayKey) return;
+          this.activeEventDayKey = nextKey;
+          this.cancelCurrentRequest();
+          this.deps.session.reset();
+        },
+      );
+    }
+
+    const target =
+      this.deps.targetElement ??
+      (typeof document !== "undefined" ? document : null);
+    const diffDialog =
+      this.deps.diffDialogElement ??
+      (typeof document !== "undefined"
+        ? (document.getElementById("source-diff-dialog") ?? document)
+        : null);
+
+    if (target) {
+      this.bindListener(target, "csv-preview-request", (e: Event) => {
+        const detail = (e as CustomEvent).detail;
+        if (detail?.file) {
+          const ref =
+            detail.ref ??
+            this.deps.activeEventDaySession?.getActiveEventDay()?.ref;
+          if (ref) {
+            void this.handleCsvFileFromFile(ref, detail.file);
+          }
+        }
+      });
+
+      this.bindListener(target, "csv-export-request", (e: Event) => {
+        const detail = (e as CustomEvent).detail;
+        const ref =
+          detail?.ref ??
+          this.deps.activeEventDaySession?.getActiveEventDay()?.ref;
+        if (ref) {
+          this.exportCsv(ref);
+        }
+      });
+
+      this.bindListener(target, "gas-sheets-request", (e: Event) => {
+        const detail = (e as CustomEvent).detail;
+        if (detail?.gasUrl) {
+          this.deps.session.updateDraft({
+            draftWebAppUrl: detail.gasUrl,
+            selectedSheetName: "",
+          });
+          void this.loadGoogleSheetNames(detail.gasUrl);
+        }
+      });
+
+      this.bindListener(target, "gas-preview-request", (e: Event) => {
+        const detail = (e as CustomEvent).detail;
+        if (detail?.source) {
+          this.deps.session.updateDraft({
+            draftWebAppUrl: detail.source.gasUrl,
+            selectedSheetName: detail.source.sheetName,
+          });
+          const ref =
+            detail.ref ??
+            this.deps.activeEventDaySession?.getActiveEventDay()?.ref;
+          if (ref) {
+            void this.handleGasPreviewRequest(ref, detail.source);
+          }
+        }
+      });
+    }
+
+    if (diffDialog) {
+      this.bindListener(diffDialog, "source-preview-apply", (e: Event) => {
+        const detail = (e as CustomEvent).detail;
+        if (detail?.previewId) {
+          void this.applyPreview(detail.previewId);
+        }
+      });
+
+      this.bindListener(diffDialog, "source-preview-cancel", (e: Event) => {
+        const detail = (e as CustomEvent).detail;
+        this.cancelPreview(detail?.previewId ?? "");
+      });
+    }
+  }
+
+  private bindListener(
+    target: HTMLElement | Window | Document,
+    type: string,
+    handler: (e: Event) => void,
+  ): void {
+    if (target && typeof target.addEventListener === "function") {
+      target.addEventListener(type, handler);
+      this.listeners.push({ target, type, handler });
+    }
+  }
+
+  async handleCsvFileFromFile(
+    ref: EventDayRef,
+    file: File,
+  ): Promise<CircleDataPreview | null> {
+    const text = await file.text();
+    return this.handleCsvFile(ref, file.name, text);
+  }
 
   async handleCsvFile(
     ref: EventDayRef,
@@ -84,7 +213,6 @@ export class CircleDataSourceController {
         fileName,
         text,
       });
-      this.previews.set(preview.previewId, preview);
       this.deps.session.setPreview(preview);
       this.deps.view?.showPreview(preview);
       return preview;
@@ -109,7 +237,6 @@ export class CircleDataSourceController {
       let preview: CircleDataPreview | null = null;
       await this.runRequest(request, (value) => {
         preview = value;
-        this.previews.set(value.previewId, value);
         this.deps.session.setPreview(value);
         this.deps.view?.showPreview(value);
       });
@@ -123,28 +250,32 @@ export class CircleDataSourceController {
 
   async applyPreview(previewId: string): Promise<void> {
     if (this.stopped || !this.deps.applyCircleDataPreview) return;
-    const preview = this.previews.get(previewId);
-    if (!preview) throw new Error("Preview not found or expired");
+    const preview = this.deps.session.getSnapshot().preview;
+    if (!preview || (previewId && preview.previewId !== previewId)) {
+      throw new Error("Preview not found or expired");
+    }
     try {
       this.deps.view?.showLoading();
-      await this.deps.applyCircleDataPreview.execute({ previewId, preview });
-      this.previews.delete(previewId);
+      await this.deps.applyCircleDataPreview.execute({
+        previewId: preview.previewId,
+        preview,
+      });
       this.deps.session.setPreview(null);
       this.deps.view?.showReady();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Apply preview failed";
+      const message =
+        err instanceof Error ? err.message : "Apply preview failed";
       this.deps.view?.showError(message);
       throw err;
     }
   }
 
-  cancelPreview(previewId: string): void {
+  cancelPreview(_previewId?: string): void {
     if (this.stopped) return;
-    const preview = this.previews.get(previewId);
+    const preview = this.deps.session.getSnapshot().preview;
     if (preview && this.deps.cancelCircleDataPreview) {
       this.deps.cancelCircleDataPreview.execute(preview);
     }
-    this.previews.delete(previewId);
     this.deps.session.setPreview(null);
     this.deps.view?.showReady();
   }
@@ -185,7 +316,15 @@ export class CircleDataSourceController {
 
   stop(): void {
     this.stopped = true;
+    this.started = false;
+    this.activeEventDayUnsubscribe?.();
+    this.activeEventDayUnsubscribe = null;
+    this.activeEventDayKey = null;
     this.cancelCurrentRequest();
+    for (const { target, type, handler } of this.listeners) {
+      target.removeEventListener(type, handler);
+    }
+    this.listeners = [];
   }
 
   private parseStringList(value: unknown): readonly string[] {

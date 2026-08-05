@@ -1,10 +1,10 @@
-import { diffCircleSources } from "../domain/circle-source-diff";
-import type { CircleDataPreview } from "../domain/circle-data-source-types";
 import type {
   EventDayRef,
   GasDataSource,
   LocalEventDayState,
 } from "../../event-day/public-api";
+import type { CircleDataPreview } from "../domain/circle-data-source-types";
+import { diffCircleSources } from "../domain/circle-source-diff";
 import type { CancelableRequest } from "./cancelable-request";
 import type { GoogleSheetCircleClient } from "./google-sheet-circle-client";
 
@@ -66,6 +66,7 @@ export class PreviewGoogleSheetImportUseCase {
         ref: Object.freeze({ ...input.eventDay }),
         mode,
         expectedSourceGeneration: state.sourceGeneration,
+        source: { ...input.source },
         diff: diffCircleSources(state.circles, circles),
         newCircles: Object.freeze([...circles]),
         fetchedAt: new Date(nowMs).toISOString(),
