@@ -1,5 +1,4 @@
 import { GasApiClient } from "./api/gas-api-client";
-import { GasRefreshService } from "./data/gas-refresh-service";
 import {
   decodeLegacyCircles,
   decodeLegacyHistory,
@@ -12,6 +11,15 @@ import {
   parseCircleCsv,
   serializeCircleCsv,
 } from "./features/circle-data-source/public-api";
+import { LocalStorageCircleDataSourceSettings as SourceSettingsService } from "./features/circle-data-source/infrastructure/local-storage-circle-data-source-settings";
+import {
+  createActiveEventDayReader,
+  createActiveEventDaySession,
+  type ActiveEventDayReader,
+  type ActiveEventDaySession,
+  type EventDayRepository,
+} from "./features/event-day/public-api";
+import { LocalStorageEventDayRepository } from "./features/event-day/infrastructure/local-storage-event-day-repository";
 import { GasPendingUpdateDelivery } from "./features/circle-status/infrastructure/gas-pending-update-delivery";
 import type {
   CircleStatusControllerPort,
@@ -25,6 +33,7 @@ import { DiscardPendingGasUpdatesUseCase } from "./features/circle-status/use-ca
 import { DefaultPendingGasUpdateBackgroundProcess } from "./features/circle-status/use-cases/pending-gas-update-background-process";
 import { SendPendingGasUpdatesUseCase } from "./features/circle-status/use-cases/send-pending-gas-updates";
 import { UndoCircleStatusChangeUseCase } from "./features/circle-status/use-cases/undo-circle-status-change";
+import { SwitchEventDayUseCase } from "./features/event-day/use-cases/switch-event-day";
 import type { MapBundleManifest } from "./features/event-day/domain/event-day-contracts";
 import {
   type LoadedEventRegistry,
@@ -34,19 +43,6 @@ import {
   loadRuntimeMapBundleManifestFromUrl,
   resolveEventMapManifestUrl,
 } from "./features/event-day/infrastructure/http-map-manifest-loader";
-import { LocalStorageEventDayRepository } from "./features/event-day/infrastructure/local-storage-event-day-repository";
-import type { EventDayRepository } from "./features/event-day/public-api";
-import {
-  type ActiveEventDayReader,
-  type ActiveEventDaySession,
-  createActiveEventDayReader,
-  createActiveEventDaySession,
-} from "./features/event-day/public-api";
-import { SwitchEventDayUseCase } from "./features/event-day/use-cases/switch-event-day";
-import {
-  SourceSettingsService,
-  StaleSourceStateError,
-} from "./state/source-settings-service";
 import {
   createEmptyEventDayState,
   getCircleVisitState,
@@ -108,8 +104,8 @@ export interface DataManagerOptions {
   readonly previewTtlMs?: number;
   readonly client?: GasApiClient;
   readonly repository?: EventDayRepository;
-  readonly sourceSettings?: SourceSettingsService;
-  readonly refreshService?: GasRefreshService;
+  readonly sourceSettings?: { saveGuarded: (args: any) => LocalEventDayState };
+  readonly refreshService?: any;
   readonly activeEventDaySession?: ActiveEventDaySession;
   readonly activeEventDayReader?: ActiveEventDayReader;
   readonly circleStatusController?: CircleStatusControllerPort;
@@ -175,12 +171,19 @@ function sameRef(left: EventDayRef | null, right: EventDayRef): boolean {
 }
 
 /** LocalStorage-backed service for the currently selected event/day. */
+export class StaleSourceStateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StaleSourceStateError";
+  }
+}
+
 export class EventDayDataStore {
   readonly storage: StorageService;
   readonly repository: EventDayRepository;
-  readonly sourceSettings: SourceSettingsService;
+  readonly sourceSettings: { saveGuarded: (args: any) => LocalEventDayState };
   readonly client: GasApiClient;
-  readonly refreshService: GasRefreshService;
+  readonly refreshService?: any;
   readonly circleStatusController?: CircleStatusControllerPort;
   readonly pendingGasUpdatesController?: PendingGasUpdatesControllerPort;
   readonly backgroundProcess?: PendingGasUpdateBackgroundProcess;
@@ -223,8 +226,12 @@ export class EventDayDataStore {
       createActiveEventDayReader(this.activeEventDaySession);
     this.repository =
       options.repository || new LocalStorageEventDayRepository(this.storage);
-    this.sourceSettings =
-      options.sourceSettings || new SourceSettingsService(this.repository);
+    this.sourceSettings = options.sourceSettings || {
+      saveGuarded: ({ nextState, ref }: any) => {
+        if (ref) this.repository.save(ref, nextState);
+        return nextState;
+      },
+    };
     this.client = options.client || new GasApiClient();
     const delivery = new GasPendingUpdateDelivery(this.client);
     const sendPendingGasUpdates = new SendPendingGasUpdatesUseCase(
@@ -269,14 +276,7 @@ export class EventDayDataStore {
       (() => `csv-preview-${Date.now()}-${previewSequence++}`);
     this.previewTtlMs = options.previewTtlMs ?? 5 * 60 * 1000;
 
-    this.refreshService =
-      options.refreshService ||
-      new GasRefreshService(this.repository, this.client, this.sourceSettings, {
-        now: this.now,
-        createSourceGeneration: this.createSourceGeneration,
-        createPreviewId: this.createPreviewId,
-        previewTtlMs: this.previewTtlMs,
-      });
+    this.refreshService = options.refreshService as any;
   }
 
   private timestamp(): string {

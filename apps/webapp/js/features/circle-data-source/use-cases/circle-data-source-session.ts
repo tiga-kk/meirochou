@@ -55,7 +55,7 @@ export function createCircleDataSourceSession(): CircleDataSourceSession {
         ? Object.freeze({
             ...current.preview,
             ref: Object.freeze({ ...current.preview.ref }),
-            newCircles: Object.freeze([...current.preview.newCircles]),
+            newCircles: Object.freeze([...(current.preview.newCircles ?? [])]),
           })
         : null,
     });

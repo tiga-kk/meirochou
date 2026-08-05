@@ -1,6 +1,7 @@
 import "./components/comipath-settings";
 import "./components/navigation-resume-dialog";
 import "./components/source-diff-dialog";
+import { createCircleDataSourceSession } from "./features/circle-data-source/public-api";
 import { parseGasWebAppUrl } from "./api/gas-api-client";
 import { ComiPathDomCoordinator } from "./comipath-dom-coordinator.js";
 import { createDevDemoData, isDevDemoEnabled } from "./dev-demo-data.js";
@@ -39,8 +40,7 @@ import {
 } from "./shared/ui/management-view-model";
 import { LocalStorageNavigationSnapshotRepository } from "./state/navigation-snapshot-repository";
 import { TspSolver } from "./tsp-solver.js";
-import { downloadCsv, formatCsvExportFilename } from "./ui/csv-download";
-import { ManagementSession } from "./ui/management-session";
+
 
 function formatSourceApplyError(error) {
   switch (error?.name) {
@@ -161,8 +161,13 @@ export class ComiPathBrowserRuntime {
     this.stopped = false;
     this.ownedWorkers = new Set();
     this.dm = new EventDayDataStore(undefined, options?.dataManagerOptions);
-    this.ui = new ComiPathDomCoordinator();
-    this.session = new ManagementSession();
+    const baseSession = createCircleDataSourceSession();
+    let tokenSeq = 0;
+    this.session = Object.assign(baseSession, {
+      isBusy: (_kind) => baseSession.getSnapshot().busy,
+      nextRequestToken: () => ++tokenSeq,
+      setActivePreview: (preview) => baseSession.setPreview(preview),
+    });
     this.currentTarget = null;
     this.currentRoute = null;
     this.currentStartSpace = "";
@@ -393,7 +398,7 @@ export class ComiPathBrowserRuntime {
       errorMessage: this.deleteErrorMessage || "",
     };
 
-    this.ui.updateSettingsState({
+    this.ui?.updateSettingsState({
       eventDayOptions: options,
       selectedEventId: this.dm.activeRef?.eventId || "",
       selectedDayId: this.dm.activeRef?.dayId || "",
@@ -2107,10 +2112,10 @@ export class ComiPathBrowserRuntime {
     try {
       if (type === "purchase") {
         this.dm.addPurchased(space, sheetName);
-        this.ui.showToast(`${space} 購入！`);
+        this.ui?.showToast(`${space} 購入！`);
       } else {
         this.dm.addHold(space, sheetName);
-        this.ui.showToast(`${space} 保留`);
+        this.ui?.showToast(`${space} 保留`);
       }
     } catch (error) {
       this.reportLocalMutationFailure(error);

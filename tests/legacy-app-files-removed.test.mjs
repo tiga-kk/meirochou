@@ -13,4 +13,20 @@ test("removes all legacy application files", () => {
     existsSync("scripts/webapp-architecture-legacy-allowlist.json"),
     false,
   );
+  assert.equal(
+    existsSync("apps/webapp/js/data/gas-refresh-service.ts"),
+    false,
+  );
+  assert.equal(
+    existsSync("apps/webapp/js/state/source-settings-service.ts"),
+    false,
+  );
+  assert.equal(
+    existsSync("apps/webapp/js/ui/management-session.ts"),
+    false,
+  );
+  assert.equal(
+    existsSync("apps/webapp/js/ui/csv-download.ts"),
+    false,
+  );
 });

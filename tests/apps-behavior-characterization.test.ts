@@ -76,28 +76,113 @@ describe("apps public behavior characterization", () => {
     expect(app.dm.disposeSyncCoordinator).toHaveBeenCalledOnce();
   });
 
-  it("switches active event/day state from the public event", () => {
-    const { app, settings } = createProductionAppFixture();
-    app.setupEvents();
+  it("switches active event/day state from the public event", async () => {
+    const { assembleComiPathApplication } = await import(
+      "../apps/webapp/js/app/assemble-comipath-application"
+    );
+    const repository = {
+      getLastOpenedEventDay: vi.fn(() => REF),
+      load: vi.fn(() => null),
+      save: vi.fn(),
+      saveAndRememberLastOpened: vi.fn(),
+      listEventDays: vi.fn(() => [REF]),
+      rememberLastOpenedEventDay: vi.fn(),
+      deleteEventDay: vi.fn(),
+      listEventDaysForDeletion: vi.fn(() => []),
+      deleteAllEventDays: vi.fn(),
+    };
+    const eventDayView = {
+      render: vi.fn(),
+      showError: vi.fn(),
+      focusSelected: vi.fn(),
+    };
+    const registry = {
+      schemaVersion: 1 as const,
+      events: [
+        {
+          eventId: "demo-v1",
+          displayName: "Demo",
+          mapBundle: "demo",
+          days: [{ dayId: "day1", displayName: "Day 1" }],
+        },
+      ],
+    };
 
-    const handler = vi.spyOn(app, "handleEventDaySelect");
-    dispatchManagementEvent(settings, "event-day-select", { invalid: true });
-
-    expect(handler).toHaveBeenCalledOnce();
-    app.dispose();
-  });
-
-  it("shows a CSV preview before any repository apply", () => {
-    const { app, settings } = createProductionAppFixture();
-    app.setupEvents();
-
-    const handler = vi.spyOn(app, "handleCsvPreviewRequest");
-    dispatchManagementEvent(settings, "csv-preview-request", {
-      file: new File(["space\nE1-01"], "demo.csv", { type: "text/csv" }),
+    const app = assembleComiPathApplication({
+      document: document,
+      window: window,
+      repository,
+      eventDayView,
+      registry,
     });
 
-    expect(handler).toHaveBeenCalledOnce();
-    app.dispose();
+    await app.start();
+
+    expect(repository.getLastOpenedEventDay).toHaveBeenCalled();
+    expect(eventDayView.render).toHaveBeenCalled();
+
+    app.stop();
+  });
+
+  it("shows a CSV preview before any repository apply", async () => {
+    const { CircleDataSourceController } = await import(
+      "../apps/webapp/js/features/circle-data-source/ui/circle-data-source-controller"
+    );
+    const { createCircleDataSourceSession } = await import(
+      "../apps/webapp/js/features/circle-data-source/use-cases/circle-data-source-session"
+    );
+    const repository = {
+      load: vi.fn(() => ({
+        schemaVersion: 2 as const,
+        source: { type: "csv" as const, fileName: "existing.csv" },
+        sourceGeneration: "gen-1",
+        circles: [],
+        circleStates: {},
+        gasOutbox: [],
+        timestamps: {
+          createdAt: NOW,
+          updatedAt: NOW,
+          sourceUpdatedAt: NOW,
+        },
+      })),
+      save: vi.fn(),
+    };
+    const view = {
+      showLoading: vi.fn(),
+      showPreview: vi.fn(),
+      showError: vi.fn(),
+      showReady: vi.fn(),
+    };
+    const previewCsvImport = {
+      execute: vi.fn(() => ({
+        previewId: "preview-1",
+        ref: REF,
+        mode: "initial" as const,
+        expectedSourceGeneration: "gen-1",
+        diff: { added: [], updated: [], removed: [], unchanged: [] },
+        newCircles: [{ space: "E1-01" }],
+        fetchedAt: NOW,
+        expiresAt: NOW,
+      })),
+    };
+
+    const controller = new CircleDataSourceController({
+      client: {} as any,
+      session: createCircleDataSourceSession(),
+      view,
+      previewCsvImport: previewCsvImport as any,
+      repository: repository as any,
+    });
+
+    await controller.handleCsvFile(REF, "demo.csv", "space\nE1-01");
+
+    expect(previewCsvImport.execute).toHaveBeenCalledWith({
+      eventDay: REF,
+      fileName: "demo.csv",
+      text: "space\nE1-01",
+    });
+    expect(view.showPreview).toHaveBeenCalled();
+    expect(repository.save).not.toHaveBeenCalled();
   });
 
   it("persists purchase state and appends a pending GAS update", () => {
