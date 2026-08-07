@@ -8,7 +8,21 @@
 - ブランチ: `feature/phase-05d`
 - 追加計画作成前のHEAD: `6b1499bda9323acb8e77f4bfcd35007d1f8a5114`
 - 現在のフェーズ: Phase 5D リファクタリング完了作業
-- 次に着手するタスク: Task 8
+- 次に着手するタスク: Task 8（WIPから再開）
+- Task 8の基準コミット: `ac8f2b035b3bf22b3ed03221eceebb8ccbf3f63a`
+- 直近のTask 8 WIPコミット: `24cf35fa9724e4b433e2c2573bf8b17d173481c2`
+
+## Task 8 WIPの再開状態
+
+`24cf35fa9724e4b433e2c2573bf8b17d173481c2`は破棄しない。Task 8の実装途中で、次の差分だけが入った状態で停止している。
+
+- `apps/webapp/js/app/bind-browser-events.ts`: `// @ts-nocheck`を先行削除し、一部に`any`/index signatureを追加した。
+- `tests/architecture-boundaries.test.mjs`: Task 8完了後に必要となるarchitecture ruleのfixtureを先行追加した。
+- `tests/browser-binding-ownership.test.ts`: 最終ownership契約と、未作成の`complete-circle-visit.ts`を前提とするtestを先行追加した。
+
+一方、Task 8の中心であるcomposition rootへのdependency assembly移管、Route Guidance workflow移管、`complete-circle-visit.ts`作成、architecture checker本体のrule追加は未実装である。このため現WIPではfocused architecture/ownership testと`typecheck:webapp`が失敗する。
+
+再開時は、上記WIPのred testや型エラーを単独でGREEN化することから始めない。`docs/plans/phase-05d/task-08-repair-browser-binding-ownership.md`の「WIP再開時の段階ゲート」に従い、最初の一回はStage 8Aだけを実行する。
 
 ## 現在までに実装済みの主要部分
 
@@ -92,7 +106,7 @@ Task 7で得た検証結果は原因調査のbaselineとして利用するが、
 | Task 5 | 完了 | `ComiPathBrowserRuntime`を削除しbrowser bindingを明示化 |
 | Task 6 | 完了 | architecture guardrailとテスト境界を強化 |
 | Task 7 | 中断 | 最終検証中にbrowser binding ownershipとvisual snapshotの追加blockerを発見 |
-| Task 8 | 未着手 | browser bindingからfeature ownership違反を除去 |
+| Task 8 | 中断 | WIP `24cf35f`からStage 8Aを再開する |
 | Task 9 | 未着手 | 残ったbrowser event registrationをowner別に分割 |
 | Task 10 | 未着手 | visual snapshot 5件を根拠付きで解消 |
 | Task 11 | 未着手 | 修正後HEADでPhase 5D全体を再検証 |
