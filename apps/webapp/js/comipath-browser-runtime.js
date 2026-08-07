@@ -1,7 +1,7 @@
 import "./components/comipath-settings";
 import "./components/navigation-resume-dialog";
 import "./components/source-diff-dialog";
-import { ComiPathDomCoordinator } from "./comipath-dom-coordinator.js";
+import { DomRouteGuidanceView } from "./features/route-guidance/ui/dom-route-guidance-view";
 import { createDevDemoData, isDevDemoEnabled } from "./dev-demo-data.js";
 import { createCircleDataSourceSession } from "./features/circle-data-source/public-api";
 import {
@@ -233,7 +233,7 @@ export class ComiPathBrowserRuntime {
         baseSession.setBusy(false);
       },
     });
-    this.ui = new ComiPathDomCoordinator();
+    this.ui = new DomRouteGuidanceView();
     this.activeEventDaySession.subscribe(() => {
       if (this.ui) {
         this.updateManagementModels();
@@ -1073,6 +1073,7 @@ export class ComiPathBrowserRuntime {
     this.transitionToken += 1;
     this.selectionToken += 1;
     this.managementSession?.stop();
+    this.ui?.stop?.();
     this.disposeSyncCoordinator();
     for (const remove of this.ownedEventListeners.splice(0)) remove();
     for (const timer of this.ownedTimers) clearTimeout(timer);

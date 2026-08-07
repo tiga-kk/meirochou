@@ -1110,7 +1110,7 @@ test("webapp current location keeps an exact circle number", () => {
 
 test("webapp uses an exact numeric input for the current location", () => {
   const html = read("apps/webapp/index.html");
-  const uiSource = read("apps/webapp/js/comipath-dom-coordinator.js");
+  const uiSource = read("apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts");
 
   assert.match(
     html,
@@ -1150,7 +1150,7 @@ test("webapp advances purchased navigation through orchestration", () => {
 
 test("webapp opens an empty local event/day on a first visit", () => {
   const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
-  const uiSource = read("apps/webapp/js/comipath-dom-coordinator.js");
+  const uiSource = read("apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts");
 
   assert.match(appSource, /CSVデータ未設定。空のイベント・日程で起動しました/);
   assert.doesNotMatch(appSource, /GAS URLを設定してください/);
@@ -1164,7 +1164,7 @@ test("webapp opens an empty local event/day on a first visit", () => {
 
 test("webapp brings manually opened settings into view", () => {
   const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
-  const uiSource = read("apps/webapp/js/comipath-dom-coordinator.js");
+  const uiSource = read("apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts");
 
   assert.match(
     appSource,
@@ -1270,7 +1270,7 @@ test("webapp target view model exposes the source sheet name", () => {
 test("webapp renders spreadsheet and source-sheet titles in compact labels", () => {
   const html = read("apps/webapp/index.html");
   const dataManagerSource = read("apps/webapp/js/comipath-browser-runtime.js");
-  const uiSource = read("apps/webapp/js/comipath-dom-coordinator.js");
+  const uiSource = read("apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts");
 
   assert.match(html, /id="spreadsheet-title"/);
   assert.match(html, /id="target-sheet-name"/);

@@ -18,6 +18,8 @@ export {
 } from "./ui/pending-gas-updates-panel-model";
 export type { PendingGasUpdateBackgroundProcess } from "./use-cases/pending-gas-update-background-process";
 export type { PendingGasUpdateDelivery } from "./use-cases/pending-gas-update-delivery";
+export { DomCircleGalleryView } from "./ui/dom-circle-gallery-view";
+export { DomCircleProgressView } from "./ui/dom-circle-progress-view";
 
 export interface CircleStatusControllerPort {
   changeStatus(params: {
