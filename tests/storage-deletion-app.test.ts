@@ -122,7 +122,11 @@ describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
       confirmation: "全イベントを削除",
     });
 
-    expect(app.eventDayRepository.listEventDays()).toHaveLength(0);
+    expect(app.eventDayRepository.listEventDays()).toEqual([ref1]);
+    expect(app.eventDayRepository.load(ref1)).toMatchObject({
+      source: { type: "csv", fileName: "empty.csv" },
+      circles: [],
+    });
   });
 
   it("rejects all-events deletion if confirmation text is invalid", async () => {

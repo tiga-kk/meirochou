@@ -1083,7 +1083,7 @@ test("webapp next-target search ranks candidates with grid route assets", () => 
   );
 
   assert.match(appSource, /rankCandidatesByGridDistance/);
-  assert.match(loaderSource, /this\.fetcher\(url\)/);
+  assert.match(loaderSource, /globalThis\.fetch\.bind\(globalThis\)/);
   assert.match(loaderSource, /mapArea\.assets\.grid/);
   assert.doesNotMatch(loaderSource, /c108-/i);
   assert.match(appSource, /gridDistance/);

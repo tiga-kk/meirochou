@@ -871,6 +871,8 @@ export class BrowserEventBinding {
         if (nextState) {
           this.eventDayRepository.rememberLastOpenedEventDay(nextRef);
           this.activeEventDaySession.setActiveEventDay(nextRef, nextState);
+        } else {
+          await this.openEventDay(nextRef);
         }
 
         if (!this.activeRef) {

@@ -34,6 +34,38 @@ const routeAssets = {
 };
 
 describe("Task 2 route guidance ownership", () => {
+  it("binds the default browser fetch to globalThis", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetcher = function (this: unknown, url: string): Promise<Response> {
+      expect(this).toBe(globalThis);
+      if (url.endsWith("points.json")) {
+        return Promise.resolve(
+          new Response(JSON.stringify(routeAssets.points), { status: 200 }),
+        );
+      }
+      if (url.endsWith("grid-meta.json")) {
+        return Promise.resolve(
+          new Response(JSON.stringify(routeAssets.gridMetadata), { status: 200 }),
+        );
+      }
+      return Promise.resolve(new Response(routeAssets.gridBytes, { status: 200 }));
+    };
+
+    globalThis.fetch = fetcher as typeof fetch;
+    try {
+      await new HttpRouteMapAssetsLoader().loadMapAssets({
+        areaId: "demo-east",
+        assets: {
+          points: "https://example.test/points.json",
+          gridMeta: "https://example.test/grid-meta.json",
+          grid: "https://example.test/grid.bin",
+        },
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("loads assets from the active map-area manifest instead of a fixed C108 path", async () => {
     const fetcher = vi.fn(async (url: string) => {
       if (url.endsWith("points.json"))

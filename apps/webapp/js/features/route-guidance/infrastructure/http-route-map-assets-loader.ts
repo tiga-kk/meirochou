@@ -7,7 +7,9 @@ import type {
 export class HttpRouteMapAssetsLoader implements RouteMapAssetsLoader {
   private cache = new Map<string, RouteMapAssets>();
 
-  constructor(private readonly fetcher: typeof fetch = fetch) {}
+  constructor(
+    private readonly fetcher: typeof fetch = globalThis.fetch.bind(globalThis),
+  ) {}
 
   async loadMapAssets(mapArea: MapArea): Promise<RouteMapAssets> {
     if (!mapArea.assets) {

@@ -206,7 +206,7 @@ export function assembleComiPathApplication(
               : {}),
             collaborators: {
               afterSwitch: async (newRef, manifest) => {
-                runtimeMapAreaCatalog.initializeMapAreas(manifest.areas);
+                runtimeMapAreaCatalog.replaceMapAreas(manifest.areas);
                 browserRuntime.currentManifest = manifest;
                 const state = repository.load(newRef);
                 if (state) activeEventDaySession.setActiveEventDay(newRef, state);
