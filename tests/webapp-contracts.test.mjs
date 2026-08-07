@@ -1377,13 +1377,13 @@ test("webapp navigation map renders the configured map image", () => {
   assert.match(mapRenderer, /classList\.remove\(["']hidden["']\)/);
 });
 
-test("webapp validates the map manifest before initializing ComiPathBrowserRuntime", () => {
+test("webapp initializes the injected map catalog before binding the manifest", () => {
   const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
   const loadIndex = appSource.indexOf(
     "await loadRuntimeMapBundleManifestFromUrl",
   );
   const initializeIndex = appSource.indexOf(
-    "runtimeMapAreaCatalog.initializeMapAreas",
+    "existingApp.routeMapAreaCatalog.initializeMapAreas",
     loadIndex,
   );
   const initializeBindingIndex = appSource.indexOf(
@@ -1398,6 +1398,42 @@ test("webapp validates the map manifest before initializing ComiPathBrowserRunti
     appSource,
     /catch\s*\(error\)[\s\S]*renderMapBootstrapError\(document,\s*error\)/,
   );
+});
+
+test("webapp injects route guidance and delegates the start flow to its controller", () => {
+  const assemblySource = read(
+    "apps/webapp/js/app/assemble-comipath-application.ts",
+  );
+  const bindingSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const controllerIndex = assemblySource.indexOf(
+    "const routeGuidanceController = new RouteGuidanceController",
+  );
+  const bindingIndex = assemblySource.indexOf(
+    "browserRuntime = new BrowserEventBinding({",
+    controllerIndex,
+  );
+  const dependenciesIndex = assemblySource.indexOf(
+    "routeGuidanceDependencies: {",
+    bindingIndex,
+  );
+  const startFlowStart = bindingSource.indexOf("searchNext(startSpace");
+  const startFlow = bindingSource.slice(
+    startFlowStart,
+    bindingSource.indexOf("\n  searchNextDevDemo(", startFlowStart),
+  );
+
+  assert.ok(controllerIndex >= 0);
+  assert.ok(bindingIndex > controllerIndex);
+  assert.ok(dependenciesIndex > bindingIndex);
+  assert.match(
+    assemblySource.slice(dependenciesIndex, assemblySource.indexOf("eventDayDependencies", dependenciesIndex)),
+    /routeGuidanceController,/
+  );
+  assert.match(
+    startFlow,
+    /await this\.routeGuidanceController\.startFromCurrentLocation\(\{[\s\S]*eventDay:[\s\S]*startPosition,[\s\S]*pendingCircles: candidates,/,
+  );
+  assert.doesNotMatch(startFlow, /startRouteGuidanceUseCase/);
 });
 
 test("webapp map rendering avoids a permanently low-resolution transform layer", () => {

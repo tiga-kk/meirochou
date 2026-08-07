@@ -30,7 +30,9 @@ Stage 8Aは完了した。WIPで先行追加された型注釈、ownership test�
 
 Stage 8Bも完了した。event/day、circle status/GAS outbox、circle data source、event registry loader、local data deletionの生成をcomposition rootへ寄せ、BrowserEventBindingへ注入した。background processのstart/stopとlocal deletionのRoute Guidance cleanup callbackを関連テストで確認している。
 
-次はStage 8C（Route Guidanceの生成物とmutable state ownershipの移管）であり、Stage 8A/8Bの完了確認なしに着手しない。
+Stage 8C-Aも完了した。Route Guidanceのsession、map catalog、assets loader、snapshot/matrix repository、operations、runtime controller、Use Case、Controllerをcomposition rootで生成し、BrowserEventBindingへ注入した。開始フローが注入済みControllerへ到達することと、既存のmanifest検証契約を確認している。`Object.defineProperties`によるstate proxyと既存workflowは次の内部サブステップまで維持する。
+
+次はStage 8C-B（Route Guidance mutable state ownershipの移管）であり、Stage 8C-Aの独立レビューと検証完了なしに着手しない。
 
 ## 現在までに実装済みの主要部分
 

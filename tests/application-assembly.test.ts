@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   EventDayRef,
@@ -8,6 +9,15 @@ import type { LocalDataDeletionScope } from "../apps/webapp/js/features/local-da
 
 interface BindingOptions {
   readonly alnsWorkerFactory?: () => Worker;
+  readonly routeGuidanceDependencies?: {
+    readonly routeGuidanceSession: unknown;
+    readonly routeMapAssetsLoader: unknown;
+    readonly snapshotRepository: unknown;
+    readonly matrixRepository: unknown;
+    readonly orchestrationService: unknown;
+    readonly navigationRuntimeController: unknown;
+    readonly routeGuidanceController: unknown;
+  };
   readonly localDataDeletionUseCase: {
     execute(scope: LocalDataDeletionScope): Promise<void>;
   };
@@ -57,7 +67,7 @@ describe("application assembly", () => {
     mockState.bindings = [];
   });
 
-  it("creates the legacy application and worker factory once", async () => {
+  it("creates the browser binding once", async () => {
     const createAlnsWorker = vi.fn(() => ({}) as Worker);
     const app = assembleComiPathApplication({
       document: {} as Document,
@@ -71,7 +81,24 @@ describe("application assembly", () => {
     await Promise.all([app.start(), app.start()]);
     expect(mockState.constructors).toBe(1);
     expect(mockState.workerFactories).toHaveLength(1);
-    expect(createAlnsWorker).toHaveBeenCalledOnce();
+    expect(createAlnsWorker).not.toHaveBeenCalled();
+  });
+
+  it("injects the assembled Route Guidance runtime into the browser binding", () => {
+    assembleComiPathApplication({
+      document: {} as Document,
+      window: {} as Window,
+    });
+
+    expect(mockState.options[0].routeGuidanceDependencies).toMatchObject({
+      routeGuidanceSession: expect.any(Object),
+      routeMapAssetsLoader: expect.any(Object),
+      snapshotRepository: expect.any(Object),
+      matrixRepository: expect.any(Object),
+      orchestrationService: expect.any(Object),
+      navigationRuntimeController: expect.any(Object),
+      routeGuidanceController: expect.any(Object),
+    });
   });
 
   it("injects one background process without starting or stopping it twice", async () => {

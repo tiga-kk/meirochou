@@ -39,6 +39,19 @@ import { loadRuntimeMapBundleManifestFromUrl, resolveEventMapManifestUrl } from 
 import { loadEventRegistryWithUrl } from "../features/event-day/infrastructure/http-event-registry-loader";
 import { DeleteLocalDataUseCase } from "../features/local-data-deletion/public-api";
 import { runtimeMapAreaCatalog } from "../features/route-guidance/infrastructure/runtime-map-area-catalog";
+import type { MapAreaCatalog } from "../features/route-guidance/domain/map-area";
+import { HttpRouteMapAssetsLoader } from "../features/route-guidance/infrastructure/http-route-map-assets-loader";
+import { LocalStorageDistanceMatrixRepository } from "../features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
+import { LocalStorageRouteGuidanceSnapshotRepository } from "../features/route-guidance/infrastructure/local-storage-route-guidance-snapshot-repository";
+import { RouteGuidanceRuntimeController } from "../features/route-guidance/infrastructure/route-guidance-runtime-controller";
+import { RouteGuidanceController } from "../features/route-guidance/ui/route-guidance-controller";
+import { ChangeDestinationUseCase } from "../features/route-guidance/use-cases/change-destination";
+import { FinishCurrentCircleUseCase } from "../features/route-guidance/use-cases/finish-current-circle";
+import { InvalidateRouteGuidanceUseCase } from "../features/route-guidance/use-cases/invalidate-route-guidance";
+import { ResumeRouteGuidanceUseCase } from "../features/route-guidance/use-cases/resume-route-guidance";
+import { RouteGuidanceNavigationOperations } from "../features/route-guidance/use-cases/route-guidance-navigation-operations";
+import { createRouteGuidanceSession } from "../features/route-guidance/use-cases/route-guidance-session";
+import { StartRouteGuidanceUseCase } from "../features/route-guidance/use-cases/start-route-guidance";
 import type { MapBundleManifest } from "../features/event-day/domain/event-day-contracts";
 import { StorageService } from "../state/storage-service";
 import {
@@ -64,6 +77,7 @@ export interface AssembleComiPathApplicationOptions {
 export function assembleComiPathApplication(
   options: AssembleComiPathApplicationOptions,
 ): StartableApplication & Record<string, unknown> {
+  let browserRuntime: any;
   const storage = new StorageService();
   const repository =
     options.repository ?? new LocalStorageEventDayRepository(storage);
@@ -164,7 +178,48 @@ export function assembleComiPathApplication(
         : undefined,
   });
 
-  let browserRuntime: any;
+  const routeGuidanceSession = createRouteGuidanceSession();
+  const routeMapAreaCatalog =
+    runtimeMapAreaCatalog as unknown as MapAreaCatalog;
+  const routeMapAssetsLoader = new HttpRouteMapAssetsLoader();
+  const snapshotRepository = new LocalStorageRouteGuidanceSnapshotRepository();
+  const matrixRepository = new LocalStorageDistanceMatrixRepository();
+  const orchestrationService = new RouteGuidanceNavigationOperations();
+  const navigationRuntimeController = new RouteGuidanceRuntimeController({
+    snapshotRepo: snapshotRepository,
+    matrixRepo: matrixRepository,
+    orchestration: orchestrationService,
+    ...(options.createAlnsWorker
+      ? { workerFactory: options.createAlnsWorker }
+      : {}),
+  });
+  const routeGuidanceSnapshotRepository = {
+    loadSnapshot: () => null,
+    saveSnapshot: () => browserRuntime.saveNavigationSnapshot(),
+    deleteSnapshot: (ref: Parameters<BrowserEventBinding["clearNavigationSnapshot"]>[0]) =>
+      browserRuntime.clearNavigationSnapshot(ref),
+  };
+  const routeGuidanceController = new RouteGuidanceController({
+    startGuidance: new StartRouteGuidanceUseCase(
+      routeGuidanceSession,
+      routeMapAreaCatalog,
+      routeMapAssetsLoader,
+      routeGuidanceSnapshotRepository,
+    ),
+    resumeGuidance: new ResumeRouteGuidanceUseCase(
+      routeGuidanceSession,
+      routeGuidanceSnapshotRepository,
+      routeMapAssetsLoader,
+      routeMapAreaCatalog,
+    ),
+    changeDestination: new ChangeDestinationUseCase(routeGuidanceSession),
+    finishCircle: new FinishCurrentCircleUseCase(routeGuidanceSession),
+    session: routeGuidanceSession,
+    invalidateGuidance: new InvalidateRouteGuidanceUseCase(
+      routeGuidanceSession,
+    ),
+  });
+
   const deleteLocalData = new DeleteLocalDataUseCase(
     repository,
     {
@@ -184,10 +239,19 @@ export function assembleComiPathApplication(
   );
 
   browserRuntime = new BrowserEventBinding({
-    alnsWorkerFactory: options.createAlnsWorker,
     circleDataSourceSession,
     circleDataSourceController,
     localDataDeletionUseCase: deleteLocalData,
+    routeGuidanceDependencies: {
+      routeGuidanceSession,
+      routeMapAreaCatalog,
+      routeMapAssetsLoader,
+      snapshotRepository,
+      matrixRepository,
+      orchestrationService,
+      navigationRuntimeController,
+      routeGuidanceController,
+    },
     eventDayDependencies: {
       repository,
       activeEventDaySession,
@@ -275,7 +339,7 @@ export function assembleComiPathApplication(
     exportCirclesToCsv,
     switchEventDay,
     openInitialEventDay,
-    routeGuidanceController: browserRuntime.routeGuidanceController,
-    routeGuidanceSession: browserRuntime.routeGuidanceSession,
+    routeGuidanceController,
+    routeGuidanceSession,
   }) as unknown as StartableApplication & Record<string, unknown>;
 }

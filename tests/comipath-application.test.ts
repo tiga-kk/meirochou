@@ -46,6 +46,7 @@ describe("ComiPath application shell", () => {
 
   it("settles scheduled work when the legacy application is disposed", async () => {
     let cancelled = false;
+    let disposeCalls = 0;
     const fakeApp = {
       stopped: false,
       ownedTimers: new Set<ReturnType<typeof setTimeout>>(),
@@ -53,7 +54,7 @@ describe("ComiPath application shell", () => {
       ownedEventListeners: [],
       ownedWorkers: new Set(),
       disposeSyncCoordinator() {},
-      navigationRuntimeController: {},
+      navigationRuntimeController: { dispose() { disposeCalls++; } },
       settingsEscapeHandler: null,
     } as unknown as BrowserEventBinding;
 
@@ -72,5 +73,6 @@ describe("ComiPath application shell", () => {
     BrowserEventBinding.prototype.dispose.call(fakeApp);
     await pending;
     expect(cancelled).toBe(true);
+    expect(disposeCalls).toBe(1);
   });
 });

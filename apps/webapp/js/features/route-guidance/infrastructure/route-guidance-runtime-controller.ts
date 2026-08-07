@@ -98,6 +98,13 @@ export class RouteGuidanceRuntimeController {
     return this.currentGeneration;
   }
 
+  /** Releases the optimizer worker owned by this Route Guidance runtime. */
+  dispose(): void {
+    this.worker?.terminate?.();
+    this.worker = null;
+    this.currentJobId = null;
+  }
+
   startOptimization(navState: NavigationState): OptimizationStartResult {
     const optimization = this.orchestration.startOptimization(navState);
     this.currentGeneration = optimization.generation;

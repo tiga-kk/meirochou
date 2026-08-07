@@ -23,20 +23,7 @@ import {
   planRouteFromGridIndex,
   rankCandidatesByGridDistance,
 } from "../features/route-guidance/domain/routing/grid-route-planner";
-import { HttpRouteMapAssetsLoader } from "../features/route-guidance/infrastructure/http-route-map-assets-loader";
-import { LocalStorageDistanceMatrixRepository } from "../features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
-import { LocalStorageRouteGuidanceSnapshotRepository } from "../features/route-guidance/infrastructure/local-storage-route-guidance-snapshot-repository";
-import { RouteGuidanceRuntimeController } from "../features/route-guidance/infrastructure/route-guidance-runtime-controller";
-import { runtimeMapAreaCatalog } from "../features/route-guidance/infrastructure/runtime-map-area-catalog";
 import { buildSpaceFromLocation } from "../features/route-guidance/ui/parse-current-location-form";
-import { RouteGuidanceController } from "../features/route-guidance/ui/route-guidance-controller";
-import { ChangeDestinationUseCase } from "../features/route-guidance/use-cases/change-destination";
-import { FinishCurrentCircleUseCase } from "../features/route-guidance/use-cases/finish-current-circle";
-import { InvalidateRouteGuidanceUseCase } from "../features/route-guidance/use-cases/invalidate-route-guidance";
-import { ResumeRouteGuidanceUseCase } from "../features/route-guidance/use-cases/resume-route-guidance";
-import { RouteGuidanceNavigationOperations } from "../features/route-guidance/use-cases/route-guidance-navigation-operations";
-import { createRouteGuidanceSession } from "../features/route-guidance/use-cases/route-guidance-session";
-import { StartRouteGuidanceUseCase } from "../features/route-guidance/use-cases/start-route-guidance";
 import {
   buildDeleteOptions,
   buildEventDayOptions,
@@ -76,7 +63,7 @@ function sameEventDayRef(left, right) {
   );
 }
 
-function findAreaForSpace(space) {
+function findAreaForSpace(space, mapAreaCatalog) {
   if (!space || typeof space !== "string") return null;
 
   const cleanedSpace = space.trim();
@@ -86,7 +73,7 @@ function findAreaForSpace(space) {
   const labelChar = cleanedSpace[1];
 
   return (
-    runtimeMapAreaCatalog
+    mapAreaCatalog
       .getAllMapAreas()
       .find(
         (area) =>
@@ -95,9 +82,9 @@ function findAreaForSpace(space) {
   );
 }
 
-function areSpacesInSameArea(spaceA, spaceB) {
-  const areaA = findAreaForSpace(spaceA);
-  const areaB = findAreaForSpace(spaceB);
+function areSpacesInSameArea(spaceA, spaceB, mapAreaCatalog) {
+  const areaA = findAreaForSpace(spaceA, mapAreaCatalog);
+  const areaB = findAreaForSpace(spaceB, mapAreaCatalog);
   return Boolean(areaA && areaB && areaA.id === areaB.id);
 }
 
@@ -110,8 +97,8 @@ export class BrowserEventBinding {
   constructor(options = {}) {
     this.started = false;
     this.stopped = false;
-    this.ownedWorkers = new Set();
     const eventDayDependencies = options?.eventDayDependencies;
+    const routeGuidanceDependencies = options?.routeGuidanceDependencies;
     if (
       !eventDayDependencies ||
       !eventDayDependencies.repository ||
@@ -123,7 +110,16 @@ export class BrowserEventBinding {
       !eventDayDependencies.loadEventRegistry ||
       !options?.circleDataSourceSession ||
       !options?.circleDataSourceController ||
-      !options?.localDataDeletionUseCase
+      !options?.localDataDeletionUseCase ||
+      !routeGuidanceDependencies ||
+      !routeGuidanceDependencies.routeGuidanceSession ||
+      !routeGuidanceDependencies.routeMapAreaCatalog ||
+      !routeGuidanceDependencies.routeMapAssetsLoader ||
+      !routeGuidanceDependencies.snapshotRepository ||
+      !routeGuidanceDependencies.matrixRepository ||
+      !routeGuidanceDependencies.orchestrationService ||
+      !routeGuidanceDependencies.navigationRuntimeController ||
+      !routeGuidanceDependencies.routeGuidanceController
     ) {
       throw new Error("BrowserEventBinding requires assembled dependencies");
     }
@@ -139,7 +135,15 @@ export class BrowserEventBinding {
     this.eventRegistryUrl = eventDayDependencies.eventRegistryUrl ?? null;
     this.localDataDeletionUseCase = options.localDataDeletionUseCase;
     this.spreadsheetTitle = "";
-    this.routeGuidanceSession = createRouteGuidanceSession();
+    this.routeGuidanceSession = routeGuidanceDependencies.routeGuidanceSession;
+    this.routeMapAreaCatalog = routeGuidanceDependencies.routeMapAreaCatalog;
+    this.routeMapAssetsLoader = routeGuidanceDependencies.routeMapAssetsLoader;
+    this.snapshotRepository = routeGuidanceDependencies.snapshotRepository;
+    this.matrixRepository = routeGuidanceDependencies.matrixRepository;
+    this.orchestrationService = routeGuidanceDependencies.orchestrationService;
+    this.navigationRuntimeController =
+      routeGuidanceDependencies.navigationRuntimeController;
+    this.routeGuidanceController = routeGuidanceDependencies.routeGuidanceController;
     const baseSession = options.circleDataSourceSession;
     this.circleDataSourceController = options.circleDataSourceController;
     let tokenSeq = 0;
@@ -284,39 +288,6 @@ export class BrowserEventBinding {
     this.currentStartSpace = "";
     this.selectionMessage = "";
     this.selectionToken = 0;
-    this.routeMapAssetsLoader = new HttpRouteMapAssetsLoader();
-    this.startRouteGuidanceUseCase = new StartRouteGuidanceUseCase(
-      this.routeGuidanceSession,
-      runtimeMapAreaCatalog,
-      this.routeMapAssetsLoader,
-      {
-        saveSnapshot: () => {
-          this.saveNavigationSnapshot();
-        },
-      },
-    );
-    const routeGuidanceSnapshotRepository = {
-      loadSnapshot: () => null,
-      saveSnapshot: () => this.saveNavigationSnapshot(),
-      deleteSnapshot: (ref) => this.clearNavigationSnapshot(ref),
-    };
-    this.routeGuidanceController = new RouteGuidanceController({
-      startGuidance: this.startRouteGuidanceUseCase,
-      resumeGuidance: new ResumeRouteGuidanceUseCase(
-        this.routeGuidanceSession,
-        routeGuidanceSnapshotRepository,
-        this.routeMapAssetsLoader,
-        runtimeMapAreaCatalog,
-      ),
-      changeDestination: new ChangeDestinationUseCase(
-        this.routeGuidanceSession,
-      ),
-      finishCircle: new FinishCurrentCircleUseCase(this.routeGuidanceSession),
-      session: this.routeGuidanceSession,
-      invalidateGuidance: new InvalidateRouteGuidanceUseCase(
-        this.routeGuidanceSession,
-      ),
-    });
     this.currentManifest = null;
     this.transitionToken = 0;
     this.isTransitioning = false;
@@ -348,30 +319,6 @@ export class BrowserEventBinding {
       },
     };
 
-    // Phase 5C: Single composition root instances for navigation runtime
-    this.snapshotRepository = new LocalStorageRouteGuidanceSnapshotRepository();
-    this.matrixRepository = new LocalStorageDistanceMatrixRepository();
-    this.orchestrationService = new RouteGuidanceNavigationOperations();
-    this.navigationRuntimeController = new RouteGuidanceRuntimeController({
-      snapshotRepo: this.snapshotRepository,
-      matrixRepo: this.matrixRepository,
-      orchestration: this.orchestrationService,
-      workerFactory: () => {
-        const worker = options?.alnsWorkerFactory
-          ? options.alnsWorkerFactory()
-          : new Worker(
-              new URL(
-                "../features/route-guidance/infrastructure/worker/alns-worker.ts",
-                import.meta.url,
-              ),
-              {
-                type: "module",
-              },
-            );
-        this.ownedWorkers.add(worker);
-        return worker;
-      },
-    });
   }
 
   showToast(message, type) {
@@ -1029,11 +976,7 @@ export class BrowserEventBinding {
     this.ownedTimers.clear();
     for (const cancel of this.ownedTimerCancels.values()) cancel();
     this.ownedTimerCancels.clear();
-    for (const worker of this.ownedWorkers) {
-      worker.onmessage = null;
-      worker.terminate?.();
-    }
-    this.ownedWorkers.clear();
+    this.navigationRuntimeController.dispose();
     if (this.settingsEscapeHandler) {
       document.removeEventListener("keydown", this.settingsEscapeHandler);
       this.settingsEscapeHandler = null;
@@ -1148,8 +1091,8 @@ export class BrowserEventBinding {
 
   /** Resolve an exact same-area route using cached, runtime-validated assets. */
   async planGridRoute(startSpace, targetSpace, options = {}) {
-    if (!areSpacesInSameArea(startSpace, targetSpace)) return null;
-    const area = findAreaForSpace(startSpace);
+    if (!areSpacesInSameArea(startSpace, targetSpace, this.routeMapAreaCatalog)) return null;
+    const area = findAreaForSpace(startSpace, this.routeMapAreaCatalog);
     const assets = await this.loadGridRouteAssets(area);
     if (!assets) return null;
     return planRoute(
@@ -1175,7 +1118,11 @@ export class BrowserEventBinding {
 
     if (
       !this.currentRoute ||
-      !areSpacesInSameArea(this.currentStartSpace, circle.space)
+      !areSpacesInSameArea(
+        this.currentStartSpace,
+        circle.space,
+        this.routeMapAreaCatalog,
+      )
     ) {
       if (token !== this.selectionToken) return;
       this.selectionState = "error";
@@ -1271,7 +1218,7 @@ export class BrowserEventBinding {
     try {
       const lockedFrom = currentNavigationState.lockedFirstLeg?.from;
       if (lockedFrom?.type === "start") {
-        const area = runtimeMapAreaCatalog
+        const area = this.routeMapAreaCatalog
           .getAllMapAreas()
           .find((candidate) => candidate.id === lockedFrom.areaId);
         const assets = area ? await this.loadGridRouteAssets(area) : null;
@@ -1339,7 +1286,7 @@ export class BrowserEventBinding {
 
   readCurrentSpace() {
     const areaId = document.getElementById("loc-ewsn").value;
-    const area = runtimeMapAreaCatalog
+    const area = this.routeMapAreaCatalog
       .getAllMapAreas()
       .find((candidate) => candidate.id === areaId);
     const currentSpace = buildSpaceFromLocation({
@@ -1417,7 +1364,7 @@ export class BrowserEventBinding {
     if (btnOpenGallery) {
       btnOpenGallery.onclick = () => {
         const areaId = document.getElementById("loc-ewsn").value;
-        const area = runtimeMapAreaCatalog
+        const area = this.routeMapAreaCatalog
           .getAllMapAreas()
           .find((candidate) => candidate.id === areaId);
         this.ui.showGallery(area?.name || areaId, false);
@@ -1521,13 +1468,19 @@ export class BrowserEventBinding {
   }
 
   async rankCandidatesByGrid(currentSpace, candidates) {
-    const area = findAreaForSpace(currentSpace);
+    const area = findAreaForSpace(currentSpace, this.routeMapAreaCatalog);
     if (!area) return null;
 
     const sameAreaCandidates = [];
     const otherCandidates = [];
     candidates.forEach((candidate) => {
-      if (areSpacesInSameArea(currentSpace, candidate?.space)) {
+      if (
+        areSpacesInSameArea(
+          currentSpace,
+          candidate?.space,
+          this.routeMapAreaCatalog,
+        )
+      ) {
         sameAreaCandidates.push(candidate);
       } else {
         otherCandidates.push(candidate);
@@ -1561,7 +1514,7 @@ export class BrowserEventBinding {
     const fallbackRemainder = solveNearestNeighbor(
       currentSpace,
       [...unreachable, ...otherCandidates],
-      runtimeMapAreaCatalog.getAllMapAreas(),
+      this.routeMapAreaCatalog.getAllMapAreas(),
     ).slice(1);
 
     return [...reachable, ...fallbackRemainder];
@@ -1608,7 +1561,10 @@ export class BrowserEventBinding {
           }
 
           // Initial navigation start via NavigationOrchestrationService
-          const area = findAreaForSpace(currentSpace);
+          const area = findAreaForSpace(
+            currentSpace,
+            this.routeMapAreaCatalog,
+          );
           if (!area) {
             this.ui.showToast("現在地のエリアを特定できませんでした", "error");
             resolve();
@@ -1620,7 +1576,9 @@ export class BrowserEventBinding {
           // area; those remain pending until the user switches maps and sets a
           // start position there.
           const candidates = allCandidates.filter(
-            (candidate) => findAreaForSpace(candidate.space)?.id === area.id,
+            (candidate) =>
+              findAreaForSpace(candidate.space, this.routeMapAreaCatalog)?.id ===
+              area.id,
           );
           if (candidates.length === 0) {
             this.ui.showToast(
@@ -1678,7 +1636,7 @@ export class BrowserEventBinding {
           };
 
           try {
-            await this.startRouteGuidanceUseCase.execute({
+            await this.routeGuidanceController.startFromCurrentLocation({
               eventDay: this.activeRef || {
                 eventId: this.currentManifest?.eventId || "runtime",
                 dayId: "active",
@@ -1765,7 +1723,7 @@ export class BrowserEventBinding {
               : solveNearestNeighbor(
                   currentSpace,
                   candidates,
-                  runtimeMapAreaCatalog.getAllMapAreas(),
+                  this.routeMapAreaCatalog.getAllMapAreas(),
                 );
           } catch (error) {
             console.warn(
@@ -1841,7 +1799,7 @@ export class BrowserEventBinding {
 
     if (type === "purchase" && this.navigationState) {
       const activeState = this.navigationState;
-      const area = runtimeMapAreaCatalog
+      const area = this.routeMapAreaCatalog
         .getAllMapAreas()
         .find((candidate) => candidate.id === activeState.areaId);
       const assets = area ? await this.loadGridRouteAssets(area) : null;
@@ -1917,7 +1875,7 @@ export class BrowserEventBinding {
         if (lockedFrom?.type === "circle") {
           route = await this.planGridRoute(lockedFrom.space, nextTargetSpace);
         } else if (lockedFrom?.type === "start") {
-          const area = runtimeMapAreaCatalog
+          const area = this.routeMapAreaCatalog
             .getAllMapAreas()
             .find((candidate) => candidate.id === lockedFrom.areaId);
           const assets = area ? await this.loadGridRouteAssets(area) : null;
@@ -1995,7 +1953,7 @@ export class BrowserEventBinding {
     let route = null;
     try {
       if (lockedFrom?.type === "start") {
-        const area = runtimeMapAreaCatalog
+        const area = this.routeMapAreaCatalog
           .getAllMapAreas()
           .find((candidate) => candidate.id === lockedFrom.areaId);
         const assets = area ? await this.loadGridRouteAssets(area) : null;
@@ -2125,11 +2083,11 @@ export class BrowserEventBinding {
     let route = null;
     if (lockedLeg?.from) {
       if (lockedLeg.from.type === "start") {
-        const area = runtimeMapAreaCatalog
+        const area = this.routeMapAreaCatalog
           .getAllMapAreas()
           .find((a) => a.id === lockedLeg.from.areaId) ||
-          findAreaForSpace(targetCircle.space) ||
-          runtimeMapAreaCatalog.getAllMapAreas()[0] || {
+          findAreaForSpace(targetCircle.space, this.routeMapAreaCatalog) ||
+          this.routeMapAreaCatalog.getAllMapAreas()[0] || {
             id: lockedLeg.from.areaId,
           };
         const assets = area ? await this.loadGridRouteAssets(area) : null;
@@ -2257,12 +2215,12 @@ export class BrowserEventBinding {
 
     const startArea =
       lockedLeg?.from?.type === "start"
-        ? runtimeMapAreaCatalog
+        ? this.routeMapAreaCatalog
             .getAllMapAreas()
             .find((a) => a.id === lockedLeg.from.areaId) ||
-          findAreaForSpace(targetCircle.space)
+          findAreaForSpace(targetCircle.space, this.routeMapAreaCatalog)
         : lockedLeg?.from?.type === "circle"
-          ? findAreaForSpace(lockedLeg.from.space)
+          ? findAreaForSpace(lockedLeg.from.space, this.routeMapAreaCatalog)
           : null;
 
     const assets = startArea ? await this.loadGridRouteAssets(startArea) : null;
@@ -2345,7 +2303,7 @@ export class BrowserEventBinding {
   findPointPortalIndex(pointsPayload, gridMeta, space) {
     const [, identifier, number] = parseSpace(
       space,
-      runtimeMapAreaCatalog.getAllMapAreas(),
+      this.routeMapAreaCatalog.getAllMapAreas(),
     );
     const point = pointsPayload?.points?.find(
       (candidate) =>
@@ -2371,7 +2329,7 @@ export class BrowserEventBinding {
   findPointPortalPosition(pointsPayload, gridMeta, space) {
     const [, identifier, number] = parseSpace(
       space,
-      runtimeMapAreaCatalog.getAllMapAreas(),
+      this.routeMapAreaCatalog.getAllMapAreas(),
     );
     const point = pointsPayload?.points?.find(
       (candidate) =>
@@ -2505,7 +2463,7 @@ async function bootstrapApp(existingApp) {
           areas: [],
         };
     }
-    runtimeMapAreaCatalog.initializeMapAreas(manifest.areas);
+    existingApp.routeMapAreaCatalog.initializeMapAreas(manifest.areas);
   } catch (error) {
     console.error("Map bundle initialization failed.", error);
     renderMapBootstrapError(document, error);
