@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
 import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
+import { createBrowserEventBindingOptions } from "./helpers/browser-event-binding-fixture";
 import { ChangeCircleStatusUseCase } from "../apps/webapp/js/features/circle-status/use-cases/change-circle-status";
 import type {
   CircleRecord,
@@ -35,7 +36,10 @@ function createProductionAppFixture() {
     postMessage: vi.fn(),
     terminate: vi.fn(),
   };
-  const app = new BrowserEventBinding({ alnsWorkerFactory: () => worker });
+  const app = new BrowserEventBinding({
+    ...createBrowserEventBindingOptions(),
+    alnsWorkerFactory: () => worker,
+  });
   vi.spyOn(app, "disposeSyncCoordinator");
   return { app, settings, addEventListener, resumeAddEventListener };
 }
@@ -49,6 +53,12 @@ function createGasState(): LocalEventDayState {
 }
 
 describe("apps public behavior characterization", () => {
+  it("requires non-route dependencies assembled outside the browser binder", () => {
+    expect(() => new BrowserEventBinding()).toThrow(
+      "BrowserEventBinding requires assembled dependencies",
+    );
+  });
+
   it("binds each browser event once and stops sync coordination on dispose", () => {
     const { app, addEventListener, resumeAddEventListener } =
       createProductionAppFixture();

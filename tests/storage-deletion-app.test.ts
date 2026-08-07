@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
+import { createBrowserEventBindingOptions } from "./helpers/browser-event-binding-fixture";
 import type {
   EventRegistryV1,
   LocalEventDayState,
@@ -47,7 +48,7 @@ function createSampleState(eventId: string, dayId: string): LocalEventDayState {
 
 describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
   it("handles storage-delete-request for active event-day and falls back to default event/day", async () => {
-    const app = new BrowserEventBinding();
+    const app = new BrowserEventBinding(createBrowserEventBindingOptions());
     app.eventRegistry = createSampleRegistry();
 
     const ref1 = { eventId: "c104", dayId: "day1" };
@@ -74,7 +75,7 @@ describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
   });
 
   it("does not switch active state when deleting a non-active event-day", async () => {
-    const app = new BrowserEventBinding();
+    const app = new BrowserEventBinding(createBrowserEventBindingOptions());
     app.eventRegistry = createSampleRegistry();
 
     const activeRef = { eventId: "c104", dayId: "day1" };
@@ -100,7 +101,7 @@ describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
   });
 
   it("handles all-events deletion, clears repository, and reinitializes registry default state", async () => {
-    const app = new BrowserEventBinding();
+    const app = new BrowserEventBinding(createBrowserEventBindingOptions());
     app.eventRegistry = createSampleRegistry();
 
     const ref1 = { eventId: "c104", dayId: "day1" };
@@ -130,7 +131,7 @@ describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
   });
 
   it("rejects all-events deletion if confirmation text is invalid", async () => {
-    const app = new BrowserEventBinding();
+    const app = new BrowserEventBinding(createBrowserEventBindingOptions());
     app.eventRegistry = createSampleRegistry();
 
     const ref1 = { eventId: "c104", dayId: "day1" };

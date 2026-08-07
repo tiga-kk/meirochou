@@ -5,18 +5,15 @@ import "../components/navigation-resume-dialog";
 import "../components/source-diff-dialog";
 import { DomRouteGuidanceView } from "../features/route-guidance/ui/dom-route-guidance-view";
 import { createDevDemoData, isDevDemoEnabled } from "../dev-demo-data.js";
-import { createCircleDataSourceSession } from "../features/circle-data-source/public-api";
 import {
   parseGridMeta,
   parsePointsPayload,
 } from "../features/event-day/infrastructure/application-boundary-parsers";
-import { loadEventRegistryWithUrl } from "../features/event-day/infrastructure/http-event-registry-loader";
 import {
   loadRuntimeMapBundleManifestFromUrl,
   renderMapBootstrapError,
   resolveEventMapManifestUrl,
 } from "../features/event-day/infrastructure/http-map-manifest-loader";
-import { DeleteLocalDataUseCase } from "../features/local-data-deletion/public-api";
 import {
   parseSpace,
   solveNearestNeighbor,
@@ -33,17 +30,6 @@ import { RouteGuidanceRuntimeController } from "../features/route-guidance/infra
 import { runtimeMapAreaCatalog } from "../features/route-guidance/infrastructure/runtime-map-area-catalog";
 import { buildSpaceFromLocation } from "../features/route-guidance/ui/parse-current-location-form";
 import { RouteGuidanceController } from "../features/route-guidance/ui/route-guidance-controller";
-import { GasPendingUpdateDelivery } from "../features/circle-status/infrastructure/gas-pending-update-delivery";
-import { CircleStatusController } from "../features/circle-status/ui/circle-status-controller";
-import { PendingGasUpdatesController } from "../features/circle-status/ui/pending-gas-updates-controller";
-import { ChangeCircleStatusUseCase } from "../features/circle-status/use-cases/change-circle-status";
-import { DiscardPendingGasUpdatesUseCase } from "../features/circle-status/use-cases/discard-pending-gas-updates";
-import { DefaultPendingGasUpdateBackgroundProcess } from "../features/circle-status/use-cases/pending-gas-update-background-process";
-import { SendPendingGasUpdatesUseCase } from "../features/circle-status/use-cases/send-pending-gas-updates";
-import { UndoCircleStatusChangeUseCase } from "../features/circle-status/use-cases/undo-circle-status-change";
-import { LocalStorageEventDayRepository } from "../features/event-day/infrastructure/local-storage-event-day-repository";
-import { createActiveEventDayReader, createActiveEventDaySession } from "../features/event-day/public-api";
-import { StorageService } from "../state/storage-service.js";
 import { ChangeDestinationUseCase } from "../features/route-guidance/use-cases/change-destination";
 import { FinishCurrentCircleUseCase } from "../features/route-guidance/use-cases/finish-current-circle";
 import { InvalidateRouteGuidanceUseCase } from "../features/route-guidance/use-cases/invalidate-route-guidance";
@@ -125,58 +111,37 @@ export class BrowserEventBinding {
     this.started = false;
     this.stopped = false;
     this.ownedWorkers = new Set();
-    const eventDayDependencies = options?.eventDayDependencies ?? {};
-    const storage = eventDayDependencies.storage ?? new StorageService();
-    this.eventDayRepository =
-      eventDayDependencies.repository ?? new LocalStorageEventDayRepository(storage);
-    this.activeEventDaySession =
-      eventDayDependencies.activeEventDaySession ?? createActiveEventDaySession();
-    this.activeEventDayReader =
-      eventDayDependencies.activeEventDayReader ??
-      createActiveEventDayReader(this.activeEventDaySession);
-    const delivery = new GasPendingUpdateDelivery();
-    const sendPendingGasUpdates = new SendPendingGasUpdatesUseCase(
-      this.eventDayRepository,
-      this.activeEventDaySession,
-      delivery,
-    );
-    const discardPendingGasUpdates = new DiscardPendingGasUpdatesUseCase(
-      this.eventDayRepository,
-      this.activeEventDaySession,
-    );
-    this.backgroundProcess =
-      eventDayDependencies.backgroundProcess ??
-      new DefaultPendingGasUpdateBackgroundProcess(
-        sendPendingGasUpdates,
-        typeof window !== "undefined" ? window : undefined,
-      );
-    this.circleStatusController =
-      eventDayDependencies.circleStatusController ??
-      new CircleStatusController(
-        new ChangeCircleStatusUseCase(
-          this.eventDayRepository,
-          this.activeEventDaySession,
-          this.backgroundProcess,
-        ),
-        new UndoCircleStatusChangeUseCase(
-          this.eventDayRepository,
-          this.activeEventDaySession,
-        ),
-      );
+    const eventDayDependencies = options?.eventDayDependencies;
+    if (
+      !eventDayDependencies ||
+      !eventDayDependencies.repository ||
+      !eventDayDependencies.activeEventDaySession ||
+      !eventDayDependencies.activeEventDayReader ||
+      !eventDayDependencies.circleStatusController ||
+      !eventDayDependencies.pendingGasUpdatesController ||
+      !eventDayDependencies.backgroundProcess ||
+      !eventDayDependencies.loadEventRegistry ||
+      !options?.circleDataSourceSession ||
+      !options?.circleDataSourceController ||
+      !options?.localDataDeletionUseCase
+    ) {
+      throw new Error("BrowserEventBinding requires assembled dependencies");
+    }
+    this.eventDayRepository = eventDayDependencies.repository;
+    this.activeEventDaySession = eventDayDependencies.activeEventDaySession;
+    this.activeEventDayReader = eventDayDependencies.activeEventDayReader;
+    this.backgroundProcess = eventDayDependencies.backgroundProcess;
+    this.circleStatusController = eventDayDependencies.circleStatusController;
     this.pendingGasUpdatesController =
-      eventDayDependencies.pendingGasUpdatesController ??
-      new PendingGasUpdatesController(
-        sendPendingGasUpdates,
-        discardPendingGasUpdates,
-      );
+      eventDayDependencies.pendingGasUpdatesController;
+    this.loadEventRegistryOperation = eventDayDependencies.loadEventRegistry;
     this.eventRegistry = eventDayDependencies.eventRegistry ?? null;
     this.eventRegistryUrl = eventDayDependencies.eventRegistryUrl ?? null;
+    this.localDataDeletionUseCase = options.localDataDeletionUseCase;
     this.spreadsheetTitle = "";
     this.routeGuidanceSession = createRouteGuidanceSession();
-    const baseSession =
-      options?.circleDataSourceSession ?? createCircleDataSourceSession();
-    this.circleDataSourceController =
-      options?.circleDataSourceController ?? null;
+    const baseSession = options.circleDataSourceSession;
+    this.circleDataSourceController = options.circleDataSourceController;
     let tokenSeq = 0;
     const busyLanes = new Set();
     let gasAbortController = null;
@@ -448,26 +413,6 @@ export class BrowserEventBinding {
     }
   }
 
-  get localDataDeletionUseCase() {
-    return new DeleteLocalDataUseCase(
-      this.eventDayRepository,
-      {
-        deleteActivitySnapshot: (ref) => this.snapshotRepository.clear(ref),
-        deleteAllRouteData: (ref) => {
-          this.matrixRepository.deleteByEventDay(ref.eventId, ref.dayId);
-          this.snapshotRepository.clear(ref);
-        },
-      },
-      {
-        now: () => new Date().toISOString(),
-        createSourceGeneration: () =>
-          typeof crypto !== "undefined" && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `gen-${Date.now()}`,
-      },
-    );
-  }
-
   get activeRef() {
     return this.activeEventDaySession.getActiveEventDay()?.ref ?? null;
   }
@@ -493,10 +438,10 @@ export class BrowserEventBinding {
   }
 
   async loadEventRegistry() {
-    if (this.eventRegistry && this.eventRegistryUrl) {
-      return { registry: this.eventRegistry, registryUrl: this.eventRegistryUrl };
+    if (this.eventRegistry) {
+      return { registry: this.eventRegistry, registryUrl: this.eventRegistryUrl ?? "" };
     }
-    const loaded = await loadEventRegistryWithUrl();
+    const loaded = await this.loadEventRegistryOperation();
     this.eventRegistry = loaded.registry;
     this.eventRegistryUrl = loaded.registryUrl;
     return loaded;
@@ -2523,12 +2468,7 @@ async function bootstrapApp(existingApp) {
   let registryUrl;
   let targetRef;
   try {
-    if (existingApp.eventRegistry && !existingApp.eventRegistryUrl) {
-      registry = existingApp.eventRegistry;
-      registryUrl = "";
-    } else {
-      ({ registry, registryUrl } = await loadEventRegistryWithUrl());
-    }
+    ({ registry, registryUrl } = await existingApp.loadEventRegistry());
     targetRef = existingApp.eventDayRepository.getLastOpenedEventDay();
 
     const isValidRef =
@@ -2572,6 +2512,5 @@ async function bootstrapApp(existingApp) {
     return;
   }
 
-  const app = existingApp || new BrowserEventBinding();
-  await app.init(manifest, targetRef, { registry, registryUrl });
+  await existingApp.init(manifest, targetRef, { registry, registryUrl });
 }

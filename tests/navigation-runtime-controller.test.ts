@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, test } from "vitest";
 import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
+import { createBrowserEventBindingOptions } from "./helpers/browser-event-binding-fixture";
 import { LocalStorageDistanceMatrixRepository } from "../apps/webapp/js/features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
 import { LocalStorageRouteGuidanceSnapshotRepository as LocalStorageNavigationSnapshotRepository } from "../apps/webapp/js/features/route-guidance/infrastructure/local-storage-route-guidance-snapshot-repository";
 import { RouteGuidanceRuntimeController as NavigationRuntimeController } from "../apps/webapp/js/features/route-guidance/infrastructure/route-guidance-runtime-controller";
@@ -30,7 +31,8 @@ describe("Phase 5C Task 11: NavigationRuntimeController", () => {
   });
 
   test("ComiPathBrowserRuntime constructor instantiates NavigationRuntimeController and shares single repository instances", () => {
-    const app = new BrowserEventBinding();
+    const dependencies = createBrowserEventBindingOptions();
+    const app = new BrowserEventBinding(dependencies);
     expect(app.navigationRuntimeController).toBeDefined();
     expect(app.snapshotRepository).toBeDefined();
     expect(app.matrixRepository).toBeDefined();
@@ -46,16 +48,9 @@ describe("Phase 5C Task 11: NavigationRuntimeController", () => {
       app.orchestrationService,
     );
 
-    // Verify storageDeletionService receives the exact same single repository instances
-    const deletionService = app.storageDeletionService;
-    expect(deletionService).toBeDefined();
-    expect(
-      (deletionService as unknown as Record<string, unknown>)
-        .snapshotRepository,
-    ).toBe(app.snapshotRepository);
-    expect(
-      (deletionService as unknown as Record<string, unknown>).matrixRepository,
-    ).toBe(app.matrixRepository);
+    expect(app.localDataDeletionUseCase).toBe(
+      dependencies.localDataDeletionUseCase,
+    );
   });
 
   test("loads valid snapshot on init and triggers resume dialog prompt", () => {

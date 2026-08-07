@@ -36,6 +36,8 @@ import {
   SwitchEventDayUseCase,
 } from "../features/event-day/public-api";
 import { loadRuntimeMapBundleManifestFromUrl, resolveEventMapManifestUrl } from "../features/event-day/infrastructure/http-map-manifest-loader";
+import { loadEventRegistryWithUrl } from "../features/event-day/infrastructure/http-event-registry-loader";
+import { DeleteLocalDataUseCase } from "../features/local-data-deletion/public-api";
 import { runtimeMapAreaCatalog } from "../features/route-guidance/infrastructure/runtime-map-area-catalog";
 import type { MapBundleManifest } from "../features/event-day/domain/event-day-contracts";
 import { StorageService } from "../state/storage-service";
@@ -162,12 +164,31 @@ export function assembleComiPathApplication(
         : undefined,
   });
 
-  const browserRuntime: any = new BrowserEventBinding({
+  let browserRuntime: any;
+  const deleteLocalData = new DeleteLocalDataUseCase(
+    repository,
+    {
+      deleteActivitySnapshot: (ref) => browserRuntime.clearNavigationSnapshot(ref),
+      deleteAllRouteData: (ref) => {
+        browserRuntime.matrixRepository.deleteByEventDay(ref.eventId, ref.dayId);
+        browserRuntime.clearNavigationSnapshot(ref);
+      },
+    },
+    {
+      now: () => new Date().toISOString(),
+      createSourceGeneration: () =>
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `gen-${Date.now()}`,
+    },
+  );
+
+  browserRuntime = new BrowserEventBinding({
     alnsWorkerFactory: options.createAlnsWorker,
     circleDataSourceSession,
     circleDataSourceController,
+    localDataDeletionUseCase: deleteLocalData,
     eventDayDependencies: {
-      storage,
       repository,
       activeEventDaySession,
       activeEventDayReader,
@@ -175,13 +196,16 @@ export function assembleComiPathApplication(
       pendingGasUpdatesController,
       backgroundProcess,
       eventRegistry: options.registry,
+      loadEventRegistry: () =>
+        options.registry
+          ? Promise.resolve({ registry: options.registry, registryUrl: "" })
+          : loadEventRegistryWithUrl(),
     },
   });
 
   const baseApp = createComiPathApplication({
     browserRuntime: {
       start: async () => {
-        backgroundProcess.start();
         await browserRuntime.start();
         const runtimeRegistry = browserRuntime.eventRegistry;
         const runtimeRegistryUrl = browserRuntime.eventRegistryUrl;
@@ -234,7 +258,6 @@ export function assembleComiPathApplication(
         return undefined;
       },
       stop: () => {
-        backgroundProcess.stop();
         eventDaySelectorController?.stop();
         circleDataSourceController.stop();
         browserRuntime.dispose();

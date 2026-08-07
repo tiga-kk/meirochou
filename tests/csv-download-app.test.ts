@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
+import { createBrowserEventBindingOptions } from "./helpers/browser-event-binding-fixture";
 import type {
   EventDayRef,
   EventRegistryV1,
@@ -40,7 +41,7 @@ describe("ComiPathBrowserRuntime & CircleDataSource CSV Export Integration", () 
     vi.spyOn(window.URL, "createObjectURL").mockImplementation(() => "blob:http://localhost/mock-csv");
     vi.spyOn(window.URL, "revokeObjectURL").mockImplementation(() => {});
 
-    app = new BrowserEventBinding();
+    app = new BrowserEventBinding(createBrowserEventBindingOptions());
     app.eventRegistry = createRegistry();
     app.eventRegistryUrl = "http://localhost/assets/events/manifest.json";
   });

@@ -1377,7 +1377,7 @@ test("webapp navigation map renders the configured map image", () => {
   assert.match(mapRenderer, /classList\.remove\(["']hidden["']\)/);
 });
 
-test("webapp validates the map manifest before constructing ComiPathBrowserRuntime", () => {
+test("webapp validates the map manifest before initializing ComiPathBrowserRuntime", () => {
   const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
   const loadIndex = appSource.indexOf(
     "await loadRuntimeMapBundleManifestFromUrl",
@@ -1386,14 +1386,14 @@ test("webapp validates the map manifest before constructing ComiPathBrowserRunti
     "runtimeMapAreaCatalog.initializeMapAreas",
     loadIndex,
   );
-  const constructIndex = appSource.indexOf(
-    "new BrowserEventBinding()",
+  const initializeBindingIndex = appSource.indexOf(
+    "await existingApp.init(",
     initializeIndex,
   );
 
   assert.ok(loadIndex >= 0);
   assert.ok(initializeIndex > loadIndex);
-  assert.ok(constructIndex > initializeIndex);
+  assert.ok(initializeBindingIndex > initializeIndex);
   assert.match(
     appSource,
     /catch\s*\(error\)[\s\S]*renderMapBootstrapError\(document,\s*error\)/,

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
 import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
+import { createBrowserEventBindingOptions } from "./helpers/browser-event-binding-fixture";
 import type {
   EventRegistryV1,
   LocalEventDayState,
@@ -79,7 +80,7 @@ function createSampleGasState(
 
 describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
   it("does not repaint settings after retry completion becomes stale", async () => {
-    const app = new BrowserEventBinding();
+    const app = new BrowserEventBinding(createBrowserEventBindingOptions());
     const ref = { eventId: "c104", dayId: "day1" };
     let resolveRetry: (summary: {
       processedRefs: number;
@@ -111,7 +112,7 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
   });
 
   it("rejects forged retry and discard event details at the ComiPathBrowserRuntime boundary", async () => {
-    const app = new BrowserEventBinding();
+    const app = new BrowserEventBinding(createBrowserEventBindingOptions());
     const retrySpy = vi.spyOn(app.pendingGasUpdatesController, "retryAll");
     const discardSpy = vi.spyOn(
       app.pendingGasUpdatesController,
@@ -132,7 +133,7 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
   });
 
   it("delegates retry request to pendingGasUpdatesController and updates management models", async () => {
-    const app = new BrowserEventBinding();
+    const app = new BrowserEventBinding(createBrowserEventBindingOptions());
     app.eventRegistry = createSampleRegistry();
 
     const ref = { eventId: "c104", dayId: "day1" };
@@ -153,7 +154,7 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
   });
 
   it("handles discard request with exact confirmation text and updates repository", async () => {
-    const app = new BrowserEventBinding();
+    const app = new BrowserEventBinding(createBrowserEventBindingOptions());
     app.eventRegistry = createSampleRegistry();
 
     const ref = { eventId: "c104", dayId: "day1" };
@@ -183,7 +184,7 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
   });
 
   it("rejects discard request if confirmation text does not match", async () => {
-    const app = new BrowserEventBinding();
+    const app = new BrowserEventBinding(createBrowserEventBindingOptions());
     app.eventRegistry = createSampleRegistry();
 
     const ref = { eventId: "c104", dayId: "day1" };
@@ -209,7 +210,7 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
   });
 
   it("maintains model coherence across outbox panel, event-day options, and delete options from the same snapshot", async () => {
-    const app = new BrowserEventBinding();
+    const app = new BrowserEventBinding(createBrowserEventBindingOptions());
     const registry = createSampleRegistry();
     app.eventRegistry = registry;
 
