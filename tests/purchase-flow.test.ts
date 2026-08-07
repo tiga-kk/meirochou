@@ -2,6 +2,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
 import { createBrowserEventBindingOptions } from "./helpers/browser-event-binding-fixture";
+import { completeCircleVisit } from "../apps/webapp/js/app/complete-circle-visit";
 import { GasApiClient } from "../apps/webapp/js/api/gas-api-client";
 import { GasPendingUpdateDelivery } from "../apps/webapp/js/features/circle-status/infrastructure/gas-pending-update-delivery";
 import { CircleStatusController } from "../apps/webapp/js/features/circle-status/ui/circle-status-controller";
@@ -55,6 +56,9 @@ function createSetup(source: LocalEventDayState["source"], adapter = new MockSto
     new UndoCircleStatusChangeUseCase(repository, session),
   );
   const pending = new PendingGasUpdatesController(send, discard);
+  const completeCircleVisitOperation = vi.fn(
+    completeCircleVisit.bind(null, status),
+  );
   const state = {
     ...createEmptyEventDayState(source, "generation-1", NOW),
     circles: [{ space: "A-01", priority: 1 }],
@@ -68,6 +72,7 @@ function createSetup(source: LocalEventDayState["source"], adapter = new MockSto
       circleStatusController: status,
       pendingGasUpdatesController: pending,
       backgroundProcess: background,
+      completeCircleVisit: completeCircleVisitOperation,
     }),
   );
   app.routeGuidanceSession.replaceSnapshot({
@@ -79,10 +84,31 @@ function createSetup(source: LocalEventDayState["source"], adapter = new MockSto
   app.ui.updateCounts = vi.fn();
   app.ui.updateCurrentLocation = vi.fn();
   app.searchNext = vi.fn();
-  return { adapter, repository, session, fetcher, app };
+  return {
+    adapter,
+    repository,
+    session,
+    fetcher,
+    app,
+    completeCircleVisitOperation,
+  };
 }
 
 describe("circle-status production integration", () => {
+  test("routes a purchase through the injected plain operation", async () => {
+    const fixture = createSetup({ type: "csv", fileName: "day1.csv" });
+
+    await fixture.app.handleAction("purchase");
+
+    expect(fixture.completeCircleVisitOperation).toHaveBeenCalledWith({
+      eventDay: REF,
+      circleSpace: "A-01",
+      nextStatus: "purchased",
+      expectedSourceGeneration: "generation-1",
+    });
+    expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("purchased");
+  });
+
   test("saves a purchase before attempting GAS delivery", async () => {
     const fixture = createSetup({
       type: "gas",

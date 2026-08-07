@@ -37,6 +37,11 @@ import type {
 } from "../../apps/webapp/js/features/route-guidance/use-cases/route-guidance-snapshot-repository";
 import { StartRouteGuidanceUseCase } from "../../apps/webapp/js/features/route-guidance/use-cases/start-route-guidance";
 import { StorageService } from "../../apps/webapp/js/state/storage-service";
+import {
+  completeCircleVisit,
+  type CompleteCircleVisitInput,
+} from "../../apps/webapp/js/app/complete-circle-visit";
+import type { ChangeCircleStatusResult } from "../../apps/webapp/js/features/circle-status/public-api";
 
 interface BrowserEventBindingFixtureOptions {
   readonly repository?: EventDayRepository;
@@ -45,6 +50,9 @@ interface BrowserEventBindingFixtureOptions {
   readonly circleStatusController?: CircleStatusController;
   readonly pendingGasUpdatesController?: PendingGasUpdatesController;
   readonly backgroundProcess?: PendingGasUpdateBackgroundProcess;
+  readonly completeCircleVisit?: (
+    input: CompleteCircleVisitInput,
+  ) => ChangeCircleStatusResult;
 }
 
 /** Supplies the explicitly assembled dependencies required by the browser binder. */
@@ -82,6 +90,8 @@ export function createBrowserEventBindingOptions(
       sendPendingGasUpdates,
       new DiscardPendingGasUpdatesUseCase(repository, activeEventDaySession),
     );
+  const completeCircleVisitOperation =
+    options.completeCircleVisit ?? completeCircleVisit.bind(null, circleStatusController);
   const routeGuidanceSession = createRouteGuidanceSession();
   const routeMapAreaCatalog = runtimeMapAreaCatalog;
   const routeMapAssetsLoader = new HttpRouteMapAssetsLoader();
@@ -128,6 +138,7 @@ export function createBrowserEventBindingOptions(
   return {
     circleDataSourceSession: createCircleDataSourceSession(),
     circleDataSourceController: { cancelPreview() {} },
+    completeCircleVisit: completeCircleVisitOperation,
     localDataDeletionUseCase: new DeleteLocalDataUseCase(repository, {
       deleteActivitySnapshot() {},
       deleteAllRouteData() {},

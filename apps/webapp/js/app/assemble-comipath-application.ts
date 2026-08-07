@@ -1,4 +1,8 @@
 import { BrowserEventBinding } from "./bind-browser-events";
+import {
+  completeCircleVisit,
+  type CompleteCircleVisitInput,
+} from "./complete-circle-visit";
 import { BrowserCircleCsvDownloader } from "../features/circle-data-source/infrastructure/browser-circle-csv-downloader";
 import { GasGoogleSheetCircleClient } from "../features/circle-data-source/infrastructure/gas-google-sheet-circle-client";
 import {
@@ -241,6 +245,8 @@ export function assembleComiPathApplication(
   browserRuntime = new BrowserEventBinding({
     circleDataSourceSession,
     circleDataSourceController,
+    completeCircleVisit: (input: CompleteCircleVisitInput) =>
+      completeCircleVisit(circleStatusController, input),
     localDataDeletionUseCase: deleteLocalData,
     routeGuidanceDependencies: {
       routeGuidanceSession,

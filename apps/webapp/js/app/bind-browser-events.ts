@@ -110,6 +110,7 @@ export class BrowserEventBinding {
       !eventDayDependencies.loadEventRegistry ||
       !options?.circleDataSourceSession ||
       !options?.circleDataSourceController ||
+      !options?.completeCircleVisit ||
       !options?.localDataDeletionUseCase ||
       !routeGuidanceDependencies ||
       !routeGuidanceDependencies.routeGuidanceSession ||
@@ -131,6 +132,7 @@ export class BrowserEventBinding {
     this.pendingGasUpdatesController =
       eventDayDependencies.pendingGasUpdatesController;
     this.loadEventRegistryOperation = eventDayDependencies.loadEventRegistry;
+    this.completeCircleVisit = options.completeCircleVisit;
     this.eventRegistry = eventDayDependencies.eventRegistry ?? null;
     this.eventRegistryUrl = eventDayDependencies.eventRegistryUrl ?? null;
     this.localDataDeletionUseCase = options.localDataDeletionUseCase;
@@ -366,7 +368,7 @@ export class BrowserEventBinding {
 
   addPurchased(space) {
     if (!this.activeRef || !this.activeState) throw new Error("No event/day is open");
-    const result = this.circleStatusController.changeStatus({
+    const result = this.completeCircleVisit({
       eventDay: this.activeRef,
       circleSpace: space,
       nextStatus: "purchased",
@@ -377,7 +379,7 @@ export class BrowserEventBinding {
 
   addHold(space) {
     if (!this.activeRef || !this.activeState) throw new Error("No event/day is open");
-    const result = this.circleStatusController.changeStatus({
+    const result = this.completeCircleVisit({
       eventDay: this.activeRef,
       circleSpace: space,
       nextStatus: "held",

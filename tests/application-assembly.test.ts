@@ -6,8 +6,13 @@ import type {
   LocalEventDayState,
 } from "../apps/webapp/js/features/event-day/public-api";
 import type { LocalDataDeletionScope } from "../apps/webapp/js/features/local-data-deletion/public-api";
+import type { CompleteCircleVisitInput } from "../apps/webapp/js/app/complete-circle-visit";
+import type { ChangeCircleStatusResult } from "../apps/webapp/js/features/circle-status/public-api";
 
 interface BindingOptions {
+  readonly completeCircleVisit: (
+    input: CompleteCircleVisitInput,
+  ) => ChangeCircleStatusResult;
   readonly alnsWorkerFactory?: () => Worker;
   readonly routeGuidanceDependencies?: {
     readonly routeGuidanceSession: unknown;
