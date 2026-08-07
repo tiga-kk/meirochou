@@ -366,26 +366,26 @@ export class BrowserEventBinding {
     return this.eventDayRepository.load(ref) ?? this.activeState;
   }
 
-  addPurchased(space) {
+  async addPurchased(space) {
     if (!this.activeRef || !this.activeState) throw new Error("No event/day is open");
-    const result = this.completeCircleVisit({
+    const result = await this.completeCircleVisit({
       eventDay: this.activeRef,
       circleSpace: space,
       nextStatus: "purchased",
       expectedSourceGeneration: this.activeState.sourceGeneration,
     });
-    return result.state;
+    return result.statusResult.state;
   }
 
-  addHold(space) {
+  async addHold(space) {
     if (!this.activeRef || !this.activeState) throw new Error("No event/day is open");
-    const result = this.completeCircleVisit({
+    const result = await this.completeCircleVisit({
       eventDay: this.activeRef,
       circleSpace: space,
       nextStatus: "held",
       expectedSourceGeneration: this.activeState.sourceGeneration,
     });
-    return result.state;
+    return result.statusResult.state;
   }
 
   resetAll() {
@@ -1739,24 +1739,28 @@ export class BrowserEventBinding {
   async handleAction(type) {
     const guidanceSnapshot = this.routeGuidanceSession.getSnapshot();
     if (guidanceSnapshot.selectionStatus === "comparing") return;
+    if (type !== "purchase" && type !== "hold") return;
     const actionTarget =
       guidanceSnapshot.selectedDestination || guidanceSnapshot.currentDestination;
     if (!actionTarget) return;
 
     const space = actionTarget.space;
-    const sheetName = actionTarget.sheetName || "";
+    let visitResult;
     try {
-      if (type === "purchase") {
-        this.addPurchased(space, sheetName);
-        this.ui?.showToast(`${space} 購入！`);
-      } else {
-        this.addHold(space, sheetName);
-        this.ui?.showToast(`${space} 保留`);
-      }
+      visitResult = await this.completeCircleVisit({
+        eventDay: this.activeRef,
+        circleSpace: space,
+        nextStatus: type === "purchase" ? "purchased" : "held",
+        expectedSourceGeneration: this.activeState.sourceGeneration,
+      });
     } catch (error) {
       this.reportLocalMutationFailure(error);
       return;
     }
+
+    this.ui?.showToast(
+      type === "purchase" ? `${space} 購入！` : `${space} 保留`,
+    );
 
     if (this.activeState?.source.type === "gas") {
       this.flushOutboxWithDiagnostic();
@@ -1771,190 +1775,28 @@ export class BrowserEventBinding {
       return;
     }
 
-    if (type === "purchase" && guidanceSnapshot.navigationState) {
-      const activeState = guidanceSnapshot.navigationState;
-      const area = this.routeMapAreaCatalog
-        .getAllMapAreas()
-        .find((candidate) => candidate.id === activeState.areaId);
-      const assets = area ? await this.loadGridRouteAssets(area) : null;
-      const arrivedGridIndex = assets
-        ? this.findPointPortalIndex(
-            assets.pointsPayload,
-            assets.gridMeta,
-            space,
-          )
-        : null;
-      const arrivedSvgPosition = assets
-        ? this.findPointPortalPosition(
-            assets.pointsPayload,
-            assets.gridMeta,
-            space,
-          )
-        : null;
-      if (
-        !activeState.areaId ||
-        arrivedGridIndex === null ||
-        !arrivedSvgPosition
-      ) {
-        this.ui.showToast(
-          "現在地を確定できないため、次の案内へ進めません",
-          "error",
-        );
-        return;
-      }
-
-      const arrivedPosition = {
-        areaId: activeState.areaId,
-        gridIndex: arrivedGridIndex,
-        svgX: arrivedSvgPosition.svgX,
-        svgY: arrivedSvgPosition.svgY,
-        source: "arrived-circle",
-        circleSpace: space,
-      };
-      let arrivedState;
-      let purchasedState;
-      try {
-        arrivedState = this.orchestrationService.handleArrival(
-          activeState,
-          arrivedPosition,
-        );
-        purchasedState =
-          this.orchestrationService.handlePurchaseNext(arrivedState);
-      } catch (error) {
-        console.warn("Purchase navigation state update failed.", error);
-        return;
-      }
-
-      const nextTargetSpace = purchasedState.targetSpace;
-      if (!nextTargetSpace) {
-        this.replaceRouteGuidanceSnapshot({
-          navigationState: purchasedState,
-          currentDestination: null,
-          currentRoute: null,
-          selectedDestination: null,
-          selectedRoute: null,
-        });
-        this.ui.showTarget(null);
-        this.saveNavigationSnapshot();
-        return;
-      }
-
-      const nextTarget = this.wantToBuy.find(
-        (candidate) => candidate.space === nextTargetSpace,
-      );
-      if (!nextTarget) return;
-
-      let route = null;
-      try {
-        const lockedFrom = purchasedState.lockedFirstLeg?.from;
-        if (lockedFrom?.type === "circle") {
-          route = await this.planGridRoute(lockedFrom.space, nextTargetSpace);
-        } else if (lockedFrom?.type === "start") {
-          const area = this.routeMapAreaCatalog
-            .getAllMapAreas()
-            .find((candidate) => candidate.id === lockedFrom.areaId);
-          const assets = area ? await this.loadGridRouteAssets(area) : null;
-          if (assets) {
-            route = planRouteFromGridIndex(
-              assets.pointsPayload,
-              assets.gridMeta,
-              assets.gridBytes,
-              lockedFrom.gridIndex,
-              nextTargetSpace,
-            );
-          }
-        }
-      } catch (error) {
-        console.warn("Purchased target route could not be calculated.", error);
-      }
-      if (!route) {
-        this.ui.showToast(
-          "次の目的地への経路を再構築できませんでした。現在の案内を保持します",
-          "error",
-        );
-        return;
-      }
-
-      const target = this.targetWithRoute(nextTarget, route);
-      this.replaceRouteGuidanceSnapshot({
-        navigationState: purchasedState,
-        currentDestination: target,
-        currentRoute: route,
-        selectedDestination: target,
-        selectedRoute: route,
-      });
+    const routeResult = visitResult.routeGuidanceResult;
+    if (routeResult.kind === "advanced") {
       this.ui.showNavigation(this.getNavigationContext("current"));
       this.saveNavigationSnapshot();
       return;
     }
 
-    if (type !== "hold" || !guidanceSnapshot.navigationState) return;
-
-    let holdResult;
-    try {
-      holdResult = this.orchestrationService.handleBeforeArrivalHold(
-        guidanceSnapshot.navigationState,
-      );
-    } catch (error) {
-      console.warn("Hold navigation state update failed.", error);
-      return;
-    }
-
-    const nextTargetSpace = holdResult.navState.targetSpace;
-    if (!nextTargetSpace) {
+    if (routeResult.kind === "finished") {
       this.ui.showTarget(null);
-      this.clearNavigationSnapshot(this.activeRef);
-      this.resetNavigationRuntimeState();
+      if (type === "purchase") this.saveNavigationSnapshot();
+      else this.clearNavigationSnapshot(this.activeRef);
       return;
     }
 
-    const nextTarget = this.wantToBuy.find(
-      (candidate) => candidate.space === nextTargetSpace,
-    );
-    if (!nextTarget) return;
-
-    const lockedFrom = holdResult.navState.lockedFirstLeg?.from;
-    let route = null;
-    try {
-      if (lockedFrom?.type === "start") {
-        const area = this.routeMapAreaCatalog
-          .getAllMapAreas()
-          .find((candidate) => candidate.id === lockedFrom.areaId);
-        const assets = area ? await this.loadGridRouteAssets(area) : null;
-        if (assets) {
-          route = planRouteFromGridIndex(
-            assets.pointsPayload,
-            assets.gridMeta,
-            assets.gridBytes,
-            guidanceSnapshot.navigationState.currentPosition?.gridIndex ??
-              lockedFrom.gridIndex,
-            nextTargetSpace,
-          );
-        }
-      } else if (lockedFrom?.type === "circle") {
-        route = await this.planGridRoute(lockedFrom.space, nextTargetSpace);
-      }
-    } catch (error) {
-      console.warn("Held target route could not be calculated.", error);
-    }
-    if (!route) {
+    if (routeResult.kind === "failed") {
       this.ui.showToast(
-        "次の目的地への経路を再構築できませんでした。現在の案内を保持します",
+        routeResult.reason === "arrival-position-unavailable"
+          ? "現在地を確定できないため、次の案内へ進めません"
+          : "次の目的地への経路を再構築できませんでした。現在の案内を保持します",
         "error",
       );
-      return;
     }
-
-    const target = this.targetWithRoute(nextTarget, route);
-    this.replaceRouteGuidanceSnapshot({
-      navigationState: holdResult.navState,
-      currentDestination: target,
-      currentRoute: route,
-      selectedDestination: target,
-      selectedRoute: route,
-    });
-    this.ui.showNavigation(this.getNavigationContext("current"));
-    this.saveNavigationSnapshot();
   }
 
   /**

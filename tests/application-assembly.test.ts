@@ -6,16 +6,19 @@ import type {
   LocalEventDayState,
 } from "../apps/webapp/js/features/event-day/public-api";
 import type { LocalDataDeletionScope } from "../apps/webapp/js/features/local-data-deletion/public-api";
-import type { CompleteCircleVisitInput } from "../apps/webapp/js/app/complete-circle-visit";
-import type { ChangeCircleStatusResult } from "../apps/webapp/js/features/circle-status/public-api";
+import type {
+  CompleteCircleVisitInput,
+  CompleteCircleVisitResult,
+} from "../apps/webapp/js/app/complete-circle-visit";
 
 interface BindingOptions {
   readonly completeCircleVisit: (
     input: CompleteCircleVisitInput,
-  ) => ChangeCircleStatusResult;
+  ) => Promise<CompleteCircleVisitResult>;
   readonly alnsWorkerFactory?: () => Worker;
   readonly routeGuidanceDependencies?: {
     readonly routeGuidanceSession: unknown;
+    readonly routeMapAreaCatalog: unknown;
     readonly routeMapAssetsLoader: unknown;
     readonly snapshotRepository: unknown;
     readonly matrixRepository: unknown;
@@ -97,6 +100,7 @@ describe("application assembly", () => {
 
     expect(mockState.options[0].routeGuidanceDependencies).toMatchObject({
       routeGuidanceSession: expect.any(Object),
+      routeMapAreaCatalog: expect.any(Object),
       routeMapAssetsLoader: expect.any(Object),
       snapshotRepository: expect.any(Object),
       matrixRepository: expect.any(Object),
@@ -104,6 +108,22 @@ describe("application assembly", () => {
       navigationRuntimeController: expect.any(Object),
       routeGuidanceController: expect.any(Object),
     });
+    const routeDependencies = mockState.options[0]
+      .routeGuidanceDependencies as any;
+    const finishUseCase = routeDependencies.routeGuidanceController.deps
+      .finishCircle;
+    expect(finishUseCase.session).toBe(
+      routeDependencies.routeGuidanceSession,
+    );
+    expect(finishUseCase.mapAreaCatalog).toBe(
+      routeDependencies.routeMapAreaCatalog,
+    );
+    expect(finishUseCase.assetsLoader).toBe(
+      routeDependencies.routeMapAssetsLoader,
+    );
+    expect(finishUseCase.navigationOperations).toBe(
+      routeDependencies.orchestrationService,
+    );
   });
 
   it("injects one background process without starting or stopping it twice", async () => {

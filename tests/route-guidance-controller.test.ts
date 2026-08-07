@@ -21,4 +21,26 @@ describe("RouteGuidanceController", () => {
     );
     expect(resumeGuidance.execute).toHaveBeenCalledOnce();
   });
+
+  it("delegates the finish input and result without rebuilding guidance", async () => {
+    const finishCircle = {
+      execute: vi.fn(async () => ({ kind: "advanced" as const })),
+    };
+    const controller = new RouteGuidanceController({
+      startGuidance: {} as any,
+      resumeGuidance: {} as any,
+      changeDestination: {} as any,
+      finishCircle: finishCircle as any,
+    });
+    const input = {
+      action: "purchase" as const,
+      completedSpace: "東A01a",
+      remainingCircles: [{ space: "東A02b" }],
+    };
+
+    await expect(controller.finishCurrentCircle(input)).resolves.toEqual({
+      kind: "advanced",
+    });
+    expect(finishCircle.execute).toHaveBeenCalledWith(input);
+  });
 });

@@ -2,7 +2,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
 import { createBrowserEventBindingOptions } from "./helpers/browser-event-binding-fixture";
-import { completeCircleVisit } from "../apps/webapp/js/app/complete-circle-visit";
 import { GasApiClient } from "../apps/webapp/js/api/gas-api-client";
 import { GasPendingUpdateDelivery } from "../apps/webapp/js/features/circle-status/infrastructure/gas-pending-update-delivery";
 import { CircleStatusController } from "../apps/webapp/js/features/circle-status/ui/circle-status-controller";
@@ -56,25 +55,26 @@ function createSetup(source: LocalEventDayState["source"], adapter = new MockSto
     new UndoCircleStatusChangeUseCase(repository, session),
   );
   const pending = new PendingGasUpdatesController(send, discard);
-  const completeCircleVisitOperation = vi.fn(
-    completeCircleVisit.bind(null, status),
-  );
   const state = {
     ...createEmptyEventDayState(source, "generation-1", NOW),
     circles: [{ space: "A-01", priority: 1 }],
   };
   repository.saveAndRememberLastOpened(REF, state);
   session.setActiveEventDay(REF, state);
-  const app = new BrowserEventBinding(
-    createBrowserEventBindingOptions({
-      repository,
-      activeEventDaySession: session,
-      circleStatusController: status,
-      pendingGasUpdatesController: pending,
-      backgroundProcess: background,
-      completeCircleVisit: completeCircleVisitOperation,
-    }),
+  const bindingOptions = createBrowserEventBindingOptions({
+    repository,
+    activeEventDaySession: session,
+    circleStatusController: status,
+    pendingGasUpdatesController: pending,
+    backgroundProcess: background,
+  });
+  const completeCircleVisitOperation = vi.fn(
+    bindingOptions.completeCircleVisit,
   );
+  const app = new BrowserEventBinding({
+    ...bindingOptions,
+    completeCircleVisit: completeCircleVisitOperation,
+  });
   app.routeGuidanceSession.replaceSnapshot({
     ...app.routeGuidanceSession.getSnapshot(),
     selectedDestination: { space: "A-01", sheetName: "Day1" },
@@ -83,6 +83,8 @@ function createSetup(source: LocalEventDayState["source"], adapter = new MockSto
   app.ui.showToast = vi.fn();
   app.ui.updateCounts = vi.fn();
   app.ui.updateCurrentLocation = vi.fn();
+  app.ui.showNavigation = vi.fn();
+  app.ui.showTarget = vi.fn();
   app.searchNext = vi.fn();
   return {
     adapter,
@@ -107,6 +109,81 @@ describe("circle-status production integration", () => {
       expectedSourceGeneration: "generation-1",
     });
     expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("purchased");
+  });
+
+  test("reaches the real FinishCurrentCircleUseCase and shared Session", async () => {
+    const fixture = createSetup({ type: "csv", fileName: "day1.csv" });
+    fixture.app.routeMapAreaCatalog.replaceMapAreas([{ id: "east" }]);
+    const loadMapAssets = vi
+      .spyOn(fixture.app.routeMapAssetsLoader, "loadMapAssets")
+      .mockResolvedValue({
+        points: { image: { width: 20, height: 10 }, points: [] },
+        gridMetadata: {
+          width: 20,
+          height: 10,
+          cell_size: 10,
+          cols: 2,
+          rows: 1,
+        },
+        gridBytes: new Uint8Array([1, 1]),
+      });
+    const currentRoute = {
+      cost: 10,
+      cells: [
+        { col: 0, row: 0 },
+        { col: 1, row: 0 },
+      ],
+      points: [
+        { x: 5, y: 5 },
+        { x: 15, y: 5 },
+      ],
+      startPosition: { x: 5, y: 5 },
+      targetPosition: { x: 75, y: 50 },
+      image: { width: 20, height: 10 },
+    };
+    fixture.app.routeGuidanceSession.replaceSnapshot({
+      navigationState: {
+        stage: "navigating",
+        areaId: "east",
+        currentPosition: {
+          areaId: "east",
+          gridIndex: 0,
+          svgX: 25,
+          svgY: 50,
+          source: "manual-start",
+        },
+        targetSpace: "A-01",
+        lockedFirstLeg: {
+          from: { type: "start", areaId: "east", gridIndex: 0 },
+          toSpace: "A-01",
+        },
+        provisionalOrder: ["A-01"],
+        bestOrder: ["A-01"],
+        optimizationGeneration: 1,
+      },
+      currentDestination: { space: "A-01", sheetName: "Day1" },
+      currentRoute,
+      selectedDestination: { space: "A-01", sheetName: "Day1" },
+      selectedRoute: currentRoute,
+      selectionStatus: "ready",
+      routeOptimizationGeneration: 1,
+    });
+
+    await fixture.app.handleAction("purchase");
+
+    expect(loadMapAssets).toHaveBeenCalledOnce();
+    expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("purchased");
+    expect(fixture.app.routeGuidanceSession.getSnapshot().navigationState).toMatchObject({
+      stage: "idle",
+      targetSpace: null,
+      currentPosition: {
+        gridIndex: 1,
+        svgX: 75,
+        svgY: 50,
+        source: "arrived-circle",
+        circleSpace: "A-01",
+      },
+    });
   });
 
   test("saves a purchase before attempting GAS delivery", async () => {

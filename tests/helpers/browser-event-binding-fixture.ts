@@ -40,8 +40,8 @@ import { StorageService } from "../../apps/webapp/js/state/storage-service";
 import {
   completeCircleVisit,
   type CompleteCircleVisitInput,
+  type CompleteCircleVisitResult,
 } from "../../apps/webapp/js/app/complete-circle-visit";
-import type { ChangeCircleStatusResult } from "../../apps/webapp/js/features/circle-status/public-api";
 
 interface BrowserEventBindingFixtureOptions {
   readonly repository?: EventDayRepository;
@@ -52,7 +52,7 @@ interface BrowserEventBindingFixtureOptions {
   readonly backgroundProcess?: PendingGasUpdateBackgroundProcess;
   readonly completeCircleVisit?: (
     input: CompleteCircleVisitInput,
-  ) => ChangeCircleStatusResult;
+  ) => Promise<CompleteCircleVisitResult>;
 }
 
 /** Supplies the explicitly assembled dependencies required by the browser binder. */
@@ -90,8 +90,6 @@ export function createBrowserEventBindingOptions(
       sendPendingGasUpdates,
       new DiscardPendingGasUpdatesUseCase(repository, activeEventDaySession),
     );
-  const completeCircleVisitOperation =
-    options.completeCircleVisit ?? completeCircleVisit.bind(null, circleStatusController);
   const routeGuidanceSession = createRouteGuidanceSession();
   const routeMapAreaCatalog = runtimeMapAreaCatalog;
   const routeMapAssetsLoader = new HttpRouteMapAssetsLoader();
@@ -128,12 +126,27 @@ export function createBrowserEventBindingOptions(
       runtimeMapAreaCatalog,
     ),
     changeDestination: new ChangeDestinationUseCase(routeGuidanceSession),
-    finishCircle: new FinishCurrentCircleUseCase(routeGuidanceSession),
+    finishCircle: new FinishCurrentCircleUseCase(
+      routeGuidanceSession,
+      routeMapAreaCatalog,
+      routeMapAssetsLoader,
+      orchestrationService,
+    ),
     session: routeGuidanceSession,
     invalidateGuidance: new InvalidateRouteGuidanceUseCase(
       routeGuidanceSession,
     ),
   });
+  const completeCircleVisitOperation =
+    options.completeCircleVisit ??
+    ((input: CompleteCircleVisitInput) =>
+      completeCircleVisit(
+        circleStatusController,
+        () => activeEventDayReader.getPendingCircles(),
+        (finishInput) =>
+          routeGuidanceController.finishCurrentCircle(finishInput),
+        input,
+      ));
 
   return {
     circleDataSourceSession: createCircleDataSourceSession(),

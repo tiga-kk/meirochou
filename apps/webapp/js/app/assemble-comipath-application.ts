@@ -217,7 +217,12 @@ export function assembleComiPathApplication(
       routeMapAreaCatalog,
     ),
     changeDestination: new ChangeDestinationUseCase(routeGuidanceSession),
-    finishCircle: new FinishCurrentCircleUseCase(routeGuidanceSession),
+    finishCircle: new FinishCurrentCircleUseCase(
+      routeGuidanceSession,
+      routeMapAreaCatalog,
+      routeMapAssetsLoader,
+      orchestrationService,
+    ),
     session: routeGuidanceSession,
     invalidateGuidance: new InvalidateRouteGuidanceUseCase(
       routeGuidanceSession,
@@ -246,7 +251,13 @@ export function assembleComiPathApplication(
     circleDataSourceSession,
     circleDataSourceController,
     completeCircleVisit: (input: CompleteCircleVisitInput) =>
-      completeCircleVisit(circleStatusController, input),
+      completeCircleVisit(
+        circleStatusController,
+        () => activeEventDayReader.getPendingCircles(),
+        (finishInput) =>
+          routeGuidanceController.finishCurrentCircle(finishInput),
+        input,
+      ),
     localDataDeletionUseCase: deleteLocalData,
     routeGuidanceDependencies: {
       routeGuidanceSession,

@@ -2,7 +2,11 @@ import type { Circle, EventDayRef } from "../../event-day/public-api";
 import type { RouteGuidanceSession } from "../domain/route-guidance-types";
 import type { ApplyOptimizedRouteOrderUseCase } from "../use-cases/apply-optimized-route-order";
 import type { ChangeDestinationUseCase } from "../use-cases/change-destination";
-import type { FinishCurrentCircleUseCase } from "../use-cases/finish-current-circle";
+import type {
+  FinishCurrentCircleInput,
+  FinishCurrentCircleResult,
+  FinishCurrentCircleUseCase,
+} from "../use-cases/finish-current-circle";
 import type { InvalidateRouteGuidanceUseCase } from "../use-cases/invalidate-route-guidance";
 import type { ResumeRouteGuidanceUseCase } from "../use-cases/resume-route-guidance";
 import type { StartRouteGuidanceUseCase } from "../use-cases/start-route-guidance";
@@ -73,10 +77,9 @@ export class RouteGuidanceController {
   }
 
   async finishCurrentCircle(
-    completedSpace: string,
-    remainingCircles: readonly Circle[],
-  ): Promise<void> {
-    return this.deps.finishCircle.execute({ completedSpace, remainingCircles });
+    input: FinishCurrentCircleInput,
+  ): Promise<FinishCurrentCircleResult> {
+    return this.deps.finishCircle.execute(input);
   }
 
   reset(): void {

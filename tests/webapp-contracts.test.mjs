@@ -1135,7 +1135,7 @@ test("webapp routes gallery target changes through navigation orchestration", ()
   assert.doesNotMatch(handler, /updateCurrentLocation/);
 });
 
-test("webapp advances purchased navigation through orchestration", () => {
+test("webapp delegates purchase and hold navigation to completeCircleVisit", () => {
   const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
 
   const purchaseHandler =
@@ -1143,8 +1143,17 @@ test("webapp advances purchased navigation through orchestration", () => {
       /async\s+handleAction\(type\)[\s\S]*?\n\s*}\n\n\s*\/\*\*/,
     )?.[0] || "";
 
-  assert.match(purchaseHandler, /orchestrationService\.handleArrival\(/);
-  assert.match(purchaseHandler, /orchestrationService\.handlePurchaseNext\(/);
+  assert.match(purchaseHandler, /await\s+this\.completeCircleVisit\(/);
+  assert.doesNotMatch(purchaseHandler, /orchestrationService\.handleArrival\(/);
+  assert.doesNotMatch(
+    purchaseHandler,
+    /orchestrationService\.handlePurchaseNext\(/,
+  );
+  assert.doesNotMatch(
+    purchaseHandler,
+    /orchestrationService\.handleBeforeArrivalHold\(/,
+  );
+  assert.doesNotMatch(purchaseHandler, /planRoute(?:FromGridIndex)?\(/);
   assert.doesNotMatch(purchaseHandler, /searchNext\(space,\s*false\)/);
 });
 
