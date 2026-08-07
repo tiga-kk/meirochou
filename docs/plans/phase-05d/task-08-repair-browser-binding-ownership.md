@@ -49,6 +49,95 @@
 - 行数上限をarchitecture ruleとして追加すること
 - 既存feature Controllerを置き換えるためだけのapp-level Facade追加
 
+## WIP再開時の段階ゲート
+
+2026-08-07のWIP `24cf35fa9724e4b433e2c2573bf8b17d173481c2`は、基準コミット`ac8f2b035b3bf22b3ed03221eceebb8ccbf3f63a`上でTask 8を二度委譲した結果である。WIP commit自体はreset/rebase/amend等で消さず、その上から再開する。
+
+WIPではTask 8全体の責務移管より先に、次のend-state作業だけが進んだ。
+
+- `bind-browser-events.ts`から`// @ts-nocheck`を削除し、広い`any`/index signatureで型エラーを埋め始めた。
+- architecture checker本体を変える前に、未実装ruleを要求するnegative fixtureを追加した。
+- `complete-circle-visit.ts`を作る前に、それをimportするownership testを追加した。
+
+この状態でfocused test/typecheckを停止条件にすると、まだ実装していない完成形を先に要求するため同じ失敗を繰り返す。以後はTask 8全体を一回で委譲せず、次のStageを一つずつ完了させる。一回の実装担当へ複数Stageをまとめて渡さない。
+
+### Stage 8A: WIPを安全な中間baselineへ戻す
+
+最初の一回はこれだけを行う。production behaviorや責務配置はまだ変更しない。
+
+- `bind-browser-events.ts`の`// @ts-nocheck`削除はStage 8Fまで延期してよい。必要なら通常の新規commitで一時的に復元する。
+- WIPで追加した`[key: string]: any`や、`@ts-nocheck`削除を通すためだけの広い`any`注釈は最終設計として固定しない。baselineへ戻す際に不要なら除去する。
+- `tests/browser-binding-ownership.test.ts`の、未作成`complete-circle-visit.ts`をimportするtestは現時点のproduction contractを証明していない。Stage 8Dまで延期し、WIP commit履歴と本書に意図を残す。不存在moduleをstubで作ってtestだけ通してはいけない。
+- `tests/architecture-boundaries.test.mjs`の未実装ruleを要求するnegative fixtureはStage 8Gまで延期する。checkerを現行binderが違反したまま先に厳格化しない。
+- WIPの「最終的に何を検出・証明したいか」という意図は維持するが、現時点で必ずredになるtest行を保持すること自体を目的にしない。
+
+Stage 8Aの完了条件は、基準コミットで成功していたproduction挙動を変えず、WIP履歴を保持したまま通常のWebapp unit/type/build検証へ戻れることである。Task 8の最終ownership条件はまだ満たさなくてよい。
+
+最低限の確認:
+
+```bash
+npm run verify:webapp
+git diff --check
+```
+
+Stage 8Aでarchitecture checkerの新rule、Route Guidance workflow、`complete-circle-visit.ts`、snapshotを実装しない。
+
+### Stage 8B: 既存composition rootと重複する非Route Guidance組立てだけを移す
+
+Stage 8AがGREENになってから行う。
+
+- `assemble-comipath-application.ts`が既に生成しているevent/day、circle status/GAS outbox、circle data sourceのRepository/Session/Controller/background processを`BrowserEventBinding`側で再生成しない。
+- local data deletionの生成もcomposition rootへ寄せるが、Route Guidanceのworkflow/state移管はまだ行わない。
+- productionの`BrowserEventBinding`はこれらを注入で受ける。
+- test用fallbackとしてconcrete infrastructure生成をbinderに残さない。必要ならtest側でfake dependencyを渡す。
+- listener二重startを増やさない。
+
+このStageでRoute Guidanceのconcrete import/state proxyがbinderに残っていても一時的には許容する。architecture最終testをここでGREENにするためだけにRoute Guidanceまで同時変更しない。
+
+主な検証:
+
+```bash
+npx vitest run --root . \
+  tests/application-assembly.test.ts \
+  tests/browser-application-lifecycle.test.ts \
+  tests/production-event-day-source-wiring.test.ts \
+  tests/apps-behavior-characterization.test.ts
+npm run test:webapp
+npm run check:webapp
+git diff --check
+```
+
+### Stage 8C: Route Guidanceの生成物とmutable state ownershipを移す
+
+- `RouteGuidanceSession`、assets loader、snapshot/matrix repository、Worker runtime、Use Case、Controllerをcomposition root/Route Guidance featureで一度だけ生成する。
+- `BrowserEventBinding`からRoute Guidance concrete infrastructure import、`Object.defineProperties`によるstate proxy、独自selected/current route stateを除く。
+- このStageでは既存production workflowの実装場所を移す準備をし、purchase/hold/destination/resume semanticsを簡略化しない。
+
+### Stage 8D: Route Guidance workflowとcross-feature購入・保留処理を移す
+
+- destination selection、purchase、hold、resume、route再構築失敗時整合性を既存production behaviorのcharacterizationに合わせてfeature Use Case/Controllerへ移す。
+- ここで初めて`complete-circle-visit.ts`を作成し、status mutationとRoute Guidance進行のcross-feature順序だけを持たせる。
+- Stage 8Aで延期した`completeCircleVisit` focused testを、purchase/hold差・非current target・status失敗を含む現行contractに合わせて追加する。WIPの単純な「常にstatus→finishCurrentCircle」だけを完成仕様にしない。
+
+### Stage 8E: 残るduplicate wrapperとsettings projectionを整理する
+
+- event/day、circle data source、local deletion、outboxのduplicate state/request wrapperを削除する。
+- settings表示を既存View/pure builderへ寄せる。
+- 新しい巨大parameter object/Façadeへ移しただけの実装を作らない。
+
+### Stage 8F: binder contractを型で固定する
+
+- Stage 8B〜8Eで責務移管が完了してから`// @ts-nocheck`を最終的に削除する。
+- binder dependenciesを実際に必要なpublic operation/View/queryだけの明示型にする。
+- `[key: string]: any`や広い`any`でtypecheckを黙らせない。
+
+### Stage 8G: architecture guardrailとTask 8最終検証
+
+- 最後にcheckerの`bind-browser-events.ts`特例を削除する。
+- `application-imports-concrete-infrastructure`、`localStorage`、`new Worker(...)`のnegative fixtureと、正当なDOM/public-api importのpositive fixtureを追加する。
+- Stage 8Aで延期したownership/architecture testを最終sourceに対して復活・強化する。
+- Task 8の全検証コマンドと受入条件をここで初めて一括適用する。
+
 ## 対象ファイル
 
 ### 作成
@@ -196,6 +285,8 @@ startup順序の変更でbackground process、EventDay Controller、Circle Data 
 `document`、`window`、`addEventListener`自体はbrowser bindingの正当な責務なので禁止しない。文字列名だけで広範囲を誤検出するruleを増やさず、fixtureで「本当に禁止したい依存」と「正当なbrowser binding」を両方固定する。
 
 ## 実装手順
+
+以下はTask 8全体の論理順序である。WIPからの再開では上記Stage 8A〜8Gを優先し、一回の実装担当が複数Stageを跨がない。
 
 1. `bind-browser-events.ts`のfield、constructor生成物、methodを責務表へ分類する。
 2. 移管前に、Route Guidanceのdestination selection、purchase、hold、resume、route再構築失敗、event/day切替、source cancellationのproduction characterizationを確認する。既存testで証明できないものだけfocused testを追加する。
