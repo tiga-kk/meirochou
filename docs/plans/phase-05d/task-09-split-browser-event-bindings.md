@@ -1,10 +1,12 @@
-# Phase 5D Task 9: browser event bindingを責務別に分割する
+# Phase 5D Task 9: browser event bindingを責務所有者ごとに整理する
 
 ## 目的
 
-Task 8で`BrowserEventBinding`からbusiness state、dependency assembly、feature workflowを除いた後、残ったbrowser event registrationをevent ownerごとの小さなmoduleへ分割する。
+Task 8で`BrowserEventBinding`からbusiness state、dependency assembly、feature workflowを除いた後、残ったbrowser event registrationを責務所有者ごとに整理する。
 
-このTaskは「何行以下にする」という機械的な分割ではない。どのfeatureへの入力なのかをファイル名と依存関係から判断でき、各binderを単独で読んでlistenerの登録・解除を追える状態にする。
+このTaskの目的はファイル数を増やすことではない。どのeventを誰が所有し、どこで登録・解除するかが一意で、`stop()`後に二重発火しない状態にする。
+
+既存feature Controllerがlistener lifecycleを自然に所有できるeventは、そのfeatureへ残す。app層に「feature名ごとのbinderを必ず一つずつ作る」ことは要求しない。
 
 ## 前提
 
@@ -12,10 +14,11 @@ Task 8が完了していること。
 
 Task 8終了時点で`bind-browser-events.ts`は少なくとも次を満たしていなければならない。
 
-- concrete infrastructureを生成・importしない。
-- feature mutable stateを所有しない。
+- concrete infrastructureを生成・deep importしない。
+- feature mutable stateやそのproxyを所有しない。
 - event handlerは注入済みpublic operationを呼ぶだけである。
 - `// @ts-nocheck`がない。
+- purchase/hold、destination selection、resume等のproduction workflowはfeature側へ移管済みである。
 
 これを満たさない状態で物理分割だけを行うと巨大Facadeを複数ファイルへ散らすだけになるため、Task 9へ進まない。
 
@@ -26,39 +29,65 @@ Task 8終了時点で`bind-browser-events.ts`は少なくとも次を満たし�
 - snapshot更新
 - EventBus、DI container、generic command dispatcherの導入
 - DOM elementごとに1ファイルを作ること
+- featureごとにbinder fileを必ず作ること
 - 行数制限をCI ruleにすること
+- 既存Custom Element内部のlistener方式の全面変更
 
-## 最終event ownership
+## event ownershipの原則
 
-既存Controllerがlistener lifecycleを既に持つeventはapp binderへ戻さない。
+1. feature内部で完結するCustom Eventは、既存feature Controllerが`start()/stop()`で所有できるならfeature側で所有する。
+2. 複数featureをまたぐpage-level action、またはfeature外のshell操作だけをapp binderへ残す。
+3. 同一eventをfeature Controllerとapp binderの両方で登録しない。
+4. listener登録先がDOM EventTargetである場合は、登録と解除を同じownerから追えるようにする。
+5. callback propertyやcomponent固有callback APIまで、理由なくDOM `addEventListener`へ書き換えない。重要なのはcleanup可能な所有権であり、API形式の統一自体ではない。
 
-| event / input | owner |
+## 想定する最終所有者
+
+| event / input | 優先owner |
 |---|---|
 | `event-day-select` | `EventDaySelectorController` |
 | Circle Data Sourceのpreview/apply/cancel/export/request event | `CircleDataSourceController` |
-| local data deletionのscope/select/confirm/cancel | local-data-deletion binder → `LocalDataDeletionController` |
-| GAS outbox retry/discard | pending-GAS binder → `PendingGasUpdatesController` |
-| purchase/hold/resetのページボタン | circle-status binder → public circle action / `CompleteCircleVisitOperation` |
-| current location、search、route preview/confirm/cancel、resume | route-guidance binder → `RouteGuidanceController` |
-| settings shellの開閉などfeature非依存のUI操作 | settings-shell binder |
-| `DOMContentLoaded`、`pagehide` | 既存`run-comipath-in-browser.ts`。重複させない |
+| local data deletionのscope/select/confirm/cancel | `LocalDataDeletionController`がlistener lifecycleを持てるなら同Controller。持たせると不自然な場合だけ小さなfeature-local/app binder |
+| GAS outbox retry/discard | `PendingGasUpdatesController`がlistener lifecycleを持てるなら同Controller。持たせると不自然な場合だけ小さなfeature-local/app binder |
+| purchase/hold/resetのページボタン | appのcircle-status/page-action binder → public Circle Status action / Task 8のcross-feature function |
+| current location、search、destination select、route preview/confirm/cancel、resume | route-guidance binder → `RouteGuidanceController` |
+| settings shellの開閉、Escape、gallery等feature非依存のUI操作 | settings-shell binderまたは既存Viewの明確なowner |
+| `DOMContentLoaded`、`pagehide` | `run-comipath-in-browser.ts`。重複させない |
 | online retry timer / listener | 既存background process。bindingへ戻さない |
+
+`LocalDataDeletionController`と`PendingGasUpdatesController`には既にfeature operationが存在するため、2〜3個のevent転送だけのためにapp配下へ専用binderを必ず増やすのではなく、まず既存Controllerへtarget/lifecycleを追加する方が単純かを検討する。
 
 ## 対象ファイル
 
 ### 作成
 
+Task 8後の実event一覧を確認して必要なものだけ作成する。
+
+作成候補:
+
 - `apps/webapp/js/app/bind-route-guidance-events.ts`
+  - Route Guidanceのpage-level DOM inputが複数残るため、原則作成する。
 - `apps/webapp/js/app/bind-circle-status-events.ts`
-- `apps/webapp/js/app/bind-pending-gas-update-events.ts`
-- `apps/webapp/js/app/bind-local-data-deletion-events.ts`
+  - purchase/hold/reset等のpage-level actionが残る場合に作成する。
 - `apps/webapp/js/app/bind-settings-shell-events.ts`
+  - feature非依存のsettings/gallery/shell eventが複数残る場合に作成する。
 - `tests/browser-event-bindings.test.ts`
+
+次のapp binderは必須ではない。
+
+- `bind-pending-gas-update-events.ts`
+- `bind-local-data-deletion-events.ts`
+
+それぞれ既存feature Controllerへlistener ownershipを寄せられず、app側に残す方が明確だと確認できた場合だけ作成する。
+
+単一listenerしか持たず、既存root binderへ置いた方が読みやすいものを、ファイル数を増やすためだけに切り出さない。
 
 ### 変更
 
 - `apps/webapp/js/app/bind-browser-events.ts`
 - `apps/webapp/js/app/assemble-comipath-application.ts`
+- `apps/webapp/js/features/local-data-deletion/ui/local-data-deletion-controller.ts`（feature側でlistener lifecycleを持たせる場合）
+- `apps/webapp/js/features/circle-status/ui/pending-gas-updates-controller.ts`（feature側でlistener lifecycleを持たせる場合）
 - 必要に応じて各featureのpublic Controller contract
 - `tests/browser-application-lifecycle.test.ts`
 - `tests/apps-behavior-characterization.test.ts`
@@ -68,27 +97,11 @@ Task 8終了時点で`bind-browser-events.ts`は少なくとも次を満たし�
 
 - Task 8で残っている`BrowserEventBinding` class。最終的にfunction-based rootへ置換する。
 
-## 共通binder contract
-
-各binderはlistenerを登録してcleanup functionを返す。新しい基底classや共通EventBinder classは作らない。
-
-```ts
-export type StopBrowserEventBinding = () => void;
-```
-
-各moduleは概ね次の形にする。
-
-```ts
-export function bindRouteGuidanceEvents(
-  dependencies: RouteGuidanceBrowserEventDependencies,
-): StopBrowserEventBinding;
-```
-
-`dependencies`にはそのbinderが実際に呼ぶpublic Controller/action、必要なDOM root、read-only queryだけを含める。Repository、Session concrete implementation、Worker、HTTP loaderを渡さない。
+Task 8で既にclassが不要になっている場合は、Task 9開始まで維持するために復活させない。
 
 ## root binder contract
 
-`bind-browser-events.ts`は個別binderを呼び出し、cleanupを逆順に実行するだけにする。
+`bind-browser-events.ts`はTask 9後に残る個別binder/feature listener ownerを起動し、app側で登録したcleanupをまとめるだけにする。
 
 ```ts
 export interface BrowserEventBindings {
@@ -102,113 +115,116 @@ export function bindBrowserEvents(
 
 必要な性質:
 
-- `bindBrowserEvents()`を1回呼ぶと各binderを1回だけ登録する。
-- `stop()`はidempotentで、全listenerを解除する。
-- `stop()`後の二重解除で例外を投げない。
-- 再start時にlistenerを二重登録しない。
+- `bindBrowserEvents()`を1回呼ぶとapp所有listenerを1回だけ登録する。
+- `stop()`はidempotentで、app所有listenerをすべて解除する。
+- feature Controller自身が所有するlistenerをroot binderが重複して解除・再登録しない。
+- start→stop→start相当の再構築で二重発火しない。
 - root binder自身はfeature workflowを実装しない。
 
-## 各binderの責務
+新しい基底class、共通`EventBinder` class、registry、generic dispatcherは作らない。cleanup functionの配列で十分ならそれを使う。
 
-### `bind-route-guidance-events.ts`
+## app binderの責務
+
+### Route Guidance binder
 
 所有してよいもの:
 
-- current-location formのsubmit/click/input event読取
+- current-location formのDOM value取得とsubmit/click event
 - search/start button
-- destination select
+- destination select event
 - route preview/confirm/cancel
 - resume confirm/reset-start
 - optimization time input
-- keyboard shortcutがRoute Guidance固有ならそのlistener
+- Route Guidance固有keyboard shortcut
 
-handlerは`RouteGuidanceController`等のpublic operationを呼び、計算・snapshot・state mutationの詳細を実装しない。
+handlerは`RouteGuidanceController`等のpublic operationを呼ぶ。grid計算、snapshot、Session mutation、route reconstruction、Worker操作を実装しない。
 
-### `bind-circle-status-events.ts`
+DOMから読み取った文字列を既存`parse-current-location-form.ts`等のpure parserへ渡すことは許容するが、binder自身へspace解析規則を複製しない。
+
+### Circle Status/page-action binder
 
 所有してよいもの:
 
 - purchase button
 - hold button
-- circle status reset系のページ操作
+- reset等のpage-level操作
 
-purchase/hold後のRoute Guidance進行はTask 8の`CompleteCircleVisitOperation`を呼ぶ。binder内で`remainingCircles`を組み立てたりroute stateを書き換えたりしない。
+purchase/hold後のRoute Guidance進行はTask 8で確立したcross-feature functionを呼ぶ。binder内で`remainingCircles`、arrival position、next routeを組み立てない。
 
-### `bind-pending-gas-update-events.ts`
+resetがCircle StatusだけでなくRoute Guidance等も無効化するcross-feature操作なら、binderへ直接処理を書かず、Task 8と同じ原則で小さなapp-level functionへ渡す。reset専用frameworkは作らない。
 
-所有してよいもの:
-
-- GAS retry
-- selected outbox discard
-
-`PendingGasUpdatesController`へ転送するだけとし、GAS clientやoutbox repositoryを知らない。
-
-### `bind-local-data-deletion-events.ts`
-
-所有してよいもの:
-
-- delete scope select
-- delete confirm
-- delete cancel
-
-`LocalDataDeletionController`へ転送する。LocalStorage key、snapshot repository、matrix repositoryを直接触らない。
-
-### `bind-settings-shell-events.ts`
+### Settings shell binder
 
 所有してよいもの:
 
 - settings表示/非表示
-- settings shell固有で、どのfeatureにも属さないUI event
+- Escapeでのshell close
+- gallery等、現行仕様上どのfeatureにも属さないpage-level UI操作
 
-source、event/day、GAS、deletion等のfeature eventをここへ集約しない。
+source、event/day、GAS、deletion等のfeature eventを便宜上ここへ集約しない。
 
-## `onclick`の扱い
+## feature Controllerへlistenerを寄せる場合
 
-既存の`element.onclick = ...`と`addEventListener`を混在させず、このTaskで追加・整理するbindingは`addEventListener` + cleanup functionに統一する。
+`EventDaySelectorController`や`CircleDataSourceController`は既に`start()/stop()`でlistener lifecycleを所有している。同じ形式が自然なfeature eventは、既存Controllerへ次だけ追加する。
 
-理由:
+- optional `targetElement`等のDOM boundary dependency
+- `start()`でのlistener登録
+- `stop()`での確実な解除
+- malformed `CustomEvent.detail`のboundary validation
 
-- `stop()`で確実に解除できる。
-- testでlistener ownershipを検証できる。
-- 他featureが設定したproperty handlerを上書きしない。
+ControllerへRepository、HTTP client、他feature stateを新たに持たせない。listener ownershipのためだけにbusiness responsibilityを広げない。
 
-既存Custom Element内部のlistener実装までTask外で変更しない。
+## `onclick`とcallback APIの扱い
+
+app層が直接設定しているDOM elementの`onclick = ...`は、他ownerのproperty handlerを上書きせずcleanup可能にするため、原則`addEventListener` + removeへ移す。
+
+ただし次は一律変換対象ではない。
+
+- Custom Element内部の既存listener
+- `setOnHoldListReset(...)`等、明示的にcallback登録/解除の契約を持つcomponent API
+
+callback APIを残す場合は`stop()`時に解除できることだけを確認する。`addEventListener`へ統一すること自体を目的にしない。
 
 ## 実装手順
 
-1. Task 8後の`bind-browser-events.ts`に残るevent一覧を列挙する。
+1. Task 8後の`bind-browser-events.ts`に残るevent一覧を、event名・DOM target・呼び出すoperation・現ownerとともに表にする。
 2. 既存Controllerが既に所有するeventをroot bindingから削除する。
-3. 残りを上記5つのevent ownerへ分類する。
-4. `tests/browser-event-bindings.test.ts`で各binderの「登録1回・operation呼出1回・stop後0回」をREDで固定する。
-5. binderを一つずつ切り出し、切り出すたびfocused testをGREENにする。
-6. `BrowserEventBinding` classを削除し、`bindBrowserEvents()` functionへ置換する。
-7. `assemble-comipath-application.ts`から新root functionを呼ぶ。
-8. rootのstopを`ComiPathApplication` lifecycleへ接続する。
-9. `rg`で`BrowserEventBinding`参照とduplicate listenerを確認する。
+3. Local Data Deletion / Pending GASのeventは、既存Controllerへlistener lifecycleを寄せる方が単純かを先に確認する。2〜3listenerだけのapp binderを自動作成しない。
+4. appに残るeventをRoute Guidance、Circle Status/page action、Settings shell等の実際の責務単位へ分類する。
+5. `tests/browser-event-bindings.test.ts`で各ownerの「登録1回・operation呼出1回・stop後0回」を、ownerごとに必要な範囲だけREDで固定する。
+6. binderを切り出す場合は一つずつ行い、切り出すたびfocused testをGREENにする。
+7. `BrowserEventBinding` classを削除し、必要最小限の`bindBrowserEvents()` functionへ置換する。
+8. `assemble-comipath-application.ts`から各feature Controllerのstart/stopとroot binder lifecycleを一度だけ接続する。
+9. `rg`で`BrowserEventBinding`参照、同じCustom Event名のduplicate registration、app-level `onclick =`を確認する。
 10. full unit/type/build verificationを実行する。
 
 ## architecture guardrail
 
-Task 8で追加したapp concrete infrastructure ruleに加えて、fixture testで次を確認する。
+Task 8で追加した非composition-root app concrete infrastructure ruleを、新しい`bind-*.ts`にもそのまま適用する。
 
-- `app/bind-route-guidance-events.ts`から`features/route-guidance/infrastructure/*`をimportするとFAIL。
+fixture testで少なくとも次を確認する。
+
+- app binderから`features/route-guidance/infrastructure/*`をimportするとFAIL。
 - binderから別featureのinternal pathへdeep importするとFAIL。
-- binderからpublic API / app-level operationへの依存はPASS。
+- binderからfeature public API / app-level cross-feature functionへの依存はPASS。
+- feature Controllerが自featureのUse Case contractを使うことは、app binderの禁止ruleで誤検出しない。
 
 ファイル名や行数のallowlistは追加しない。
 
 ## テスト方針
 
-`tests/browser-event-bindings.test.ts`ではfake DOM EventTargetとfake operationを用いて少なくとも次を固定する。
+`tests/browser-event-bindings.test.ts`では、実際にapp binderとして残したownerだけについて少なくとも次を固定する。
 
-- purchase clickが1回のoperation呼出になる。
+- purchase/hold clickが1回のcross-feature operation呼出になる。
 - route preview/confirm/cancelが対応operationへ転送される。
 - resume dialog eventがroute operationへ転送される。
-- GAS retry/discardがpending controllerへ転送される。
-- deletion select/confirm/cancelがdeletion controllerへ転送される。
-- settings toggleがsettings shellだけを更新する。
-- `stop()`後は全eventが無効になる。
+- settings toggle/closeがshell操作だけを行う。
+- `stop()`後はapp所有eventが無効になる。
 - start→stop→start相当の再構築でも二重発火しない。
+
+Pending GAS / Local Data Deletionをfeature Controller所有へ移した場合は、同じ性質を各Controller testで確認し、app binder testへ重複ケースを作らない。
+
+fake EventTarget testだけでなく、`application-assembly`またはcharacterizationで実DOM Custom Eventがproduction assembly上の実Controllerへ一度だけ到達する代表ケースを確認する。
 
 ## 検証コマンド
 
@@ -218,6 +234,7 @@ npx vitest run --root . \
   tests/browser-binding-ownership.test.ts \
   tests/browser-application-lifecycle.test.ts \
   tests/apps-behavior-characterization.test.ts \
+  tests/application-assembly.test.ts \
   tests/architecture-boundaries.test.mjs
 npm run test:webapp
 npm run test:route-guidance
@@ -232,16 +249,19 @@ Task 9でもsnapshotは更新しない。
 ## 受入条件
 
 - `BrowserEventBinding` classが存在しない。
-- `bind-browser-events.ts`は個別binderのcomposeとcleanupだけを行う。
+- `bind-browser-events.ts`はapp所有listenerのcomposeとcleanupだけを行う。
 - event/dayとCircle Data Sourceの既存Controller listenerを重複登録しない。
-- 各binderの名前から対象feature/event ownerが分かる。
+- Pending GAS / Local Data Deletionを含むfeature内部eventが、理由なくapp binderへ残っていない。
+- app binderは実際に残った責務単位だけ作られ、空に近いbinderや1listenerだけの形式的fileを増やしていない。
 - binder間でmutable stateを共有しない。
 - Repository、HTTP、GAS client、Worker、routing algorithmをbinderがimportしない。
-- `onclick`によるapp-level bindingを新規追加せず、登録listenerをcleanupできる。
+- app-owned DOM listenerはstop時に解除できる。
+- callback-based component APIを残す場合もstop時に解除できる。
+- production assemblyで同一eventが一回だけ処理される。
 - unit/type/build検証が成功する。
 
 ## 予定コミットメッセージ
 
 ```text
-refactor(app): split browser event bindings by owner
+refactor(app): clarify browser event ownership
 ```
