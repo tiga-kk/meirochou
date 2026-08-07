@@ -59,6 +59,83 @@ describe("apps public behavior characterization", () => {
     );
   });
 
+  it("reads route guidance rendering state directly from the injected session", () => {
+    const { app } = createProductionAppFixture();
+    const activeState = {
+      ...createEmptyEventDayState(
+        { type: "csv" as const, fileName: "circles.csv" },
+        "generation-1",
+        NOW,
+      ),
+      circles: [{ space: "E1-01" }, { space: "E1-02" }],
+    };
+    app.activeEventDaySession.setActiveEventDay(REF, activeState);
+    const route = {
+      cost: 1,
+      cells: [{ col: 0, row: 0 }],
+      points: [{ x: 0, y: 0 }],
+      startPosition: { x: 0, y: 0 },
+      targetPosition: { x: 1, y: 1 },
+      image: { width: 1, height: 1 },
+    };
+    app.routeGuidanceSession.replaceSnapshot({
+      navigationState: {
+        stage: "navigating",
+        areaId: "east",
+        currentPosition: null,
+        targetSpace: "E1-01",
+        lockedFirstLeg: null,
+        provisionalOrder: ["E1-01", "E1-02"],
+        bestOrder: ["E1-01", "E1-02"],
+      },
+      currentDestination: activeState.circles[0],
+      currentRoute: route,
+      selectedDestination: activeState.circles[0],
+      selectedRoute: route,
+      selectionStatus: "ready",
+      routeOptimizationGeneration: 1,
+    });
+
+    for (const property of [
+      "navigationState",
+      "currentTarget",
+      "currentRoute",
+      "selectedTarget",
+      "selectedRoute",
+      "selectionState",
+      "nextTarget",
+    ]) {
+      expect(Object.hasOwn(app, property)).toBe(false);
+    }
+    expect(app.getNavigationContext()).toMatchObject({
+      currentTarget: activeState.circles[0],
+      currentRoute: route,
+      selectedTarget: activeState.circles[0],
+      selectedRoute: route,
+      selectionState: "ready",
+      nextTarget: activeState.circles[1],
+    });
+
+    app.routeGuidanceSession.replaceSnapshot({
+      ...app.routeGuidanceSession.getSnapshot(),
+      currentDestination: activeState.circles[1],
+      selectionStatus: "comparing",
+    });
+    const transitions: unknown[] = [];
+    app.routeGuidanceSession.subscribe((snapshot) => transitions.push(snapshot));
+    app.ui.showNavigation = vi.fn();
+    app.ui.showToast = vi.fn();
+
+    app.handleConfirmRoute();
+
+    expect(transitions).toHaveLength(1);
+    expect(app.routeGuidanceSession.getSnapshot()).toMatchObject({
+      currentDestination: activeState.circles[0],
+      currentRoute: route,
+      selectionStatus: "idle",
+    });
+  });
+
   it("binds each browser event once and stops sync coordination on dispose", () => {
     const { app, addEventListener, resumeAddEventListener } =
       createProductionAppFixture();

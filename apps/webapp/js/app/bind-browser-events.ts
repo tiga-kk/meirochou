@@ -215,76 +215,6 @@ export class BrowserEventBinding {
       if (this.ui && !this.suppressSessionModelUpdates)
         this.updateManagementModels();
     });
-    Object.defineProperties(this, {
-      navigationState: {
-        configurable: true,
-        get: () => this.routeGuidanceSession.getSnapshot().navigationState,
-        set: (value) =>
-          this.routeGuidanceSession.replaceSnapshot({
-            ...this.routeGuidanceSession.getSnapshot(),
-            navigationState: value,
-          }),
-      },
-      currentTarget: {
-        configurable: true,
-        get: () => this.routeGuidanceSession.getSnapshot().currentDestination,
-        set: (value) =>
-          this.routeGuidanceSession.replaceSnapshot({
-            ...this.routeGuidanceSession.getSnapshot(),
-            currentDestination: value,
-          }),
-      },
-      currentRoute: {
-        configurable: true,
-        get: () => this.routeGuidanceSession.getSnapshot().currentRoute,
-        set: (value) =>
-          this.routeGuidanceSession.replaceSnapshot({
-            ...this.routeGuidanceSession.getSnapshot(),
-            currentRoute: value,
-          }),
-      },
-      selectedTarget: {
-        configurable: true,
-        get: () => this.routeGuidanceSession.getSnapshot().selectedDestination,
-        set: (value) =>
-          this.routeGuidanceSession.replaceSnapshot({
-            ...this.routeGuidanceSession.getSnapshot(),
-            selectedDestination: value,
-          }),
-      },
-      selectedRoute: {
-        configurable: true,
-        get: () => this.routeGuidanceSession.getSnapshot().selectedRoute,
-        set: (value) =>
-          this.routeGuidanceSession.replaceSnapshot({
-            ...this.routeGuidanceSession.getSnapshot(),
-            selectedRoute: value,
-          }),
-      },
-      selectionState: {
-        configurable: true,
-        get: () => this.routeGuidanceSession.getSnapshot().selectionStatus,
-        set: (value) =>
-          this.routeGuidanceSession.replaceSnapshot({
-            ...this.routeGuidanceSession.getSnapshot(),
-            selectionStatus: value,
-          }),
-      },
-      nextTarget: {
-        configurable: true,
-        get: () => {
-          const state = this.routeGuidanceSession.getSnapshot().navigationState;
-          const nextSpace = state?.bestOrder.find(
-            (space) => space !== state.targetSpace,
-          );
-          return nextSpace
-            ? this.wantToBuy.find((circle) => circle.space === nextSpace) ||
-                null
-            : null;
-        },
-        set: () => undefined,
-      },
-    });
     this.currentStartSpace = "";
     this.selectionMessage = "";
     this.selectionToken = 0;
@@ -994,16 +924,35 @@ export class BrowserEventBinding {
     }
   }
 
+  /** Atomically applies one Route Guidance state transition through its Session. */
+  replaceRouteGuidanceSnapshot(changes) {
+    this.routeGuidanceSession.replaceSnapshot({
+      ...this.routeGuidanceSession.getSnapshot(),
+      ...changes,
+    });
+  }
+
+  /** Derives the next circle from the current Route Guidance order. */
+  getNextTarget(snapshot = this.routeGuidanceSession.getSnapshot()) {
+    const nextSpace = snapshot.navigationState?.bestOrder.find(
+      (space) => space !== snapshot.navigationState.targetSpace,
+    );
+    return nextSpace
+      ? this.wantToBuy.find((circle) => circle.space === nextSpace) || null
+      : null;
+  }
+
   /** Build the complete render contract shared by the sheet and map. */
   getNavigationContext(fitMode = "preserve") {
+    const snapshot = this.routeGuidanceSession.getSnapshot();
     return {
-      currentTarget: this.currentTarget,
-      currentRoute: this.currentRoute,
-      selectedTarget: this.selectedTarget || this.currentTarget,
-      selectedRoute: this.selectedRoute,
+      currentTarget: snapshot.currentDestination,
+      currentRoute: snapshot.currentRoute,
+      selectedTarget: snapshot.selectedDestination || snapshot.currentDestination,
+      selectedRoute: snapshot.selectedRoute,
       startSpace: this.currentStartSpace,
-      nextTarget: this.nextTarget,
-      selectionState: this.selectionState,
+      nextTarget: this.getNextTarget(snapshot),
+      selectionState: snapshot.selectionStatus,
       selectionMessage: this.selectionMessage,
       fitMode,
     };
@@ -1013,7 +962,7 @@ export class BrowserEventBinding {
   saveNavigationSnapshot() {
     const activeRef = this.activeRef;
     const bundleVersion = this.currentManifest?.bundleVersion;
-    const navState = this.navigationState;
+    const navState = this.routeGuidanceSession.getSnapshot().navigationState;
     if (!activeRef || !bundleVersion || !navState?.areaId) return;
 
     const snapshot = {
@@ -1068,15 +1017,16 @@ export class BrowserEventBinding {
   }
 
   resetNavigationRuntimeState() {
-    this.navigationState = null;
     this.navigationMatrixRef = null;
     this.activeResumeSnapshot = null;
-    this.currentTarget = null;
-    this.currentRoute = null;
     this.currentStartSpace = "";
-    this.selectedTarget = null;
-    this.selectedRoute = null;
-    this.nextTarget = null;
+    this.replaceRouteGuidanceSnapshot({
+      navigationState: null,
+      currentDestination: null,
+      currentRoute: null,
+      selectedDestination: null,
+      selectedRoute: null,
+    });
   }
 
   /** Copy exact grid distance and adopted endpoint onto a circle view model. */
@@ -1107,17 +1057,24 @@ export class BrowserEventBinding {
 
   /** Select a pin without changing the active destination or route. */
   async handleSelectTarget(circle) {
-    if (!circle || this.selectionState === "comparing") return;
+    if (
+      !circle ||
+      this.routeGuidanceSession.getSnapshot().selectionStatus === "comparing"
+    )
+      return;
 
     const token = ++this.selectionToken;
-    this.selectedTarget = circle;
-    this.selectedRoute = null;
-    this.selectionState = "loading";
+    this.replaceRouteGuidanceSnapshot({
+      selectedDestination: circle,
+      selectedRoute: null,
+      selectionStatus: "loading",
+    });
     this.selectionMessage = "候補経路を計算中…";
     this.ui.showNavigation(this.getNavigationContext("preserve"));
 
+    const currentRoute = this.routeGuidanceSession.getSnapshot().currentRoute;
     if (
-      !this.currentRoute ||
+      !currentRoute ||
       !areSpacesInSameArea(
         this.currentStartSpace,
         circle.space,
@@ -1125,7 +1082,7 @@ export class BrowserEventBinding {
       )
     ) {
       if (token !== this.selectionToken) return;
-      this.selectionState = "error";
+      this.replaceRouteGuidanceSnapshot({ selectionStatus: "error" });
       this.selectionMessage = "同じ地図エリアの正式な経路を計算できません";
       this.ui.showNavigation(this.getNavigationContext("preserve"));
       return;
@@ -1135,59 +1092,71 @@ export class BrowserEventBinding {
       const route = await this.planGridRoute(
         this.currentStartSpace,
         circle.space,
-        { startPosition: this.currentRoute.startPosition },
+        { startPosition: currentRoute.startPosition },
       );
       if (token !== this.selectionToken) return;
       if (!route) {
-        this.selectionState = "error";
+        this.replaceRouteGuidanceSnapshot({ selectionStatus: "error" });
         this.selectionMessage = "候補地点までの経路を探索できません";
       } else {
-        this.selectedRoute = route;
-        this.selectedTarget = this.targetWithRoute(circle, route);
-        this.selectionState =
-          circle.space === this.currentTarget?.space ? "idle" : "ready";
+        this.replaceRouteGuidanceSnapshot({
+          selectedRoute: route,
+          selectedDestination: this.targetWithRoute(circle, route),
+          selectionStatus:
+            circle.space ===
+            this.routeGuidanceSession.getSnapshot().currentDestination?.space
+              ? "idle"
+              : "ready",
+        });
         this.selectionMessage = "";
       }
     } catch (error) {
       if (token !== this.selectionToken) return;
       console.warn("Selected target route could not be calculated.", error);
-      this.selectionState = "error";
+      this.replaceRouteGuidanceSnapshot({ selectionStatus: "error" });
       this.selectionMessage =
         "候補経路の読込に失敗しました。もう一度お試しください";
     }
 
-    const fitMode = this.selectionState === "ready" ? "comparison" : "preserve";
+    const fitMode =
+      this.routeGuidanceSession.getSnapshot().selectionStatus === "ready"
+        ? "comparison"
+        : "preserve";
     this.ui.showNavigation(this.getNavigationContext(fitMode));
   }
 
   /** Enter the two-route comparison state after a candidate route is ready. */
   handlePreviewRoute() {
-    if (this.selectionState !== "ready" || !this.selectedRoute) return;
-    this.selectionState = "comparing";
+    const snapshot = this.routeGuidanceSession.getSnapshot();
+    if (snapshot.selectionStatus !== "ready" || !snapshot.selectedRoute) return;
+    this.replaceRouteGuidanceSnapshot({ selectionStatus: "comparing" });
     this.ui.showNavigation(this.getNavigationContext("comparison"));
   }
 
   /** Promote the compared candidate to the active destination without recalculation. */
   handleConfirmRoute() {
+    const snapshot = this.routeGuidanceSession.getSnapshot();
     if (
-      this.selectionState !== "comparing" ||
-      !this.selectedTarget ||
-      !this.selectedRoute
+      snapshot.selectionStatus !== "comparing" ||
+      !snapshot.selectedDestination ||
+      !snapshot.selectedRoute
     )
       return;
-    this.currentTarget = this.selectedTarget;
-    this.currentRoute = this.selectedRoute;
-    this.nextTarget = null;
-    this.selectionState = "idle";
+    this.replaceRouteGuidanceSnapshot({
+      currentDestination: snapshot.selectedDestination,
+      currentRoute: snapshot.selectedRoute,
+      selectionStatus: "idle",
+    });
     this.selectionMessage = "";
     this.ui.showNavigation(this.getNavigationContext("current"));
-    this.ui.showToast(`目的地を ${this.currentTarget.space} に変更しました`);
+    this.ui.showToast(`目的地を ${snapshot.selectedDestination.space} に変更しました`);
   }
 
   /** Leave comparison while retaining the selected target details. */
   handleCancelRoute() {
-    if (this.selectionState !== "comparing") return;
-    this.selectionState = "ready";
+    if (this.routeGuidanceSession.getSnapshot().selectionStatus !== "comparing")
+      return;
+    this.replaceRouteGuidanceSnapshot({ selectionStatus: "ready" });
     this.ui.showNavigation(this.getNavigationContext("comparison"));
   }
 
@@ -1203,7 +1172,8 @@ export class BrowserEventBinding {
     }
 
     this.selectionToken += 1;
-    const currentNavigationState = this.navigationState;
+    const currentNavigationState =
+      this.routeGuidanceSession.getSnapshot().navigationState;
     const currentPosition = currentNavigationState?.currentPosition;
     if (!currentNavigationState || !currentPosition) {
       this.ui.showToast(
@@ -1260,24 +1230,19 @@ export class BrowserEventBinding {
       return;
     }
 
-    this.navigationState = manualTargetResult.navState;
     this.currentStartSpace =
       currentPosition.source === "arrived-circle"
         ? currentPosition.circleSpace || ""
         : "";
-    this.currentRoute = route;
-    this.currentTarget = this.targetWithRoute(circle, route);
-    this.selectedTarget = this.currentTarget;
-    this.selectedRoute = route;
-    const nextTargetSpace = manualTargetResult.navState.bestOrder.find(
-      (space) => space !== circle.space,
-    );
-    this.nextTarget = nextTargetSpace
-      ? this.wantToBuy.find(
-          (candidate) => candidate.space === nextTargetSpace,
-        ) || null
-      : null;
-    this.selectionState = "idle";
+    const target = this.targetWithRoute(circle, route);
+    this.replaceRouteGuidanceSnapshot({
+      navigationState: manualTargetResult.navState,
+      currentRoute: route,
+      currentDestination: target,
+      selectedDestination: target,
+      selectedRoute: route,
+      selectionStatus: "idle",
+    });
     this.selectionMessage = "";
     this.ui.showNavigation(this.getNavigationContext("current"));
     this.ui.showToast(`目的地を ${circle.space} に設定しました`);
@@ -1321,12 +1286,14 @@ export class BrowserEventBinding {
       );
     }
     this.currentStartSpace = currentSpace;
-    this.currentRoute = route;
-    this.currentTarget = this.targetWithRoute(gridTarget || circle, route);
-    this.selectedTarget = this.currentTarget;
-    this.selectedRoute = route;
-    this.nextTarget = null;
-    this.selectionState = "idle";
+    const target = this.targetWithRoute(gridTarget || circle, route);
+    this.replaceRouteGuidanceSnapshot({
+      currentRoute: route,
+      currentDestination: target,
+      selectedDestination: target,
+      selectedRoute: route,
+      selectionStatus: "idle",
+    });
     this.selectionMessage = "";
     this.ui.showNavigation(this.getNavigationContext("current"));
     this.ui.showToast(`目的地を ${circle.space} に設定しました`);
@@ -1384,7 +1351,8 @@ export class BrowserEventBinding {
         const value = Number(e.detail?.searchTimeLimitMs);
         if ([5000, 10000, 15000].includes(value)) {
           this.optimizationTimeLimitMs = value;
-          if (this.navigationState) this.saveNavigationSnapshot();
+          if (this.routeGuidanceSession.getSnapshot().navigationState)
+            this.saveNavigationSnapshot();
         }
       },
     );
@@ -1549,10 +1517,6 @@ export class BrowserEventBinding {
           if (allCandidates.length === 0) {
             this.clearNavigationSnapshot();
             this.resetNavigationRuntimeState();
-            this.currentTarget = null;
-            this.currentRoute = null;
-            this.selectedTarget = null;
-            this.selectedRoute = null;
             this.ui.showTarget(null);
             if (notifyComplete)
               this.ui.showToast("全てのサークルを回りました！");
@@ -1659,10 +1623,12 @@ export class BrowserEventBinding {
             guidanceSnapshot.currentDestination,
             guidanceSnapshot.currentRoute,
           );
-          this.currentTarget = displayTarget;
-          this.selectedTarget = displayTarget;
           this.currentStartSpace = currentSpace;
-          this.selectionState = "idle";
+          this.replaceRouteGuidanceSnapshot({
+            currentDestination: displayTarget,
+            selectedDestination: displayTarget,
+            selectionStatus: "idle",
+          });
           this.selectionMessage = "";
           this.ui.showNavigation(this.getNavigationContext("current"));
 
@@ -1692,10 +1658,12 @@ export class BrowserEventBinding {
         async () => {
           const candidates = this.getUnvisited();
           if (candidates.length === 0) {
-            this.currentTarget = null;
-            this.currentRoute = null;
-            this.selectedTarget = null;
-            this.selectedRoute = null;
+            this.replaceRouteGuidanceSnapshot({
+              currentDestination: null,
+              currentRoute: null,
+              selectedDestination: null,
+              selectedRoute: null,
+            });
             this.ui.showTarget(null);
             if (notifyComplete)
               this.ui.showToast("全てのサークルを回りました！");
@@ -1744,12 +1712,14 @@ export class BrowserEventBinding {
               );
             }
             this.currentStartSpace = currentSpace;
-            this.currentRoute = route;
-            this.currentTarget = this.targetWithRoute(path[1], route);
-            this.nextTarget = path.length > 2 ? path[2] : null;
-            this.selectedTarget = this.currentTarget;
-            this.selectedRoute = route;
-            this.selectionState = "idle";
+            const target = this.targetWithRoute(path[1], route);
+            this.replaceRouteGuidanceSnapshot({
+              currentRoute: route,
+              currentDestination: target,
+              selectedDestination: target,
+              selectedRoute: route,
+              selectionStatus: "idle",
+            });
             this.selectionMessage = "";
             this.ui.showNavigation(this.getNavigationContext("current"));
           }
@@ -1765,8 +1735,10 @@ export class BrowserEventBinding {
    * 購入・保留アクション
    */
   async handleAction(type) {
-    if (this.selectionState === "comparing") return;
-    const actionTarget = this.selectedTarget || this.currentTarget;
+    const guidanceSnapshot = this.routeGuidanceSession.getSnapshot();
+    if (guidanceSnapshot.selectionStatus === "comparing") return;
+    const actionTarget =
+      guidanceSnapshot.selectedDestination || guidanceSnapshot.currentDestination;
     if (!actionTarget) return;
 
     const space = actionTarget.space;
@@ -1797,8 +1769,8 @@ export class BrowserEventBinding {
       return;
     }
 
-    if (type === "purchase" && this.navigationState) {
-      const activeState = this.navigationState;
+    if (type === "purchase" && guidanceSnapshot.navigationState) {
+      const activeState = guidanceSnapshot.navigationState;
       const area = this.routeMapAreaCatalog
         .getAllMapAreas()
         .find((candidate) => candidate.id === activeState.areaId);
@@ -1853,12 +1825,13 @@ export class BrowserEventBinding {
 
       const nextTargetSpace = purchasedState.targetSpace;
       if (!nextTargetSpace) {
-        this.navigationState = purchasedState;
-        this.currentTarget = null;
-        this.currentRoute = null;
-        this.selectedTarget = null;
-        this.selectedRoute = null;
-        this.nextTarget = null;
+        this.replaceRouteGuidanceSnapshot({
+          navigationState: purchasedState,
+          currentDestination: null,
+          currentRoute: null,
+          selectedDestination: null,
+          selectedRoute: null,
+        });
         this.ui.showTarget(null);
         this.saveNavigationSnapshot();
         return;
@@ -1900,30 +1873,25 @@ export class BrowserEventBinding {
         return;
       }
 
-      this.navigationState = purchasedState;
-      this.currentTarget = this.targetWithRoute(nextTarget, route);
-      this.currentRoute = route;
-      this.selectedTarget = this.currentTarget;
-      this.selectedRoute = route;
-      const followingTargetSpace = purchasedState.bestOrder.find(
-        (candidate) => candidate !== nextTargetSpace,
-      );
-      this.nextTarget = followingTargetSpace
-        ? this.wantToBuy.find(
-            (candidate) => candidate.space === followingTargetSpace,
-          ) || null
-        : null;
+      const target = this.targetWithRoute(nextTarget, route);
+      this.replaceRouteGuidanceSnapshot({
+        navigationState: purchasedState,
+        currentDestination: target,
+        currentRoute: route,
+        selectedDestination: target,
+        selectedRoute: route,
+      });
       this.ui.showNavigation(this.getNavigationContext("current"));
       this.saveNavigationSnapshot();
       return;
     }
 
-    if (type !== "hold" || !this.navigationState) return;
+    if (type !== "hold" || !guidanceSnapshot.navigationState) return;
 
     let holdResult;
     try {
       holdResult = this.orchestrationService.handleBeforeArrivalHold(
-        this.navigationState,
+        guidanceSnapshot.navigationState,
       );
     } catch (error) {
       console.warn("Hold navigation state update failed.", error);
@@ -1932,12 +1900,6 @@ export class BrowserEventBinding {
 
     const nextTargetSpace = holdResult.navState.targetSpace;
     if (!nextTargetSpace) {
-      this.navigationState = holdResult.navState;
-      this.currentTarget = null;
-      this.currentRoute = null;
-      this.selectedTarget = null;
-      this.selectedRoute = null;
-      this.nextTarget = null;
       this.ui.showTarget(null);
       this.clearNavigationSnapshot(this.activeRef);
       this.resetNavigationRuntimeState();
@@ -1962,7 +1924,7 @@ export class BrowserEventBinding {
             assets.pointsPayload,
             assets.gridMeta,
             assets.gridBytes,
-            this.navigationState.currentPosition?.gridIndex ??
+            guidanceSnapshot.navigationState.currentPosition?.gridIndex ??
               lockedFrom.gridIndex,
             nextTargetSpace,
           );
@@ -1981,19 +1943,14 @@ export class BrowserEventBinding {
       return;
     }
 
-    this.navigationState = holdResult.navState;
-    this.currentTarget = this.targetWithRoute(nextTarget, route);
-    this.currentRoute = route;
-    this.selectedTarget = this.currentTarget;
-    this.selectedRoute = route;
-    const followingTargetSpace = holdResult.navState.bestOrder.find(
-      (candidate) => candidate !== nextTargetSpace,
-    );
-    this.nextTarget = followingTargetSpace
-        ? this.wantToBuy.find(
-          (candidate) => candidate.space === followingTargetSpace,
-        ) || null
-      : null;
+    const target = this.targetWithRoute(nextTarget, route);
+    this.replaceRouteGuidanceSnapshot({
+      navigationState: holdResult.navState,
+      currentDestination: target,
+      currentRoute: route,
+      selectedDestination: target,
+      selectedRoute: route,
+    });
     this.ui.showNavigation(this.getNavigationContext("current"));
     this.saveNavigationSnapshot();
   }
@@ -2124,7 +2081,6 @@ export class BrowserEventBinding {
 
     // Geometry reconstruction succeeded: dismiss dialog and discard snapshot lock
     this.activeResumeSnapshot = null;
-    this.navigationState = resumeResult.navState;
     this.navigationMatrixRef = resumeResult.matrixRef;
     this.optimizationTimeLimitMs = resumeResult.optimizationTimeLimitMs;
     const dialog = document.getElementById("navigation-resume-dialog");
@@ -2133,19 +2089,17 @@ export class BrowserEventBinding {
       dialog.open = false;
     }
 
-    this.currentTarget = this.targetWithRoute(targetCircle, route);
-    this.currentRoute = route;
     this.currentStartSpace =
       lockedLeg.from.type === "circle" ? lockedLeg.from.space : "";
-    this.selectedTarget = this.currentTarget;
-    this.selectedRoute = route;
-    const bestOrder = resumeResult.initialSolutions[0] ?? [];
-    const nextTargetSpace = bestOrder.find((space) => space !== targetSpace);
-    this.nextTarget = nextTargetSpace
-      ? this.wantToBuy.find((circle) => circle.space === nextTargetSpace) ||
-        null
-      : null;
-    this.selectionState = "idle";
+    const target = this.targetWithRoute(targetCircle, route);
+    this.replaceRouteGuidanceSnapshot({
+      navigationState: resumeResult.navState,
+      currentDestination: target,
+      currentRoute: route,
+      selectedDestination: target,
+      selectedRoute: route,
+      selectionStatus: "idle",
+    });
     this.selectionMessage = "";
 
     this.ui.showNavigation(this.getNavigationContext("current"));
@@ -2370,7 +2324,7 @@ export class BrowserEventBinding {
     const updatedNavState =
       this.navigationRuntimeController.launchAlnsOptimization(
         {
-          navState: this.navigationState,
+          navState: this.routeGuidanceSession.getSnapshot().navigationState,
           areaId: params.areaId,
           startDistanceToCircles: params.startDistanceToCircles,
           pendingCircles: params.pendingCircles,
@@ -2380,21 +2334,12 @@ export class BrowserEventBinding {
           initialSolutions: params.initialSolutions,
         },
         (nextNavState) => {
-          this.navigationState = nextNavState;
-          const bestOrder = this.navigationState.bestOrder;
-          const nextTargetSpace = bestOrder.find(
-            (space) => space !== this.currentTarget?.space,
-          );
-          this.nextTarget = nextTargetSpace
-            ? this.wantToBuy.find(
-                (circle) => circle.space === nextTargetSpace,
-              ) || null
-            : null;
+          this.replaceRouteGuidanceSnapshot({ navigationState: nextNavState });
           this.ui.showNavigation(this.getNavigationContext("current"));
           this.saveNavigationSnapshot();
         },
       );
-    this.navigationState = updatedNavState;
+    this.replaceRouteGuidanceSnapshot({ navigationState: updatedNavState });
   }
 
   /**

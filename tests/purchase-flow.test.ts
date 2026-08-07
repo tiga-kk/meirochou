@@ -70,8 +70,11 @@ function createSetup(source: LocalEventDayState["source"], adapter = new MockSto
       backgroundProcess: background,
     }),
   );
-  app.selectedTarget = { space: "A-01", sheetName: "Day1" };
-  app.currentTarget = null;
+  app.routeGuidanceSession.replaceSnapshot({
+    ...app.routeGuidanceSession.getSnapshot(),
+    selectedDestination: { space: "A-01", sheetName: "Day1" },
+    currentDestination: null,
+  });
   app.ui.showToast = vi.fn();
   app.ui.updateCounts = vi.fn();
   app.ui.updateCurrentLocation = vi.fn();
