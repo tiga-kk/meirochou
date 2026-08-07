@@ -10,6 +10,7 @@ Phase 5Dの最終状態をfull test、build、Playwright E2Eで確認し、既�
 - visual snapshotの機械的な一括更新
 - Phase 5Dと無関係な機能追加
 - 性能改善や追加リファクタリング
+- 検証環境をcleanにするための他者差分のstash、reset、restore、clean、破棄
 
 ## 前提と依存関係
 
@@ -69,12 +70,12 @@ E2E spec自体が誤っていることを実装・既存仕様・履歴から証
 
 ## 実装手順
 
-1. clean working treeからNode/npm/Playwrightのpinned versionを確認し、`npm ci`を実行する。
+1. まずリモートの対象ブランチHEADと現在の作業差分を確認する。Task 7と無関係な未コミット差分がある場合は変更・stash・reset・restore・cleanせず、可能なら最新リモートHEADから一時worktreeまたは一時cloneを作って検証する。作業領域がTask 7専用であることを確認してから、Node/npm/Playwrightのpinned versionを確認し、`npm ci`を実行する。
 2. `npm run verify:webapp`を実行する。失敗した場合はTask 1〜6のどの責務に由来するか特定し、最小のsource fixを行う。
 3. `npm run test:e2e`を実行し、各failureのtrace、actual、expected、diffを確認する。
 4. visual差分について、DOM内容・layout・既存仕様・Phase開始前履歴を比較する。Phase 5Dで意図していない表示変更ならsourceを修正して既存snapshotへ戻す。
 5. 既存snapshotの方が明らかに古く、現在表示を正とすべき根拠がrepository内だけでは一意に決められない場合は、snapshotを変更せずユーザー判断事項として報告する。
-6. 次目的地pinの前面表示flakyはretry成功だけで完了扱いにしない。DOM/SVG layer orderが決定的になるまで原因を修正するか、test側の非決定的待機が原因だと証明できる場合だけ同期条件を修正する。
+6. 次目的地pinの前面表示flakyはretry成功だけで完了扱いにしない。現在この検証は`tests/e2e/webapp.spec.ts`にある。DOM/SVG layer orderが決定的になるまでsource原因を修正するか、test側の非決定的待機が原因だと証明できる場合だけ同specの同期条件を修正する。
 7. E2EがGREENになった後、削除対象Facade/旧route pathの不存在とproduction import 0件を`rg`で再確認する。
 8. public buildに不要なarchive/debug/legacy fileが混入していないことを既存audit scriptで確認する。
 9. `docs/status/progress.md`のTask 7を完了、Phase 5Dを完了へ更新する。未解決事項が一つでもある場合は完了と書かない。
@@ -93,6 +94,7 @@ npm run verify:webapp
 npm run test:e2e
 node scripts/audit-public-tree.mjs
 git diff --check
+git status --short
 ```
 
 `package.json`の`verify:webapp`がfull test/typecheck/buildを含む現行契約を維持していることも確認する。
