@@ -24,6 +24,8 @@ Route Guidanceにだけ使うpure algorithm、Worker protocol、LocalStorage rep
 - `apps/webapp/js/features/route-guidance/domain/route-guidance-types.ts`
 - `apps/webapp/js/features/route-guidance/domain/map-area.ts`
 - `apps/webapp/js/features/route-guidance/use-cases/route-guidance-session.ts`
+- `apps/webapp/js/features/route-guidance/use-cases/route-map-assets-loader.ts`
+- `apps/webapp/js/features/route-guidance/infrastructure/http-route-map-assets-loader.ts`
 - `apps/webapp/js/features/route-guidance/infrastructure/runtime-map-area-catalog.ts`
 - `apps/webapp/js/features/event-day/domain/application-contract-types.ts`
 - `apps/webapp/js/route-planner.ts`
@@ -64,6 +66,8 @@ Route Guidanceにだけ使うpure algorithm、Worker protocol、LocalStorage rep
 
 - `apps/webapp/js/features/route-guidance/public-api.ts`
 - `apps/webapp/js/features/route-guidance/domain/route-guidance-types.ts`
+- `apps/webapp/js/features/route-guidance/use-cases/route-map-assets-loader.ts`
+- `apps/webapp/js/features/route-guidance/infrastructure/http-route-map-assets-loader.ts`
 - `apps/webapp/js/features/event-day/domain/application-contract-types.ts`
 - `apps/webapp/js/comipath-browser-runtime.js`
 - `apps/webapp/js/navigation/navigation-runtime-controller.ts`
@@ -93,8 +97,8 @@ Route Guidanceにだけ使うpure algorithm、Worker protocol、LocalStorage rep
 
 ## 実装手順
 
-1. 各旧moduleのproduction callerとtest callerを`rg`で列挙する。`tsp-solver.js`については`toHalfWidth()`、`parseSpace()`、`calcDist()`、`solve()`をmethod単位で確認する。`application-contract-types.ts`のroute/grid型についてもcallerを型ごとに確認する。
-2. `route-planner.ts`が現在event-day contractからimportしているroute/grid geometry型を`grid-route-types.ts`へ移し、Route Guidance内部callerを新しい型へ切り替える。event-day側にRoute Guidance専用型のre-exportを追加してarchitecture checkerを回避する方法は取らない。
+1. 各旧moduleのproduction callerとtest callerを`rg`で列挙する。`tsp-solver.js`については`toHalfWidth()`、`parseSpace()`、`calcDist()`、`solve()`をmethod単位で確認する。`application-contract-types.ts`と`route-guidance-types.ts`のroute/grid型についてもcallerを型ごとに確認する。
+2. `route-planner.ts`が現在event-day contractからimportしているroute/grid geometry型を`grid-route-types.ts`へ移す。同時に`route-guidance-types.ts`にある簡略化された別`PointsPayload`/`GridMeta`/`RouteResult`定義を残さず、同じ正本型を参照するようにする。`route-map-assets-loader.ts`と`http-route-map-assets-loader.ts`もその正本型へ切り替える。event-day側にRoute Guidance専用型のre-exportを追加してarchitecture checkerを回避する方法は取らない。このタスクではHTTP loaderのURL解決方式自体は変えず、本番接続の是正はTask 2で扱う。
 3. pure algorithmは処理本体を変更せず、上記target pathへ移す。import pathや型名の整理に必要な最小差分だけを許容する。
 4. `grid-route-planner.ts`が現在`TspSolver.parseSpace()`経由で使っているidentifier/number抽出は、同fileのprivate pure helperまたは既存のpure domain helperへ移す。`grid-route-planner.ts`からrootの`tsp-solver.js`をimportしない。現在の`tsp-solver.js`は`runtimeMapAreaCatalog`というconcrete infrastructureをimportしているため、その依存をdomainへ持ち込んではいけない。
 5. `TspSolver.solve()`/`calcDist()`の既存fallbackがproductionまたはdev characterizationで必要なら、計算規則を変えず`nearest-neighbor-order.ts`へ移す。map area判定が必要な場合は`MapAreaCatalog`等のdomain contractまたは純粋なlookup関数を引数で受け、domainから`runtimeMapAreaCatalog`をimportしない。callerが残らない場合はこのfileを作らず、旧`TspSolver`を削除する。
@@ -110,11 +114,11 @@ Route Guidanceにだけ使うpure algorithm、Worker protocol、LocalStorage rep
 
 アルゴリズムの期待値は変更しない。既存testを新pathへ向け直し、同じfixture・同じ期待値で通ることを確認する。
 
-route/grid型の移動ではruntime object shapeを変更しない。現在のgrid route resultが持つ`cost`、`cells`、`points`、`startPosition`、`targetPosition`、`image`を別形式へ変換してしまわない。
+route/grid型の移動ではruntime object shapeを変更しない。現在のgrid route resultが持つ`cost`、`cells`、`points`、`startPosition`、`targetPosition`、`image`を別形式へ変換してしまわない。`RouteMapAssetsLoader`が返す`points`/`gridMetadata`も同じ正本型を使う。
 
 `TspSolver`からpure helper/fallbackを移す場合も、既存のspace解析とnearest-neighbor順序の期待値を変更しない。移動のためだけに新しいpublic classやwrapperを作らない。
 
-追加testが必要なのは、移動後にdomain/use-caseがDOM、LocalStorage、`fetch`、`Worker`、`runtimeMapAreaCatalog`等のconcrete infrastructureへ直接依存していないこと、またはcross-feature deep importが残っていないことを証明する場合だけとする。単なるfile存在testは追加しない。
+追加testが必要なのは、移動後にdomain/use-caseがDOM、LocalStorage、`fetch`、`Worker`、`runtimeMapAreaCatalog`等のconcrete infrastructureへ直接依存していないこと、cross-feature deep importやroute/grid型の二重定義が残っていないことを証明する場合だけとする。単なるfile存在testは追加しない。
 
 ## 検証コマンド
 
@@ -135,7 +139,8 @@ git diff --check
 
 - 上記旧route/routing pathと`tsp-solver.js`へのproduction importが0件である。
 - Route Guidance production sourceから`features/event-day/domain/application-contract-types.ts`へのdeep importが残っていない。
-- route/grid geometry型の正本がRoute Guidance domainから追え、event-day contractへ専用型を残していない。
+- route/grid geometry型の正本がRoute Guidance domainから追え、event-day contractや`route-guidance-types.ts`へ競合する別定義を残していない。
+- `RouteMapAssetsLoader`とgrid route plannerが同じ`PointsPayload`/`GridMeta`正本を使う。
 - pure algorithm、space解析、既存fallback、grid route resultのruntime shapeが変わっていない。
 - Route Guidance domainが`runtimeMapAreaCatalog`等のconcrete infrastructureを直接importしていない。
 - WorkerとLocalStorageのconcrete実装がRoute Guidance infrastructureから追える。
