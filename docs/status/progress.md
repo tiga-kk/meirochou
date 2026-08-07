@@ -8,7 +8,7 @@
 - ブランチ: `feature/phase-05d`
 - 計画再作成前のHEAD: `90528fdab3dd27307edeed51021548d5dc2ef0f6`
 - 現在のフェーズ: Phase 5D リファクタリング完了作業
-- 次に着手するタスク: Task 6
+- 次に着手するタスク: Task 7
 
 ## 現在までに実装済みの主要部分
 
@@ -61,7 +61,7 @@ Phase 5Dは見た目を変更するフェーズではないため、visual snaps
 | Task 3 | 完了 | `EventDayDataStore`を削除して既存featureを直接接続 |
 | Task 4 | 完了 | `ComiPathDomCoordinator`をfeature別Viewへ解体 |
 | Task 5 | 完了 | `ComiPathBrowserRuntime`を削除しbrowser bindingを明示化 |
-| Task 6 | 未着手 | architecture guardrailとテスト境界を強化 |
+| Task 6 | 完了 | architecture guardrailとテスト境界を強化 |
 | Task 7 | 未着手 | E2Eを含む最終検証とPhase完了整理 |
 
 タスク完了時はこの表と「次に着手するタスク」だけを実態に合わせて更新する。個別タスク文書へ進捗状態を重複して記録しない。

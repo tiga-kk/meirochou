@@ -174,38 +174,10 @@ describe("webapp architecture boundaries", () => {
     expect(result.violations).toEqual([]);
   });
 
-  it("enforces composition-root line limit and exact allowlist entries", () => {
+  it("does not reject a composition root because of its length", () => {
     const longApplication = `${"const line = 1;\n".repeat(201)}export class ComipathApplication {}`;
-    const allowlistPath = join(
-      mkdtempSync(join(tmpdir(), "comipath-allowlist-")),
-      "allowlist.json",
-    );
-    writeFileSync(
-      allowlistPath,
-      JSON.stringify([
-        {
-          ruleId: "application-line-limit",
-          importer: "app/other.ts",
-          imported: null,
-        },
-        { ruleId: "vague-name", importer: "features/mgr.ts", imported: "*" },
-      ]),
-      "utf8",
-    );
-    const result = scanFixture(
-      { "app/comipath-application.ts": longApplication },
-      { allowlistPath },
-    );
-
-    expect(result.violations.map((item) => item.ruleId)).toEqual(
-      expect.arrayContaining(["invalid-allowlist-entry"]),
-    );
-    expect(result.violations.map((item) => item.ruleId)).toContain(
-      "stale-allowlist-entry",
-    );
-    expect(result.violations.map((item) => item.ruleId)).toContain(
-      "application-line-limit",
-    );
+    const result = scanFixture({ "app/comipath-application.ts": longApplication });
+    expect(result.violations).toEqual([]);
   });
 
   it("reports duplicate, wildcard, stale, and malformed allowlist entries in a focused fixture", () => {

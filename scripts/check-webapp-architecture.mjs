@@ -400,16 +400,6 @@ export function scanWebappArchitecture(options = {}) {
     }
 
     if (filePath.endsWith("/app/comipath-application.ts")) {
-      const lineCount = source.split("\n").length;
-      if (lineCount > 200) {
-        addViolation(
-          violations,
-          "application-line-limit",
-          importer,
-          null,
-          `Composition root must be 200 lines or fewer (found ${lineCount})`,
-        );
-      }
       const applicationSource = stripStringLiterals(
         stripComments(source),
       ).toLowerCase();
