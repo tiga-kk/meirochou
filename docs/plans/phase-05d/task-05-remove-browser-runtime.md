@@ -50,9 +50,8 @@ Task 2、3、4が完了していること。`ComiPathBrowserRuntime`にRoute Gui
 ### 削除
 
 - `apps/webapp/js/comipath-browser-runtime.js`
-- `apps/webapp/js/comipath-browser-runtime.ts`
 
-`.ts`側が単なる型wrapper/re-exportであっても、旧runtimeの入口として残さない。
+`apps/webapp/js/comipath-browser-runtime.ts`は計画再作成時点のブランチには存在しない。削除対象として新規作成したり、互換wrapper/re-exportとして復活させたりしない。
 
 ## 実装手順
 
@@ -64,7 +63,7 @@ Task 2、3、4が完了していること。`ComiPathBrowserRuntime`にRoute Gui
 6. `assemble-comipath-application.ts`はconcrete infrastructure、Session、Use Case、Controller、Viewを明示的に生成し、最後にbrowser bindingsと`ComiPathApplication`へ渡す。
 7. `ComiPathApplication`は各lifecycle participantをstart/stopするだけに保つ。各ユーザー操作の分岐を追加しない。
 8. characterization testsは`new ComiPathBrowserRuntime()`ではなく、production assemblyまたはfeature public operationから同じ外部挙動を検証する形へ変更する。
-9. runtimeへのproduction/test importが0件になったことを確認し、`.js`/`.ts`を削除する。
+9. runtimeへのproduction/test importが0件になったことを確認し、`.js`を削除する。存在しない`.ts`互換入口は作らない。
 
 ## テスト方針
 
@@ -93,7 +92,7 @@ git diff --check
 
 ## 受入条件
 
-- `comipath-browser-runtime.js`と`.ts`が存在しない。
+- `comipath-browser-runtime.js`が存在せず、計画再作成時点から存在しない`comipath-browser-runtime.ts`も作られていない。
 - production entrypointから各featureへの処理経路が`app/`のassembly/bindingとfeature public APIで追える。
 - `bind-browser-events.ts`がstate owner、Repository、routing engine、Worker factoryの役割を持たない。
 - `ComiPathApplication`へ旧runtime相当の巨大なmethod群を移していない。
