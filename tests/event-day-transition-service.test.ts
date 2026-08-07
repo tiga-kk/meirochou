@@ -241,10 +241,10 @@ describe("EventDayTransitionService prepare", () => {
     });
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
       {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
         fetcher: mockFetcher,
       },
     );
@@ -273,10 +273,10 @@ describe("EventDayTransitionService prepare", () => {
     } as Response);
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
       {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
         currentManifest: resolvedManifestC104,
         fetcher: mockFetcher,
       },
@@ -299,10 +299,10 @@ describe("EventDayTransitionService prepare", () => {
     } as Response);
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
       {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
         currentManifest: resolvedManifestC104,
         fetcher: mockFetcher,
       },
@@ -325,10 +325,10 @@ describe("EventDayTransitionService prepare", () => {
     } as Response);
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
       {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
         fetcher: mockFetcher,
       },
     );
@@ -343,9 +343,11 @@ describe("EventDayTransitionService prepare", () => {
     const repo = new EventDayRepository(storageService);
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
+      {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
+      },
     );
     await expect(
       service.prepare({ eventId: "unknown", dayId: "day1" }),
@@ -365,10 +367,10 @@ describe("EventDayTransitionService prepare", () => {
     });
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
       {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
         fetcher: mockFetcher,
       },
     );
@@ -398,10 +400,12 @@ describe("EventDayTransitionService prepare", () => {
       url.includes("demo-v1") ? c104Response : c105Response,
     );
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
-      { fetcher: mockFetcher },
+      {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
+        fetcher: mockFetcher,
+      },
     );
 
     const older = service.prepare({ eventId: "c104", dayId: "day1" });
@@ -428,10 +432,10 @@ describe("EventDayTransitionService commit & rollback", () => {
     const repo = new EventDayRepository(storageService);
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
       {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
         currentManifest: resolvedManifestC104,
       },
     );
@@ -472,10 +476,10 @@ describe("EventDayTransitionService commit & rollback", () => {
     const repo = new EventDayRepository(storageService);
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
       {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
         currentManifest: resolvedManifestC104,
       },
     );

@@ -63,15 +63,16 @@ test("browser entrypoint owns startup side effects", () => {
 
 // GAS contract tests are restored for Task 4
 test("Phase 2 keeps GAS sale actions outside the local data service", () => {
-  const source = read("apps/webapp/js/event-day-data-store.ts");
+  const source = read(
+    "apps/webapp/js/features/circle-status/infrastructure/gas-pending-update-delivery.ts",
+  );
   const gasSource = read("integrations/gas-spreadsheet/src/web-api.js");
 
-  assert.doesNotMatch(source, /SyncQueue/);
-  assert.doesNotMatch(source, /action:\s*["']sale["']/);
+  assert.match(source, /action:\s*["']sale["']/);
   assert.match(source, /sheetName/);
   assert.match(gasSource, /requestData\.sheetName/);
   assert.match(gasSource, /getSheetByName/);
-  assert.doesNotMatch(source, /\?\s*\{\s*spaces:\s*space,\s*undo:\s*true\s*\}/);
+  assert.doesNotMatch(read("apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository.ts"), /SyncQueue/);
 });
 
 test("Phase 5C Task 1 removes persistent Undo/Redo controls from the UI", () => {
@@ -220,17 +221,21 @@ test("shared webapp and GAS names use lower camel case", () => {
 });
 
 test("Phase 3 keeps fetch inside GasApiClient and out of EventDayDataStore", () => {
-  const dataManagerSource = read("apps/webapp/js/event-day-data-store.ts");
+  const dataManagerSource = read(
+    "apps/webapp/js/features/circle-data-source/infrastructure/gas-google-sheet-circle-client.ts",
+  );
   const gasClientSource = read("apps/webapp/js/api/gas-api-client.ts");
 
-  assert.doesNotMatch(dataManagerSource, /\bfetch\(/);
+  assert.doesNotMatch(dataManagerSource, /new\s+GasApiClient/);
   assert.match(gasClientSource, /async fetchSheetList/);
   assert.match(gasClientSource, /async fetchCircles/);
   assert.match(gasClientSource, /async sendSaleUpdate/);
 });
 
 test("Phase 2/3 EventDayDataStore storage is separate from the sync outbox", () => {
-  const dataManagerSource = read("apps/webapp/js/event-day-data-store.ts");
+  const dataManagerSource = read(
+    "apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository.ts",
+  );
   const storageSource = read("apps/webapp/js/state/storage-service.ts");
   const appendSource = read(
     "apps/webapp/js/features/circle-status/domain/pending-gas-update-state.ts",
@@ -239,7 +244,6 @@ test("Phase 2/3 EventDayDataStore storage is separate from the sync outbox", () 
     "apps/webapp/js/features/circle-status/use-cases/send-pending-gas-updates.ts",
   );
 
-  assert.match(dataManagerSource, /new StorageService\(/);
   assert.doesNotMatch(dataManagerSource, /SyncQueue/);
   assert.doesNotMatch(dataManagerSource, /localStorage\./);
   assert.match(storageSource, /localStorage/);
@@ -1265,13 +1269,13 @@ test("webapp target view model exposes the source sheet name", () => {
 
 test("webapp renders spreadsheet and source-sheet titles in compact labels", () => {
   const html = read("apps/webapp/index.html");
-  const dataManagerSource = read("apps/webapp/js/event-day-data-store.ts");
+  const dataManagerSource = read("apps/webapp/js/comipath-browser-runtime.js");
   const uiSource = read("apps/webapp/js/comipath-dom-coordinator.js");
 
   assert.match(html, /id="spreadsheet-title"/);
   assert.match(html, /id="target-sheet-name"/);
   assert.match(dataManagerSource, /spreadsheetTitle/);
-  assert.match(dataManagerSource, /spreadsheetTitle/);
+  assert.match(dataManagerSource, /getSpreadsheetTitle/);
   assert.match(uiSource, /updateSpreadsheetTitle/);
   assert.match(uiSource, /viewModel\.sheetNameLabel/);
 });

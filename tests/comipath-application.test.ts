@@ -52,7 +52,7 @@ describe("ComiPath application shell", () => {
       ownedTimerCancels: new Map<ReturnType<typeof setTimeout>, () => void>(),
       ownedEventListeners: [],
       ownedWorkers: new Set(),
-      dm: { disposeSyncCoordinator() {} },
+      disposeSyncCoordinator() {},
       navigationRuntimeController: {},
       settingsEscapeHandler: null,
     } as unknown as ComiPathBrowserRuntime;

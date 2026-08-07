@@ -20,6 +20,9 @@ function createProductionAppFixture() {
     <button id="toggle-settings"></button><div id="settings-area"></div>
     <button id="btn-search"></button><button id="btn-purchased"></button>
     <button id="btn-hold"></button><button id="btn-reset-all"></button>
+    <select id="loc-ewsn"></select><select id="loc-label"></select>
+    <input id="loc-number" /><span id="header-area-mark"></span>
+    <span id="header-area-title"></span>
     <div id="source-diff-dialog"></div><div id="navigation-resume-dialog"></div>`;
   const settings = document.getElementById("settings-area") as HTMLElement;
   const resumeDialog = document.getElementById(
@@ -33,7 +36,7 @@ function createProductionAppFixture() {
     terminate: vi.fn(),
   };
   const app = new ComiPathBrowserRuntime({ alnsWorkerFactory: () => worker });
-  vi.spyOn(app.dm, "disposeSyncCoordinator");
+  vi.spyOn(app, "disposeSyncCoordinator");
   return { app, settings, addEventListener, resumeAddEventListener };
 }
 
@@ -64,7 +67,7 @@ describe("apps public behavior characterization", () => {
     ).toHaveLength(1);
 
     app.dispose();
-    expect(app.dm.disposeSyncCoordinator).toHaveBeenCalledOnce();
+    expect(app.disposeSyncCoordinator).toHaveBeenCalledOnce();
   });
 
   it("switches active event/day state from the public event", async () => {

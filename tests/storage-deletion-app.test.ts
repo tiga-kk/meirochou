@@ -48,19 +48,19 @@ function createSampleState(eventId: string, dayId: string): LocalEventDayState {
 describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
   it("handles storage-delete-request for active event-day and falls back to default event/day", async () => {
     const app = new ComiPathBrowserRuntime();
-    app.dm.eventRegistry = createSampleRegistry();
+    app.eventRegistry = createSampleRegistry();
 
     const ref1 = { eventId: "c104", dayId: "day1" };
     const ref2 = { eventId: "c104", dayId: "day2" };
 
-    app.dm.repository.saveAndRememberLastOpened(
+    app.eventDayRepository.saveAndRememberLastOpened(
       ref1,
       createSampleState("c104", "day1"),
     );
-    app.dm.repository.save(ref2, createSampleState("c104", "day2"));
-    app.dm.activeEventDaySession.setActiveEventDay(
+    app.eventDayRepository.save(ref2, createSampleState("c104", "day2"));
+    app.activeEventDaySession.setActiveEventDay(
       ref1,
-      app.dm.repository.load(ref1) ??
+      app.eventDayRepository.load(ref1) ??
         createSampleState(ref1.eventId, ref1.dayId),
     );
 
@@ -69,24 +69,24 @@ describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
       confirmation: "",
     });
 
-    expect(app.dm.repository.load(ref1)).toBeNull();
-    expect(app.dm.activeRef).toEqual(ref2);
+    expect(app.eventDayRepository.load(ref1)).toBeNull();
+    expect(app.activeRef).toEqual(ref2);
   });
 
   it("does not switch active state when deleting a non-active event-day", async () => {
     const app = new ComiPathBrowserRuntime();
-    app.dm.eventRegistry = createSampleRegistry();
+    app.eventRegistry = createSampleRegistry();
 
     const activeRef = { eventId: "c104", dayId: "day1" };
     const deletedRef = { eventId: "c104", dayId: "day2" };
-    app.dm.repository.saveAndRememberLastOpened(
+    app.eventDayRepository.saveAndRememberLastOpened(
       activeRef,
       createSampleState("c104", "day1"),
     );
-    app.dm.repository.save(deletedRef, createSampleState("c104", "day2"));
-    app.dm.activeEventDaySession.setActiveEventDay(
+    app.eventDayRepository.save(deletedRef, createSampleState("c104", "day2"));
+    app.activeEventDaySession.setActiveEventDay(
       activeRef,
-      app.dm.repository.load(activeRef) ??
+      app.eventDayRepository.load(activeRef) ??
         createSampleState(activeRef.eventId, activeRef.dayId),
     );
 
@@ -95,25 +95,25 @@ describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
       confirmation: "",
     });
 
-    expect(app.dm.repository.load(deletedRef)).toBeNull();
-    expect(app.dm.activeRef).toEqual(activeRef);
+    expect(app.eventDayRepository.load(deletedRef)).toBeNull();
+    expect(app.activeRef).toEqual(activeRef);
   });
 
   it("handles all-events deletion, clears repository, and reinitializes registry default state", async () => {
     const app = new ComiPathBrowserRuntime();
-    app.dm.eventRegistry = createSampleRegistry();
+    app.eventRegistry = createSampleRegistry();
 
     const ref1 = { eventId: "c104", dayId: "day1" };
     const ref2 = { eventId: "c104", dayId: "day2" };
 
-    app.dm.repository.saveAndRememberLastOpened(
+    app.eventDayRepository.saveAndRememberLastOpened(
       ref1,
       createSampleState("c104", "day1"),
     );
-    app.dm.repository.save(ref2, createSampleState("c104", "day2"));
-    app.dm.activeEventDaySession.setActiveEventDay(
+    app.eventDayRepository.save(ref2, createSampleState("c104", "day2"));
+    app.activeEventDaySession.setActiveEventDay(
       ref1,
-      app.dm.repository.load(ref1) ??
+      app.eventDayRepository.load(ref1) ??
         createSampleState(ref1.eventId, ref1.dayId),
     );
 
@@ -122,18 +122,18 @@ describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
       confirmation: "全イベントを削除",
     });
 
-    expect(app.dm.repository.listEventDays()).toHaveLength(0);
+    expect(app.eventDayRepository.listEventDays()).toHaveLength(0);
   });
 
   it("rejects all-events deletion if confirmation text is invalid", async () => {
     const app = new ComiPathBrowserRuntime();
-    app.dm.eventRegistry = createSampleRegistry();
+    app.eventRegistry = createSampleRegistry();
 
     const ref1 = { eventId: "c104", dayId: "day1" };
-    app.dm.repository.save(ref1, createSampleState("c104", "day1"));
-    app.dm.activeEventDaySession.setActiveEventDay(
+    app.eventDayRepository.save(ref1, createSampleState("c104", "day1"));
+    app.activeEventDaySession.setActiveEventDay(
       ref1,
-      app.dm.repository.load(ref1) ?? createSampleState("c104", "day1"),
+      app.eventDayRepository.load(ref1) ?? createSampleState("c104", "day1"),
     );
 
     await app.handleStorageDeleteRequest({
@@ -141,6 +141,6 @@ describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
       confirmation: "全イベントを削除 ",
     });
 
-    expect(app.dm.repository.listEventDays()).toHaveLength(1);
+    expect(app.eventDayRepository.listEventDays()).toHaveLength(1);
   });
 });

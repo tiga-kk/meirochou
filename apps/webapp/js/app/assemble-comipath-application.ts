@@ -35,6 +35,9 @@ import {
   OpenInitialEventDayUseCase,
   SwitchEventDayUseCase,
 } from "../features/event-day/public-api";
+import { loadRuntimeMapBundleManifestFromUrl, resolveEventMapManifestUrl } from "../features/event-day/infrastructure/http-map-manifest-loader";
+import { runtimeMapAreaCatalog } from "../features/route-guidance/infrastructure/runtime-map-area-catalog";
+import type { MapBundleManifest } from "../features/event-day/domain/event-day-contracts";
 import { StorageService } from "../state/storage-service";
 import {
   createComiPathApplication,
@@ -99,34 +102,9 @@ export function assembleComiPathApplication(
   );
 
   // Event Day feature assembly
-  const switchEventDay = new SwitchEventDayUseCase(
-    repository,
-    {
-      afterSwitch: async (newRef) => {
-        const state = repository.load(newRef);
-        if (state) {
-          activeEventDaySession.setActiveEventDay(newRef, state);
-        }
-      },
-    },
-    options.registry ?? undefined,
-  );
   const openInitialEventDay = new OpenInitialEventDayUseCase(repository);
-  let eventDaySelectorController = new EventDaySelectorController({
-    switchEventDay,
-    openInitialEventDay,
-    registry: options.registry,
-    view:
-      options.eventDayView ??
-      new DomEventDaySelectorView(
-        typeof options.document.querySelector === "function"
-          ? options.document.querySelector("event-day-selector")
-          : null,
-      ),
-    repository,
-    activeEventDaySession,
-    targetElement: options.targetElement ?? options.document,
-  });
+  let eventDaySelectorController: EventDaySelectorController | null = null;
+  let switchEventDay: SwitchEventDayUseCase | null = null;
 
   // Route Guidance invalidation fallback if not provided
   const routeGuidanceInvalidation: RouteGuidanceInvalidation =
@@ -188,7 +166,7 @@ export function assembleComiPathApplication(
     alnsWorkerFactory: options.createAlnsWorker,
     circleDataSourceSession,
     circleDataSourceController,
-    dataManagerOptions: {
+    eventDayDependencies: {
       storage,
       repository,
       activeEventDaySession,
@@ -196,6 +174,7 @@ export function assembleComiPathApplication(
       circleStatusController,
       pendingGasUpdatesController,
       backgroundProcess,
+      eventRegistry: options.registry,
     },
   });
 
@@ -203,37 +182,60 @@ export function assembleComiPathApplication(
     browserRuntime: {
       start: async () => {
         backgroundProcess.start();
-        if (options.registry) await eventDaySelectorController.start();
         await browserRuntime.start();
-        if (!options.registry) {
-          const runtimeRegistry = browserRuntime.dm?.eventRegistry;
-          if (runtimeRegistry) {
-            eventDaySelectorController = new EventDaySelectorController({
-              switchEventDay: browserRuntime.dm.getTransitionService(
-                browserRuntime.currentManifest,
+        const runtimeRegistry = browserRuntime.eventRegistry;
+        const runtimeRegistryUrl = browserRuntime.eventRegistryUrl;
+        if (runtimeRegistry) {
+          switchEventDay = new SwitchEventDayUseCase({
+            repository,
+            registry: runtimeRegistry,
+            ...(runtimeRegistryUrl ? { registryUrl: runtimeRegistryUrl } : {}),
+            currentManifest: browserRuntime.currentManifest,
+            ...(runtimeRegistryUrl
+              ? {
+                  loadManifest: async (event: Parameters<typeof resolveEventMapManifestUrl>[1], signal?: AbortSignal) =>
+                    (await loadRuntimeMapBundleManifestFromUrl(
+                      resolveEventMapManifestUrl(runtimeRegistryUrl, event),
+                      event.eventId,
+                      {
+                        fetcher: options.window.fetch?.bind(options.window),
+                        signal,
+                      },
+                    )) as unknown as MapBundleManifest,
+                }
+              : {}),
+            collaborators: {
+              afterSwitch: async (newRef, manifest) => {
+                runtimeMapAreaCatalog.initializeMapAreas(manifest.areas);
+                browserRuntime.currentManifest = manifest;
+                const state = repository.load(newRef);
+                if (state) activeEventDaySession.setActiveEventDay(newRef, state);
+              },
+            },
+          });
+          eventDaySelectorController = new EventDaySelectorController({
+            switchEventDay,
+            openInitialEventDay,
+            registry: runtimeRegistry,
+            view:
+              options.eventDayView ??
+              new DomEventDaySelectorView(
+                typeof options.document.querySelector === "function"
+                  ? options.document.querySelector("event-day-selector")
+                  : null,
               ),
-              openInitialEventDay,
-              registry: runtimeRegistry,
-              view:
-                options.eventDayView ??
-                new DomEventDaySelectorView(
-                  typeof options.document.querySelector === "function"
-                    ? options.document.querySelector("event-day-selector")
-                    : null,
-                ),
-              repository,
-              activeEventDaySession,
-              targetElement: options.targetElement ?? options.document,
-            });
-            await eventDaySelectorController.start();
-          }
+            repository,
+            activeEventDaySession,
+            targetElement: options.targetElement ?? options.document,
+          });
+          await eventDaySelectorController.start();
         }
         circleDataSourceController.start();
         return undefined;
       },
       stop: () => {
         backgroundProcess.stop();
-        eventDaySelectorController.stop();
+        eventDaySelectorController?.stop();
         circleDataSourceController.stop();
         browserRuntime.dispose();
       },

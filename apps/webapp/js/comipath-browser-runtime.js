@@ -3,7 +3,6 @@ import "./components/navigation-resume-dialog";
 import "./components/source-diff-dialog";
 import { ComiPathDomCoordinator } from "./comipath-dom-coordinator.js";
 import { createDevDemoData, isDevDemoEnabled } from "./dev-demo-data.js";
-import { EventDayDataStore } from "./event-day-data-store.ts";
 import { createCircleDataSourceSession } from "./features/circle-data-source/public-api";
 import {
   parseGridMeta,
@@ -32,6 +31,17 @@ import { RouteGuidanceRuntimeController } from "./features/route-guidance/infras
 import { runtimeMapAreaCatalog } from "./features/route-guidance/infrastructure/runtime-map-area-catalog";
 import { buildSpaceFromLocation } from "./features/route-guidance/ui/parse-current-location-form";
 import { RouteGuidanceController } from "./features/route-guidance/ui/route-guidance-controller";
+import { GasPendingUpdateDelivery } from "./features/circle-status/infrastructure/gas-pending-update-delivery";
+import { CircleStatusController } from "./features/circle-status/ui/circle-status-controller";
+import { PendingGasUpdatesController } from "./features/circle-status/ui/pending-gas-updates-controller";
+import { ChangeCircleStatusUseCase } from "./features/circle-status/use-cases/change-circle-status";
+import { DiscardPendingGasUpdatesUseCase } from "./features/circle-status/use-cases/discard-pending-gas-updates";
+import { DefaultPendingGasUpdateBackgroundProcess } from "./features/circle-status/use-cases/pending-gas-update-background-process";
+import { SendPendingGasUpdatesUseCase } from "./features/circle-status/use-cases/send-pending-gas-updates";
+import { UndoCircleStatusChangeUseCase } from "./features/circle-status/use-cases/undo-circle-status-change";
+import { LocalStorageEventDayRepository } from "./features/event-day/infrastructure/local-storage-event-day-repository";
+import { createActiveEventDayReader, createActiveEventDaySession } from "./features/event-day/public-api";
+import { StorageService } from "./state/storage-service.js";
 import { ChangeDestinationUseCase } from "./features/route-guidance/use-cases/change-destination";
 import { FinishCurrentCircleUseCase } from "./features/route-guidance/use-cases/finish-current-circle";
 import { InvalidateRouteGuidanceUseCase } from "./features/route-guidance/use-cases/invalidate-route-guidance";
@@ -113,7 +123,53 @@ export class ComiPathBrowserRuntime {
     this.started = false;
     this.stopped = false;
     this.ownedWorkers = new Set();
-    this.dm = new EventDayDataStore(undefined, options?.dataManagerOptions);
+    const eventDayDependencies = options?.eventDayDependencies ?? {};
+    const storage = eventDayDependencies.storage ?? new StorageService();
+    this.eventDayRepository =
+      eventDayDependencies.repository ?? new LocalStorageEventDayRepository(storage);
+    this.activeEventDaySession =
+      eventDayDependencies.activeEventDaySession ?? createActiveEventDaySession();
+    this.activeEventDayReader =
+      eventDayDependencies.activeEventDayReader ??
+      createActiveEventDayReader(this.activeEventDaySession);
+    const delivery = new GasPendingUpdateDelivery();
+    const sendPendingGasUpdates = new SendPendingGasUpdatesUseCase(
+      this.eventDayRepository,
+      this.activeEventDaySession,
+      delivery,
+    );
+    const discardPendingGasUpdates = new DiscardPendingGasUpdatesUseCase(
+      this.eventDayRepository,
+      this.activeEventDaySession,
+    );
+    this.backgroundProcess =
+      eventDayDependencies.backgroundProcess ??
+      new DefaultPendingGasUpdateBackgroundProcess(
+        sendPendingGasUpdates,
+        typeof window !== "undefined" ? window : undefined,
+      );
+    this.circleStatusController =
+      eventDayDependencies.circleStatusController ??
+      new CircleStatusController(
+        new ChangeCircleStatusUseCase(
+          this.eventDayRepository,
+          this.activeEventDaySession,
+          this.backgroundProcess,
+        ),
+        new UndoCircleStatusChangeUseCase(
+          this.eventDayRepository,
+          this.activeEventDaySession,
+        ),
+      );
+    this.pendingGasUpdatesController =
+      eventDayDependencies.pendingGasUpdatesController ??
+      new PendingGasUpdatesController(
+        sendPendingGasUpdates,
+        discardPendingGasUpdates,
+      );
+    this.eventRegistry = eventDayDependencies.eventRegistry ?? null;
+    this.eventRegistryUrl = eventDayDependencies.eventRegistryUrl ?? null;
+    this.spreadsheetTitle = "";
     this.routeGuidanceSession = createRouteGuidanceSession();
     const baseSession =
       options?.circleDataSourceSession ?? createCircleDataSourceSession();
@@ -178,10 +234,10 @@ export class ComiPathBrowserRuntime {
       },
     });
     this.ui = new ComiPathDomCoordinator();
-    this.dm.activeEventDaySession.subscribe(() => {
+    this.activeEventDaySession.subscribe(() => {
       if (this.ui) {
         this.updateManagementModels();
-        this.ui.updateCounts?.(this.dm);
+        this.ui.updateCounts?.(this);
       }
     });
     baseSession.subscribe(() => {
@@ -251,7 +307,7 @@ export class ComiPathBrowserRuntime {
             (space) => space !== state.targetSpace,
           );
           return nextSpace
-            ? this.dm.wantToBuy.find((circle) => circle.space === nextSpace) ||
+            ? this.wantToBuy.find((circle) => circle.space === nextSpace) ||
                 null
             : null;
         },
@@ -355,6 +411,10 @@ export class ComiPathBrowserRuntime {
     this.ui?.showToast?.(message, type);
   }
 
+  getSpreadsheetTitle() {
+    return this.spreadsheetTitle || "";
+  }
+
   addOwnedEventListener(target, type, listener, options) {
     if (target && typeof target.addEventListener === "function") {
       target.addEventListener(type, listener, options);
@@ -388,7 +448,7 @@ export class ComiPathBrowserRuntime {
 
   get localDataDeletionUseCase() {
     return new DeleteLocalDataUseCase(
-      this.dm.repository,
+      this.eventDayRepository,
       {
         deleteActivitySnapshot: (ref) => this.snapshotRepository.clear(ref),
         deleteAllRouteData: (ref) => {
@@ -406,27 +466,144 @@ export class ComiPathBrowserRuntime {
     );
   }
 
+  get activeRef() {
+    return this.activeEventDaySession.getActiveEventDay()?.ref ?? null;
+  }
+
+  get activeState() {
+    return this.activeEventDaySession.getActiveEventDay()?.state ?? null;
+  }
+
+  get wantToBuy() {
+    return [...this.activeEventDayReader.getAllCircles()];
+  }
+
+  get purchasedList() {
+    return [...this.activeEventDayReader.getPurchasedCircleSpaces()];
+  }
+
+  get holdList() {
+    return [...this.activeEventDayReader.getHeldCircleSpaces()];
+  }
+
+  getUnvisited() {
+    return [...this.activeEventDayReader.getPendingCircles()];
+  }
+
+  async loadEventRegistry() {
+    if (this.eventRegistry && this.eventRegistryUrl) {
+      return { registry: this.eventRegistry, registryUrl: this.eventRegistryUrl };
+    }
+    const loaded = await loadEventRegistryWithUrl();
+    this.eventRegistry = loaded.registry;
+    this.eventRegistryUrl = loaded.registryUrl;
+    return loaded;
+  }
+
+  async openEventDay(ref) {
+    const event = this.eventRegistry?.events.find(
+      (candidate) => candidate.eventId === ref.eventId,
+    );
+    if (!event?.days.some((day) => day.dayId === ref.dayId)) {
+      throw new Error("Event/Day not found in registry");
+    }
+    const state =
+      this.eventDayRepository.load(ref) ??
+      {
+        schemaVersion: 2,
+        source: { type: "csv", fileName: "empty.csv" },
+        sourceGeneration: `source-${Date.now()}`,
+        circles: [],
+        circleStates: {},
+        gasOutbox: [],
+        timestamps: {
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          sourceUpdatedAt: new Date().toISOString(),
+        },
+      };
+    this.eventDayRepository.saveAndRememberLastOpened(ref, state);
+    this.activeEventDaySession.setActiveEventDay(ref, state);
+    return state;
+  }
+
+  startSyncCoordinator() {
+    this.backgroundProcess.start();
+  }
+
+  disposeSyncCoordinator() {
+    this.backgroundProcess.stop();
+  }
+
+  discardOutboxEntries(ref, ids) {
+    for (const id of ids) this.pendingGasUpdatesController.discardOne(ref, id);
+    return this.eventDayRepository.load(ref) ?? this.activeState;
+  }
+
+  addPurchased(space) {
+    if (!this.activeRef || !this.activeState) throw new Error("No event/day is open");
+    const result = this.circleStatusController.changeStatus({
+      eventDay: this.activeRef,
+      circleSpace: space,
+      nextStatus: "purchased",
+      expectedSourceGeneration: this.activeState.sourceGeneration,
+    });
+    return result.state;
+  }
+
+  addHold(space) {
+    if (!this.activeRef || !this.activeState) throw new Error("No event/day is open");
+    const result = this.circleStatusController.changeStatus({
+      eventDay: this.activeRef,
+      circleSpace: space,
+      nextStatus: "held",
+      expectedSourceGeneration: this.activeState.sourceGeneration,
+    });
+    return result.state;
+  }
+
+  resetAll() {
+    if (!this.activeRef || !this.activeState) return [];
+    const purchased = [...this.activeEventDayReader.getPurchasedCircleSpaces()];
+    for (const space of Object.keys(this.activeState.circleStates)) {
+      this.circleStatusController.changeStatus({
+        eventDay: this.activeRef,
+        circleSpace: space,
+        nextStatus: "pending",
+        expectedSourceGeneration: this.activeState.sourceGeneration,
+      });
+    }
+    return purchased;
+  }
+
+  async flushActiveOutbox() {
+    if (!this.activeRef) return { sent: 0, pending: 0, error: null };
+    const sent = await this.pendingGasUpdatesController.retryAll(this.activeRef);
+    const pending = this.activeState?.gasOutbox.length ?? 0;
+    return { sent, pending, error: pending ? new Error("Pending GAS updates remain") : null };
+  }
+
   /** Rebuild the management selector and source manager models from registry and local state. */
   updateManagementModels() {
-    if (!this.dm.eventRegistry) return;
-    const states = this.dm.repository
+    if (!this.eventRegistry) return;
+    const states = this.eventDayRepository
       .listEventDays()
       .map((ref) => ({
         ref,
-        state: this.dm.repository.load(ref),
+        state: this.eventDayRepository.load(ref),
       }))
       .filter((item) => item.state !== null);
 
     const options = buildEventDayOptions(
-      this.dm.eventRegistry,
+      this.eventRegistry,
       states,
-      this.dm.activeRef,
+      this.activeRef,
     );
 
-    const activeState = this.dm.activeState;
-    const activeRef = this.dm.activeRef;
+    const activeState = this.activeState;
+    const activeRef = this.activeRef;
     const eventObj = activeRef
-      ? this.dm.eventRegistry.events.find(
+      ? this.eventRegistry.events.find(
           (e) => e.eventId === activeRef.eventId,
         )
       : null;
@@ -477,7 +654,7 @@ export class ComiPathBrowserRuntime {
     };
 
     const outboxPanelModel = buildOutboxPanelModel(
-      this.dm.eventRegistry,
+      this.eventRegistry,
       states,
       {
         processing: this.session.isBusy("outbox-retry"),
@@ -494,7 +671,7 @@ export class ComiPathBrowserRuntime {
     const deleteOptions = activeRef
       ? buildDeleteOptions({
           selected: activeRef,
-          eventDayCount: this.dm.repository.listEventDays().length,
+          eventDayCount: this.eventDayRepository.listEventDays().length,
           activeCircleCount: activeState ? activeState.circles.length : 0,
           activityCount: activeState
             ? Object.keys(activeState.circleStates).length
@@ -525,8 +702,8 @@ export class ComiPathBrowserRuntime {
 
     this.ui?.updateSettingsState({
       eventDayOptions: options,
-      selectedEventId: this.dm.activeRef?.eventId || "",
-      selectedDayId: this.dm.activeRef?.dayId || "",
+      selectedEventId: this.activeRef?.eventId || "",
+      selectedDayId: this.activeRef?.dayId || "",
       sourceManagerModel,
       outboxPanelModel,
       deleteOptions,
@@ -590,8 +767,8 @@ export class ComiPathBrowserRuntime {
     this.updateManagementModels();
 
     try {
-      const processed = this.dm.pendingGasUpdatesController
-        ? await this.dm.pendingGasUpdatesController.retryAll(ref)
+      const processed = this.pendingGasUpdatesController
+        ? await this.pendingGasUpdatesController.retryAll(ref)
         : 0;
       if (!this.session.isLatestRequestToken(requestToken)) return;
       this.session.setBusy("outbox-retry", false);
@@ -607,7 +784,7 @@ export class ComiPathBrowserRuntime {
       this.suppressSessionModelUpdates = false;
       if (this.session.isLatestRequestToken(requestToken)) {
         this.updateManagementModels();
-        this.ui?.updateCounts?.(this.dm);
+        this.ui?.updateCounts?.(this);
       }
     }
   }
@@ -646,8 +823,8 @@ export class ComiPathBrowserRuntime {
     }
 
     const token = this.session.nextRequestToken();
-    const activeRefBeforeDelete = this.dm.activeRef
-      ? { ...this.dm.activeRef }
+    const activeRefBeforeDelete = this.activeRef
+      ? { ...this.activeRef }
       : null;
     this.session.setBusy("storage-delete", true);
     this.deleteErrorMessage = "";
@@ -678,23 +855,23 @@ export class ComiPathBrowserRuntime {
       if (activeRefDeleted) {
         this.clearNavigationSnapshot(activeRefBeforeDelete);
         this.resetNavigationRuntimeState();
-        this.dm.activeEventDaySession.clearActiveEventDay();
+        this.activeEventDaySession.clearActiveEventDay();
 
-        const remainingList = this.dm.repository.listEventDays();
+        const remainingList = this.eventDayRepository.listEventDays();
         const nextRef =
           remainingList.length > 0
             ? remainingList[0]
             : {
-                eventId: this.dm.eventRegistry.events[0].eventId,
-                dayId: this.dm.eventRegistry.events[0].days[0].dayId,
+                eventId: this.eventRegistry.events[0].eventId,
+                dayId: this.eventRegistry.events[0].days[0].dayId,
               };
-        const nextState = this.dm.repository.load(nextRef);
+        const nextState = this.eventDayRepository.load(nextRef);
         if (nextState) {
-          this.dm.repository.rememberLastOpenedEventDay(nextRef);
-          this.dm.activeEventDaySession.setActiveEventDay(nextRef, nextState);
+          this.eventDayRepository.rememberLastOpenedEventDay(nextRef);
+          this.activeEventDaySession.setActiveEventDay(nextRef, nextState);
         }
 
-        if (!this.dm.activeRef) {
+        if (!this.activeRef) {
           renderMapBootstrapError(
             document,
             new Error("No active event/day remains after deletion"),
@@ -705,16 +882,16 @@ export class ComiPathBrowserRuntime {
         this.invalidateNavigationForSourceChange(activeRefBeforeDelete);
         this.ui.showTarget(null);
         this.updateManagementModels();
-        this.ui.updateCounts(this.dm);
+        this.ui.updateCounts(this);
       } else {
         this.updateManagementModels();
-        this.ui.updateCounts(this.dm);
+        this.ui.updateCounts(this);
       }
       this.ui.showToast("データを削除しました");
     } catch (_error) {
       if (!this.session.isLatestRequestToken(token)) return;
       this.session.setBusy("storage-delete", false);
-      if (activeRefBeforeDelete && !this.dm.activeRef) {
+      if (activeRefBeforeDelete && !this.activeRef) {
         renderMapBootstrapError(
           document,
           new Error("No active event/day remains after deletion"),
@@ -739,7 +916,7 @@ export class ComiPathBrowserRuntime {
     }
 
     try {
-      this.dm.discardOutboxEntries(
+      this.discardOutboxEntries(
         detail.ref,
         detail.ids,
         new Date().toISOString(),
@@ -752,7 +929,7 @@ export class ComiPathBrowserRuntime {
       this.ui.showToast("破棄エラー", "error");
     } finally {
       this.updateManagementModels();
-      this.ui?.updateCounts?.(this.dm);
+      this.ui?.updateCounts?.(this);
     }
   }
 
@@ -761,16 +938,16 @@ export class ComiPathBrowserRuntime {
    */
   async init(manifest, initialRef = null, loadedRegistry = null) {
     if (loadedRegistry) {
-      this.dm.eventRegistry = loadedRegistry.registry;
-      this.dm.eventRegistryUrl = loadedRegistry.registryUrl;
+      this.eventRegistry = loadedRegistry.registry;
+      this.eventRegistryUrl = loadedRegistry.registryUrl;
     } else {
-      await this.dm.loadEventRegistry();
+      await this.loadEventRegistry();
     }
 
     const devDemoEnabled = isDevDemoEnabled(window.location);
     if (devDemoEnabled) {
       const demoData = createDevDemoData();
-      this.dm.spreadsheetTitle = demoData.spreadsheetTitle;
+      this.spreadsheetTitle = demoData.spreadsheetTitle;
       const demoRef = { eventId: "demo-v1", dayId: "day1" };
       const now = new Date().toISOString();
       const purchased = new Set(demoData.purchasedList);
@@ -790,18 +967,18 @@ export class ComiPathBrowserRuntime {
         gasOutbox: [],
         timestamps: { createdAt: now, updatedAt: now, sourceUpdatedAt: now },
       };
-      this.dm.repository.save(demoRef, demoState);
-      this.dm.activeEventDaySession.setActiveEventDay(demoRef, demoState);
+      this.eventDayRepository.save(demoRef, demoState);
+      this.activeEventDaySession.setActiveEventDay(demoRef, demoState);
     } else {
       const isRegisteredRef = (ref) => {
-        const event = this.dm.eventRegistry?.events.find(
+        const event = this.eventRegistry?.events.find(
           (candidate) => candidate.eventId === ref?.eventId,
         );
         return Boolean(event?.days.some((day) => day.dayId === ref?.dayId));
       };
-      let activeRef = initialRef || this.dm.repository.getLastOpenedEventDay();
+      let activeRef = initialRef || this.eventDayRepository.getLastOpenedEventDay();
       if (!activeRef || !isRegisteredRef(activeRef)) {
-        const defaultEvent = this.dm.eventRegistry?.events[0];
+        const defaultEvent = this.eventRegistry?.events[0];
         if (!defaultEvent || defaultEvent.days.length === 0) {
           renderMapBootstrapError(
             document,
@@ -816,7 +993,7 @@ export class ComiPathBrowserRuntime {
       }
 
       try {
-        await this.dm.openEventDay(activeRef);
+        await this.openEventDay(activeRef);
         this.currentManifest = manifest;
       } catch (error) {
         console.error("Failed to open initial event day:", error);
@@ -825,7 +1002,7 @@ export class ComiPathBrowserRuntime {
       }
     }
 
-    this.ui.init(this.dm, {
+    this.ui.init(this, {
       onSetNextTarget: (circle) => this.handleSetNextTarget(circle),
       onSelectTarget: (circle) => this.handleSelectTarget(circle),
       onPreviewRoute: () => this.handlePreviewRoute(),
@@ -835,35 +1012,35 @@ export class ComiPathBrowserRuntime {
     this.setupEvents();
 
     if (devDemoEnabled) {
-      this.ui.updateCounts(this.dm);
+      this.ui.updateCounts(this);
       this.updateManagementModels();
       this.ui.showToast("UIデモデータを表示中");
       this.searchNext();
       return;
     }
 
-    this.ui.updateCounts(this.dm);
+    this.ui.updateCounts(this);
     this.updateManagementModels();
 
     // スタートアップ時に非同期でバックグラウンド同期コーディネーターを起動
-    this.dm.startSyncCoordinator();
+    this.startSyncCoordinator();
 
-    // Phase 5C: Load and validate snapshot after EventDayDataStore.openEventDay and ComiPathDomCoordinator.init
-    if (this.dm.activeRef && this.dm.activeState) {
-      const pendingCircleSpaces = this.dm.activeState.circles
+    // Load and validate the navigation snapshot after the active event/day and DOM are ready.
+    if (this.activeRef && this.activeState) {
+      const pendingCircleSpaces = this.activeState.circles
         .filter(
           (c) =>
             !c.removedFromSource &&
-            (this.dm.activeState.circleStates[c.space] === undefined ||
-              this.dm.activeState.circleStates[c.space] === "pending"),
+            (this.activeState.circleStates[c.space] === undefined ||
+              this.activeState.circleStates[c.space] === "pending"),
         )
         .map((c) => c.space);
 
       const startupResult = this.navigationRuntimeController.initStartup({
-        eventId: this.dm.activeRef.eventId,
-        dayId: this.dm.activeRef.dayId,
+        eventId: this.activeRef.eventId,
+        dayId: this.activeRef.dayId,
         bundleVersion: manifest?.bundleVersion || "",
-        circleStates: this.dm.activeState.circleStates,
+        circleStates: this.activeState.circleStates,
         pendingCircleSpaces,
       });
 
@@ -881,7 +1058,7 @@ export class ComiPathBrowserRuntime {
     }
 
     // データがあれば初期表示
-    if (this.dm.wantToBuy.length > 0) {
+    if (this.wantToBuy.length > 0) {
       this.ui.showToast("データ読み込み済み");
       this.searchNext("", false);
     } else {
@@ -896,7 +1073,7 @@ export class ComiPathBrowserRuntime {
     this.transitionToken += 1;
     this.selectionToken += 1;
     this.managementSession?.stop();
-    this.dm.disposeSyncCoordinator();
+    this.disposeSyncCoordinator();
     for (const remove of this.ownedEventListeners.splice(0)) remove();
     for (const timer of this.ownedTimers) clearTimeout(timer);
     this.ownedTimers.clear();
@@ -941,7 +1118,7 @@ export class ComiPathBrowserRuntime {
 
   /** Persist the current navigation state when all snapshot identity fields exist. */
   saveNavigationSnapshot() {
-    const activeRef = this.dm.activeRef;
+    const activeRef = this.activeRef;
     const bundleVersion = this.currentManifest?.bundleVersion;
     const navState = this.navigationState;
     if (!activeRef || !bundleVersion || !navState?.areaId) return;
@@ -973,7 +1150,7 @@ export class ComiPathBrowserRuntime {
   }
 
   /** Clear a navigation snapshot without allowing storage errors to break the UI. */
-  clearNavigationSnapshot(ref = this.dm.activeRef) {
+  clearNavigationSnapshot(ref = this.activeRef) {
     if (!ref) return;
     try {
       this.navigationRuntimeController.clearSnapshot(ref.eventId, ref.dayId);
@@ -1199,7 +1376,7 @@ export class ComiPathBrowserRuntime {
       (space) => space !== circle.space,
     );
     this.nextTarget = nextTargetSpace
-      ? this.dm.wantToBuy.find(
+      ? this.wantToBuy.find(
           (candidate) => candidate.space === nextTargetSpace,
         ) || null
       : null;
@@ -1448,7 +1625,7 @@ export class ComiPathBrowserRuntime {
       return this.searchNextDevDemo(startSpace, notifyComplete);
     }
 
-    if (this.dm.wantToBuy.length === 0) {
+    if (this.wantToBuy.length === 0) {
       this.clearNavigationSnapshot();
       this.resetNavigationRuntimeState();
       this.ui.showToast("データがありません");
@@ -1465,7 +1642,7 @@ export class ComiPathBrowserRuntime {
     return new Promise((resolve) =>
       this.scheduleTimeout(
         async () => {
-          const allCandidates = this.dm.getUnvisited();
+          const allCandidates = this.getUnvisited();
           if (allCandidates.length === 0) {
             this.clearNavigationSnapshot();
             this.resetNavigationRuntimeState();
@@ -1552,7 +1729,7 @@ export class ComiPathBrowserRuntime {
 
           try {
             await this.startRouteGuidanceUseCase.execute({
-              eventDay: this.dm.activeRef || {
+              eventDay: this.activeRef || {
                 eventId: this.currentManifest?.eventId || "runtime",
                 dayId: "active",
               },
@@ -1591,7 +1768,7 @@ export class ComiPathBrowserRuntime {
 
   /** Keep the legacy demo-only fixture path outside production navigation. */
   searchNextDevDemo(startSpace = "", notifyComplete = true) {
-    if (this.dm.wantToBuy.length === 0) {
+    if (this.wantToBuy.length === 0) {
       this.ui.showToast("データがありません");
       return Promise.resolve();
     }
@@ -1605,7 +1782,7 @@ export class ComiPathBrowserRuntime {
     return new Promise((resolve) =>
       this.scheduleTimeout(
         async () => {
-          const candidates = this.dm.getUnvisited();
+          const candidates = this.getUnvisited();
           if (candidates.length === 0) {
             this.currentTarget = null;
             this.currentRoute = null;
@@ -1688,10 +1865,10 @@ export class ComiPathBrowserRuntime {
     const sheetName = actionTarget.sheetName || "";
     try {
       if (type === "purchase") {
-        this.dm.addPurchased(space, sheetName);
+        this.addPurchased(space, sheetName);
         this.ui?.showToast(`${space} 購入！`);
       } else {
-        this.dm.addHold(space, sheetName);
+        this.addHold(space, sheetName);
         this.ui?.showToast(`${space} 保留`);
       }
     } catch (error) {
@@ -1699,11 +1876,11 @@ export class ComiPathBrowserRuntime {
       return;
     }
 
-    if (this.dm.activeState?.source.type === "gas") {
+    if (this.activeState?.source.type === "gas") {
       this.flushOutboxWithDiagnostic();
     }
 
-    this.ui.updateCounts(this.dm);
+    this.ui.updateCounts(this);
     this.updateManagementModels();
     this.ui.updateCurrentLocation(space); // 現在地を更新
 
@@ -1779,7 +1956,7 @@ export class ComiPathBrowserRuntime {
         return;
       }
 
-      const nextTarget = this.dm.wantToBuy.find(
+      const nextTarget = this.wantToBuy.find(
         (candidate) => candidate.space === nextTargetSpace,
       );
       if (!nextTarget) return;
@@ -1824,7 +2001,7 @@ export class ComiPathBrowserRuntime {
         (candidate) => candidate !== nextTargetSpace,
       );
       this.nextTarget = followingTargetSpace
-        ? this.dm.wantToBuy.find(
+        ? this.wantToBuy.find(
             (candidate) => candidate.space === followingTargetSpace,
           ) || null
         : null;
@@ -1854,12 +2031,12 @@ export class ComiPathBrowserRuntime {
       this.selectedRoute = null;
       this.nextTarget = null;
       this.ui.showTarget(null);
-      this.clearNavigationSnapshot(this.dm.activeRef);
+      this.clearNavigationSnapshot(this.activeRef);
       this.resetNavigationRuntimeState();
       return;
     }
 
-    const nextTarget = this.dm.wantToBuy.find(
+    const nextTarget = this.wantToBuy.find(
       (candidate) => candidate.space === nextTargetSpace,
     );
     if (!nextTarget) return;
@@ -1905,7 +2082,7 @@ export class ComiPathBrowserRuntime {
       (candidate) => candidate !== nextTargetSpace,
     );
     this.nextTarget = followingTargetSpace
-      ? this.dm.wantToBuy.find(
+        ? this.wantToBuy.find(
           (candidate) => candidate.space === followingTargetSpace,
         ) || null
       : null;
@@ -1919,17 +2096,17 @@ export class ComiPathBrowserRuntime {
   handleReset() {
     if (confirm("本当にリセットしますか？")) {
       try {
-        this.dm.resetAll();
+        this.resetAll();
       } catch (error) {
         this.reportLocalMutationFailure(error);
         return;
       }
-      if (this.dm.activeState?.source.type === "gas") {
+      if (this.activeState?.source.type === "gas") {
         this.flushOutboxWithDiagnostic();
       }
       this.clearNavigationSnapshot();
       this.resetNavigationRuntimeState();
-      this.ui.updateCounts(this.dm);
+      this.ui.updateCounts(this);
       this.ui.showTarget(null); // 表示クリア
       this.ui.els.targetSection.classList.add("hidden");
       this.ui.els.targetEmpty.classList.remove("hidden");
@@ -1949,7 +2126,7 @@ export class ComiPathBrowserRuntime {
   /** Process GAS after local success and report failures without rolling back. */
   async flushOutboxWithDiagnostic() {
     try {
-      const result = await this.dm.flushActiveOutbox();
+      const result = await this.flushActiveOutbox();
       if (result.error) {
         this.ui.showToast(
           "GAS同期に失敗しました。未送信データは端末に保持されています。",
@@ -1979,7 +2156,7 @@ export class ComiPathBrowserRuntime {
     const lockedLeg = resumeResult.navState.lockedFirstLeg;
 
     const targetCircle = targetSpace
-      ? this.dm.wantToBuy.find((c) => c.space === targetSpace) || null
+      ? this.wantToBuy.find((c) => c.space === targetSpace) || null
       : null;
 
     if (!targetCircle) {
@@ -2057,7 +2234,7 @@ export class ComiPathBrowserRuntime {
     const bestOrder = resumeResult.initialSolutions[0] ?? [];
     const nextTargetSpace = bestOrder.find((space) => space !== targetSpace);
     this.nextTarget = nextTargetSpace
-      ? this.dm.wantToBuy.find((circle) => circle.space === nextTargetSpace) ||
+      ? this.wantToBuy.find((circle) => circle.space === nextTargetSpace) ||
         null
       : null;
     this.selectionState = "idle";
@@ -2110,10 +2287,10 @@ export class ComiPathBrowserRuntime {
     }
 
     // Filter pending circles present in stored matrix spaces
-    const pendingCircles = this.dm.wantToBuy.filter(
+    const pendingCircles = this.wantToBuy.filter(
       (c) =>
         matrixSpaces.includes(c.space) &&
-        (this.dm.activeState?.circleStates[c.space] ?? "pending") === "pending",
+        (this.activeState?.circleStates[c.space] ?? "pending") === "pending",
     );
     const pendingSpaces = pendingCircles.map((c) => c.space);
 
@@ -2301,7 +2478,7 @@ export class ComiPathBrowserRuntime {
             (space) => space !== this.currentTarget?.space,
           );
           this.nextTarget = nextTargetSpace
-            ? this.dm.wantToBuy.find(
+            ? this.wantToBuy.find(
                 (circle) => circle.space === nextTargetSpace,
               ) || null
             : null;
@@ -2341,8 +2518,13 @@ async function bootstrapApp(existingApp) {
   let registryUrl;
   let targetRef;
   try {
-    ({ registry, registryUrl } = await loadEventRegistryWithUrl());
-    targetRef = existingApp.dm.repository.getLastOpenedEventDay();
+    if (existingApp.eventRegistry && !existingApp.eventRegistryUrl) {
+      registry = existingApp.eventRegistry;
+      registryUrl = "";
+    } else {
+      ({ registry, registryUrl } = await loadEventRegistryWithUrl());
+    }
+    targetRef = existingApp.eventDayRepository.getLastOpenedEventDay();
 
     const isValidRef =
       targetRef &&
@@ -2362,11 +2544,22 @@ async function bootstrapApp(existingApp) {
 
     const event = registry.events.find((e) => e.eventId === targetRef.eventId);
     if (!event) throw new Error("Last-opened event is not in registry");
-    const manifestUrl = resolveEventMapManifestUrl(registryUrl, event);
-    manifest = await loadRuntimeMapBundleManifestFromUrl(
-      manifestUrl,
-      event.eventId,
-    );
+    if (registryUrl) {
+      const manifestUrl = resolveEventMapManifestUrl(registryUrl, event);
+      manifest = await loadRuntimeMapBundleManifestFromUrl(
+        manifestUrl,
+        event.eventId,
+      );
+    } else {
+      manifest =
+        existingApp.currentManifest ??
+        {
+          schemaVersion: 1,
+          eventId: event.eventId,
+          displayName: event.displayName,
+          areas: [],
+        };
+    }
     runtimeMapAreaCatalog.initializeMapAreas(manifest.areas);
   } catch (error) {
     console.error("Map bundle initialization failed.", error);

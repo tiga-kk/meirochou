@@ -71,8 +71,8 @@ describe("CircleDataSource Orchestration & App Integration", () => {
     setupDOM();
     localStorage.clear();
     app = new ComiPathBrowserRuntime();
-    app.dm.eventRegistry = sampleRegistry;
-    app.dm.eventRegistryUrl = "/assets/events/manifest.json";
+    app.eventRegistry = sampleRegistry;
+    app.eventRegistryUrl = "/assets/events/manifest.json";
 
     const storage = new StorageService();
     const repo = new EventDayRepository(storage);
@@ -96,7 +96,7 @@ describe("CircleDataSource Orchestration & App Integration", () => {
       },
     );
 
-    await app.dm.openEventDay({ eventId: "c104", dayId: "day1" });
+    await app.openEventDay({ eventId: "c104", dayId: "day1" });
     app.updateManagementModels();
   });
 
@@ -142,7 +142,7 @@ describe("CircleDataSource Orchestration & App Integration", () => {
     const { PreviewCsvImportUseCase } = await import(
       "../apps/webapp/js/features/circle-data-source/use-cases/preview-csv-import"
     );
-    const useCase = new PreviewCsvImportUseCase(app.dm.repository);
+    const useCase = new PreviewCsvImportUseCase(app.eventDayRepository);
 
     expect(() =>
       useCase.execute({
@@ -157,7 +157,7 @@ describe("CircleDataSource Orchestration & App Integration", () => {
     const { PreviewCsvImportUseCase } = await import(
       "../apps/webapp/js/features/circle-data-source/use-cases/preview-csv-import"
     );
-    const useCase = new PreviewCsvImportUseCase(app.dm.repository);
+    const useCase = new PreviewCsvImportUseCase(app.eventDayRepository);
 
     const preview = useCase.execute({
       eventDay: { eventId: "c104", dayId: "day1" },
@@ -166,7 +166,7 @@ describe("CircleDataSource Orchestration & App Integration", () => {
     });
 
     expect(preview.previewId).toBeDefined();
-    const storedState = app.dm.repository.load({
+    const storedState = app.eventDayRepository.load({
       eventId: "c104",
       dayId: "day1",
     });
@@ -178,7 +178,7 @@ describe("CircleDataSource Orchestration & App Integration", () => {
     const { PreviewCsvImportUseCase } = await import(
       "../apps/webapp/js/features/circle-data-source/use-cases/preview-csv-import"
     );
-    const useCase = new PreviewCsvImportUseCase(app.dm.repository);
+    const useCase = new PreviewCsvImportUseCase(app.eventDayRepository);
 
     try {
       useCase.execute({

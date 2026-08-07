@@ -101,6 +101,10 @@ describe("production event day and circle data source wiring", () => {
     diffDialogElement.id = "source-diff-dialog";
     document.body.appendChild(targetElement);
     document.body.appendChild(diffDialogElement);
+    document.body.insertAdjacentHTML(
+      "beforeend",
+      '<button id="toggle-settings"></button><button id="btn-search"></button><button id="btn-purchased"></button><button id="btn-hold"></button><button id="btn-reset-all"></button><select id="loc-ewsn"></select><select id="loc-label"></select><input id="loc-number"><span id="header-area-mark"></span><span id="header-area-title"></span>',
+    );
 
     const app = assembleComiPathApplication({
       document,

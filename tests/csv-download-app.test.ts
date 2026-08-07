@@ -41,8 +41,8 @@ describe("ComiPathBrowserRuntime & CircleDataSource CSV Export Integration", () 
     vi.spyOn(window.URL, "revokeObjectURL").mockImplementation(() => {});
 
     app = new ComiPathBrowserRuntime();
-    app.dm.eventRegistry = createRegistry();
-    app.dm.eventRegistryUrl = "http://localhost/assets/events/manifest.json";
+    app.eventRegistry = createRegistry();
+    app.eventRegistryUrl = "http://localhost/assets/events/manifest.json";
   });
 
   it("exports active event day CSV via BrowserCircleCsvDownloader on request", async () => {
@@ -63,11 +63,11 @@ describe("ComiPathBrowserRuntime & CircleDataSource CSV Export Integration", () 
         sourceUpdatedAt: "2026-07-25T00:00:00.000Z",
       },
     };
-    app.dm.repository.save(ref, sampleState);
-    await app.dm.openEventDay(ref);
+    app.eventDayRepository.save(ref, sampleState);
+    await app.openEventDay(ref);
 
     const downloader = new BrowserCircleCsvDownloader(window);
-    const useCase = new ExportCirclesToCsvUseCase(app.dm.repository, downloader);
+    const useCase = new ExportCirclesToCsvUseCase(app.eventDayRepository, downloader);
 
     expect(() => useCase.execute({ eventDay: ref })).not.toThrow();
     expect(window.URL.createObjectURL).toHaveBeenCalledTimes(1);
@@ -95,10 +95,10 @@ describe("ComiPathBrowserRuntime & CircleDataSource CSV Export Integration", () 
         sourceUpdatedAt: "2026-07-25T00:00:00.000Z",
       },
     };
-    app.dm.repository.save(ref, stateWithRemoved);
+    app.eventDayRepository.save(ref, stateWithRemoved);
 
     const downloader = new BrowserCircleCsvDownloader(window);
-    const useCase = new ExportCirclesToCsvUseCase(app.dm.repository, downloader);
+    const useCase = new ExportCirclesToCsvUseCase(app.eventDayRepository, downloader);
 
     expect(() => useCase.execute({ eventDay: ref })).not.toThrow();
     expect(window.URL.createObjectURL).toHaveBeenCalledTimes(1);
@@ -107,7 +107,7 @@ describe("ComiPathBrowserRuntime & CircleDataSource CSV Export Integration", () 
   it("throws error when event day state is missing", () => {
     const ref: EventDayRef = { eventId: "non-existent", dayId: "day1" };
     const downloader = new BrowserCircleCsvDownloader(window);
-    const useCase = new ExportCirclesToCsvUseCase(app.dm.repository, downloader);
+    const useCase = new ExportCirclesToCsvUseCase(app.eventDayRepository, downloader);
 
     expect(() => useCase.execute({ eventDay: ref })).toThrow("Event day state not found");
   });
@@ -130,11 +130,11 @@ describe("ComiPathBrowserRuntime & CircleDataSource CSV Export Integration", () 
         sourceUpdatedAt: "2026-07-25T00:00:00.000Z",
       },
     };
-    app.dm.repository.save(ref, sampleState);
-    await app.dm.openEventDay(ref);
+    app.eventDayRepository.save(ref, sampleState);
+    await app.openEventDay(ref);
 
     const downloader = new BrowserCircleCsvDownloader(window);
-    const exportUseCase = new ExportCirclesToCsvUseCase(app.dm.repository, downloader);
+    const exportUseCase = new ExportCirclesToCsvUseCase(app.eventDayRepository, downloader);
 
     expect(() => exportUseCase.execute({ eventDay: ref })).not.toThrow();
     expect(window.URL.createObjectURL).toHaveBeenCalledTimes(1);
@@ -158,10 +158,10 @@ describe("ComiPathBrowserRuntime & CircleDataSource CSV Export Integration", () 
         sourceUpdatedAt: "2026-07-25T00:00:00.000Z",
       },
     };
-    app.dm.repository.save(ref, emptyState);
+    app.eventDayRepository.save(ref, emptyState);
 
     const downloader = new BrowserCircleCsvDownloader(window);
-    const useCase = new ExportCirclesToCsvUseCase(app.dm.repository, downloader);
+    const useCase = new ExportCirclesToCsvUseCase(app.eventDayRepository, downloader);
 
     expect(() => useCase.execute({ eventDay: ref })).not.toThrow();
     expect(window.URL.createObjectURL).toHaveBeenCalledTimes(1);

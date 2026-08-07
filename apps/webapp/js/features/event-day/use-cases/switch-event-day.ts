@@ -32,7 +32,10 @@ export interface SwitchEventDayInput {
 
 export interface SwitchEventDayCollaborators {
   beforeSwitch?: (currentRef: EventDayRef) => Promise<void>;
-  afterSwitch?: (newRef: EventDayRef) => Promise<void>;
+  afterSwitch?: (
+    newRef: EventDayRef,
+    manifest: MapBundleManifest,
+  ) => Promise<void>;
   onSwitchFailure?: (requestedRef: EventDayRef, error: unknown) => void;
 }
 
@@ -50,6 +53,13 @@ export interface SwitchEventDayOptions {
     registryUrl: string,
     event: EventRegistryEntry,
   ) => string;
+}
+
+export interface SwitchEventDayDependencies extends SwitchEventDayOptions {
+  readonly repository: EventDayRepository;
+  readonly registry: EventRegistry;
+  readonly registryUrl?: string;
+  readonly collaborators?: SwitchEventDayCollaborators;
 }
 
 export interface SwitchEventDayOperation {
@@ -70,6 +80,7 @@ function parseRef(input: SwitchEventDayInput): EventDayRef {
 
 /** Owns event/day validation, manifest preparation, durable commit and UI switching. */
 export class SwitchEventDayUseCase implements SwitchEventDayOperation {
+  private readonly repository: EventDayRepository;
   private switching = false;
   private currentManifest: MapBundleManifest | null;
   private activeToken: string | null = null;
@@ -87,45 +98,19 @@ export class SwitchEventDayUseCase implements SwitchEventDayOperation {
         signal?: AbortSignal,
       ) => Promise<MapBundleManifest>)
     | null;
-  private readonly registry: EventRegistry | null;
+  private readonly registry: EventRegistry;
   private readonly collaborators: SwitchEventDayCollaborators;
   private readonly registryUrl: string | null;
   private readonly resolveManifestUrl:
     | ((registryUrl: string, event: EventRegistryEntry) => string)
     | null;
 
-  constructor(
-    private readonly repository: EventDayRepository,
-    second?: string | EventRegistry | SwitchEventDayCollaborators,
-    third: EventRegistry | SwitchEventDayOptions = {},
-    options: SwitchEventDayOptions = {},
-  ) {
-    const oldStyle =
-      typeof second === "string" &&
-      typeof third === "object" &&
-      third !== null &&
-      "events" in third;
-    this.registryUrl = oldStyle ? second : null;
-    const registryCandidate =
-      typeof second === "object" && second !== null && "events" in second
-        ? second
-        : typeof third === "object" &&
-            third !== null &&
-            "events" in third
-          ? third
-          : null;
-    this.registry = oldStyle ? (third as EventRegistry) : registryCandidate;
-    const collaboratorCandidate =
-      typeof second === "object" && second !== null && !("events" in second)
-        ? second
-        : null;
-    this.collaborators =
-      !oldStyle && collaboratorCandidate ? collaboratorCandidate : {};
-    const resolvedOptions = oldStyle
-      ? options
-      : !oldStyle && !registryCandidate
-        ? (third as SwitchEventDayOptions)
-        : options;
+  constructor(dependencies: SwitchEventDayDependencies) {
+    this.repository = dependencies.repository;
+    this.registry = dependencies.registry;
+    this.registryUrl = dependencies.registryUrl ?? null;
+    this.collaborators = dependencies.collaborators ?? {};
+    const resolvedOptions = dependencies;
     this.currentManifest = resolvedOptions.currentManifest ?? null;
     this.now = resolvedOptions.now ?? (() => new Date().toISOString());
     this.createSourceGeneration =
@@ -162,7 +147,7 @@ export class SwitchEventDayUseCase implements SwitchEventDayOperation {
       if (currentRef) await collaborators.beforeSwitch?.(currentRef);
       const prepared = await this.prepare(requestedRef);
       this.commit(prepared);
-      await collaborators.afterSwitch?.(requestedRef);
+      await collaborators.afterSwitch?.(requestedRef, prepared.manifest);
     } catch (error: unknown) {
       this.getCollaborators().onSwitchFailure?.(requestedRef, error);
       throw error;

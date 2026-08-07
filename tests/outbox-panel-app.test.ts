@@ -87,7 +87,7 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
       pending: number;
       failures: never[];
     }) => void = () => {};
-    vi.spyOn(app.dm.pendingGasUpdatesController, "retryAll").mockImplementation(
+    vi.spyOn(app.pendingGasUpdatesController, "retryAll").mockImplementation(
       () =>
         new Promise((resolve) => {
           resolveRetry = (s) => resolve(s.sent);
@@ -112,9 +112,9 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
 
   it("rejects forged retry and discard event details at the ComiPathBrowserRuntime boundary", async () => {
     const app = new ComiPathBrowserRuntime();
-    const retrySpy = vi.spyOn(app.dm.pendingGasUpdatesController, "retryAll");
+    const retrySpy = vi.spyOn(app.pendingGasUpdatesController, "retryAll");
     const discardSpy = vi.spyOn(
-      app.dm.pendingGasUpdatesController,
+      app.pendingGasUpdatesController,
       "discardOne",
     );
 
@@ -133,18 +133,18 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
 
   it("delegates retry request to pendingGasUpdatesController and updates management models", async () => {
     const app = new ComiPathBrowserRuntime();
-    app.dm.eventRegistry = createSampleRegistry();
+    app.eventRegistry = createSampleRegistry();
 
     const ref = { eventId: "c104", dayId: "day1" };
-    app.dm.repository.save(ref, createSampleGasState("c104", "day1"));
-    app.dm.activeEventDaySession.setActiveEventDay(
+    app.eventDayRepository.save(ref, createSampleGasState("c104", "day1"));
+    app.activeEventDaySession.setActiveEventDay(
       ref,
-      app.dm.repository.load(ref) ??
+      app.eventDayRepository.load(ref) ??
         createSampleGasState(ref.eventId, ref.dayId),
     );
 
     const retrySpy = vi
-      .spyOn(app.dm.pendingGasUpdatesController, "retryAll")
+      .spyOn(app.pendingGasUpdatesController, "retryAll")
       .mockResolvedValue(1);
 
     await app.handleGasRetryRequest({ ref });
@@ -154,19 +154,19 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
 
   it("handles discard request with exact confirmation text and updates repository", async () => {
     const app = new ComiPathBrowserRuntime();
-    app.dm.eventRegistry = createSampleRegistry();
+    app.eventRegistry = createSampleRegistry();
 
     const ref = { eventId: "c104", dayId: "day1" };
     const initialState = createSampleGasState("c104", "day1");
-    app.dm.repository.save(ref, initialState);
-    app.dm.activeEventDaySession.setActiveEventDay(
+    app.eventDayRepository.save(ref, initialState);
+    app.activeEventDaySession.setActiveEventDay(
       ref,
-      app.dm.repository.load(ref) ??
+      app.eventDayRepository.load(ref) ??
         createSampleGasState(ref.eventId, ref.dayId),
     );
 
     const discardSpy = vi.spyOn(
-      app.dm.pendingGasUpdatesController,
+      app.pendingGasUpdatesController,
       "discardOne",
     );
 
@@ -178,24 +178,24 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
 
     expect(discardSpy).toHaveBeenCalledWith(ref, `outbox-c104-day1-1`);
 
-    const updated = app.dm.repository.load(ref);
+    const updated = app.eventDayRepository.load(ref);
     expect(updated?.gasOutbox).toHaveLength(0);
   });
 
   it("rejects discard request if confirmation text does not match", async () => {
     const app = new ComiPathBrowserRuntime();
-    app.dm.eventRegistry = createSampleRegistry();
+    app.eventRegistry = createSampleRegistry();
 
     const ref = { eventId: "c104", dayId: "day1" };
-    app.dm.repository.save(ref, createSampleGasState("c104", "day1"));
-    app.dm.activeEventDaySession.setActiveEventDay(
+    app.eventDayRepository.save(ref, createSampleGasState("c104", "day1"));
+    app.activeEventDaySession.setActiveEventDay(
       ref,
-      app.dm.repository.load(ref) ??
+      app.eventDayRepository.load(ref) ??
         createSampleGasState(ref.eventId, ref.dayId),
     );
 
     const discardSpy = vi.spyOn(
-      app.dm.pendingGasUpdatesController,
+      app.pendingGasUpdatesController,
       "discardOne",
     );
 
@@ -211,25 +211,25 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
   it("maintains model coherence across outbox panel, event-day options, and delete options from the same snapshot", async () => {
     const app = new ComiPathBrowserRuntime();
     const registry = createSampleRegistry();
-    app.dm.eventRegistry = registry;
+    app.eventRegistry = registry;
 
     const ref1 = { eventId: "c104", dayId: "day1" };
     const ref2 = { eventId: "c104", dayId: "day2" };
-    app.dm.repository.save(ref1, createSampleGasState("c104", "day1"));
-    app.dm.repository.save(ref2, createSampleGasState("c104", "day2"));
-    app.dm.activeEventDaySession.setActiveEventDay(
+    app.eventDayRepository.save(ref1, createSampleGasState("c104", "day1"));
+    app.eventDayRepository.save(ref2, createSampleGasState("c104", "day2"));
+    app.activeEventDaySession.setActiveEventDay(
       ref1,
-      app.dm.repository.load(ref1) ??
+      app.eventDayRepository.load(ref1) ??
         createSampleGasState(ref1.eventId, ref1.dayId),
     );
 
     app.updateManagementModels();
 
     // Verify outbox model counts match selector pending counts
-    const stateList = app.dm.repository
+    const stateList = app.eventDayRepository
       .listEventDays()
       .map((r) => {
-        const s = app.dm.repository.load(r);
+        const s = app.eventDayRepository.load(r);
         return s ? { ref: r, state: s } : null;
       })
       .filter(
@@ -237,7 +237,7 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
           item,
         ): item is {
           ref: typeof ref1;
-          state: NonNullable<ReturnType<typeof app.dm.repository.load>>;
+          state: NonNullable<ReturnType<typeof app.eventDayRepository.load>>;
         } => item !== null,
       );
     const totalPendingInRepo = stateList.reduce(

@@ -39,9 +39,9 @@ describe("Circle Data Source Diff & Preview Dialog Integration", () => {
     repo = new EventDayRepository(storage);
 
     app = new ComiPathBrowserRuntime();
-    app.dm.eventRegistry = createRegistry();
-    app.dm.eventRegistryUrl = "";
-    app.dm.repository = repo;
+    app.eventRegistry = createRegistry();
+    app.eventRegistryUrl = "";
+    app.eventDayRepository = repo;
 
     const ref: EventDayRef = { eventId: "C108", dayId: "day1" };
     repo.save(ref, {
@@ -61,7 +61,7 @@ describe("Circle Data Source Diff & Preview Dialog Integration", () => {
       },
     });
 
-    await app.dm.openEventDay(ref);
+    await app.openEventDay(ref);
   });
 
   it("stages and applies a valid CSV preview when PreviewCsvImportUseCase is triggered", async () => {
