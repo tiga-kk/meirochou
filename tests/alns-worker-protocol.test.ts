@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
   parseTimeDecayedAlnsWorkerRequest,
   parseTimeDecayedAlnsWorkerResponse,
-} from "../apps/webapp/js/routing/alns-worker-protocol";
+} from "../apps/webapp/js/features/route-guidance/infrastructure/worker/alns-worker-protocol";
 
 const problem = {
   nodeIds: ["A-01"],

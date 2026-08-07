@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { Config } from "../apps/webapp/js/config";
 import {
   BoundaryValidationError,
   parseEventMapBundleManifest,
@@ -9,7 +8,8 @@ import {
   parseGridMeta,
   parseMapBundleManifest,
   parsePointsPayload,
-} from "../apps/webapp/js/types/boundary-parsers";
+} from "../apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers";
+import { runtimeMapAreaCatalog } from "../apps/webapp/js/features/route-guidance/infrastructure/runtime-map-area-catalog";
 
 const validMapManifest = {
   schemaVersion: 1,
@@ -107,20 +107,26 @@ test("map manifest parser rejects empty and duplicate area labels", () => {
 });
 
 test("map areas are initialized exactly once from a validated manifest", () => {
-  assert.deepEqual(Config.AREAS, []);
+  assert.deepEqual(runtimeMapAreaCatalog.getAllMapAreas(), []);
   const manifest = parseMapBundleManifest(
     validMapManifest,
     "https://example.test/assets/maps/manifest.json",
   );
 
-  Config.initializeAreas(manifest.areas);
+  runtimeMapAreaCatalog.initializeMapAreas(manifest.areas);
 
-  assert.equal(Config.AREAS[0].id, "demo-east");
-  assert.equal(Object.isFrozen(Config.AREAS), true);
-  assert.equal(Object.isFrozen(Config.AREAS[0]), true);
-  assert.equal(Object.isFrozen(Config.AREAS[0].labels), true);
+  assert.equal(runtimeMapAreaCatalog.getAllMapAreas()[0].id, "demo-east");
+  assert.equal(Object.isFrozen(runtimeMapAreaCatalog.getAllMapAreas()), true);
+  assert.equal(
+    Object.isFrozen(runtimeMapAreaCatalog.getAllMapAreas()[0]),
+    true,
+  );
+  assert.equal(
+    Object.isFrozen(runtimeMapAreaCatalog.getAllMapAreas()[0].labels),
+    true,
+  );
   assert.throws(
-    () => Config.initializeAreas(manifest.areas),
+    () => runtimeMapAreaCatalog.initializeMapAreas(manifest.areas),
     /already initialized/,
   );
 });

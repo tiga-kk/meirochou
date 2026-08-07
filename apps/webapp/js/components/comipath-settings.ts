@@ -3,17 +3,17 @@ import {
   ALNS_SEARCH_TIME_LIMITS,
   type AlnsSearchTimeLimitMs,
   DEFAULT_SEARCH_TIME_LIMIT_MS,
-} from "../routing/time-decayed-objective";
-import { dispatchManagementEvent } from "../ui/management-events";
+} from "../features/route-guidance/domain/optimization/time-decayed-objective";
+import { dispatchManagementEvent } from "../shared/ui/management-events";
 import type {
   DeleteOptionViewModel,
   EventDayOption,
   OutboxPanelModel,
-} from "../ui/management-view-model";
-import type { SourceManagerModel } from "./source-manager";
+} from "../shared/ui/management-view-model";
+import type { CircleDataSourcePanelModel } from "./circle-data-source-panel";
 import type { StorageDeleteDialogModel } from "./storage-delete-dialog";
 import "./event-day-selector";
-import "./source-manager";
+import "./circle-data-source-panel";
 import "./outbox-panel";
 import "./storage-delete-dialog";
 
@@ -40,7 +40,7 @@ export class ComipathSettings extends LitElement {
   declare eventDayOptions: readonly EventDayOption[];
   declare selectedEventId: string;
   declare selectedDayId: string;
-  declare sourceManagerModel: SourceManagerModel | null;
+  declare sourceManagerModel: CircleDataSourcePanelModel | null;
   declare outboxPanelModel: OutboxPanelModel | null;
   declare deleteOptions: readonly DeleteOptionViewModel[];
   declare deleteDialogModel: StorageDeleteDialogModel | null;

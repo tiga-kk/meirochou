@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { App } from "../apps/webapp/js/app.js";
-import { Config } from "../apps/webapp/js/config.js";
+import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime.js";
+import { runtimeMapAreaCatalog } from "../apps/webapp/js/features/route-guidance/infrastructure/runtime-map-area-catalog";
 
 describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", () => {
   beforeEach(() => {
@@ -39,7 +39,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       <navigation-resume-dialog id="navigation-resume-dialog"></navigation-resume-dialog>
     `;
 
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     const searchNextSpy = vi
       .spyOn(app, "searchNext")
       .mockImplementation(async () => {});
@@ -87,7 +87,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       ],
     };
 
-    // Mock DataManager openEventDay, activeRef & activeState
+    // Mock EventDayDataStore openEventDay, activeRef & activeState
     app.dm.openEventDay = async (ref) => {
       app.dm.activeRef = ref;
       app.dm.activeState = {
@@ -153,7 +153,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       <navigation-resume-dialog id="navigation-resume-dialog"></navigation-resume-dialog>
     `;
 
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     vi.spyOn(app, "searchNext").mockImplementation(async () => {});
 
     // Save snapshot where target circle is already purchased
@@ -190,7 +190,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       ],
     };
 
-    // Mock DataManager openEventDay, activeRef & activeState
+    // Mock EventDayDataStore openEventDay, activeRef & activeState
     app.dm.openEventDay = async (ref) => {
       app.dm.activeRef = ref;
       app.dm.activeState = {
@@ -224,7 +224,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
   });
 
   test("handleResumeResetStart clears snapshot while preserving distance matrix", () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.dm.activeRef = { eventId: "demo-v1", dayId: "day1" };
 
     // Save snapshot and distance matrix
@@ -288,7 +288,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       <div id="toast"></div>
       <navigation-resume-dialog id="navigation-resume-dialog"></navigation-resume-dialog>
     `;
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.ui.init(app.dm);
     const snapshot = {
       schemaVersion: 1 as const,
@@ -319,7 +319,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       savedAt: "2026-07-27T00:00:00.000Z",
     };
 
-    Config.initializeAreas([
+    runtimeMapAreaCatalog.initializeMapAreas([
       { id: "east", name: "東ホール", prefixes: ["東"], labels: ["A"] },
     ]);
 
@@ -391,7 +391,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       '<navigation-resume-dialog id="navigation-resume-dialog"></navigation-resume-dialog>';
     const dialog = document.getElementById("navigation-resume-dialog");
     if (dialog) dialog.open = true;
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     const snapshot = {
       schemaVersion: 1 as const,
       eventId: "demo-v1",
@@ -466,7 +466,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       <navigation-resume-dialog id="navigation-resume-dialog"></navigation-resume-dialog>
     `;
 
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.ui.init(app.dm);
 
     // Save matrix into matrixRepository
@@ -509,7 +509,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       savedAt: "2026-07-27T00:00:00.000Z",
     };
 
-    Config.replaceAreas([
+    runtimeMapAreaCatalog.replaceMapAreas([
       { id: "e456", name: "東ホール", prefixes: ["東"], labels: ["A"] },
     ]);
 
@@ -574,7 +574,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       onmessage: null as ((ev: { data: unknown }) => void) | null,
     };
 
-    const testApp = new App({
+    const testApp = new ComiPathBrowserRuntime({
       alnsWorkerFactory: () => {
         factoryCalled = true;
         return fakeWorker as unknown as Worker;
@@ -592,7 +592,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
 
     await testApp.handleResumeConfirm();
 
-    // 1. Verify App production path invoked worker factory
+    // 1. Verify ComiPathBrowserRuntime production path invoked worker factory
     expect(factoryCalled).toBe(true);
 
     // 2. Verify worker request contains fixedFirstTarget, initialSolutions, searchTimeLimitMs
@@ -701,7 +701,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       },
       onmessage: null,
     };
-    const app = new App({
+    const app = new ComiPathBrowserRuntime({
       alnsWorkerFactory: () => {
         factoryCalled = true;
         return fakeWorker as unknown as Worker;
@@ -747,7 +747,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       <div id="toast"></div>
     `;
 
-    Config.replaceAreas([
+    runtimeMapAreaCatalog.replaceMapAreas([
       {
         id: "e456",
         mapId: "m1",
@@ -761,7 +761,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       },
     ]);
 
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.ui.init(app.dm);
     app.dm.wantToBuy = [
       {
@@ -833,12 +833,12 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
   });
 
   test("searchNext limits production candidates to the current map area", async () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.ui.showLoading = vi.fn();
     app.ui.showToast = vi.fn();
     app.ui.showNavigation = vi.fn();
 
-    Config.replaceAreas([
+    runtimeMapAreaCatalog.replaceMapAreas([
       {
         id: "e456",
         mapId: "m-e456",
@@ -932,7 +932,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       <select id="loc-label"><option value="A">A</option></select>
       <input id="loc-number" value="1" />
     `;
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.ui.showNavigation = vi.fn();
     app.ui.showLoading = vi.fn();
     app.ui.showToast = vi.fn();
@@ -1010,7 +1010,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
   });
 
   test("hold updates orchestration state without falling back to searchNext", async () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.ui.showToast = vi.fn();
     app.ui.showNavigation = vi.fn();
     app.ui.updateCounts = vi.fn();
@@ -1090,7 +1090,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
   });
 
   test("hold completion clears the snapshot without referencing an undefined state", async () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.dm.activeRef = { eventId: "demo-v1", dayId: "day1" };
     app.dm.addHold = vi.fn();
     app.dm.wantToBuy = [{ space: "東A01a" }];
@@ -1135,7 +1135,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
   });
 
   test("hold keeps current navigation and shows an error when next route fails", async () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.ui.showToast = vi.fn();
     app.ui.updateCounts = vi.fn();
     app.ui.updateCurrentLocation = vi.fn();
@@ -1199,7 +1199,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
   });
 
   test("purchase advances through arrival and purchase orchestration without searchNext", async () => {
-    Config.replaceAreas([
+    runtimeMapAreaCatalog.replaceMapAreas([
       {
         id: "east",
         mapId: "east-map",
@@ -1212,7 +1212,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
         gridFile: "grid.bin",
       },
     ]);
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.ui.showToast = vi.fn();
     app.ui.showNavigation = vi.fn();
     app.ui.updateCounts = vi.fn();
@@ -1329,7 +1329,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       <div id="toast"></div>
     `;
 
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.ui.init(app.dm);
     app.dm.wantToBuy = []; // Empty
 
@@ -1340,7 +1340,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
   });
 
   test("saveNavigationSnapshot builds the existing schema and preserves known matrixRef", () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.dm.activeRef = { eventId: "demo-v1", dayId: "day1" };
     app.currentManifest = { bundleVersion: "fixture-v2" };
     app.navigationState = {
@@ -1378,7 +1378,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
   });
 
   test("source changes clear navigation snapshot, matrix cache, and runtime state", () => {
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     const ref = { eventId: "demo-v1", dayId: "day1" };
     app.dm.activeRef = ref;
     app.navigationState = {
@@ -1420,7 +1420,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       <div id="toast"></div>
     `;
 
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.ui.init(app.dm);
     app.dm.wantToBuy = [
       {
@@ -1457,7 +1457,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       <div id="toast"></div>
     `;
 
-    Config.replaceAreas([
+    runtimeMapAreaCatalog.replaceMapAreas([
       {
         id: "e456",
         mapId: "m1",
@@ -1471,7 +1471,7 @@ describe("Phase 5C Task 11: Startup Snapshot Load & Resume Dialog Integration", 
       },
     ]);
 
-    const app = new App();
+    const app = new ComiPathBrowserRuntime();
     app.ui.init(app.dm);
     app.dm.wantToBuy = [
       {

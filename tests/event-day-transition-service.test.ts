@@ -1,21 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  loadMapBundleManifestFromUrl,
-  resolveEventMapManifestUrl,
-} from "../apps/webapp/js/map-manifest-loader";
-import {
-  EventDayRepository,
-  StorageWriteError,
-} from "../apps/webapp/js/state/event-day-repository";
-import {
-  EventDayTransitionService,
-  type PreparedEventDayTransition,
-} from "../apps/webapp/js/state/event-day-transition-service";
-import { StorageService } from "../apps/webapp/js/state/storage-service";
 import type {
   EventRegistryV1,
   MapBundleManifestV1,
-} from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
+import {
+  loadMapBundleManifestFromUrl,
+  resolveEventMapManifestUrl,
+} from "../apps/webapp/js/features/event-day/infrastructure/http-map-manifest-loader";
+import {
+  LocalStorageEventDayRepository as EventDayRepository,
+  StorageWriteError,
+} from "../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
+import {
+  SwitchEventDayUseCase as EventDayTransitionService,
+  type PreparedEventDayTransition,
+} from "../apps/webapp/js/features/event-day/use-cases/switch-event-day";
+import { StorageService } from "../apps/webapp/js/state/storage-service";
 
 const registryUrl = "http://localhost:5173/assets/events/manifest.json";
 
@@ -241,10 +241,10 @@ describe("EventDayTransitionService prepare", () => {
     });
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
       {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
         fetcher: mockFetcher,
       },
     );
@@ -260,7 +260,7 @@ describe("EventDayTransitionService prepare", () => {
 
     // Zero side effects before commit
     expect(repo.load(ref)).toBeNull();
-    expect(repo.getLastOpened()).toBeNull();
+    expect(repo.getLastOpenedEventDay()).toBeNull();
   });
 
   it("reuses current manifest for same-event day switch without fetching again", async () => {
@@ -273,10 +273,10 @@ describe("EventDayTransitionService prepare", () => {
     } as Response);
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
       {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
         currentManifest: resolvedManifestC104,
         fetcher: mockFetcher,
       },
@@ -299,10 +299,10 @@ describe("EventDayTransitionService prepare", () => {
     } as Response);
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
       {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
         currentManifest: resolvedManifestC104,
         fetcher: mockFetcher,
       },
@@ -325,10 +325,10 @@ describe("EventDayTransitionService prepare", () => {
     } as Response);
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
       {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
         fetcher: mockFetcher,
       },
     );
@@ -343,9 +343,11 @@ describe("EventDayTransitionService prepare", () => {
     const repo = new EventDayRepository(storageService);
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
+      {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
+      },
     );
     await expect(
       service.prepare({ eventId: "unknown", dayId: "day1" }),
@@ -365,10 +367,10 @@ describe("EventDayTransitionService prepare", () => {
     });
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
       {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
         fetcher: mockFetcher,
       },
     );
@@ -398,10 +400,12 @@ describe("EventDayTransitionService prepare", () => {
       url.includes("demo-v1") ? c104Response : c105Response,
     );
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
-      { fetcher: mockFetcher },
+      {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
+        fetcher: mockFetcher,
+      },
     );
 
     const older = service.prepare({ eventId: "c104", dayId: "day1" });
@@ -428,10 +432,10 @@ describe("EventDayTransitionService commit & rollback", () => {
     const repo = new EventDayRepository(storageService);
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
       {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
         currentManifest: resolvedManifestC104,
       },
     );
@@ -463,7 +467,7 @@ describe("EventDayTransitionService commit & rollback", () => {
     expect(committed).toEqual(prepared.state);
 
     expect(repo.load(prepared.ref)).toEqual(prepared.state);
-    expect(repo.getLastOpened()).toEqual(prepared.ref);
+    expect(repo.getLastOpenedEventDay()).toEqual(prepared.ref);
   });
 
   it("rolls back storage on save or last-opened failure during commit", () => {
@@ -472,10 +476,10 @@ describe("EventDayTransitionService commit & rollback", () => {
     const repo = new EventDayRepository(storageService);
 
     const service = new EventDayTransitionService(
-      repo,
-      registryUrl,
-      sampleRegistry,
       {
+        repository: repo,
+        registry: sampleRegistry,
+        registryUrl,
         currentManifest: resolvedManifestC104,
       },
     );
@@ -495,7 +499,7 @@ describe("EventDayTransitionService commit & rollback", () => {
         sourceUpdatedAt: "2026-07-23T00:00:00Z",
       },
     });
-    repo.setLastOpened(initialRef);
+    repo.rememberLastOpenedEventDay(initialRef);
 
     // Mock storage to fail on next setItem
     vi.spyOn(storageService, "setJson").mockImplementation((key: string) => {
@@ -530,7 +534,7 @@ describe("EventDayTransitionService commit & rollback", () => {
     expect(() => service.commit(prepared)).toThrow(StorageWriteError);
 
     // Previous state and last-opened remain intact
-    expect(repo.getLastOpened()).toEqual(initialRef);
+    expect(repo.getLastOpenedEventDay()).toEqual(initialRef);
     expect(repo.load({ eventId: "c105", dayId: "day1" })).toBeNull();
   });
 });

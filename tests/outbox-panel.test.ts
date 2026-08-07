@@ -2,8 +2,8 @@
 import { describe, expect, it } from "vitest";
 import "../apps/webapp/js/components/outbox-panel";
 import type { OutboxPanel } from "../apps/webapp/js/components/outbox-panel";
-import type { ManagementEventDetailMap } from "../apps/webapp/js/ui/management-events";
-import type { OutboxPanelModel } from "../apps/webapp/js/ui/management-view-model";
+import type { ManagementEventDetailMap } from "../apps/webapp/js/shared/ui/management-events";
+import type { OutboxPanelModel } from "../apps/webapp/js/shared/ui/management-view-model";
 
 function createSampleModel(): OutboxPanelModel {
   return {

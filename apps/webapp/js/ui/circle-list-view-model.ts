@@ -1,9 +1,9 @@
-import { getCircleVisitState } from "../state/storage-schema";
 import type {
   CircleRecord,
   CircleStateOverrides,
   CircleVisitState,
-} from "../types/domain";
+} from "../features/event-day/domain/application-contract-types";
+import { getCircleVisitState } from "../state/storage-schema";
 
 export type CircleActionType =
   | "set-target"

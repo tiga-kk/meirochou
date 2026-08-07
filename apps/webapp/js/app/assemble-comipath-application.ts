@@ -1,0 +1,351 @@
+import { BrowserEventBinding } from "./bind-browser-events";
+import {
+  completeCircleVisit,
+  type CompleteCircleVisitInput,
+} from "./complete-circle-visit";
+import { BrowserCircleCsvDownloader } from "../features/circle-data-source/infrastructure/browser-circle-csv-downloader";
+import { GasGoogleSheetCircleClient } from "../features/circle-data-source/infrastructure/gas-google-sheet-circle-client";
+import {
+  ApplyCircleDataPreviewUseCase,
+  CancelCircleDataPreviewUseCase,
+  type CircleCsvDownloader,
+  CircleDataSourceController,
+  type CircleDataSourceView,
+  createCircleDataSourceSession,
+  DomCircleDataSourceView,
+  ExportCirclesToCsvUseCase,
+  type GoogleSheetCircleClient,
+  PreviewCsvImportUseCase,
+  PreviewGoogleSheetImportUseCase,
+  type RouteGuidanceInvalidation,
+} from "../features/circle-data-source/public-api";
+import { GasPendingUpdateDelivery } from "../features/circle-status/infrastructure/gas-pending-update-delivery";
+import { CircleStatusController } from "../features/circle-status/ui/circle-status-controller";
+import { PendingGasUpdatesController } from "../features/circle-status/ui/pending-gas-updates-controller";
+import { ChangeCircleStatusUseCase } from "../features/circle-status/use-cases/change-circle-status";
+import { DiscardPendingGasUpdatesUseCase } from "../features/circle-status/use-cases/discard-pending-gas-updates";
+import { DefaultPendingGasUpdateBackgroundProcess } from "../features/circle-status/use-cases/pending-gas-update-background-process";
+import { SendPendingGasUpdatesUseCase } from "../features/circle-status/use-cases/send-pending-gas-updates";
+import { UndoCircleStatusChangeUseCase } from "../features/circle-status/use-cases/undo-circle-status-change";
+import { LocalStorageEventDayRepository } from "../features/event-day/infrastructure/local-storage-event-day-repository";
+import {
+  createActiveEventDayReader,
+  createActiveEventDaySession,
+  DomEventDaySelectorView,
+  type EventDayRepository,
+  EventDaySelectorController,
+  type EventDaySelectorView,
+  type EventRegistry,
+  OpenInitialEventDayUseCase,
+  SwitchEventDayUseCase,
+} from "../features/event-day/public-api";
+import { loadRuntimeMapBundleManifestFromUrl, resolveEventMapManifestUrl } from "../features/event-day/infrastructure/http-map-manifest-loader";
+import { loadEventRegistryWithUrl } from "../features/event-day/infrastructure/http-event-registry-loader";
+import { DeleteLocalDataUseCase } from "../features/local-data-deletion/public-api";
+import { runtimeMapAreaCatalog } from "../features/route-guidance/infrastructure/runtime-map-area-catalog";
+import type { MapAreaCatalog } from "../features/route-guidance/domain/map-area";
+import { HttpRouteMapAssetsLoader } from "../features/route-guidance/infrastructure/http-route-map-assets-loader";
+import { LocalStorageDistanceMatrixRepository } from "../features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
+import { LocalStorageRouteGuidanceSnapshotRepository } from "../features/route-guidance/infrastructure/local-storage-route-guidance-snapshot-repository";
+import { RouteGuidanceRuntimeController } from "../features/route-guidance/infrastructure/route-guidance-runtime-controller";
+import { RouteGuidanceController } from "../features/route-guidance/ui/route-guidance-controller";
+import { ChangeDestinationUseCase } from "../features/route-guidance/use-cases/change-destination";
+import { FinishCurrentCircleUseCase } from "../features/route-guidance/use-cases/finish-current-circle";
+import { InvalidateRouteGuidanceUseCase } from "../features/route-guidance/use-cases/invalidate-route-guidance";
+import { ResumeRouteGuidanceUseCase } from "../features/route-guidance/use-cases/resume-route-guidance";
+import { RouteGuidanceNavigationOperations } from "../features/route-guidance/use-cases/route-guidance-navigation-operations";
+import { createRouteGuidanceSession } from "../features/route-guidance/use-cases/route-guidance-session";
+import { StartRouteGuidanceUseCase } from "../features/route-guidance/use-cases/start-route-guidance";
+import type { MapBundleManifest } from "../features/event-day/domain/event-day-contracts";
+import { StorageService } from "../state/storage-service";
+import {
+  createComiPathApplication,
+  type StartableApplication,
+} from "./comipath-application";
+
+export interface AssembleComiPathApplicationOptions {
+  readonly document: Document;
+  readonly window: Window;
+  readonly createAlnsWorker?: () => Worker;
+  readonly repository?: EventDayRepository;
+  readonly eventDayView?: EventDaySelectorView;
+  readonly circleDataSourceView?: CircleDataSourceView;
+  readonly routeGuidanceInvalidation?: RouteGuidanceInvalidation;
+  readonly registry?: EventRegistry;
+  readonly googleSheetClient?: GoogleSheetCircleClient;
+  readonly csvDownloader?: CircleCsvDownloader;
+  readonly targetElement?: HTMLElement | Window | Document;
+}
+
+/** Composition root for the browser runtime and feature infrastructure. */
+export function assembleComiPathApplication(
+  options: AssembleComiPathApplicationOptions,
+): StartableApplication & Record<string, unknown> {
+  let browserRuntime: any;
+  const storage = new StorageService();
+  const repository =
+    options.repository ?? new LocalStorageEventDayRepository(storage);
+  const activeEventDaySession = createActiveEventDaySession();
+  const activeEventDayReader = createActiveEventDayReader(
+    activeEventDaySession,
+  );
+  const delivery = new GasPendingUpdateDelivery();
+  const sendPendingGasUpdates = new SendPendingGasUpdatesUseCase(
+    repository,
+    activeEventDaySession,
+    delivery,
+  );
+  const discardPendingGasUpdates = new DiscardPendingGasUpdatesUseCase(
+    repository,
+    activeEventDaySession,
+  );
+  const backgroundProcess = new DefaultPendingGasUpdateBackgroundProcess(
+    sendPendingGasUpdates,
+    options.window,
+  );
+  const changeCircleStatus = new ChangeCircleStatusUseCase(
+    repository,
+    activeEventDaySession,
+    backgroundProcess,
+  );
+  const undoCircleStatus = new UndoCircleStatusChangeUseCase(
+    repository,
+    activeEventDaySession,
+  );
+  const circleStatusController = new CircleStatusController(
+    changeCircleStatus,
+    undoCircleStatus,
+  );
+  const pendingGasUpdatesController = new PendingGasUpdatesController(
+    sendPendingGasUpdates,
+    discardPendingGasUpdates,
+  );
+
+  // Event Day feature assembly
+  const openInitialEventDay = new OpenInitialEventDayUseCase(repository);
+  let eventDaySelectorController: EventDaySelectorController | null = null;
+  let switchEventDay: SwitchEventDayUseCase | null = null;
+
+  // Route Guidance invalidation fallback if not provided
+  const routeGuidanceInvalidation: RouteGuidanceInvalidation =
+    options.routeGuidanceInvalidation ?? {
+      invalidateAfterCircleSourceChange: () => {},
+    };
+
+  // Circle Data Source feature assembly
+  const googleSheetClient =
+    options.googleSheetClient ?? new GasGoogleSheetCircleClient();
+  const csvDownloader =
+    options.csvDownloader ??
+    new BrowserCircleCsvDownloader(
+      options.window as Window & typeof globalThis,
+    );
+  const circleDataSourceSession = createCircleDataSourceSession();
+
+  const previewCsvImport = new PreviewCsvImportUseCase(repository);
+  const previewGoogleSheetImport = new PreviewGoogleSheetImportUseCase(
+    repository,
+    googleSheetClient,
+  );
+  const applyCircleDataPreview = new ApplyCircleDataPreviewUseCase(
+    repository,
+    activeEventDaySession,
+    routeGuidanceInvalidation,
+  );
+  const cancelCircleDataPreview = new CancelCircleDataPreviewUseCase();
+  const exportCirclesToCsv = new ExportCirclesToCsvUseCase(
+    repository,
+    csvDownloader,
+  );
+
+  const circleDataSourceController = new CircleDataSourceController({
+    client: googleSheetClient,
+    session: circleDataSourceSession,
+    view:
+      options.circleDataSourceView ??
+      new DomCircleDataSourceView(
+        typeof options.document.getElementById === "function"
+          ? options.document.getElementById("source-diff-dialog")
+          : null,
+      ),
+    previewCsvImport,
+    previewGoogleSheetImport,
+    applyCircleDataPreview,
+    cancelCircleDataPreview,
+    exportCirclesToCsv,
+    routeGuidanceInvalidation,
+    activeEventDaySession,
+    targetElement: options.targetElement ?? options.document,
+    diffDialogElement:
+      typeof options.document.getElementById === "function"
+        ? (options.document.getElementById("source-diff-dialog") ?? undefined)
+        : undefined,
+  });
+
+  const routeGuidanceSession = createRouteGuidanceSession();
+  const routeMapAreaCatalog =
+    runtimeMapAreaCatalog as unknown as MapAreaCatalog;
+  const routeMapAssetsLoader = new HttpRouteMapAssetsLoader();
+  const snapshotRepository = new LocalStorageRouteGuidanceSnapshotRepository();
+  const matrixRepository = new LocalStorageDistanceMatrixRepository();
+  const orchestrationService = new RouteGuidanceNavigationOperations();
+  const navigationRuntimeController = new RouteGuidanceRuntimeController({
+    snapshotRepo: snapshotRepository,
+    matrixRepo: matrixRepository,
+    orchestration: orchestrationService,
+    ...(options.createAlnsWorker
+      ? { workerFactory: options.createAlnsWorker }
+      : {}),
+  });
+  const routeGuidanceSnapshotRepository = {
+    loadSnapshot: () => null,
+    saveSnapshot: () => browserRuntime.saveNavigationSnapshot(),
+    deleteSnapshot: (ref: Parameters<BrowserEventBinding["clearNavigationSnapshot"]>[0]) =>
+      browserRuntime.clearNavigationSnapshot(ref),
+  };
+  const routeGuidanceController = new RouteGuidanceController({
+    startGuidance: new StartRouteGuidanceUseCase(
+      routeGuidanceSession,
+      routeMapAreaCatalog,
+      routeMapAssetsLoader,
+      routeGuidanceSnapshotRepository,
+    ),
+    resumeGuidance: new ResumeRouteGuidanceUseCase(
+      routeGuidanceSession,
+      routeGuidanceSnapshotRepository,
+      routeMapAssetsLoader,
+      routeMapAreaCatalog,
+    ),
+    changeDestination: new ChangeDestinationUseCase(routeGuidanceSession),
+    finishCircle: new FinishCurrentCircleUseCase(routeGuidanceSession),
+    session: routeGuidanceSession,
+    invalidateGuidance: new InvalidateRouteGuidanceUseCase(
+      routeGuidanceSession,
+    ),
+  });
+
+  const deleteLocalData = new DeleteLocalDataUseCase(
+    repository,
+    {
+      deleteActivitySnapshot: (ref) => browserRuntime.clearNavigationSnapshot(ref),
+      deleteAllRouteData: (ref) => {
+        browserRuntime.matrixRepository.deleteByEventDay(ref.eventId, ref.dayId);
+        browserRuntime.clearNavigationSnapshot(ref);
+      },
+    },
+    {
+      now: () => new Date().toISOString(),
+      createSourceGeneration: () =>
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `gen-${Date.now()}`,
+    },
+  );
+
+  browserRuntime = new BrowserEventBinding({
+    circleDataSourceSession,
+    circleDataSourceController,
+    completeCircleVisit: (input: CompleteCircleVisitInput) =>
+      completeCircleVisit(circleStatusController, input),
+    localDataDeletionUseCase: deleteLocalData,
+    routeGuidanceDependencies: {
+      routeGuidanceSession,
+      routeMapAreaCatalog,
+      routeMapAssetsLoader,
+      snapshotRepository,
+      matrixRepository,
+      orchestrationService,
+      navigationRuntimeController,
+      routeGuidanceController,
+    },
+    eventDayDependencies: {
+      repository,
+      activeEventDaySession,
+      activeEventDayReader,
+      circleStatusController,
+      pendingGasUpdatesController,
+      backgroundProcess,
+      eventRegistry: options.registry,
+      loadEventRegistry: () =>
+        options.registry
+          ? Promise.resolve({ registry: options.registry, registryUrl: "" })
+          : loadEventRegistryWithUrl(),
+    },
+  });
+
+  const baseApp = createComiPathApplication({
+    browserRuntime: {
+      start: async () => {
+        await browserRuntime.start();
+        const runtimeRegistry = browserRuntime.eventRegistry;
+        const runtimeRegistryUrl = browserRuntime.eventRegistryUrl;
+        if (runtimeRegistry) {
+          switchEventDay = new SwitchEventDayUseCase({
+            repository,
+            registry: runtimeRegistry,
+            ...(runtimeRegistryUrl ? { registryUrl: runtimeRegistryUrl } : {}),
+            currentManifest: browserRuntime.currentManifest,
+            ...(runtimeRegistryUrl
+              ? {
+                  loadManifest: async (event: Parameters<typeof resolveEventMapManifestUrl>[1], signal?: AbortSignal) =>
+                    (await loadRuntimeMapBundleManifestFromUrl(
+                      resolveEventMapManifestUrl(runtimeRegistryUrl, event),
+                      event.eventId,
+                      {
+                        fetcher: options.window.fetch?.bind(options.window),
+                        signal,
+                      },
+                    )) as unknown as MapBundleManifest,
+                }
+              : {}),
+            collaborators: {
+              afterSwitch: async (newRef, manifest) => {
+                runtimeMapAreaCatalog.replaceMapAreas(manifest.areas);
+                browserRuntime.currentManifest = manifest;
+                const state = repository.load(newRef);
+                if (state) activeEventDaySession.setActiveEventDay(newRef, state);
+              },
+            },
+          });
+          eventDaySelectorController = new EventDaySelectorController({
+            switchEventDay,
+            openInitialEventDay,
+            registry: runtimeRegistry,
+            view:
+              options.eventDayView ??
+              new DomEventDaySelectorView(
+                typeof options.document.querySelector === "function"
+                  ? options.document.querySelector("event-day-selector")
+                  : null,
+              ),
+            repository,
+            activeEventDaySession,
+            targetElement: options.targetElement ?? options.document,
+          });
+          await eventDaySelectorController.start();
+        }
+        circleDataSourceController.start();
+        return undefined;
+      },
+      stop: () => {
+        eventDaySelectorController?.stop();
+        circleDataSourceController.stop();
+        browserRuntime.dispose();
+      },
+    },
+  });
+
+  return Object.assign(baseApp, {
+    eventDaySelectorController,
+    circleDataSourceController,
+    previewCsvImport,
+    previewGoogleSheetImport,
+    applyCircleDataPreview,
+    cancelCircleDataPreview,
+    exportCirclesToCsv,
+    switchEventDay,
+    openInitialEventDay,
+    routeGuidanceController,
+    routeGuidanceSession,
+  }) as unknown as StartableApplication & Record<string, unknown>;
+}

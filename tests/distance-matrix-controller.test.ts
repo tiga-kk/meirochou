@@ -4,12 +4,12 @@ import type {
   DistanceMatrixJobInput,
   DistanceMatrixRepository,
   StoredDistanceMatrix,
-} from "../apps/webapp/js/routing/distance-matrix";
+} from "../apps/webapp/js/features/route-guidance/domain/routing/distance-matrix";
 import {
   DistanceMatrixController,
   type DistanceMatrixWorkerPort,
-} from "../apps/webapp/js/routing/distance-matrix-controller";
-import type { DistanceMatrixWorkerResponse } from "../apps/webapp/js/routing/distance-matrix-worker-protocol";
+} from "../apps/webapp/js/features/route-guidance/infrastructure/distance-matrix-controller";
+import type { DistanceMatrixWorkerResponse } from "../apps/webapp/js/features/route-guidance/infrastructure/worker/distance-matrix-worker-protocol";
 
 class FakeWorker implements DistanceMatrixWorkerPort {
   onmessage:

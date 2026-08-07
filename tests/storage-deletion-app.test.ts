@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
-import { describe, expect, it, vi } from "vitest";
-import { App } from "../apps/webapp/js/app";
+import { describe, expect, it } from "vitest";
+import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
+import { createBrowserEventBindingOptions } from "./helpers/browser-event-binding-fixture";
 import type {
   EventRegistryV1,
   LocalEventDayState,
-} from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 
 function createSampleRegistry(): EventRegistryV1 {
   return {
@@ -45,104 +46,106 @@ function createSampleState(eventId: string, dayId: string): LocalEventDayState {
   };
 }
 
-describe("App & Storage Deletion Integration", () => {
+describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
   it("handles storage-delete-request for active event-day and falls back to default event/day", async () => {
-    const app = new App();
-    app.dm.eventRegistry = createSampleRegistry();
+    const app = new BrowserEventBinding(createBrowserEventBindingOptions());
+    app.eventRegistry = createSampleRegistry();
 
     const ref1 = { eventId: "c104", dayId: "day1" };
     const ref2 = { eventId: "c104", dayId: "day2" };
 
-    app.dm.repository.saveWithLastOpened(
+    app.eventDayRepository.saveAndRememberLastOpened(
       ref1,
       createSampleState("c104", "day1"),
     );
-    app.dm.repository.save(ref2, createSampleState("c104", "day2"));
-    app.dm.activeRef = ref1;
-    app.dm.activeState = app.dm.repository.load(ref1);
-
-    const transitionSpy = vi
-      .spyOn(app, "handleEventDaySelect")
-      .mockResolvedValue(undefined);
+    app.eventDayRepository.save(ref2, createSampleState("c104", "day2"));
+    app.activeEventDaySession.setActiveEventDay(
+      ref1,
+      app.eventDayRepository.load(ref1) ??
+        createSampleState(ref1.eventId, ref1.dayId),
+    );
 
     await app.handleStorageDeleteRequest({
       scope: { type: "event-day", ref: ref1 },
       confirmation: "",
     });
 
-    expect(app.dm.repository.load(ref1)).toBeNull();
-    expect(transitionSpy).toHaveBeenCalledWith(ref2);
+    expect(app.eventDayRepository.load(ref1)).toBeNull();
+    expect(app.activeRef).toEqual(ref2);
   });
 
   it("does not switch active state when deleting a non-active event-day", async () => {
-    const app = new App();
-    app.dm.eventRegistry = createSampleRegistry();
+    const app = new BrowserEventBinding(createBrowserEventBindingOptions());
+    app.eventRegistry = createSampleRegistry();
 
     const activeRef = { eventId: "c104", dayId: "day1" };
     const deletedRef = { eventId: "c104", dayId: "day2" };
-    app.dm.repository.saveWithLastOpened(
+    app.eventDayRepository.saveAndRememberLastOpened(
       activeRef,
       createSampleState("c104", "day1"),
     );
-    app.dm.repository.save(deletedRef, createSampleState("c104", "day2"));
-    app.dm.activeRef = activeRef;
-    app.dm.activeState = app.dm.repository.load(activeRef);
+    app.eventDayRepository.save(deletedRef, createSampleState("c104", "day2"));
+    app.activeEventDaySession.setActiveEventDay(
+      activeRef,
+      app.eventDayRepository.load(activeRef) ??
+        createSampleState(activeRef.eventId, activeRef.dayId),
+    );
 
-    const transitionSpy = vi.spyOn(app, "handleEventDaySelect");
     await app.handleStorageDeleteRequest({
       scope: { type: "event-day", ref: deletedRef },
       confirmation: "",
     });
 
-    expect(app.dm.repository.load(deletedRef)).toBeNull();
-    expect(app.dm.activeRef).toEqual(activeRef);
-    expect(transitionSpy).not.toHaveBeenCalled();
+    expect(app.eventDayRepository.load(deletedRef)).toBeNull();
+    expect(app.activeRef).toEqual(activeRef);
   });
 
   it("handles all-events deletion, clears repository, and reinitializes registry default state", async () => {
-    const app = new App();
-    app.dm.eventRegistry = createSampleRegistry();
+    const app = new BrowserEventBinding(createBrowserEventBindingOptions());
+    app.eventRegistry = createSampleRegistry();
 
     const ref1 = { eventId: "c104", dayId: "day1" };
     const ref2 = { eventId: "c104", dayId: "day2" };
 
-    app.dm.repository.saveWithLastOpened(
+    app.eventDayRepository.saveAndRememberLastOpened(
       ref1,
       createSampleState("c104", "day1"),
     );
-    app.dm.repository.save(ref2, createSampleState("c104", "day2"));
-    app.dm.activeRef = ref1;
-    app.dm.activeState = app.dm.repository.load(ref1);
-
-    const transitionSpy = vi
-      .spyOn(app, "handleEventDaySelect")
-      .mockResolvedValue(undefined);
+    app.eventDayRepository.save(ref2, createSampleState("c104", "day2"));
+    app.activeEventDaySession.setActiveEventDay(
+      ref1,
+      app.eventDayRepository.load(ref1) ??
+        createSampleState(ref1.eventId, ref1.dayId),
+    );
 
     await app.handleStorageDeleteRequest({
       scope: { type: "all-events" },
       confirmation: "全イベントを削除",
     });
 
-    expect(app.dm.repository.list()).toHaveLength(0);
-    expect(transitionSpy).toHaveBeenCalledWith({
-      eventId: "c104",
-      dayId: "day1",
+    expect(app.eventDayRepository.listEventDays()).toEqual([ref1]);
+    expect(app.eventDayRepository.load(ref1)).toMatchObject({
+      source: { type: "csv", fileName: "empty.csv" },
+      circles: [],
     });
   });
 
   it("rejects all-events deletion if confirmation text is invalid", async () => {
-    const app = new App();
-    app.dm.eventRegistry = createSampleRegistry();
+    const app = new BrowserEventBinding(createBrowserEventBindingOptions());
+    app.eventRegistry = createSampleRegistry();
 
     const ref1 = { eventId: "c104", dayId: "day1" };
-    app.dm.repository.save(ref1, createSampleState("c104", "day1"));
-    app.dm.activeRef = ref1;
+    app.eventDayRepository.save(ref1, createSampleState("c104", "day1"));
+    app.activeEventDaySession.setActiveEventDay(
+      ref1,
+      app.eventDayRepository.load(ref1) ?? createSampleState("c104", "day1"),
+    );
 
     await app.handleStorageDeleteRequest({
       scope: { type: "all-events" },
       confirmation: "全イベントを削除 ",
     });
 
-    expect(app.dm.repository.list()).toHaveLength(1);
+    expect(app.eventDayRepository.listEventDays()).toHaveLength(1);
   });
 });

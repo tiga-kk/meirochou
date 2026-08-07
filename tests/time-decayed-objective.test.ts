@@ -6,7 +6,7 @@ import {
   DEFAULT_TIMING_PROFILE,
   evaluateRouteScore,
   type TimeDecayedAlnsProblem,
-} from "../apps/webapp/js/routing/time-decayed-objective";
+} from "../apps/webapp/js/features/route-guidance/domain/optimization/time-decayed-objective";
 
 describe("Phase 5C Task 6: time-decayed-objective", () => {
   test("converts weighted distance to travel time using area-specific coefficient", () => {

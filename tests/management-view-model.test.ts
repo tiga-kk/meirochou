@@ -4,18 +4,18 @@ import type {
   GasOutboxEntry,
   LocalEventDayState,
   SourceDiff,
-} from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import {
   dispatchManagementEvent,
   type ManagementEventDetailMap,
-} from "../apps/webapp/js/ui/management-events";
+} from "../apps/webapp/js/shared/ui/management-events";
 import {
   buildDeleteOptions,
   buildEventDayOptions,
   formatOutbox,
   formatSourceDiff,
   formatSourceSummary,
-} from "../apps/webapp/js/ui/management-view-model";
+} from "../apps/webapp/js/shared/ui/management-view-model";
 
 const sampleRegistry: EventRegistryV1 = {
   schemaVersion: 1,

@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 import { describe, expect, test } from "vitest";
-import { CircleStateUndoService } from "../apps/webapp/js/state/circle-state-undo-service";
 import type {
   CircleRecord,
   CircleStateOverrides,
-} from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
+import { CircleStateUndoService } from "../apps/webapp/js/state/circle-state-undo-service";
 import {
   buildAllCircleList,
   buildUnpurchasedCircleList,

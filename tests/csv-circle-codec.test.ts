@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   parseCircleCsv,
   serializeCircleCsv,
-} from "../apps/webapp/js/data/csv-circle-codec";
-import type { CircleRecord } from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/circle-data-source/public-api";
+import type { CircleRecord } from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 
 describe("csv-circle-codec", () => {
   describe("parseCircleCsv", () => {

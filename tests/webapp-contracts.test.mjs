@@ -1,34 +1,32 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "vitest";
-import { Config } from "../apps/webapp/js/config.js";
 import {
   createDevDemoData,
   isDevDemoEnabled,
 } from "../apps/webapp/js/dev-demo-data.js";
+import { parseMapBundleManifest } from "../apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers";
 import {
-  getPinSourceSize,
-  getRouteStartSpaceForMap,
-} from "../apps/webapp/js/map-renderer.js";
-import {
-  buildRouteOverlaySvg,
   planRoute,
   rankCandidatesByGridDistance,
-} from "../apps/webapp/js/route-planner";
-import { StorageService } from "../apps/webapp/js/state/storage-service.js";
-import { parseMapBundleManifest } from "../apps/webapp/js/types/boundary-parsers";
+} from "../apps/webapp/js/features/route-guidance/domain/routing/grid-route-planner";
+import { runtimeMapAreaCatalog } from "../apps/webapp/js/features/route-guidance/infrastructure/runtime-map-area-catalog.ts";
+import { formatTargetViewModel } from "../apps/webapp/js/features/route-guidance/ui/format-target-view-model.ts";
+import { buildSpaceFromLocation } from "../apps/webapp/js/features/route-guidance/ui/parse-current-location-form.ts";
 import {
   buildMapPins,
   buildMapPointIndex,
-  buildSpaceFromLocation,
   calculateContainedImageBox,
   calculateFitTransform,
   calculateMapPinSize,
   calculateNativeImageScale,
-  formatTargetViewModel,
   getPinPosition,
-  normalizeExternalUrl,
-} from "../apps/webapp/js/ui/navigation-view-model";
+  getPinSourceSize,
+} from "../apps/webapp/js/features/route-guidance/ui/route-map-pin-model.ts";
+import { buildRouteOverlaySvg } from "../apps/webapp/js/features/route-guidance/ui/route-overlay-svg";
+import { parseSafeExternalUrl as normalizeExternalUrl } from "../apps/webapp/js/shared/browser/parse-safe-external-url.ts";
+import { getRouteStartSpaceForMap } from "../apps/webapp/js/shared/ui/contained-image-layout.ts";
+import { StorageService } from "../apps/webapp/js/state/storage-service.js";
 
 const root = new URL("../", import.meta.url);
 
@@ -51,24 +49,37 @@ const mapManifest = parseMapBundleManifest(
   rawMapManifest,
   "https://example.test/assets/maps/manifest.json",
 );
-Config.initializeAreas(mapManifest.areas);
+runtimeMapAreaCatalog.initializeMapAreas(mapManifest.areas);
+
+test("browser entrypoint owns startup side effects", () => {
+  const html = read("apps/webapp/index.html");
+  assert.match(
+    html,
+    /<script\s+type="module"\s+src="js\/app\/browser-entrypoint\.ts"><\/script>/,
+  );
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  assert.doesNotMatch(appSource, /DOMContentLoaded/);
+});
 
 // GAS contract tests are restored for Task 4
 test("Phase 2 keeps GAS sale actions outside the local data service", () => {
-  const source = read("apps/webapp/js/data-manager.ts");
+  const source = read(
+    "apps/webapp/js/features/circle-status/infrastructure/gas-pending-update-delivery.ts",
+  );
   const gasSource = read("integrations/gas-spreadsheet/src/web-api.js");
 
-  assert.doesNotMatch(source, /SyncQueue/);
-  assert.doesNotMatch(source, /action:\s*["']sale["']/);
+  assert.match(source, /action:\s*["']sale["']/);
   assert.match(source, /sheetName/);
   assert.match(gasSource, /requestData\.sheetName/);
   assert.match(gasSource, /getSheetByName/);
-  assert.doesNotMatch(source, /\?\s*\{\s*spaces:\s*space,\s*undo:\s*true\s*\}/);
+  assert.doesNotMatch(read("apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository.ts"), /SyncQueue/);
 });
 
 test("Phase 5C Task 1 removes persistent Undo/Redo controls from the UI", () => {
-  const appSource = read("apps/webapp/js/app.js");
-  const modalSource = read("apps/webapp/js/modal-manager.js");
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const modalSource = read(
+    "apps/webapp/js/features/circle-status/ui/dom-circle-gallery-view.ts",
+  );
   const indexSource = read("apps/webapp/index.html");
 
   assert.doesNotMatch(indexSource, /id=["']btn-(?:undo|redo)["']/);
@@ -209,28 +220,36 @@ test("shared webapp and GAS names use lower camel case", () => {
   assert.doesNotMatch(sources, /\bval2\b/);
 });
 
-test("Phase 3 keeps fetch inside GasApiClient and out of DataManager", () => {
-  const dataManagerSource = read("apps/webapp/js/data-manager.ts");
+test("Phase 3 keeps fetch inside GasApiClient and out of EventDayDataStore", () => {
+  const dataManagerSource = read(
+    "apps/webapp/js/features/circle-data-source/infrastructure/gas-google-sheet-circle-client.ts",
+  );
   const gasClientSource = read("apps/webapp/js/api/gas-api-client.ts");
 
-  assert.doesNotMatch(dataManagerSource, /\bfetch\(/);
+  assert.doesNotMatch(dataManagerSource, /new\s+GasApiClient/);
   assert.match(gasClientSource, /async fetchSheetList/);
   assert.match(gasClientSource, /async fetchCircles/);
   assert.match(gasClientSource, /async sendSaleUpdate/);
 });
 
-test("Phase 2/3 DataManager storage is separate from the sync outbox", () => {
-  const dataManagerSource = read("apps/webapp/js/data-manager.ts");
+test("Phase 2/3 EventDayDataStore storage is separate from the sync outbox", () => {
+  const dataManagerSource = read(
+    "apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository.ts",
+  );
   const storageSource = read("apps/webapp/js/state/storage-service.ts");
-  const outboxSource = read("apps/webapp/js/state/gas-outbox-service.ts");
+  const appendSource = read(
+    "apps/webapp/js/features/circle-status/domain/pending-gas-update-state.ts",
+  );
+  const sendSource = read(
+    "apps/webapp/js/features/circle-status/use-cases/send-pending-gas-updates.ts",
+  );
 
-  assert.match(dataManagerSource, /new StorageService\(/);
   assert.doesNotMatch(dataManagerSource, /SyncQueue/);
   assert.doesNotMatch(dataManagerSource, /localStorage\./);
   assert.match(storageSource, /localStorage/);
   assert.match(storageSource, /getStorage/);
-  assert.match(outboxSource, /append/);
-  assert.match(outboxSource, /process/);
+  assert.match(appendSource, /append/);
+  assert.match(sendSource, /deliver/);
 });
 
 test("webapp storage falls back when localStorage is unavailable", () => {
@@ -659,7 +678,7 @@ test("webapp route start marker is kept only when start and target share a map a
 });
 
 test("webapp area config exposes grid route assets for each map", () => {
-  Config.AREAS.forEach((area) => {
+  runtimeMapAreaCatalog.getAllMapAreas().forEach((area) => {
     assert.match(
       area.gridMetaFile,
       new RegExp(`assets/maps/${area.id}/grid-meta\\.json$`),
@@ -1058,10 +1077,15 @@ test("webapp route exposes the exact OCR points selected for both endpoint pins"
 });
 
 test("webapp next-target search ranks candidates with grid route assets", () => {
-  const appSource = read("apps/webapp/js/app.js");
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const loaderSource = read(
+    "apps/webapp/js/features/route-guidance/infrastructure/http-route-map-assets-loader.ts",
+  );
 
   assert.match(appSource, /rankCandidatesByGridDistance/);
-  assert.match(appSource, /fetch\(area\.gridFile\)/);
+  assert.match(loaderSource, /globalThis\.fetch\.bind\(globalThis\)/);
+  assert.match(loaderSource, /mapArea\.assets\.grid/);
+  assert.doesNotMatch(loaderSource, /c108-/i);
   assert.match(appSource, /gridDistance/);
 });
 
@@ -1086,7 +1110,7 @@ test("webapp current location keeps an exact circle number", () => {
 
 test("webapp uses an exact numeric input for the current location", () => {
   const html = read("apps/webapp/index.html");
-  const uiSource = read("apps/webapp/js/ui-manager.js");
+  const uiSource = read("apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts");
 
   assert.match(
     html,
@@ -1100,7 +1124,7 @@ test("webapp uses an exact numeric input for the current location", () => {
 });
 
 test("webapp routes gallery target changes through navigation orchestration", () => {
-  const appSource = read("apps/webapp/js/app.js");
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
   const handler =
     appSource.match(
       /async\s+handleSetNextTarget\(circle\)[\s\S]*?\n\s*}\n\n\s*\/\*\*/,
@@ -1112,7 +1136,7 @@ test("webapp routes gallery target changes through navigation orchestration", ()
 });
 
 test("webapp advances purchased navigation through orchestration", () => {
-  const appSource = read("apps/webapp/js/app.js");
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
 
   const purchaseHandler =
     appSource.match(
@@ -1125,8 +1149,8 @@ test("webapp advances purchased navigation through orchestration", () => {
 });
 
 test("webapp opens an empty local event/day on a first visit", () => {
-  const appSource = read("apps/webapp/js/app.js");
-  const uiSource = read("apps/webapp/js/ui-manager.js");
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const uiSource = read("apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts");
 
   assert.match(appSource, /CSVデータ未設定。空のイベント・日程で起動しました/);
   assert.doesNotMatch(appSource, /GAS URLを設定してください/);
@@ -1139,8 +1163,8 @@ test("webapp opens an empty local event/day on a first visit", () => {
 });
 
 test("webapp brings manually opened settings into view", () => {
-  const appSource = read("apps/webapp/js/app.js");
-  const uiSource = read("apps/webapp/js/ui-manager.js");
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const uiSource = read("apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts");
 
   assert.match(
     appSource,
@@ -1245,13 +1269,13 @@ test("webapp target view model exposes the source sheet name", () => {
 
 test("webapp renders spreadsheet and source-sheet titles in compact labels", () => {
   const html = read("apps/webapp/index.html");
-  const dataManagerSource = read("apps/webapp/js/data-manager.ts");
-  const uiSource = read("apps/webapp/js/ui-manager.js");
+  const dataManagerSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const uiSource = read("apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts");
 
   assert.match(html, /id="spreadsheet-title"/);
   assert.match(html, /id="target-sheet-name"/);
   assert.match(dataManagerSource, /spreadsheetTitle/);
-  assert.match(dataManagerSource, /spreadsheetTitle/);
+  assert.match(dataManagerSource, /getSpreadsheetTitle/);
   assert.match(uiSource, /updateSpreadsheetTitle/);
   assert.match(uiSource, /viewModel\.sheetNameLabel/);
 });
@@ -1267,10 +1291,10 @@ test("webapp typography uses mincho as the primary UI font", () => {
 
 test("webapp map manifest references one complete fictional bundle per area", () => {
   assert.deepEqual(
-    Config.AREAS.map((area) => area.id),
+    runtimeMapAreaCatalog.getAllMapAreas().map((area) => area.id),
     ["demo-east", "demo-west"],
   );
-  Config.AREAS.forEach((area) => {
+  runtimeMapAreaCatalog.getAllMapAreas().forEach((area) => {
     assert.equal(area.mapId, area.id);
     assert.equal(
       area.mapFile,
@@ -1295,7 +1319,7 @@ test("webapp map manifest references one complete fictional bundle per area", ()
 });
 
 test("webapp demo image, points, portals, and grid share one coordinate system", () => {
-  Config.AREAS.forEach((area) => {
+  runtimeMapAreaCatalog.getAllMapAreas().forEach((area) => {
     const assetBase = `apps/webapp/map-bundles/demo-v1/${area.id}`;
     const webImagePath = `${assetBase}/source.png`;
     const points = JSON.parse(read(`${assetBase}/points.json`));
@@ -1343,7 +1367,9 @@ test("webapp demo image, points, portals, and grid share one coordinate system",
 
 test("webapp navigation map renders the configured map image", () => {
   const html = read("apps/webapp/index.html");
-  const mapRenderer = read("apps/webapp/js/map-renderer.js");
+  const mapRenderer = read(
+    "apps/webapp/js/features/route-guidance/ui/dom-route-map-view.ts",
+  );
 
   assert.match(html, /id="navigation-map-image"/);
   assert.match(mapRenderer, /navigationMapImage/);
@@ -1351,29 +1377,68 @@ test("webapp navigation map renders the configured map image", () => {
   assert.match(mapRenderer, /classList\.remove\(["']hidden["']\)/);
 });
 
-test("webapp validates the map manifest before constructing App", () => {
-  const appSource = read("apps/webapp/js/app.js");
+test("webapp initializes the injected map catalog before binding the manifest", () => {
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
   const loadIndex = appSource.indexOf(
     "await loadRuntimeMapBundleManifestFromUrl",
   );
   const initializeIndex = appSource.indexOf(
-    "Config.initializeAreas",
+    "existingApp.routeMapAreaCatalog.initializeMapAreas",
     loadIndex,
   );
-  const constructIndex = appSource.indexOf("new App()", initializeIndex);
+  const initializeBindingIndex = appSource.indexOf(
+    "await existingApp.init(",
+    initializeIndex,
+  );
 
   assert.ok(loadIndex >= 0);
   assert.ok(initializeIndex > loadIndex);
-  assert.ok(constructIndex > initializeIndex);
+  assert.ok(initializeBindingIndex > initializeIndex);
   assert.match(
     appSource,
     /catch\s*\(error\)[\s\S]*renderMapBootstrapError\(document,\s*error\)/,
   );
 });
 
+test("webapp injects route guidance and delegates the start flow to its controller", () => {
+  const assemblySource = read(
+    "apps/webapp/js/app/assemble-comipath-application.ts",
+  );
+  const bindingSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const controllerIndex = assemblySource.indexOf(
+    "const routeGuidanceController = new RouteGuidanceController",
+  );
+  const bindingIndex = assemblySource.indexOf(
+    "browserRuntime = new BrowserEventBinding({",
+    controllerIndex,
+  );
+  const dependenciesIndex = assemblySource.indexOf(
+    "routeGuidanceDependencies: {",
+    bindingIndex,
+  );
+  const startFlowStart = bindingSource.indexOf("searchNext(startSpace");
+  const startFlow = bindingSource.slice(
+    startFlowStart,
+    bindingSource.indexOf("\n  searchNextDevDemo(", startFlowStart),
+  );
+
+  assert.ok(controllerIndex >= 0);
+  assert.ok(bindingIndex > controllerIndex);
+  assert.ok(dependenciesIndex > bindingIndex);
+  assert.match(
+    assemblySource.slice(dependenciesIndex, assemblySource.indexOf("eventDayDependencies", dependenciesIndex)),
+    /routeGuidanceController,/
+  );
+  assert.match(
+    startFlow,
+    /await this\.routeGuidanceController\.startFromCurrentLocation\(\{[\s\S]*eventDay:[\s\S]*startPosition,[\s\S]*pendingCircles: candidates,/,
+  );
+  assert.doesNotMatch(startFlow, /startRouteGuidanceUseCase/);
+});
+
 test("webapp map rendering avoids a permanently low-resolution transform layer", () => {
   const css = read("apps/webapp/css/target.css");
-  const gestureHelper = read("apps/webapp/js/utils/gesture-helper.js");
+  const gestureHelper = read("apps/webapp/js/utils/gesture-zoom-controller.js");
 
   assert.doesNotMatch(css, /will-change:\s*transform/);
   assert.doesNotMatch(
@@ -1384,7 +1449,9 @@ test("webapp map rendering avoids a permanently low-resolution transform layer",
 });
 
 test("webapp navigation map loads the configured point index for pins", () => {
-  const mapRenderer = read("apps/webapp/js/map-renderer.js");
+  const mapRenderer = read(
+    "apps/webapp/js/features/route-guidance/ui/dom-route-map-view.ts",
+  );
 
   assert.match(mapRenderer, /loadPointIndex/);
   assert.match(mapRenderer, /fetch\(area\.pointsFile\)/);
@@ -1396,7 +1463,9 @@ test("webapp navigation map loads the configured point index for pins", () => {
 });
 
 test("webapp navigation map load listener is guarded across repeated init calls", () => {
-  const mapRenderer = read("apps/webapp/js/map-renderer.js");
+  const mapRenderer = read(
+    "apps/webapp/js/features/route-guidance/ui/dom-route-map-view.ts",
+  );
 
   assert.match(mapRenderer, /navigationMapImageLoadListenerAttached/);
   assert.match(mapRenderer, /!this\.navigationMapImageLoadListenerAttached/);

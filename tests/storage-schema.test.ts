@@ -1,4 +1,8 @@
 import { describe, expect, test } from "vitest";
+import type {
+  DataSource,
+  LocalEventDayState,
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import {
   createEmptyEventDayState,
   getCircleVisitState,
@@ -6,10 +10,6 @@ import {
   StorageSchemaError,
   transitionCircleVisitState,
 } from "../apps/webapp/js/state/storage-schema";
-import type {
-  DataSource,
-  LocalEventDayState,
-} from "../apps/webapp/js/types/domain";
 
 describe("Storage Schema Version 1", () => {
   const validCsvSource: DataSource = {

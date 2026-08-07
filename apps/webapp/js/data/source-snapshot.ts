@@ -1,4 +1,4 @@
-import type { LocalEventDayState } from "../types/domain";
+import type { LocalEventDayState } from "../features/event-day/domain/application-contract-types";
 
 function fnv1aHash(str: string): string {
   let hash = 0x811c9dc5;

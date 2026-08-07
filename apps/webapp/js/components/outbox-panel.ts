@@ -1,12 +1,12 @@
 import { html, LitElement, type PropertyValues } from "lit";
-import type { EventDayRef } from "../types/domain";
-import { DialogFocusController } from "../ui/dialog-focus";
-import { dispatchManagementEvent } from "../ui/management-events";
+import type { EventDayRef } from "../features/event-day/domain/application-contract-types";
+import { dispatchManagementEvent } from "../shared/ui/management-events";
 import type {
   OutboxEntryViewModel,
   OutboxPanelGroupViewModel,
   OutboxPanelModel,
-} from "../ui/management-view-model";
+} from "../shared/ui/management-view-model";
+import { DialogFocusController } from "../ui/dialog-focus";
 
 /**
  * Component for displaying pending GAS outbox queues, initiating manual retries,

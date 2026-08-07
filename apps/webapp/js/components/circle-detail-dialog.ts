@@ -1,5 +1,8 @@
 import { css, html, LitElement, type PropertyValues } from "lit";
-import type { CircleRecord, CircleVisitState } from "../types/domain";
+import type {
+  CircleRecord,
+  CircleVisitState,
+} from "../features/event-day/domain/application-contract-types";
 import {
   type AvailableCircleActions,
   type CircleActionType,

@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   applySourceDiff,
   diffCircleSources,
-} from "../apps/webapp/js/data/source-diff";
+} from "../apps/webapp/js/features/circle-data-source/public-api";
 import type {
   CircleRecord,
   LocalEventDayState,
-} from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 
 describe("source-diff", () => {
   const dummyCircle1: CircleRecord = {

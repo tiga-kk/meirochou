@@ -1,14 +1,14 @@
 // @vitest-environment happy-dom
 import { describe, expect, test } from "vitest";
+import type {
+  ConfirmedPosition,
+  NavigationState,
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import {
   LocalStorageNavigationSnapshotRepository,
   type NavigationSnapshot,
   validateSnapshotForResume,
-} from "../apps/webapp/js/state/navigation-snapshot-repository";
-import type {
-  ConfirmedPosition,
-  NavigationState,
-} from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/route-guidance/infrastructure/local-storage-route-guidance-snapshot-repository";
 
 const samplePosition: ConfirmedPosition = {
   areaId: "east",

@@ -1,6 +1,6 @@
 import { html, LitElement, nothing, type PropertyValues } from "lit";
-import { dispatchManagementEvent } from "../ui/management-events";
-import type { EventDayOption } from "../ui/management-view-model";
+import { dispatchManagementEvent } from "../shared/ui/management-events";
+import type { EventDayOption } from "../shared/ui/management-view-model";
 
 export class EventDaySelector extends LitElement {
   static properties = {

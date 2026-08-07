@@ -1,14 +1,14 @@
+import type {
+  GasCircleResponse,
+  GasSaleUpdate,
+  GasSheetListResponse,
+} from "../features/event-day/domain/application-contract-types";
 import {
   BoundaryValidationError,
   parseGasCircleResponse,
   parseGasSaleResponse,
   parseGasSheetListResponse,
-} from "../types/boundary-parsers";
-import type {
-  GasCircleResponse,
-  GasSaleUpdate,
-  GasSheetListResponse,
-} from "../types/domain";
+} from "../features/event-day/infrastructure/application-boundary-parsers";
 
 export interface GasApiClientOptions {
   readonly fetcher?: typeof fetch;

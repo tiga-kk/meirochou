@@ -1,10 +1,10 @@
 // @vitest-environment node
 import { describe, expect, test } from "vitest";
-import type { DistanceMatrixJobInput } from "../apps/webapp/js/routing/distance-matrix";
+import type { DistanceMatrixJobInput } from "../apps/webapp/js/features/route-guidance/domain/routing/distance-matrix";
 import {
   DistanceMatrixWorkerKernel,
   type DistanceMatrixWorkerMessage,
-} from "../apps/webapp/js/routing/distance-matrix-worker-kernel";
+} from "../apps/webapp/js/features/route-guidance/domain/routing/distance-matrix-worker-kernel";
 
 /** 1x2グリッド: 2つのwalkableセル */
 function make1x2Grid(): {

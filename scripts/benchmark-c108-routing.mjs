@@ -105,7 +105,9 @@ async function benchmarkInBrowser(page, serverUrl, input) {
       warmupCount,
       runCount,
     }) => {
-      const { buildDistanceMap } = await import("/js/route-planner.ts");
+      const { buildDistanceMap } = await import(
+        "/js/features/route-guidance/domain/routing/grid-route-planner.ts"
+      );
       const percentile = (numbers, percentileValue) => {
         const sorted = [...numbers].sort((a, b) => a - b);
         const index = (percentileValue / 100) * (sorted.length - 1);
