@@ -12,6 +12,7 @@
 - CSS redesign
 - Lit componentの全面書き換え
 - business stateをViewへ移すこと
+- render-only Viewへ形式的な`start()`/`stop()` lifecycleを追加すること
 
 ## 前提と依存関係
 
@@ -72,7 +73,8 @@ Task 3完了後に実施する。Viewが`EventDayDataStore`を受け取らず、
 7. `DomRouteMapView`がTask 1で移動したRoute Guidance moduleだけをimportするようにする。root `route-planner.ts`等へ戻さない。
 8. DOM event callbackは各ControllerまたはTask 5のbrowser bindingへ渡す。ViewがUse Caseを直接生成しない。
 9. production assemblyで必要なroot elementを一度取得してconcrete Viewへ渡す。各renderごとに全画面を再lookupする構造を増やさない。
-10. coordinatorのdelegation callerをすべてView/Controllerへ切り替え、旧fileを削除する。
+10. listenerやtimerを実際に所有するViewだけに対応するcleanupを持たせる。描画だけを行うViewへ形式的な`start()`/`stop()`を追加しない。page/global eventの一括lifecycleはTask 5でbrowser bindingへ移す。
+11. coordinatorのdelegation callerをすべてView/Controllerへ切り替え、旧fileを削除する。
 
 ## テスト方針
 
@@ -85,7 +87,9 @@ happy-dom等で、各View単位に次を確認する。
 - source/settings state
 - event/day selectorとlocal deletion
 - notification timerのcleanup
-- `stop()`後のlistener/timer cleanupと再start時の二重登録防止
+- listener/timerを実際に所有するViewについてだけ、cleanup後に残存処理や二重登録がないこと
+
+page/global eventのstop→start lifecycleはTask 5の`bind-browser-events.ts`とapplication lifecycleで検証する。このタスクで全Viewへlifecycle interfaceを追加しない。
 
 `ComiPathDomCoordinator`のmethodを直接呼ぶ互換testは残さない。
 
@@ -112,6 +116,7 @@ git diff --check
 - production Viewが`EventDayDataStore`、Repository、GAS client、Worker optimizerを直接参照しない。
 - route/circle/source/event-day/deletionのDOM責務が対応featureから追える。
 - toast timerやDOM listenerのownerが重複していない。
+- render-only Viewへ不要なlifecycle abstractionを追加していない。
 - coordinatorと同等の巨大な汎用UI classを別名で作っていない。
 - DOM ID、ARIA、focus、主要表示内容を意図的に変更していない。
 - focused tests、webapp tests、architecture check、buildが成功する。
