@@ -20,9 +20,15 @@
 - `tests/architecture-boundaries.test.mjs`: Task 8完了後に必要となるarchitecture ruleのfixtureを先行追加した。
 - `tests/browser-binding-ownership.test.ts`: 最終ownership契約と、未作成の`complete-circle-visit.ts`を前提とするtestを先行追加した。
 
-一方、Task 8の中心であるcomposition rootへのdependency assembly移管、Route Guidance workflow移管、`complete-circle-visit.ts`作成、architecture checker本体のrule追加は未実装である。このため現WIPではfocused architecture/ownership testと`typecheck:webapp`が失敗する。
+一方、Task 8の中心であるcomposition rootへのdependency assembly移管、Route Guidance workflow移管、`complete-circle-visit.ts`作成、architecture checker本体のrule追加は未実装である。Stage 8A開始前のWIPではfocused architecture/ownership testと`typecheck:webapp`が失敗していた。
 
-再開時は、上記WIPのred testや型エラーを単独でGREEN化することから始めない。`docs/plans/phase-05d/task-08-repair-browser-binding-ownership.md`の「WIP再開時の段階ゲート」に従い、最初の一回はStage 8Aだけを実行する。
+再開時は、上記WIPのred testや型エラーを単独でGREEN化することから始めない。`docs/plans/phase-05d/task-08-repair-browser-binding-ownership.md`の「WIP再開時の段階ゲート」に従い、Stage 8Aから一つずつ実行する。
+
+### Stage 8Aの状態
+
+Stage 8Aは完了した。WIPで先行追加された型注釈、ownership test、architecture fixtureだけを戻し、WIPコミット`24cf35f`は履歴へ保持している。`npm run verify:webapp`と`git diff --check`が成功している。
+
+次はStage 8B（既存composition rootと重複する非Route Guidance組立ての移管）であり、Stage 8Aの完了確認なしに着手しない。
 
 ## 現在までに実装済みの主要部分
 

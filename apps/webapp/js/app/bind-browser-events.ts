@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import "../components/comipath-settings";
 import "../components/navigation-resume-dialog";
 import "../components/source-diff-dialog";
@@ -57,7 +59,7 @@ import {
 } from "../shared/ui/management-view-model";
 
 /** Validates an event/day reference at the BrowserEventBinding's DOM event boundary. */
-function isEventDayRef(value: any) {
+function isEventDayRef(value) {
   return Boolean(
     value &&
       typeof value === "object" &&
@@ -68,7 +70,7 @@ function isEventDayRef(value: any) {
   );
 }
 
-function isDeleteScope(value: any) {
+function isDeleteScope(value) {
   if (!value || typeof value !== "object") return false;
   if (value.type === "all-events") return true;
   return (
@@ -79,7 +81,7 @@ function isDeleteScope(value: any) {
   );
 }
 
-function sameEventDayRef(left: any, right: any) {
+function sameEventDayRef(left, right) {
   return Boolean(
     left &&
       right &&
@@ -88,7 +90,7 @@ function sameEventDayRef(left: any, right: any) {
   );
 }
 
-function findAreaForSpace(space: any) {
+function findAreaForSpace(space) {
   if (!space || typeof space !== "string") return null;
 
   const cleanedSpace = space.trim();
@@ -102,12 +104,12 @@ function findAreaForSpace(space: any) {
       .getAllMapAreas()
       .find(
         (area) =>
-          area.prefixes?.includes(prefixChar) && area.labels?.includes(labelChar),
+          area.prefixes.includes(prefixChar) && area.labels.includes(labelChar),
       ) || null
   );
 }
 
-function areSpacesInSameArea(spaceA: any, spaceB: any) {
+function areSpacesInSameArea(spaceA, spaceB) {
   const areaA = findAreaForSpace(spaceA);
   const areaB = findAreaForSpace(spaceB);
   return Boolean(areaA && areaB && areaA.id === areaB.id);
@@ -119,9 +121,7 @@ const DEFAULT_NAVIGATION_OPTIMIZATION_TIME_LIMIT_MS = 10000;
  * アプリケーションのメインコントローラー
  */
 export class BrowserEventBinding {
-  [key: string]: any;
-
-  constructor(options: any = {}) {
+  constructor(options = {}) {
     this.started = false;
     this.stopped = false;
     this.ownedWorkers = new Set();

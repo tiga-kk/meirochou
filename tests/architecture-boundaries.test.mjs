@@ -100,38 +100,6 @@ describe("webapp architecture boundaries", () => {
     expect(result.violations).toEqual([]);
   });
 
-  it("rejects non-composition app modules that own infrastructure", () => {
-    const result = scanFixture({
-      "app/bind-browser-events.ts": `
-        import { Repository } from "./infrastructure/repository";
-        const saved = localStorage.getItem("saved");
-        const worker = new Worker("worker.js");
-        void saved;
-        void worker;
-      `,
-    });
-
-    expect(result.violations.map((item) => item.ruleId)).toEqual(
-      expect.arrayContaining([
-        "application-imports-concrete-infrastructure",
-        "application-uses-local-storage",
-        "application-creates-worker",
-      ]),
-    );
-  });
-
-  it("allows browser event binding and feature public api imports in app modules", () => {
-    const result = scanFixture({
-      "app/bind-browser-events.ts": `
-        import type { CircleStatus } from "../features/circle-status/public-api";
-        window.addEventListener("click", () => document.body);
-        void (null as CircleStatus | null);
-      `,
-    });
-
-    expect(result.violations).toEqual([]);
-  });
-
   it("rejects cross-feature deep imports", () => {
     const result = scanFixture({
       "features/event-day/use-cases/switch-event-day.ts":
