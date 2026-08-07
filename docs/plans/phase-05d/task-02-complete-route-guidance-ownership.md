@@ -24,8 +24,11 @@ Task 1完了後に実施する。Route Guidance固有algorithm、route/grid型�
 - `docs/plans/phase-05d/task-01-consolidate-route-guidance-modules.md`
 - `apps/webapp/js/features/route-guidance/domain/route-guidance-types.ts`
 - `apps/webapp/js/features/route-guidance/domain/routing/grid-route-types.ts`
+- `apps/webapp/js/features/route-guidance/domain/map-area.ts`
 - `apps/webapp/js/features/route-guidance/use-cases/route-guidance-session.ts`
 - `apps/webapp/js/features/route-guidance/use-cases/route-map-assets-loader.ts`
+- `apps/webapp/js/features/route-guidance/infrastructure/http-route-map-assets-loader.ts`
+- `apps/webapp/js/features/route-guidance/infrastructure/runtime-map-area-catalog.ts`
 - `apps/webapp/js/features/route-guidance/use-cases/start-route-guidance.ts`
 - `apps/webapp/js/features/route-guidance/use-cases/resume-route-guidance.ts`
 - `apps/webapp/js/features/route-guidance/use-cases/change-destination.ts`
@@ -54,6 +57,7 @@ Task 1完了後に実施する。Route Guidance固有algorithm、route/grid型�
 - `apps/webapp/js/features/route-guidance/domain/route-guidance-types.ts`
 - `apps/webapp/js/features/route-guidance/use-cases/route-guidance-session.ts`
 - `apps/webapp/js/features/route-guidance/use-cases/route-map-assets-loader.ts`
+- `apps/webapp/js/features/route-guidance/infrastructure/http-route-map-assets-loader.ts`
 - `apps/webapp/js/features/route-guidance/use-cases/start-route-guidance.ts`
 - `apps/webapp/js/features/route-guidance/use-cases/resume-route-guidance.ts`
 - `apps/webapp/js/features/route-guidance/use-cases/change-destination.ts`
@@ -81,20 +85,22 @@ Task 1完了後に実施する。Route Guidance固有algorithm、route/grid型�
 2. Task 1で正本化したgrid route resultを、Sessionの`currentRoute`/`selectedRoute`でも同じruntime shapeのまま使う。現在`route-guidance-types.ts`にある`path`/`distance`だけの別`RouteResult`をproduction routeの正本として残さず、`cost`、`cells`、`points`、`startPosition`、`targetPosition`、`image`を持つ実際の経路形状と一本化する。`route-guidance-session.ts`のfreeze/copy処理もその正本に合わせ、描画に必要なgeometryを失うadapterを挟まない。
 3. `ComiPathBrowserRuntime`のcurrent/selected destination、current/selected route、selection status、optimization generationは既存`RouteGuidanceSessionSnapshot`へ集約する。`nextTarget`のように`bestOrder`とcurrent targetから決定的に導出できる表示値はscreen modelで導出し、同期用mutable copyをSessionへ増やさない。selection message等の純粋な表示文言もdomain stateにしない。
 4. route assets cache、distance matrix参照、resume snapshot、optimization time limit等、Session外に残す値にもownerを一つずつ決める。browser runtimeのfieldとfeature infrastructure/use-caseの両方で同じ値を同期保持しない。
-5. `StartRouteGuidanceUseCase`へproduction startの処理順序を移す。少なくとも、対象area確定→map assets取得→始点から各pending circleへのgrid distance算出→到達可能な最寄りtarget決定→第一leg固定→targetへのroute再構築成功確認→Session commitの順を保つ。route再構築に失敗した場合、部分的なnavigation stateをSessionへcommitしない。pendingが0件ならidleとして扱う既存production semanticsを維持する。
-6. resume、destination change、arrival/finish、optimized order適用、invalidateの処理順序を対応する既存Use Caseへ移す。generic orchestration classの別名移植はしない。第一legをoptimizer resultで上書きしない、stale generationを無視する等の既存制約を保つ。
-7. distance matrix生成の調整だけを`build-distance-matrix.ts`へ移し、計算本体はTask 1で移動したpure moduleを呼ぶ。
-8. snapshotの保存・復元・削除を`RouteGuidanceSnapshotRepository` contract経由に統一し、LocalStorage keyはconcrete repositoryだけが知るようにする。
-9. ALNS Workerの生成、cancel、generationによるstale result拒否を`WebWorkerRouteOptimizer`へ集約する。Sessionへ`Worker` objectそのものを保持しない。
-10. `RouteGuidanceController`にproduction操作として不足しているdestination選択、比較、確定/取消、current circle完了、reset、time limit等を、既存Use Caseを呼ぶ薄いoperationとして追加する。
-11. `ComiPathBrowserRuntime`の同名処理はController/Use Caseへdelegateするだけに縮め、移管済みstateをruntime側で同期コピーしない。
-12. root navigation/controller/snapshot filesへのimportを0件にして削除する。
+5. productionで使う`RouteMapAssetsLoader`を現在のmanifest/map-area contractへ接続する。現行`HttpRouteMapAssetsLoader`の`/maps/c108-${areaId}-points.json`等の固定URLはfeature骨格用で、production runtimeが使うmanifestの`pointsFile`、`gridMetaFile`、`gridFile`とは一致しない。`MapAreaCatalog`または同等のdomain contractから対象areaのasset URLを得て、既存productionと同じresourceを読むようにする。C108固定URLを新しい正本にしたり、Use Caseから`runtimeMapAreaCatalog`を直接importしたりしない。
+6. `StartRouteGuidanceUseCase`へproduction startの処理順序を移す。少なくとも、対象area確定→map assets取得→始点から各pending circleへのgrid distance算出→到達可能な最寄りtarget決定→第一leg固定→targetへのroute再構築成功確認→Session commitの順を保つ。route再構築に失敗した場合、部分的なnavigation stateをSessionへcommitしない。pendingが0件ならidleとして扱う既存production semanticsを維持する。
+7. resume、destination change、arrival/finish、optimized order適用、invalidateの処理順序を対応する既存Use Caseへ移す。generic orchestration classの別名移植はしない。第一legをoptimizer resultで上書きしない、stale generationを無視する等の既存制約を保つ。
+8. distance matrix生成の調整だけを`build-distance-matrix.ts`へ移し、計算本体はTask 1で移動したpure moduleを呼ぶ。
+9. snapshotの保存・復元・削除を`RouteGuidanceSnapshotRepository` contract経由に統一し、LocalStorage keyはconcrete repositoryだけが知るようにする。
+10. ALNS Workerの生成、cancel、generationによるstale result拒否を`WebWorkerRouteOptimizer`へ集約する。Sessionへ`Worker` objectそのものを保持しない。
+11. `RouteGuidanceController`にproduction操作として不足しているdestination選択、比較、確定/取消、current circle完了、reset、time limit等を、既存Use Caseを呼ぶ薄いoperationとして追加する。
+12. `ComiPathBrowserRuntime`の同名処理はController/Use Caseへdelegateするだけに縮め、移管済みstateをruntime側で同期コピーしない。
+13. root navigation/controller/snapshot filesへのimportを0件にして削除する。
 
 ## テスト方針
 
 主に次を直接検証する。
 
 - Session snapshotだけからcurrent/selected route状態を、実際のgrid route geometryを失わず再現できる。
+- production assemblyで使うRoute Map Assets loaderがactive manifest/map-areaに記載された`pointsFile`、`gridMetaFile`、`gridFile`を取得し、旧`/maps/c108-*`固定pathへ依存しない。
 - source配列の先頭より近い別candidateがあるfixtureで、production startがgrid distance最小の到達可能candidateを選び、第一legを固定する。既存骨格の「先頭要素を選ぶ」実装のままなら失敗するtestにする。
 - route再構築失敗時にSessionが半端なnavigating stateへ更新されない。
 - start/resume/change/finishの各Use Caseが期待する状態遷移を行う。
@@ -123,6 +129,7 @@ git diff --check
 
 - Route Guidanceのmutable stateを追う入口が`RouteGuidanceSession`に一本化されている。
 - productionで描画するgrid route resultとSessionが保持するroute型が一本化され、lossyな二重表現がない。
+- production Route Map Assets loaderがactive manifest/map-areaのasset URLを使い、C108固定pathを正本にしていない。
 - production startの最寄りcandidate選択、第一leg固定、route再構築失敗時の非commitがfeature Use Caseで維持されている。
 - `NavigationOrchestrationService`と`NavigationRuntimeController`が存在しない。
 - `ComiPathBrowserRuntime`がroute state、Worker generation、snapshot stateを正本として持たない。
