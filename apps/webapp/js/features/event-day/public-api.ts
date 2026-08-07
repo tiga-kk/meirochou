@@ -4,6 +4,7 @@ export type {
   Circle,
   CircleRecord,
   CircleStatus,
+  CircleVisitState,
   DataSource,
   EventDayRef,
   GasDataSource,
@@ -11,10 +12,10 @@ export type {
   LocalEventDayState,
   MapPoint,
 } from "./domain/event-day-types";
+export * from "./ui/dom-event-day-selector-view";
 export * from "./ui/event-day-selector-controller";
 export * from "./ui/event-day-selector-model";
 export * from "./ui/event-day-selector-view";
-export * from "./ui/dom-event-day-selector-view";
 export {
   type ActiveEventDayReader,
   createActiveEventDayReader,

@@ -11,6 +11,18 @@ function normalizeMapAreas(
       displayName: typeof area.name === "string" ? area.name : area.displayName,
       prefixes: Array.isArray(area.prefixes) ? area.prefixes : [],
       labels: Object.freeze(Array.isArray(area.labels) ? area.labels : []),
+      assets:
+        area.assets && typeof area.assets === "object"
+          ? area.assets
+          : typeof area.pointsFile === "string" &&
+              typeof area.gridMetaFile === "string" &&
+              typeof area.gridFile === "string"
+            ? {
+                points: area.pointsFile,
+                gridMeta: area.gridMetaFile,
+                grid: area.gridFile,
+              }
+            : undefined,
     }),
   ) as readonly MapArea[];
 }

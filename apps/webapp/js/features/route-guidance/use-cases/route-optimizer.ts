@@ -21,6 +21,12 @@ export interface RouteOptimizer {
   ): RouteOptimizationRun;
 }
 
+export interface AlnsWorkerPort {
+  onmessage: ((event: MessageEvent<unknown>) => void) | null;
+  postMessage(message: unknown): void;
+  terminate?(): void;
+}
+
 export interface RouteOptimizationProblem {
   readonly nodeIds: readonly string[];
   readonly travelTimesSec: readonly number[];

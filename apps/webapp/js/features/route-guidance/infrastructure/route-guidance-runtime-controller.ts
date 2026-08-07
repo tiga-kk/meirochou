@@ -1,19 +1,17 @@
-import type {
-  CircleVisitState,
-  NavigationState,
-} from "../features/event-day/domain/application-contract-types";
-import type { LocalStorageDistanceMatrixRepository } from "../features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
-import { parseTimeDecayedAlnsWorkerResponse } from "../features/route-guidance/infrastructure/worker/alns-worker-protocol";
+import type { CircleVisitState } from "../../event-day/public-api";
+import type { NavigationState } from "../domain/route-guidance-types";
 import {
   buildOptimizationProblem,
   type OptimizationProblemInput,
-} from "../features/route-guidance/use-cases/build-route-optimization-problem";
+} from "../use-cases/build-route-optimization-problem";
+import type { RouteGuidanceNavigationOperations } from "../use-cases/route-guidance-navigation-operations";
+import type { LocalStorageDistanceMatrixRepository } from "./local-storage-distance-matrix-repository";
 import {
-  type LocalStorageNavigationSnapshotRepository,
+  type LocalStorageRouteGuidanceSnapshotRepository,
   type NavigationSnapshot,
   validateSnapshotForResume,
-} from "../state/navigation-snapshot-repository";
-import type { NavigationOrchestrationService } from "./navigation-orchestration";
+} from "./local-storage-route-guidance-snapshot-repository";
+import { parseTimeDecayedAlnsWorkerResponse } from "./worker/alns-worker-protocol";
 
 export interface AlnsWorkerPort {
   onmessage: ((event: MessageEvent<unknown>) => void) | null;
@@ -22,9 +20,9 @@ export interface AlnsWorkerPort {
 }
 
 export interface ControllerDependencies {
-  readonly snapshotRepo: LocalStorageNavigationSnapshotRepository;
+  readonly snapshotRepo: LocalStorageRouteGuidanceSnapshotRepository;
   readonly matrixRepo: LocalStorageDistanceMatrixRepository;
-  readonly orchestration: NavigationOrchestrationService;
+  readonly orchestration: RouteGuidanceNavigationOperations;
   readonly workerFactory?: () => AlnsWorkerPort;
 }
 
@@ -59,10 +57,10 @@ export interface LaunchOptimizationInput extends OptimizationProblemInput {
   readonly navState: NavigationState;
 }
 
-export class NavigationRuntimeController {
-  private readonly snapshotRepo: LocalStorageNavigationSnapshotRepository;
+export class RouteGuidanceRuntimeController {
+  private readonly snapshotRepo: LocalStorageRouteGuidanceSnapshotRepository;
   private readonly matrixRepo: LocalStorageDistanceMatrixRepository;
-  private readonly orchestration: NavigationOrchestrationService;
+  private readonly orchestration: RouteGuidanceNavigationOperations;
   private readonly workerFactory: () => AlnsWorkerPort;
   private worker: AlnsWorkerPort | null = null;
   private currentJobId: string | null = null;
@@ -75,18 +73,12 @@ export class NavigationRuntimeController {
     this.workerFactory =
       deps.workerFactory ??
       (() =>
-        new Worker(
-          new URL(
-            "../features/route-guidance/infrastructure/worker/alns-worker.ts",
-            import.meta.url,
-          ),
-          {
-            type: "module",
-          },
-        ));
+        new Worker(new URL("./worker/alns-worker.ts", import.meta.url), {
+          type: "module",
+        }));
   }
 
-  getSnapshotRepo(): LocalStorageNavigationSnapshotRepository {
+  getSnapshotRepo(): LocalStorageRouteGuidanceSnapshotRepository {
     return this.snapshotRepo;
   }
 
@@ -94,7 +86,7 @@ export class NavigationRuntimeController {
     return this.matrixRepo;
   }
 
-  getOrchestration(): NavigationOrchestrationService {
+  getOrchestration(): RouteGuidanceNavigationOperations {
     return this.orchestration;
   }
 
@@ -210,7 +202,7 @@ export class NavigationRuntimeController {
    * 無効なスナップショットは即座にクリアする。
    */
   initStartup(input: StartupInitInput): StartupInitResult {
-    const snapshot = this.snapshotRepo.load(input.eventId, input.dayId);
+    const snapshot = this.snapshotRepo.loadByIds(input.eventId, input.dayId);
     if (!snapshot) {
       return { shouldShowResumeDialog: false, snapshot: null };
     }
@@ -223,7 +215,7 @@ export class NavigationRuntimeController {
     });
 
     if (!isValid) {
-      this.snapshotRepo.clear(input.eventId, input.dayId);
+      this.snapshotRepo.clearByIds(input.eventId, input.dayId);
       return { shouldShowResumeDialog: false, snapshot: null };
     }
 
@@ -259,13 +251,13 @@ export class NavigationRuntimeController {
     dayId: string,
     snapshot: NavigationSnapshot,
   ): void {
-    this.snapshotRepo.save(eventId, dayId, snapshot);
+    this.snapshotRepo.saveByIds(eventId, dayId, snapshot);
   }
 
   /**
    * スナップショットクリアトリガー。
    */
   clearSnapshot(eventId: string, dayId: string): void {
-    this.snapshotRepo.clear(eventId, dayId);
+    this.snapshotRepo.clearByIds(eventId, dayId);
   }
 }

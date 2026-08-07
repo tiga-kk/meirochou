@@ -7,6 +7,13 @@ export interface MapArea {
   readonly name?: string;
   readonly prefixes?: readonly string[];
   readonly labels?: readonly string[];
+  readonly assets?: RouteMapAssetPaths;
+}
+
+export interface RouteMapAssetPaths {
+  readonly points: string;
+  readonly gridMeta: string;
+  readonly grid: string;
 }
 
 export interface MapAreaCatalog {

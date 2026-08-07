@@ -2,9 +2,9 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime.js";
 import { LocalStorageDistanceMatrixRepository } from "../apps/webapp/js/features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
-import { NavigationOrchestrationService } from "../apps/webapp/js/navigation/navigation-orchestration";
-import { NavigationRuntimeController } from "../apps/webapp/js/navigation/navigation-runtime-controller";
-import { LocalStorageNavigationSnapshotRepository } from "../apps/webapp/js/state/navigation-snapshot-repository";
+import { LocalStorageRouteGuidanceSnapshotRepository as LocalStorageNavigationSnapshotRepository } from "../apps/webapp/js/features/route-guidance/infrastructure/local-storage-route-guidance-snapshot-repository";
+import { RouteGuidanceRuntimeController as NavigationRuntimeController } from "../apps/webapp/js/features/route-guidance/infrastructure/route-guidance-runtime-controller";
+import { RouteGuidanceNavigationOperations as NavigationOrchestrationService } from "../apps/webapp/js/features/route-guidance/use-cases/route-guidance-navigation-operations";
 
 describe("Phase 5C Task 11: NavigationRuntimeController", () => {
   beforeEach(() => {

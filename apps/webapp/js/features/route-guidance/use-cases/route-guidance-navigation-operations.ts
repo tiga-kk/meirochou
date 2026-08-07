@@ -1,10 +1,10 @@
+import type { CircleRecord } from "../../event-day/public-api";
 import type {
-  CircleRecord,
   ConfirmedPosition,
   LockedLeg,
+  NavigationState,
   RouteEndpointId,
-} from "../features/event-day/domain/application-contract-types";
-import type { NavigationState } from "../features/route-guidance/domain/navigation-state";
+} from "../domain/route-guidance-types";
 
 export interface StartNavigationInput {
   readonly navState: NavigationState;
@@ -83,7 +83,7 @@ function requireCurrentPosition(navState: NavigationState): ConfirmedPosition {
   return navState.currentPosition;
 }
 
-export class NavigationOrchestrationService {
+export class RouteGuidanceNavigationOperations {
   /**
    * 始点設定直後に最寄り pending 候補を即時 target に採用し navigating 状態へ移行する。
    */

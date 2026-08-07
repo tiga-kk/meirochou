@@ -1074,9 +1074,14 @@ test("webapp route exposes the exact OCR points selected for both endpoint pins"
 
 test("webapp next-target search ranks candidates with grid route assets", () => {
   const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
+  const loaderSource = read(
+    "apps/webapp/js/features/route-guidance/infrastructure/http-route-map-assets-loader.ts",
+  );
 
   assert.match(appSource, /rankCandidatesByGridDistance/);
-  assert.match(appSource, /fetch\(area\.gridFile\)/);
+  assert.match(loaderSource, /this\.fetcher\(url\)/);
+  assert.match(loaderSource, /mapArea\.assets\.grid/);
+  assert.doesNotMatch(loaderSource, /c108-/i);
   assert.match(appSource, /gridDistance/);
 });
 

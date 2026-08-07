@@ -8,7 +8,7 @@ import {
   LocalStorageNavigationSnapshotRepository,
   type NavigationSnapshot,
   validateSnapshotForResume,
-} from "../apps/webapp/js/state/navigation-snapshot-repository";
+} from "../apps/webapp/js/features/route-guidance/infrastructure/local-storage-route-guidance-snapshot-repository";
 
 const samplePosition: ConfirmedPosition = {
   areaId: "east",

@@ -31,7 +31,15 @@ function freezeSnapshot(
     route
       ? Object.freeze({
           ...route,
-          path: Object.freeze([...route.path]),
+          cells: Object.freeze(
+            route.cells.map((cell) => Object.freeze({ ...cell })),
+          ),
+          points: Object.freeze(
+            route.points.map((point) => Object.freeze({ ...point })),
+          ),
+          startPosition: Object.freeze({ ...route.startPosition }),
+          targetPosition: Object.freeze({ ...route.targetPosition }),
+          image: Object.freeze({ ...route.image }),
         })
       : null;
 

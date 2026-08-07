@@ -1,4 +1,5 @@
 import type { Circle, EventDayRef } from "../../event-day/public-api";
+import type { MapAreaCatalog } from "../domain/map-area";
 import type { RouteGuidanceSession } from "../domain/route-guidance-types";
 import type { RouteGuidanceSnapshotRepository } from "./route-guidance-snapshot-repository";
 import type { RouteMapAssetsLoader } from "./route-map-assets-loader";
@@ -13,6 +14,7 @@ export class ResumeRouteGuidanceUseCase {
     private session: RouteGuidanceSession,
     private snapshotRepo: RouteGuidanceSnapshotRepository,
     private assetsLoader: RouteMapAssetsLoader,
+    private mapAreaCatalog?: MapAreaCatalog,
   ) {}
 
   async execute(input: ResumeRouteGuidanceInput): Promise<boolean> {
@@ -27,7 +29,10 @@ export class ResumeRouteGuidanceUseCase {
       return false;
     }
 
-    await this.assetsLoader.loadMapAssets(saved.mapAreaId);
+    const area = this.mapAreaCatalog?.getMapArea(saved.mapAreaId) ?? {
+      areaId: saved.mapAreaId,
+    };
+    await this.assetsLoader.loadMapAssets(area);
 
     const currentDestination =
       input.circles.find((c) => c.space === saved.targetSpace) ?? null;

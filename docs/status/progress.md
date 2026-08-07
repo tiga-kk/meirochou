@@ -8,7 +8,7 @@
 - ブランチ: `feature/phase-05d`
 - 計画再作成前のHEAD: `90528fdab3dd27307edeed51021548d5dc2ef0f6`
 - 現在のフェーズ: Phase 5D リファクタリング完了作業
-- 次に着手するタスク: Task 1
+- 次に着手するタスク: Task 3
 
 ## 現在までに実装済みの主要部分
 
@@ -56,8 +56,8 @@ Phase 5Dは見た目を変更するフェーズではないため、visual snaps
 
 | タスク | 状態 | 概要 |
 |---|---|---|
-| Task 1 | 未着手 | Route Guidance固有モジュールの配置を一本化 |
-| Task 2 | 未着手 | Route Guidanceの状態所有と処理順序をfeatureへ移管 |
+| Task 1 | 完了 | Route Guidance固有モジュールの配置を一本化 |
+| Task 2 | 完了 | Route Guidanceの状態所有と処理順序をfeatureへ移管 |
 | Task 3 | 未着手 | `EventDayDataStore`を削除して既存featureを直接接続 |
 | Task 4 | 未着手 | `ComiPathDomCoordinator`をfeature別Viewへ解体 |
 | Task 5 | 未着手 | `ComiPathBrowserRuntime`を削除しbrowser bindingを明示化 |

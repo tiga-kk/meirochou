@@ -8,7 +8,7 @@ import type {
   LocalEventDayState,
 } from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import { createInitialNavigationState } from "../apps/webapp/js/features/route-guidance/domain/navigation-state";
-import { NavigationOrchestrationService } from "../apps/webapp/js/navigation/navigation-orchestration";
+import { RouteGuidanceNavigationOperations as NavigationOrchestrationService } from "../apps/webapp/js/features/route-guidance/use-cases/route-guidance-navigation-operations";
 import { dispatchManagementEvent } from "../apps/webapp/js/shared/ui/management-events";
 import { createEmptyEventDayState } from "../apps/webapp/js/state/storage-schema";
 

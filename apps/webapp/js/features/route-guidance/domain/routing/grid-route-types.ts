@@ -57,8 +57,8 @@ export interface RouteCell {
 
 export interface RouteResult {
   cost: number;
-  cells: RouteCell[];
-  points: MapPoint[];
+  cells: readonly RouteCell[];
+  points: readonly MapPoint[];
   startPosition: MapPoint;
   targetPosition: MapPoint;
   image: { width: number; height: number };

@@ -1,4 +1,5 @@
 import type { Circle } from "../../event-day/public-api";
+import type { RouteResult } from "./routing/grid-route-types";
 
 export type {
   GridMeta,
@@ -44,15 +45,13 @@ export interface NavigationState {
 
 export type SelectionStatus =
   | "idle"
+  | "loading"
   | "calculating"
   | "ready"
   | "comparing"
   | "error";
 
-export interface RouteGuidanceRoute {
-  readonly path: readonly { x: number; y: number }[];
-  readonly distance: number;
-}
+export type RouteGuidanceRoute = RouteResult;
 
 export interface RouteGuidanceSessionSnapshot {
   readonly navigationState: NavigationState | null;

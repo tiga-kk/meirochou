@@ -33,11 +33,18 @@ describe("RouteGuidanceSession", () => {
       },
       currentDestination: { space: "A01" } as any,
       currentRoute: {
-        path: [
+        cost: 14,
+        cells: [
+          { col: 0, row: 0 },
+          { col: 1, row: 1 },
+        ],
+        points: [
           { x: 0, y: 0 },
           { x: 10, y: 10 },
         ],
-        distance: 14,
+        startPosition: { x: 0, y: 0 },
+        targetPosition: { x: 10, y: 10 },
+        image: { width: 100, height: 100 },
       },
       selectedDestination: null,
       selectedRoute: null,

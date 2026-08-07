@@ -1,3 +1,4 @@
+import type { MapArea } from "../domain/map-area";
 import type {
   GridMeta,
   PointsPayload,
@@ -10,6 +11,6 @@ export interface RouteMapAssets {
 }
 
 export interface RouteMapAssetsLoader {
-  loadMapAssets(mapAreaId: string): Promise<RouteMapAssets>;
+  loadMapAssets(mapArea: MapArea): Promise<RouteMapAssets>;
   clearCachedMapAssets(mapAreaId?: string): void;
 }

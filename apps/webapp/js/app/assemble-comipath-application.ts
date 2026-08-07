@@ -27,11 +27,11 @@ import { LocalStorageEventDayRepository } from "../features/event-day/infrastruc
 import {
   createActiveEventDayReader,
   createActiveEventDaySession,
+  DomEventDaySelectorView,
   type EventDayRepository,
   EventDaySelectorController,
   type EventDaySelectorView,
   type EventRegistry,
-  DomEventDaySelectorView,
   OpenInitialEventDayUseCase,
   SwitchEventDayUseCase,
 } from "../features/event-day/public-api";
@@ -180,7 +180,7 @@ export function assembleComiPathApplication(
     targetElement: options.targetElement ?? options.document,
     diffDialogElement:
       typeof options.document.getElementById === "function"
-        ? options.document.getElementById("source-diff-dialog") ?? undefined
+        ? (options.document.getElementById("source-diff-dialog") ?? undefined)
         : undefined,
   });
 
@@ -250,5 +250,7 @@ export function assembleComiPathApplication(
     exportCirclesToCsv,
     switchEventDay,
     openInitialEventDay,
+    routeGuidanceController: browserRuntime.routeGuidanceController,
+    routeGuidanceSession: browserRuntime.routeGuidanceSession,
   }) as unknown as StartableApplication & Record<string, unknown>;
 }

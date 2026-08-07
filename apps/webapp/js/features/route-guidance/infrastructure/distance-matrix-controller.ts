@@ -2,19 +2,16 @@ import type {
   DistanceMatrixJobInput,
   DistanceMatrixRepository,
   StoredDistanceMatrix,
-} from "../features/route-guidance/domain/routing/distance-matrix";
+} from "../domain/routing/distance-matrix";
 import type {
   DistanceMatrixWorkerRequest,
   DistanceMatrixWorkerResponse,
-} from "../features/route-guidance/infrastructure/worker/distance-matrix-worker-protocol";
-import { parseDistanceMatrixWorkerResponse } from "../features/route-guidance/infrastructure/worker/distance-matrix-worker-protocol";
+} from "./worker/distance-matrix-worker-protocol";
+import { parseDistanceMatrixWorkerResponse } from "./worker/distance-matrix-worker-protocol";
 
 function createDistanceMatrixWorker(): Worker {
   return new Worker(
-    new URL(
-      "../features/route-guidance/infrastructure/worker/distance-matrix-worker.ts",
-      import.meta.url,
-    ),
+    new URL("./worker/distance-matrix-worker.ts", import.meta.url),
     {
       type: "module",
     },

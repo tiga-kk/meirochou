@@ -20,24 +20,31 @@ import {
   parseSpace,
   solveNearestNeighbor,
 } from "./features/route-guidance/domain/optimization/nearest-neighbor-order";
-import { distancesFromStartToEndpoints } from "./features/route-guidance/domain/routing/distance-matrix";
 import {
   planRoute,
   planRouteFromGridIndex,
   rankCandidatesByGridDistance,
 } from "./features/route-guidance/domain/routing/grid-route-planner";
+import { HttpRouteMapAssetsLoader } from "./features/route-guidance/infrastructure/http-route-map-assets-loader";
 import { LocalStorageDistanceMatrixRepository } from "./features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
+import { LocalStorageRouteGuidanceSnapshotRepository } from "./features/route-guidance/infrastructure/local-storage-route-guidance-snapshot-repository";
+import { RouteGuidanceRuntimeController } from "./features/route-guidance/infrastructure/route-guidance-runtime-controller";
 import { runtimeMapAreaCatalog } from "./features/route-guidance/infrastructure/runtime-map-area-catalog";
 import { buildSpaceFromLocation } from "./features/route-guidance/ui/parse-current-location-form";
-import { NavigationOrchestrationService } from "./navigation/navigation-orchestration";
-import { NavigationRuntimeController } from "./navigation/navigation-runtime-controller";
+import { RouteGuidanceController } from "./features/route-guidance/ui/route-guidance-controller";
+import { ChangeDestinationUseCase } from "./features/route-guidance/use-cases/change-destination";
+import { FinishCurrentCircleUseCase } from "./features/route-guidance/use-cases/finish-current-circle";
+import { InvalidateRouteGuidanceUseCase } from "./features/route-guidance/use-cases/invalidate-route-guidance";
+import { ResumeRouteGuidanceUseCase } from "./features/route-guidance/use-cases/resume-route-guidance";
+import { RouteGuidanceNavigationOperations } from "./features/route-guidance/use-cases/route-guidance-navigation-operations";
+import { createRouteGuidanceSession } from "./features/route-guidance/use-cases/route-guidance-session";
+import { StartRouteGuidanceUseCase } from "./features/route-guidance/use-cases/start-route-guidance";
 import {
   buildDeleteOptions,
   buildEventDayOptions,
   buildOutboxPanelModel,
   formatSourceSummary,
 } from "./shared/ui/management-view-model";
-import { LocalStorageNavigationSnapshotRepository } from "./state/navigation-snapshot-repository";
 
 /** Validates an event/day reference at the ComiPathBrowserRuntime's DOM event boundary. */
 function isEventDayRef(value) {
@@ -107,6 +114,7 @@ export class ComiPathBrowserRuntime {
     this.stopped = false;
     this.ownedWorkers = new Set();
     this.dm = new EventDayDataStore(undefined, options?.dataManagerOptions);
+    this.routeGuidanceSession = createRouteGuidanceSession();
     const baseSession =
       options?.circleDataSourceSession ?? createCircleDataSourceSession();
     this.circleDataSourceController =
@@ -180,16 +188,112 @@ export class ComiPathBrowserRuntime {
       if (this.ui && !this.suppressSessionModelUpdates)
         this.updateManagementModels();
     });
-    this.currentTarget = null;
-    this.currentRoute = null;
+    Object.defineProperties(this, {
+      navigationState: {
+        configurable: true,
+        get: () => this.routeGuidanceSession.getSnapshot().navigationState,
+        set: (value) =>
+          this.routeGuidanceSession.replaceSnapshot({
+            ...this.routeGuidanceSession.getSnapshot(),
+            navigationState: value,
+          }),
+      },
+      currentTarget: {
+        configurable: true,
+        get: () => this.routeGuidanceSession.getSnapshot().currentDestination,
+        set: (value) =>
+          this.routeGuidanceSession.replaceSnapshot({
+            ...this.routeGuidanceSession.getSnapshot(),
+            currentDestination: value,
+          }),
+      },
+      currentRoute: {
+        configurable: true,
+        get: () => this.routeGuidanceSession.getSnapshot().currentRoute,
+        set: (value) =>
+          this.routeGuidanceSession.replaceSnapshot({
+            ...this.routeGuidanceSession.getSnapshot(),
+            currentRoute: value,
+          }),
+      },
+      selectedTarget: {
+        configurable: true,
+        get: () => this.routeGuidanceSession.getSnapshot().selectedDestination,
+        set: (value) =>
+          this.routeGuidanceSession.replaceSnapshot({
+            ...this.routeGuidanceSession.getSnapshot(),
+            selectedDestination: value,
+          }),
+      },
+      selectedRoute: {
+        configurable: true,
+        get: () => this.routeGuidanceSession.getSnapshot().selectedRoute,
+        set: (value) =>
+          this.routeGuidanceSession.replaceSnapshot({
+            ...this.routeGuidanceSession.getSnapshot(),
+            selectedRoute: value,
+          }),
+      },
+      selectionState: {
+        configurable: true,
+        get: () => this.routeGuidanceSession.getSnapshot().selectionStatus,
+        set: (value) =>
+          this.routeGuidanceSession.replaceSnapshot({
+            ...this.routeGuidanceSession.getSnapshot(),
+            selectionStatus: value,
+          }),
+      },
+      nextTarget: {
+        configurable: true,
+        get: () => {
+          const state = this.routeGuidanceSession.getSnapshot().navigationState;
+          const nextSpace = state?.bestOrder.find(
+            (space) => space !== state.targetSpace,
+          );
+          return nextSpace
+            ? this.dm.wantToBuy.find((circle) => circle.space === nextSpace) ||
+                null
+            : null;
+        },
+        set: () => undefined,
+      },
+    });
     this.currentStartSpace = "";
-    this.nextTarget = null;
-    this.selectedTarget = null;
-    this.selectedRoute = null;
-    this.selectionState = "idle";
     this.selectionMessage = "";
     this.selectionToken = 0;
-    this.routeAssetsCache = new Map();
+    this.routeMapAssetsLoader = new HttpRouteMapAssetsLoader();
+    this.startRouteGuidanceUseCase = new StartRouteGuidanceUseCase(
+      this.routeGuidanceSession,
+      runtimeMapAreaCatalog,
+      this.routeMapAssetsLoader,
+      {
+        saveSnapshot: () => {
+          this.saveNavigationSnapshot();
+        },
+      },
+    );
+    const routeGuidanceSnapshotRepository = {
+      loadSnapshot: () => null,
+      saveSnapshot: () => this.saveNavigationSnapshot(),
+      deleteSnapshot: (ref) => this.clearNavigationSnapshot(ref),
+    };
+    this.routeGuidanceController = new RouteGuidanceController({
+      startGuidance: this.startRouteGuidanceUseCase,
+      resumeGuidance: new ResumeRouteGuidanceUseCase(
+        this.routeGuidanceSession,
+        routeGuidanceSnapshotRepository,
+        this.routeMapAssetsLoader,
+        runtimeMapAreaCatalog,
+      ),
+      changeDestination: new ChangeDestinationUseCase(
+        this.routeGuidanceSession,
+      ),
+      finishCircle: new FinishCurrentCircleUseCase(this.routeGuidanceSession),
+      session: this.routeGuidanceSession,
+      invalidateGuidance: new InvalidateRouteGuidanceUseCase(
+        this.routeGuidanceSession,
+      ),
+    });
     this.currentManifest = null;
     this.transitionToken = 0;
     this.isTransitioning = false;
@@ -197,7 +301,6 @@ export class ComiPathBrowserRuntime {
     this.navigationMatrixRef = null;
     this.optimizationTimeLimitMs =
       DEFAULT_NAVIGATION_OPTIMIZATION_TIME_LIMIT_MS;
-    this.navigationState = null;
     this.sourceErrorMessage = "";
     this.outboxResultMessage = "";
     this.outboxErrorMessage = "";
@@ -223,10 +326,10 @@ export class ComiPathBrowserRuntime {
     };
 
     // Phase 5C: Single composition root instances for navigation runtime
-    this.snapshotRepository = new LocalStorageNavigationSnapshotRepository();
+    this.snapshotRepository = new LocalStorageRouteGuidanceSnapshotRepository();
     this.matrixRepository = new LocalStorageDistanceMatrixRepository();
-    this.orchestrationService = new NavigationOrchestrationService();
-    this.navigationRuntimeController = new NavigationRuntimeController({
+    this.orchestrationService = new RouteGuidanceNavigationOperations();
+    this.navigationRuntimeController = new RouteGuidanceRuntimeController({
       snapshotRepo: this.snapshotRepository,
       matrixRepo: this.matrixRepository,
       orchestration: this.orchestrationService,
@@ -287,11 +390,10 @@ export class ComiPathBrowserRuntime {
     return new DeleteLocalDataUseCase(
       this.dm.repository,
       {
-        deleteActivitySnapshot: (ref) =>
-          this.snapshotRepository.clear(ref.eventId, ref.dayId),
+        deleteActivitySnapshot: (ref) => this.snapshotRepository.clear(ref),
         deleteAllRouteData: (ref) => {
           this.matrixRepository.deleteByEventDay(ref.eventId, ref.dayId);
-          this.snapshotRepository.clear(ref.eventId, ref.dayId);
+          this.snapshotRepository.clear(ref);
         },
       },
       {
@@ -1267,52 +1369,28 @@ export class ComiPathBrowserRuntime {
   }
 
   async loadGridRouteAssets(area) {
-    if (!area?.pointsFile || !area?.gridMetaFile || !area?.gridFile)
+    if (!area?.id) {
       return null;
-
-    const cached = this.routeAssetsCache.get(area.id);
-    if (cached !== undefined) return cached;
-
-    const loadPromise = Promise.all([
-      fetch(area.pointsFile).then((response) => {
-        if (!response.ok) {
-          throw new Error(
-            `Failed to load ${area.pointsFile}: ${response.status}`,
-          );
-        }
-        return response.json().then(parsePointsPayload);
-      }),
-      fetch(area.gridMetaFile).then((response) => {
-        if (!response.ok) {
-          throw new Error(
-            `Failed to load ${area.gridMetaFile}: ${response.status}`,
-          );
-        }
-        return response.json().then(parseGridMeta);
-      }),
-      fetch(area.gridFile).then((response) => {
-        if (!response.ok) {
-          throw new Error(
-            `Failed to load ${area.gridFile}: ${response.status}`,
-          );
-        }
-        return response.arrayBuffer();
-      }),
-    ])
-      .then(([pointsPayload, gridMeta, gridBuffer]) => ({
-        pointsPayload,
-        gridMeta,
-        gridBytes: new Uint8Array(gridBuffer),
-      }))
-      .catch((error) => {
-        console.warn("Grid distance assets could not be loaded.", error);
-        return null;
+    }
+    if (!area.pointsFile || !area.gridMetaFile || !area.gridFile) return null;
+    try {
+      const assets = await this.routeMapAssetsLoader.loadMapAssets({
+        areaId: area.id,
+        assets: {
+          points: area.pointsFile,
+          gridMeta: area.gridMetaFile,
+          grid: area.gridFile,
+        },
       });
-
-    this.routeAssetsCache.set(area.id, loadPromise);
-    const assets = await loadPromise;
-    this.routeAssetsCache.set(area.id, assets);
-    return assets;
+      return {
+        pointsPayload: parsePointsPayload(assets.points),
+        gridMeta: parseGridMeta(assets.gridMetadata),
+        gridBytes: assets.gridBytes,
+      };
+    } catch (error) {
+      console.warn("Grid distance assets could not be loaded.", error);
+      return null;
+    }
   }
 
   async rankCandidatesByGrid(currentSpace, candidates) {
@@ -1451,40 +1529,6 @@ export class ComiPathBrowserRuntime {
             return;
           }
 
-          const endpointIndexes = candidates.flatMap((c) => {
-            const idx = this.findPointPortalIndex(
-              assets.pointsPayload,
-              assets.gridMeta,
-              c.space,
-            );
-            return idx !== null ? [idx] : [];
-          });
-
-          if (endpointIndexes.length !== candidates.length) {
-            this.ui.showToast(
-              "候補サークルのグリッド位置を特定できませんでした",
-              "error",
-            );
-            resolve();
-            return;
-          }
-
-          const dists = distancesFromStartToEndpoints(
-            startPortalIndex,
-            {
-              grid: assets.gridBytes,
-              cols: assets.gridMeta.cols,
-              rows: assets.gridMeta.rows,
-              cellSize: assets.gridMeta.cell_size,
-            },
-            endpointIndexes,
-          );
-
-          const startDistances = new Map();
-          candidates.forEach((c, i) => {
-            startDistances.set(c.space, dists[i]);
-          });
-
           const startPointPosition = this.findPointPortalPosition(
             assets.pointsPayload,
             assets.gridMeta,
@@ -1506,65 +1550,17 @@ export class ComiPathBrowserRuntime {
             source: "manual-start",
           };
 
-          const initialNavState = this.navigationState || {
-            stage: "idle",
-            areaId: area.id,
-            currentPosition: startPosition,
-            targetSpace: null,
-            lockedFirstLeg: null,
-            provisionalOrder: [],
-            bestOrder: [],
-          };
-
-          const startResult = this.orchestrationService.startNavigation({
-            navState: initialNavState,
-            startPosition,
-            pendingCircles: candidates,
-            startDistances,
-          });
-
-          const chosenTargetSpace = startResult.chosenTargetSpace;
-
-          if (!chosenTargetSpace) {
-            this.clearNavigationSnapshot();
-            this.resetNavigationRuntimeState();
-            this.currentTarget = null;
-            this.currentRoute = null;
-            this.selectedTarget = null;
-            this.selectedRoute = null;
-            this.ui.showTarget(null);
-            if (notifyComplete)
-              this.ui.showToast("全てのサークルを回りました！");
-            resolve();
-            return;
-          }
-
-          const targetCircle = candidates.find(
-            (c) => c.space === chosenTargetSpace,
-          );
-          if (!targetCircle) {
-            this.ui.showToast(
-              "目的地のサークルが見つかりませんでした",
-              "error",
-            );
-            resolve();
-            return;
-          }
-
-          let route = null;
           try {
-            route = planRouteFromGridIndex(
-              assets.pointsPayload,
-              assets.gridMeta,
-              assets.gridBytes,
-              startPortalIndex,
-              chosenTargetSpace,
-            );
+            await this.startRouteGuidanceUseCase.execute({
+              eventDay: this.dm.activeRef || {
+                eventId: this.currentManifest?.eventId || "runtime",
+                dayId: "active",
+              },
+              startPosition,
+              pendingCircles: candidates,
+            });
           } catch (error) {
-            console.warn("Route planning from grid index failed:", error);
-          }
-
-          if (!route) {
+            console.warn("Route guidance could not be started.", error);
             this.ui.showToast(
               "経路の再構築に失敗したため、案内を開始できませんでした",
               "error",
@@ -1573,24 +1569,17 @@ export class ComiPathBrowserRuntime {
             return;
           }
 
-          this.navigationState = startResult.navState;
-          this.currentStartSpace = currentSpace;
-          this.currentRoute = route;
-          this.currentTarget = this.targetWithRoute(targetCircle, route);
-          const bestOrder = this.navigationState.bestOrder || [];
-          const nextTargetSpace = bestOrder.find(
-            (space) => space !== chosenTargetSpace,
+          const guidanceSnapshot = this.routeGuidanceSession.getSnapshot();
+          const displayTarget = this.targetWithRoute(
+            guidanceSnapshot.currentDestination,
+            guidanceSnapshot.currentRoute,
           );
-          this.nextTarget = nextTargetSpace
-            ? this.dm.wantToBuy.find((c) => c.space === nextTargetSpace) || null
-            : null;
-          this.selectedTarget = this.currentTarget;
-          this.selectedRoute = route;
+          this.currentTarget = displayTarget;
+          this.selectedTarget = displayTarget;
+          this.currentStartSpace = currentSpace;
           this.selectionState = "idle";
           this.selectionMessage = "";
           this.ui.showNavigation(this.getNavigationContext("current"));
-
-          this.saveNavigationSnapshot();
 
           resolve();
         },
