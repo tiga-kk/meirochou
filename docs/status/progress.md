@@ -6,32 +6,47 @@
 
 - リポジトリ: `tiga-kk/meirochou`
 - ブランチ: `feature/phase-05d`
-- 計画再作成前のHEAD: `90528fdab3dd27307edeed51021548d5dc2ef0f6`
+- 追加計画作成前のHEAD: `6b1499bda9323acb8e77f4bfcd35007d1f8a5114`
 - 現在のフェーズ: Phase 5D リファクタリング完了作業
-- 次に着手するタスク: Task 7（visual snapshot差分の判断待ち）
+- 次に着手するタスク: Task 8
 
 ## 現在までに実装済みの主要部分
 
-Phase 5Dの旧計画を最初から実装し直す必要はない。現行コードでは、次がすでに存在する。
+Task 1〜6は実装済みである。
 
-- `apps/webapp/js/app/comipath-application.ts`とbrowser entrypointによる小さなlifecycle層
-- `features/event-day/`のrepository、active session/reader、event/day切替Use Case
-- `features/circle-status/`のstatus変更、undo、GAS outbox処理とController
-- `features/circle-data-source/`のCSV/GAS source処理、preview/apply、Controller
-- `features/local-data-deletion/`の削除Use CaseとController
-- `features/route-guidance/`のSession、開始・再開等のUse Case、Controller、View contractの骨格
-- architecture checkerとPhase 5D向けunit/characterization tests
+- Route Guidance固有moduleは`features/route-guidance/`へ概ね集約済み。
+- `EventDayDataStore`は削除済み。
+- `ComiPathDomCoordinator`は削除済み。
+- `ComiPathBrowserRuntime`は削除済み。
+- event/day、circle status、circle data source、local data deletion、route guidanceのfeature Session/Use Case/Controller/Viewが存在する。
+- composition root、browser lifecycle、architecture checker、Phase 5D向けunit/characterization testsが存在する。
+- Task 7で機能系E2Eの回帰修正とfull verificationの一部まで完了した。
 
-## 残っている主要問題
+## Task 7で判明した追加blocker
 
-旧3ファサードとRoute Guidance旧root pathは削除され、production importも確認済みである。
+### 1. `bind-browser-events.ts`が新しい大規模Facadeになっている
 
-1. `apps/webapp/js/app/bind-browser-events.ts`には旧browser runtime由来の責務がなお集中しており、Task 5は実質的に入口名の変更に留まる部分がある。architecture checkerの除外を含め、Phaseの設計意図に照らした追加分割が必要か再確認する。
-2. 既知visual snapshot 5件は、Phase 5Dの意図しない表示変更か既存snapshotの陳腐化かを判断できていない。
+旧3 Facadeのファイル自体は削除されたが、`apps/webapp/js/app/bind-browser-events.ts`へ旧browser runtime由来の責務が集中している。
 
-## 検証基準の現状
+現行fileはbrowser event registration以外にも、次を扱っている。
 
-2026-08-07のローカル最終検証では次の結果だった。
+- concrete Repository / storage / GAS / route infrastructureの生成
+- Route Guidance Session、snapshot/matrix、Worker runtimeの生成とstate proxy
+- event registry取得とevent/day open
+- Circle Data Sourceのrequest/cancellation state wrapper
+- purchase/hold/resetとRoute Guidance進行のcross-feature workflow
+- settings画面projection
+- route assets取得、candidate ranking、route start/resume/selection/snapshot処理
+
+したがって問題は「行数が多いこと」ではなく、Task 5で意図したbrowser binding境界まで責務移管が完了していないことである。
+
+さらに現行`check-webapp-architecture.mjs`では、非composition-root app moduleのconcrete infrastructure検査から`bind-browser-events.ts`だけが明示的に除外されている。この例外によりTask 6のguardrailが上記問題を検出できていない。
+
+Task 8で所有権を修復し、Task 9で残った純粋なevent registrationをowner別に分割する。
+
+### 2. visual snapshot 5件がCI固定環境で安定して失敗する
+
+2026-08-07のGitHub Actions run `31176251395`では次の状態を確認した。
 
 - `npm run verify:webapp`: 成功
   - `test:webapp`: 70 files / 478 tests PASS
@@ -39,14 +54,32 @@ Phase 5Dの旧計画を最初から実装し直す必要はない。現行コー
   - Phase 5D regression tests: PASS
   - architecture check: PASS
   - TypeScript typecheck: PASS
-  - Vite buildとbuild verification: PASS
+  - Vite build / build verification: PASS
 - `npm run test:e2e`: 失敗
-  - 5件は既存visual snapshotとの差分
-  - 「同一地点では次目的地ピンを通常ピンより前面に表示する」は初回失敗後retryで成功し、flaky扱い
+  - 33件PASS
+  - 8件skip
+  - 5件FAIL
+  - failureは既知visual snapshot 5件に限定
 
-今回のTask 7検証では、機能系E2Eの回帰を修正し、full E2Eは33件成功・8件skip・5件失敗となった。失敗は上記の既知visual snapshot 5件に限定され、snapshotは更新していない。Phase完了は、表示差分を旧表示へ戻すか新表示を正として承認するかの判断待ちとする。
+対象:
 
-Phase 5Dは見た目を変更するフェーズではないため、visual snapshotを機械的に更新してGREENにしてはいけない。最終Taskで差分を確認し、既存挙動の回帰なら実装を修正する。意図的な見た目変更だと判断する根拠が既存仕様から得られない場合だけ、snapshot更新前にユーザー判断を求める。
+1. `settings-shell-source-manager.png`
+2. `outbox-recovery-panel.png`
+3. `scoped-deletion-dialog.png`
+4. `navigation-map-catalog.png`
+5. `navigation-map-route-candidate.png`
+
+各snapshotはretry後も同じ種類の差分が再現しているため、単なるflaky testとして扱わない。
+
+履歴上、`0a2c04286d804f4041508622ef48e2cd7ff9cdbf`で今回対象を含むmobile snapshotがCI renderingへ明示的に揃えられている。Phase 5D中に一部management snapshotはさらに更新されている一方、route guidance側にはPhase baseからbaseline画像が変わっていない対象もある。このため全snapshotの一括更新は行わない。
+
+Task 10で5枚を個別に`REGRESSION`または`BASELINE_UPDATE`へ分類し、根拠に応じてproduction修正またはCI固定環境での限定baseline更新を行う。
+
+## Task 7の扱い
+
+Task 7は「失敗」でも「完了」でもなく、最終検証中に既存計画外のblockerを発見した状態とする。
+
+Task 7で得た検証結果は原因調査のbaselineとして利用するが、Task 8〜10でproduction/test snapshotが変わるためPhase完了の最終証拠にはしない。Task 11でfull verificationを再実行する。
 
 ## タスク状態
 
@@ -58,6 +91,10 @@ Phase 5Dは見た目を変更するフェーズではないため、visual snaps
 | Task 4 | 完了 | `ComiPathDomCoordinator`をfeature別Viewへ解体 |
 | Task 5 | 完了 | `ComiPathBrowserRuntime`を削除しbrowser bindingを明示化 |
 | Task 6 | 完了 | architecture guardrailとテスト境界を強化 |
-| Task 7 | 保留 | E2Eを含む最終検証は実施済み。既知visual snapshot 5件の判断待ち |
+| Task 7 | 中断 | 最終検証中にbrowser binding ownershipとvisual snapshotの追加blockerを発見 |
+| Task 8 | 未着手 | browser bindingからfeature ownership違反を除去 |
+| Task 9 | 未着手 | 残ったbrowser event registrationをowner別に分割 |
+| Task 10 | 未着手 | visual snapshot 5件を根拠付きで解消 |
+| Task 11 | 未着手 | 修正後HEADでPhase 5D全体を再検証 |
 
-タスク完了時はこの表と「次に着手するタスク」だけを実態に合わせて更新する。個別タスク文書へ進捗状態を重複して記録しない。
+タスク完了時はこの表と「次に着手するタスク」を実態に合わせて更新する。個別タスク文書へ進捗状態を重複して記録しない。
