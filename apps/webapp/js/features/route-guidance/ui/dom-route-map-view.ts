@@ -1,6 +1,5 @@
 // @ts-nocheck
 
-import { buildRouteOverlaySvg } from "../../../route-planner";
 import { GestureZoomController } from "../../../utils/gesture-zoom-controller.js";
 import { runtimeMapAreaCatalog } from "../infrastructure/runtime-map-area-catalog";
 import {
@@ -11,6 +10,7 @@ import {
   calculateMapPinSize,
   calculateNativeImageScale,
 } from "./route-map-pin-model";
+import { buildRouteOverlaySvg } from "./route-overlay-svg";
 
 function findAreaForSpace(space) {
   if (!space || typeof space !== "string") return null;

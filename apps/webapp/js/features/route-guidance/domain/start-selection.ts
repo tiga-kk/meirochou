@@ -1,4 +1,4 @@
-import type { GridMeta } from "../features/event-day/domain/application-contract-types";
+import type { GridMeta } from "./routing/grid-route-types";
 
 export interface StartSelection {
   readonly svgX: number;

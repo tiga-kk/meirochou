@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, test } from "vitest";
 import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime.js";
+import { LocalStorageDistanceMatrixRepository } from "../apps/webapp/js/features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
 import { NavigationOrchestrationService } from "../apps/webapp/js/navigation/navigation-orchestration";
 import { NavigationRuntimeController } from "../apps/webapp/js/navigation/navigation-runtime-controller";
-import { LocalStorageDistanceMatrixRepository } from "../apps/webapp/js/routing/distance-matrix-repository";
 import { LocalStorageNavigationSnapshotRepository } from "../apps/webapp/js/state/navigation-snapshot-repository";
 
 describe("Phase 5C Task 11: NavigationRuntimeController", () => {

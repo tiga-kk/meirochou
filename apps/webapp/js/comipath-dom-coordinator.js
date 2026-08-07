@@ -4,7 +4,7 @@ import { DomCircleProgressView } from "./features/circle-status/ui/dom-circle-pr
 import { runtimeMapAreaCatalog } from "./features/route-guidance/infrastructure/runtime-map-area-catalog";
 import { DomRouteMapView } from "./features/route-guidance/ui/dom-route-map-view";
 import { buildRouteGuidanceScreenModel } from "./features/route-guidance/ui/route-guidance-screen-model";
-import { TspSolver } from "./tsp-solver.js";
+import { parseSpace } from "./shared/domain/space-parser";
 
 /**
  * UI管理クラス
@@ -19,7 +19,7 @@ export class ComiPathDomCoordinator {
     this.onConfirmRoute = null;
     this.onCancelRoute = null;
     this.statsRenderer = new DomCircleProgressView(this, runtimeMapAreaCatalog);
-    this.modalManager = new DomCircleGalleryView();
+    this.modalManager = new DomCircleGalleryView(runtimeMapAreaCatalog);
     this.mapRenderer = new DomRouteMapView(this);
 
     this.els = {
@@ -459,7 +459,10 @@ export class ComiPathDomCoordinator {
    * 現在地表示を更新
    */
   updateCurrentLocation(space) {
-    const [ewsn, label, number] = TspSolver.parseSpace(space);
+    const [ewsn, label, number] = parseSpace(
+      space,
+      runtimeMapAreaCatalog.getAllMapAreas(),
+    );
     this.els.locEwsn.value = ewsn;
     this.updateLabelOptions(true);
     this.els.locLabel.value = label;

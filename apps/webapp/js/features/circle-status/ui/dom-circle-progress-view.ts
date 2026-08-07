@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { TspSolver } from "../../../tsp-solver.js";
+import { parseSpace } from "../../../shared/domain/space-parser";
 
 /**
  * 統計情報描画クラス
@@ -120,13 +120,19 @@ export class DomCircleProgressView {
 
     // 未訪問カウント
     unvisited.forEach((c) => {
-      const [key] = TspSolver.parseSpace(c.space);
+      const [key] = parseSpace(
+        c.space,
+        this.mapAreaCatalog?.getAllMapAreas?.() || [],
+      );
       if (counts[key] !== undefined) counts[key]++;
     });
 
     // 保留カウント
     dm.holdList.forEach((space) => {
-      const [key] = TspSolver.parseSpace(space);
+      const [key] = parseSpace(
+        space,
+        this.mapAreaCatalog?.getAllMapAreas?.() || [],
+      );
       if (holdCounts[key] !== undefined) holdCounts[key]++;
     });
 

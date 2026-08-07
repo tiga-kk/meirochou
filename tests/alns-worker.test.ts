@@ -3,8 +3,8 @@ import { describe, expect, test } from "vitest";
 import {
   TimeDecayedAlnsWorkerKernel,
   type TimeDecayedAlnsWorkerMessage,
-} from "../apps/webapp/js/routing/alns-worker-kernel";
-import type { TimeDecayedAlnsProblem } from "../apps/webapp/js/routing/time-decayed-objective";
+} from "../apps/webapp/js/features/route-guidance/domain/optimization/alns-worker-kernel";
+import type { TimeDecayedAlnsProblem } from "../apps/webapp/js/features/route-guidance/domain/optimization/time-decayed-objective";
 
 function makeProblem(): TimeDecayedAlnsProblem {
   return {

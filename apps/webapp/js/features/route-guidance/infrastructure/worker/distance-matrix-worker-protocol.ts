@@ -2,8 +2,8 @@ import {
   type DistanceMatrixJobInput,
   type MatrixEndpoint,
   parseStoredDistanceMatrix,
-} from "./distance-matrix";
-import type { DistanceMatrixWorkerMessage } from "./distance-matrix-worker-kernel";
+} from "../../domain/routing/distance-matrix";
+import type { DistanceMatrixWorkerMessage } from "../../domain/routing/distance-matrix-worker-kernel";
 
 export type DistanceMatrixWorkerRequest =
   | {

@@ -1,5 +1,7 @@
 export * from "./domain/map-area";
+export * from "./domain/optimization/nearest-neighbor-order";
 export * from "./domain/route-guidance-types";
+export * from "./domain/routing/grid-route-types";
 export * from "./ui/route-guidance-controller";
 export * from "./ui/route-guidance-screen-model";
 export * from "./use-cases/apply-optimized-route-order";

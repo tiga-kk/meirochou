@@ -1,4 +1,10 @@
 import type {
+  GridMeta,
+  OcrPoint,
+  OcrPortal,
+  PointsPayload,
+} from "../../route-guidance/public-api";
+import type {
   Circle,
   EventDay,
   EventMapAreaManifest,
@@ -7,13 +13,9 @@ import type {
   EventRegistryV1,
   GasCircleResponse,
   GasSheetListResponse,
-  GridMeta,
   MapAssetPaths,
   MapBundleAreaV1,
   MapBundleManifestV1,
-  OcrPoint,
-  OcrPortal,
-  PointsPayload,
 } from "../domain/application-contract-types";
 
 export class BoundaryValidationError extends Error {

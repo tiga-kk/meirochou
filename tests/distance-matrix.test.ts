@@ -8,7 +8,7 @@ import {
   distancesFromStartToEndpoints,
   type MatrixEndpoint,
   type MatrixGridInput,
-} from "../apps/webapp/js/routing/distance-matrix";
+} from "../apps/webapp/js/features/route-guidance/domain/routing/distance-matrix";
 
 // ---- Helpers ----
 

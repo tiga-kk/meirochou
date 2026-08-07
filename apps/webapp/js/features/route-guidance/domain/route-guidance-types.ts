@@ -1,20 +1,11 @@
 import type { Circle } from "../../event-day/public-api";
 
+export type {
+  GridMeta,
+  PointsPayload,
+  RouteResult as GridRouteResult,
+} from "./routing/grid-route-types";
 export type { Circle };
-
-export interface RouteMapPoint {
-  readonly x: number;
-  readonly y: number;
-}
-
-export interface PointsPayload {
-  readonly points: readonly RouteMapPoint[];
-}
-
-export interface GridMeta {
-  readonly cols: number;
-  readonly rows: number;
-}
 
 export type NavigationStage = "idle" | "navigating" | "atTarget";
 
@@ -58,7 +49,7 @@ export type SelectionStatus =
   | "comparing"
   | "error";
 
-export interface RouteResult {
+export interface RouteGuidanceRoute {
   readonly path: readonly { x: number; y: number }[];
   readonly distance: number;
 }
@@ -66,9 +57,9 @@ export interface RouteResult {
 export interface RouteGuidanceSessionSnapshot {
   readonly navigationState: NavigationState | null;
   readonly currentDestination: Circle | null;
-  readonly currentRoute: RouteResult | null;
+  readonly currentRoute: RouteGuidanceRoute | null;
   readonly selectedDestination: Circle | null;
-  readonly selectedRoute: RouteResult | null;
+  readonly selectedRoute: RouteGuidanceRoute | null;
   readonly selectionStatus: SelectionStatus;
   readonly routeOptimizationGeneration: number;
 }

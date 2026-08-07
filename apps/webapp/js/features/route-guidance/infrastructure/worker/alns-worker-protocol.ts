@@ -1,9 +1,9 @@
-import { validateSearchTimeLimit } from "./alns-solver";
-import type { TimeDecayedAlnsWorkerMessage } from "./alns-worker-kernel";
+import { validateSearchTimeLimit } from "../../domain/optimization/alns-solver";
+import type { TimeDecayedAlnsWorkerMessage } from "../../domain/optimization/alns-worker-kernel";
 import type {
   TimeDecayedAlnsBestSolution,
   TimeDecayedAlnsProblem,
-} from "./time-decayed-objective";
+} from "../../domain/optimization/time-decayed-objective";
 
 export type TimeDecayedAlnsWorkerRequest =
   | {

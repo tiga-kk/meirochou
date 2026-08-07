@@ -6,6 +6,10 @@ import {
   isDevDemoEnabled,
 } from "../apps/webapp/js/dev-demo-data.js";
 import { parseMapBundleManifest } from "../apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers";
+import {
+  planRoute,
+  rankCandidatesByGridDistance,
+} from "../apps/webapp/js/features/route-guidance/domain/routing/grid-route-planner";
 import { runtimeMapAreaCatalog } from "../apps/webapp/js/features/route-guidance/infrastructure/runtime-map-area-catalog.ts";
 import { formatTargetViewModel } from "../apps/webapp/js/features/route-guidance/ui/format-target-view-model.ts";
 import { buildSpaceFromLocation } from "../apps/webapp/js/features/route-guidance/ui/parse-current-location-form.ts";
@@ -19,11 +23,7 @@ import {
   getPinPosition,
   getPinSourceSize,
 } from "../apps/webapp/js/features/route-guidance/ui/route-map-pin-model.ts";
-import {
-  buildRouteOverlaySvg,
-  planRoute,
-  rankCandidatesByGridDistance,
-} from "../apps/webapp/js/route-planner";
+import { buildRouteOverlaySvg } from "../apps/webapp/js/features/route-guidance/ui/route-overlay-svg";
 import { parseSafeExternalUrl as normalizeExternalUrl } from "../apps/webapp/js/shared/browser/parse-safe-external-url.ts";
 import { getRouteStartSpaceForMap } from "../apps/webapp/js/shared/ui/contained-image-layout.ts";
 import { StorageService } from "../apps/webapp/js/state/storage-service.js";

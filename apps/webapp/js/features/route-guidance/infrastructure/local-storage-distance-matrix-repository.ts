@@ -2,7 +2,7 @@ import {
   type DistanceMatrixRepository,
   parseStoredDistanceMatrix,
   type StoredDistanceMatrix,
-} from "./distance-matrix";
+} from "../domain/routing/distance-matrix";
 
 interface StorageLike {
   getItem(key: string): string | null;

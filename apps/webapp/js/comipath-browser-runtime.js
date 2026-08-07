@@ -16,17 +16,21 @@ import {
   resolveEventMapManifestUrl,
 } from "./features/event-day/infrastructure/http-map-manifest-loader";
 import { DeleteLocalDataUseCase } from "./features/local-data-deletion/public-api";
-import { runtimeMapAreaCatalog } from "./features/route-guidance/infrastructure/runtime-map-area-catalog";
-import { buildSpaceFromLocation } from "./features/route-guidance/ui/parse-current-location-form";
-import { NavigationOrchestrationService } from "./navigation/navigation-orchestration";
-import { NavigationRuntimeController } from "./navigation/navigation-runtime-controller";
+import {
+  parseSpace,
+  solveNearestNeighbor,
+} from "./features/route-guidance/domain/optimization/nearest-neighbor-order";
+import { distancesFromStartToEndpoints } from "./features/route-guidance/domain/routing/distance-matrix";
 import {
   planRoute,
   planRouteFromGridIndex,
   rankCandidatesByGridDistance,
-} from "./route-planner";
-import { distancesFromStartToEndpoints } from "./routing/distance-matrix";
-import { LocalStorageDistanceMatrixRepository } from "./routing/distance-matrix-repository";
+} from "./features/route-guidance/domain/routing/grid-route-planner";
+import { LocalStorageDistanceMatrixRepository } from "./features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
+import { runtimeMapAreaCatalog } from "./features/route-guidance/infrastructure/runtime-map-area-catalog";
+import { buildSpaceFromLocation } from "./features/route-guidance/ui/parse-current-location-form";
+import { NavigationOrchestrationService } from "./navigation/navigation-orchestration";
+import { NavigationRuntimeController } from "./navigation/navigation-runtime-controller";
 import {
   buildDeleteOptions,
   buildEventDayOptions,
@@ -34,7 +38,6 @@ import {
   formatSourceSummary,
 } from "./shared/ui/management-view-model";
 import { LocalStorageNavigationSnapshotRepository } from "./state/navigation-snapshot-repository";
-import { TspSolver } from "./tsp-solver.js";
 
 /** Validates an event/day reference at the ComiPathBrowserRuntime's DOM event boundary. */
 function isEventDayRef(value) {
@@ -230,9 +233,15 @@ export class ComiPathBrowserRuntime {
       workerFactory: () => {
         const worker = options?.alnsWorkerFactory
           ? options.alnsWorkerFactory()
-          : new Worker(new URL("./routing/alns-worker.ts", import.meta.url), {
-              type: "module",
-            });
+          : new Worker(
+              new URL(
+                "./features/route-guidance/infrastructure/worker/alns-worker.ts",
+                import.meta.url,
+              ),
+              {
+                type: "module",
+              },
+            );
         this.ownedWorkers.add(worker);
         return worker;
       },
@@ -350,7 +359,9 @@ export class ComiPathBrowserRuntime {
         (activeState?.source.type === "gas" ? activeState.source.gasUrl : ""),
       selectedSheetName:
         sourceSessionSnapshot.selectedSheetName ||
-        (activeState?.source.type === "gas" ? activeState.source.sheetName : ""),
+        (activeState?.source.type === "gas"
+          ? activeState.source.sheetName
+          : ""),
       sheetNames: sourceSessionSnapshot.sheetNames,
       pendingCount,
       canExportCsv,
@@ -358,7 +369,9 @@ export class ComiPathBrowserRuntime {
         this.session.isBusy("source-request") ||
         this.session.isBusy("transition"),
       errorMessage:
-        this.session.getSnapshot().errorMessage || this.sourceErrorMessage || "",
+        this.session.getSnapshot().errorMessage ||
+        this.sourceErrorMessage ||
+        "",
     };
 
     const outboxPanelModel = buildOutboxPanelModel(
@@ -1340,10 +1353,11 @@ export class ComiPathBrowserRuntime {
     const unreachable = ranked
       .filter((item) => !Number.isFinite(item.distance))
       .map((item) => item.candidate);
-    const fallbackRemainder = TspSolver.solve(currentSpace, [
-      ...unreachable,
-      ...otherCandidates,
-    ]).slice(1);
+    const fallbackRemainder = solveNearestNeighbor(
+      currentSpace,
+      [...unreachable, ...otherCandidates],
+      runtimeMapAreaCatalog.getAllMapAreas(),
+    ).slice(1);
 
     return [...reachable, ...fallbackRemainder];
   }
@@ -1632,7 +1646,11 @@ export class ComiPathBrowserRuntime {
           try {
             path = gridRanked
               ? [{ space: currentSpace, isStart: true }, ...gridRanked]
-              : TspSolver.solve(currentSpace, candidates);
+              : solveNearestNeighbor(
+                  currentSpace,
+                  candidates,
+                  runtimeMapAreaCatalog.getAllMapAreas(),
+                );
           } catch (error) {
             console.warn(
               "Candidate ordering failed; using source order.",
@@ -2209,7 +2227,10 @@ export class ComiPathBrowserRuntime {
   }
 
   findPointPortalIndex(pointsPayload, gridMeta, space) {
-    const [, identifier, number] = TspSolver.parseSpace(space);
+    const [, identifier, number] = parseSpace(
+      space,
+      runtimeMapAreaCatalog.getAllMapAreas(),
+    );
     const point = pointsPayload?.points?.find(
       (candidate) =>
         candidate.space === space ||
@@ -2232,7 +2253,10 @@ export class ComiPathBrowserRuntime {
   }
 
   findPointPortalPosition(pointsPayload, gridMeta, space) {
-    const [, identifier, number] = TspSolver.parseSpace(space);
+    const [, identifier, number] = parseSpace(
+      space,
+      runtimeMapAreaCatalog.getAllMapAreas(),
+    );
     const point = pointsPayload?.points?.find(
       (candidate) =>
         candidate.space === space ||

@@ -1,11 +1,11 @@
 // @vitest-environment node
 import { describe, expect, test } from "vitest";
 import type { CircleRecord } from "../apps/webapp/js/features/event-day/domain/application-contract-types";
+import { DEFAULT_TIMING_PROFILE } from "../apps/webapp/js/features/route-guidance/domain/optimization/time-decayed-objective";
 import {
   buildOptimizationProblem,
   resolveServiceTimeSec,
-} from "../apps/webapp/js/navigation/optimization-input-adapter";
-import { DEFAULT_TIMING_PROFILE } from "../apps/webapp/js/routing/time-decayed-objective";
+} from "../apps/webapp/js/features/route-guidance/use-cases/build-route-optimization-problem";
 
 describe("Phase 5C Task 7: optimization-input-adapter", () => {
   test("resolves service times: normal 30s, wall 200s, unknown default 30s", () => {

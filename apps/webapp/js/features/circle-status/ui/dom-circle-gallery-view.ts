@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { TspSolver } from "../../../tsp-solver.js";
+import { parseSpace } from "../../../shared/domain/space-parser";
 import {
   GestureZoomController,
   setupResizableMap,
@@ -11,7 +11,7 @@ import {
  * PDF（画像）モーダルおよびギャラリーモーダルの制御を担当
  */
 export class DomCircleGalleryView {
-  constructor() {
+  constructor(mapAreaCatalog) {
     this.els = {
       pdfModal: document.getElementById("pdf-modal"),
       pdfImage: document.getElementById("pdf-modal-image"),
@@ -38,6 +38,7 @@ export class DomCircleGalleryView {
     this.currentCircle = null;
     this.uiManager = null;
     this.dataManager = null;
+    this.mapAreaCatalog = mapAreaCatalog;
 
     // Gallery state
     this.currentTargets = [];
@@ -197,8 +198,9 @@ export class DomCircleGalleryView {
       }
 
       // Secondary sort (or primary if mode is 'space'): Space order
-      const [h1, l1, n1] = TspSolver.parseSpace(a.space);
-      const [h2, l2, n2] = TspSolver.parseSpace(b.space);
+      const areas = this.mapAreaCatalog?.getAllMapAreas?.() || [];
+      const [h1, l1, n1] = parseSpace(a.space, areas);
+      const [h2, l2, n2] = parseSpace(b.space, areas);
 
       if (h1 !== h2) return h1.localeCompare(h2);
       if (l1 !== l2) return l1.localeCompare(l2);
@@ -263,19 +265,20 @@ export class DomCircleGalleryView {
       });
     this.currentGalleryArea = areaKey;
     this.currentGalleryIsHold = isHold;
+    const areas = this.mapAreaCatalog?.getAllMapAreas?.() || [];
 
     // データ取得
     let targets = [];
     if (isHold) {
       targets = this.dataManager.wantToBuy.filter((c) => {
         if (!this.dataManager.holdList.includes(c.space)) return false;
-        const [key] = TspSolver.parseSpace(c.space);
+        const [key] = parseSpace(c.space, areas);
         return key === areaKey;
       });
     } else {
       const unvisited = this.dataManager.getUnvisited();
       targets = unvisited.filter((c) => {
-        const [key] = TspSolver.parseSpace(c.space);
+        const [key] = parseSpace(c.space, areas);
         return key === areaKey;
       });
     }

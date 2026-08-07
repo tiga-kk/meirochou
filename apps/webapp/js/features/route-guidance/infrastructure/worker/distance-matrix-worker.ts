@@ -1,4 +1,4 @@
-import { DistanceMatrixWorkerKernel } from "./distance-matrix-worker-kernel";
+import { DistanceMatrixWorkerKernel } from "../../domain/routing/distance-matrix-worker-kernel";
 import type {
   DistanceMatrixWorkerRequest,
   DistanceMatrixWorkerResponse,

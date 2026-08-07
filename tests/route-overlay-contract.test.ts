@@ -1,13 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
+import { planRoute } from "../apps/webapp/js/features/route-guidance/domain/routing/grid-route-planner";
 import type {
   GridMeta,
   PointsPayload,
-} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
-import {
-  buildRouteOverlaySvg,
-  planRoute,
-} from "../apps/webapp/js/route-planner";
+} from "../apps/webapp/js/features/route-guidance/domain/routing/grid-route-types";
+import { buildRouteOverlaySvg } from "../apps/webapp/js/features/route-guidance/ui/route-overlay-svg";
 
 const fictionalPoints: PointsPayload = {
   version: 1,

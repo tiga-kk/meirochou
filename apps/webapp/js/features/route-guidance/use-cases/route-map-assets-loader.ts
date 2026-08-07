@@ -1,4 +1,7 @@
-import type { GridMeta, PointsPayload } from "../domain/route-guidance-types";
+import type {
+  GridMeta,
+  PointsPayload,
+} from "../domain/routing/grid-route-types";
 
 export interface RouteMapAssets {
   readonly points: PointsPayload;

@@ -1,4 +1,4 @@
-import { TimeDecayedAlnsWorkerKernel } from "./alns-worker-kernel";
+import { TimeDecayedAlnsWorkerKernel } from "../../domain/optimization/alns-worker-kernel";
 import type {
   TimeDecayedAlnsWorkerRequest,
   TimeDecayedAlnsWorkerResponse,

@@ -2,18 +2,18 @@ import type {
   CircleVisitState,
   NavigationState,
 } from "../features/event-day/domain/application-contract-types";
-import { parseTimeDecayedAlnsWorkerResponse } from "../routing/alns-worker-protocol";
-import type { LocalStorageDistanceMatrixRepository } from "../routing/distance-matrix-repository";
+import type { LocalStorageDistanceMatrixRepository } from "../features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
+import { parseTimeDecayedAlnsWorkerResponse } from "../features/route-guidance/infrastructure/worker/alns-worker-protocol";
+import {
+  buildOptimizationProblem,
+  type OptimizationProblemInput,
+} from "../features/route-guidance/use-cases/build-route-optimization-problem";
 import {
   type LocalStorageNavigationSnapshotRepository,
   type NavigationSnapshot,
   validateSnapshotForResume,
 } from "../state/navigation-snapshot-repository";
 import type { NavigationOrchestrationService } from "./navigation-orchestration";
-import {
-  buildOptimizationProblem,
-  type OptimizationProblemInput,
-} from "./optimization-input-adapter";
 
 export interface AlnsWorkerPort {
   onmessage: ((event: MessageEvent<unknown>) => void) | null;
@@ -75,9 +75,15 @@ export class NavigationRuntimeController {
     this.workerFactory =
       deps.workerFactory ??
       (() =>
-        new Worker(new URL("../routing/alns-worker.ts", import.meta.url), {
-          type: "module",
-        }));
+        new Worker(
+          new URL(
+            "../features/route-guidance/infrastructure/worker/alns-worker.ts",
+            import.meta.url,
+          ),
+          {
+            type: "module",
+          },
+        ));
   }
 
   getSnapshotRepo(): LocalStorageNavigationSnapshotRepository {

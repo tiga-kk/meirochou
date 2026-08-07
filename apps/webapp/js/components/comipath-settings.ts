@@ -3,7 +3,7 @@ import {
   ALNS_SEARCH_TIME_LIMITS,
   type AlnsSearchTimeLimitMs,
   DEFAULT_SEARCH_TIME_LIMIT_MS,
-} from "../routing/time-decayed-objective";
+} from "../features/route-guidance/domain/optimization/time-decayed-objective";
 import { dispatchManagementEvent } from "../shared/ui/management-events";
 import type {
   DeleteOptionViewModel,
