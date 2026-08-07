@@ -24,23 +24,17 @@ Phase 5Dの旧計画を最初から実装し直す必要はない。現行コー
 
 ## 残っている主要問題
 
-旧巨大クラスは名前だけ消えた部分があり、責務の移行は完了していない。
+旧3ファサードとRoute Guidance旧root pathは削除され、production importも確認済みである。
 
-1. `apps/webapp/js/comipath-browser-runtime.js`
-   - 経路案内の状態、Worker、cache、画面状態、event binding、複数featureの調整を同時に所有している。
-2. `apps/webapp/js/event-day-data-store.ts`
-   - event/day、circle status、GAS outbox、CSV、legacy compatibilityを一つのFacadeにまとめ、feature Use Caseを内部で再組立てしている。
-3. `apps/webapp/js/comipath-dom-coordinator.js`
-   - 多数のDOM要素と複数featureの表示処理を一つのオブジェクトに集めている。
-4. `apps/webapp/js/navigation/`、`apps/webapp/js/routing/`等と`features/route-guidance/`が併存し、同じfeatureの入口が複数に見える。
-5. `tests/legacy-app-files-removed.test.mjs`は旧ファイル名の不存在だけを確認するため、巨大責務を別名へ移しても検出できない。
+1. `apps/webapp/js/app/bind-browser-events.ts`には旧browser runtime由来の責務がなお集中しており、Task 5は実質的に入口名の変更に留まる部分がある。architecture checkerの除外を含め、Phaseの設計意図に照らした追加分割が必要か再確認する。
+2. 既知visual snapshot 5件は、Phase 5Dの意図しない表示変更か既存snapshotの陳腐化かを判断できていない。
 
 ## 検証基準の現状
 
-2026-08-07のGitHub Actions run `31156422202`では次の結果だった。
+2026-08-07のローカル最終検証では次の結果だった。
 
 - `npm run verify:webapp`: 成功
-  - `test:webapp`: 70 files / 490 tests PASS
+  - `test:webapp`: 70 files / 478 tests PASS
   - route-guidance focused tests: PASS
   - Phase 5D regression tests: PASS
   - architecture check: PASS
