@@ -3,7 +3,7 @@ import type { EventDayRef } from "../features/event-day/domain/application-contr
 import { dispatchManagementEvent } from "../shared/ui/management-events";
 import type { SourceSummaryViewModel } from "../shared/ui/management-view-model";
 
-/** Safe, render-only source-management state supplied by ComiPathBrowserRuntime. */
+/** Safe, render-only source-management state supplied by the browser binding. */
 export interface CircleDataSourcePanelModel {
   readonly activeRef: EventDayRef | null;
   readonly activeRefLabel: string;

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime";
+import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
 import {
   CircleDataSourcePanel,
   type CircleDataSourcePanelModel,
@@ -65,12 +65,12 @@ function setupDOM() {
 }
 
 describe("CircleDataSource Orchestration & App Integration", () => {
-  let app: ComiPathBrowserRuntime;
+  let app: BrowserEventBinding;
 
   beforeEach(async () => {
     setupDOM();
     localStorage.clear();
-    app = new ComiPathBrowserRuntime();
+    app = new BrowserEventBinding();
     app.eventRegistry = sampleRegistry;
     app.eventRegistryUrl = "/assets/events/manifest.json";
 

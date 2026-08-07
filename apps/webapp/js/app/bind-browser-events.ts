@@ -1,62 +1,64 @@
-import "./components/comipath-settings";
-import "./components/navigation-resume-dialog";
-import "./components/source-diff-dialog";
-import { DomRouteGuidanceView } from "./features/route-guidance/ui/dom-route-guidance-view";
-import { createDevDemoData, isDevDemoEnabled } from "./dev-demo-data.js";
-import { createCircleDataSourceSession } from "./features/circle-data-source/public-api";
+// @ts-nocheck
+
+import "../components/comipath-settings";
+import "../components/navigation-resume-dialog";
+import "../components/source-diff-dialog";
+import { DomRouteGuidanceView } from "../features/route-guidance/ui/dom-route-guidance-view";
+import { createDevDemoData, isDevDemoEnabled } from "../dev-demo-data.js";
+import { createCircleDataSourceSession } from "../features/circle-data-source/public-api";
 import {
   parseGridMeta,
   parsePointsPayload,
-} from "./features/event-day/infrastructure/application-boundary-parsers";
-import { loadEventRegistryWithUrl } from "./features/event-day/infrastructure/http-event-registry-loader";
+} from "../features/event-day/infrastructure/application-boundary-parsers";
+import { loadEventRegistryWithUrl } from "../features/event-day/infrastructure/http-event-registry-loader";
 import {
   loadRuntimeMapBundleManifestFromUrl,
   renderMapBootstrapError,
   resolveEventMapManifestUrl,
-} from "./features/event-day/infrastructure/http-map-manifest-loader";
-import { DeleteLocalDataUseCase } from "./features/local-data-deletion/public-api";
+} from "../features/event-day/infrastructure/http-map-manifest-loader";
+import { DeleteLocalDataUseCase } from "../features/local-data-deletion/public-api";
 import {
   parseSpace,
   solveNearestNeighbor,
-} from "./features/route-guidance/domain/optimization/nearest-neighbor-order";
+} from "../features/route-guidance/domain/optimization/nearest-neighbor-order";
 import {
   planRoute,
   planRouteFromGridIndex,
   rankCandidatesByGridDistance,
-} from "./features/route-guidance/domain/routing/grid-route-planner";
-import { HttpRouteMapAssetsLoader } from "./features/route-guidance/infrastructure/http-route-map-assets-loader";
-import { LocalStorageDistanceMatrixRepository } from "./features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
-import { LocalStorageRouteGuidanceSnapshotRepository } from "./features/route-guidance/infrastructure/local-storage-route-guidance-snapshot-repository";
-import { RouteGuidanceRuntimeController } from "./features/route-guidance/infrastructure/route-guidance-runtime-controller";
-import { runtimeMapAreaCatalog } from "./features/route-guidance/infrastructure/runtime-map-area-catalog";
-import { buildSpaceFromLocation } from "./features/route-guidance/ui/parse-current-location-form";
-import { RouteGuidanceController } from "./features/route-guidance/ui/route-guidance-controller";
-import { GasPendingUpdateDelivery } from "./features/circle-status/infrastructure/gas-pending-update-delivery";
-import { CircleStatusController } from "./features/circle-status/ui/circle-status-controller";
-import { PendingGasUpdatesController } from "./features/circle-status/ui/pending-gas-updates-controller";
-import { ChangeCircleStatusUseCase } from "./features/circle-status/use-cases/change-circle-status";
-import { DiscardPendingGasUpdatesUseCase } from "./features/circle-status/use-cases/discard-pending-gas-updates";
-import { DefaultPendingGasUpdateBackgroundProcess } from "./features/circle-status/use-cases/pending-gas-update-background-process";
-import { SendPendingGasUpdatesUseCase } from "./features/circle-status/use-cases/send-pending-gas-updates";
-import { UndoCircleStatusChangeUseCase } from "./features/circle-status/use-cases/undo-circle-status-change";
-import { LocalStorageEventDayRepository } from "./features/event-day/infrastructure/local-storage-event-day-repository";
-import { createActiveEventDayReader, createActiveEventDaySession } from "./features/event-day/public-api";
-import { StorageService } from "./state/storage-service.js";
-import { ChangeDestinationUseCase } from "./features/route-guidance/use-cases/change-destination";
-import { FinishCurrentCircleUseCase } from "./features/route-guidance/use-cases/finish-current-circle";
-import { InvalidateRouteGuidanceUseCase } from "./features/route-guidance/use-cases/invalidate-route-guidance";
-import { ResumeRouteGuidanceUseCase } from "./features/route-guidance/use-cases/resume-route-guidance";
-import { RouteGuidanceNavigationOperations } from "./features/route-guidance/use-cases/route-guidance-navigation-operations";
-import { createRouteGuidanceSession } from "./features/route-guidance/use-cases/route-guidance-session";
-import { StartRouteGuidanceUseCase } from "./features/route-guidance/use-cases/start-route-guidance";
+} from "../features/route-guidance/domain/routing/grid-route-planner";
+import { HttpRouteMapAssetsLoader } from "../features/route-guidance/infrastructure/http-route-map-assets-loader";
+import { LocalStorageDistanceMatrixRepository } from "../features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
+import { LocalStorageRouteGuidanceSnapshotRepository } from "../features/route-guidance/infrastructure/local-storage-route-guidance-snapshot-repository";
+import { RouteGuidanceRuntimeController } from "../features/route-guidance/infrastructure/route-guidance-runtime-controller";
+import { runtimeMapAreaCatalog } from "../features/route-guidance/infrastructure/runtime-map-area-catalog";
+import { buildSpaceFromLocation } from "../features/route-guidance/ui/parse-current-location-form";
+import { RouteGuidanceController } from "../features/route-guidance/ui/route-guidance-controller";
+import { GasPendingUpdateDelivery } from "../features/circle-status/infrastructure/gas-pending-update-delivery";
+import { CircleStatusController } from "../features/circle-status/ui/circle-status-controller";
+import { PendingGasUpdatesController } from "../features/circle-status/ui/pending-gas-updates-controller";
+import { ChangeCircleStatusUseCase } from "../features/circle-status/use-cases/change-circle-status";
+import { DiscardPendingGasUpdatesUseCase } from "../features/circle-status/use-cases/discard-pending-gas-updates";
+import { DefaultPendingGasUpdateBackgroundProcess } from "../features/circle-status/use-cases/pending-gas-update-background-process";
+import { SendPendingGasUpdatesUseCase } from "../features/circle-status/use-cases/send-pending-gas-updates";
+import { UndoCircleStatusChangeUseCase } from "../features/circle-status/use-cases/undo-circle-status-change";
+import { LocalStorageEventDayRepository } from "../features/event-day/infrastructure/local-storage-event-day-repository";
+import { createActiveEventDayReader, createActiveEventDaySession } from "../features/event-day/public-api";
+import { StorageService } from "../state/storage-service.js";
+import { ChangeDestinationUseCase } from "../features/route-guidance/use-cases/change-destination";
+import { FinishCurrentCircleUseCase } from "../features/route-guidance/use-cases/finish-current-circle";
+import { InvalidateRouteGuidanceUseCase } from "../features/route-guidance/use-cases/invalidate-route-guidance";
+import { ResumeRouteGuidanceUseCase } from "../features/route-guidance/use-cases/resume-route-guidance";
+import { RouteGuidanceNavigationOperations } from "../features/route-guidance/use-cases/route-guidance-navigation-operations";
+import { createRouteGuidanceSession } from "../features/route-guidance/use-cases/route-guidance-session";
+import { StartRouteGuidanceUseCase } from "../features/route-guidance/use-cases/start-route-guidance";
 import {
   buildDeleteOptions,
   buildEventDayOptions,
   buildOutboxPanelModel,
   formatSourceSummary,
-} from "./shared/ui/management-view-model";
+} from "../shared/ui/management-view-model";
 
-/** Validates an event/day reference at the ComiPathBrowserRuntime's DOM event boundary. */
+/** Validates an event/day reference at the BrowserEventBinding's DOM event boundary. */
 function isEventDayRef(value) {
   return Boolean(
     value &&
@@ -118,7 +120,7 @@ const DEFAULT_NAVIGATION_OPTIMIZATION_TIME_LIMIT_MS = 10000;
 /**
  * アプリケーションのメインコントローラー
  */
-export class ComiPathBrowserRuntime {
+export class BrowserEventBinding {
   constructor(options = {}) {
     this.started = false;
     this.stopped = false;
@@ -394,7 +396,7 @@ export class ComiPathBrowserRuntime {
           ? options.alnsWorkerFactory()
           : new Worker(
               new URL(
-                "./features/route-guidance/infrastructure/worker/alns-worker.ts",
+                "../features/route-guidance/infrastructure/worker/alns-worker.ts",
                 import.meta.url,
               ),
               {
@@ -2568,6 +2570,6 @@ async function bootstrapApp(existingApp) {
     return;
   }
 
-  const app = existingApp || new ComiPathBrowserRuntime();
+  const app = existingApp || new BrowserEventBinding();
   await app.init(manifest, targetRef, { registry, registryUrl });
 }

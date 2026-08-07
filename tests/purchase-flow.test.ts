@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, test, vi } from "vitest";
-import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime";
+import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
 import { GasApiClient } from "../apps/webapp/js/api/gas-api-client";
 import { GasPendingUpdateDelivery } from "../apps/webapp/js/features/circle-status/infrastructure/gas-pending-update-delivery";
 import { CircleStatusController } from "../apps/webapp/js/features/circle-status/ui/circle-status-controller";
@@ -60,7 +60,7 @@ function createSetup(source: LocalEventDayState["source"], adapter = new MockSto
   };
   repository.saveAndRememberLastOpened(REF, state);
   session.setActiveEventDay(REF, state);
-  const app = new ComiPathBrowserRuntime({
+  const app = new BrowserEventBinding({
     eventDayDependencies: {
       repository,
       activeEventDaySession: session,

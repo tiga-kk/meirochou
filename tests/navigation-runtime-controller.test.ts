@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, test } from "vitest";
-import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime.js";
+import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
 import { LocalStorageDistanceMatrixRepository } from "../apps/webapp/js/features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
 import { LocalStorageRouteGuidanceSnapshotRepository as LocalStorageNavigationSnapshotRepository } from "../apps/webapp/js/features/route-guidance/infrastructure/local-storage-route-guidance-snapshot-repository";
 import { RouteGuidanceRuntimeController as NavigationRuntimeController } from "../apps/webapp/js/features/route-guidance/infrastructure/route-guidance-runtime-controller";
@@ -30,7 +30,7 @@ describe("Phase 5C Task 11: NavigationRuntimeController", () => {
   });
 
   test("ComiPathBrowserRuntime constructor instantiates NavigationRuntimeController and shares single repository instances", () => {
-    const app = new ComiPathBrowserRuntime();
+    const app = new BrowserEventBinding();
     expect(app.navigationRuntimeController).toBeDefined();
     expect(app.snapshotRepository).toBeDefined();
     expect(app.matrixRepository).toBeDefined();

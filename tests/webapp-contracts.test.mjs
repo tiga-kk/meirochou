@@ -57,7 +57,7 @@ test("browser entrypoint owns startup side effects", () => {
     html,
     /<script\s+type="module"\s+src="js\/app\/browser-entrypoint\.ts"><\/script>/,
   );
-  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
   assert.doesNotMatch(appSource, /DOMContentLoaded/);
 });
 
@@ -76,7 +76,7 @@ test("Phase 2 keeps GAS sale actions outside the local data service", () => {
 });
 
 test("Phase 5C Task 1 removes persistent Undo/Redo controls from the UI", () => {
-  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
   const modalSource = read(
     "apps/webapp/js/features/circle-status/ui/dom-circle-gallery-view.ts",
   );
@@ -1077,7 +1077,7 @@ test("webapp route exposes the exact OCR points selected for both endpoint pins"
 });
 
 test("webapp next-target search ranks candidates with grid route assets", () => {
-  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
   const loaderSource = read(
     "apps/webapp/js/features/route-guidance/infrastructure/http-route-map-assets-loader.ts",
   );
@@ -1124,7 +1124,7 @@ test("webapp uses an exact numeric input for the current location", () => {
 });
 
 test("webapp routes gallery target changes through navigation orchestration", () => {
-  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
   const handler =
     appSource.match(
       /async\s+handleSetNextTarget\(circle\)[\s\S]*?\n\s*}\n\n\s*\/\*\*/,
@@ -1136,7 +1136,7 @@ test("webapp routes gallery target changes through navigation orchestration", ()
 });
 
 test("webapp advances purchased navigation through orchestration", () => {
-  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
 
   const purchaseHandler =
     appSource.match(
@@ -1149,7 +1149,7 @@ test("webapp advances purchased navigation through orchestration", () => {
 });
 
 test("webapp opens an empty local event/day on a first visit", () => {
-  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
   const uiSource = read("apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts");
 
   assert.match(appSource, /CSVデータ未設定。空のイベント・日程で起動しました/);
@@ -1163,7 +1163,7 @@ test("webapp opens an empty local event/day on a first visit", () => {
 });
 
 test("webapp brings manually opened settings into view", () => {
-  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
   const uiSource = read("apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts");
 
   assert.match(
@@ -1269,7 +1269,7 @@ test("webapp target view model exposes the source sheet name", () => {
 
 test("webapp renders spreadsheet and source-sheet titles in compact labels", () => {
   const html = read("apps/webapp/index.html");
-  const dataManagerSource = read("apps/webapp/js/comipath-browser-runtime.js");
+  const dataManagerSource = read("apps/webapp/js/app/bind-browser-events.ts");
   const uiSource = read("apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts");
 
   assert.match(html, /id="spreadsheet-title"/);
@@ -1378,7 +1378,7 @@ test("webapp navigation map renders the configured map image", () => {
 });
 
 test("webapp validates the map manifest before constructing ComiPathBrowserRuntime", () => {
-  const appSource = read("apps/webapp/js/comipath-browser-runtime.js");
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
   const loadIndex = appSource.indexOf(
     "await loadRuntimeMapBundleManifestFromUrl",
   );
@@ -1387,7 +1387,7 @@ test("webapp validates the map manifest before constructing ComiPathBrowserRunti
     loadIndex,
   );
   const constructIndex = appSource.indexOf(
-    "new ComiPathBrowserRuntime()",
+    "new BrowserEventBinding()",
     initializeIndex,
   );
 

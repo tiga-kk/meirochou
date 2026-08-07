@@ -5,8 +5,8 @@ const mockState = vi.hoisted(() => ({
   workerFactories: [] as Array<(() => Worker) | undefined>,
 }));
 
-vi.mock("../apps/webapp/js/comipath-browser-runtime.js", () => ({
-  ComiPathBrowserRuntime: class {
+vi.mock("../apps/webapp/js/app/bind-browser-events", () => ({
+  BrowserEventBinding: class {
     constructor(options: { alnsWorkerFactory?: () => Worker }) {
       mockState.constructors += 1;
       mockState.workerFactories.push(options.alnsWorkerFactory);

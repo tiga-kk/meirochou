@@ -596,6 +596,7 @@ export function scanWebappArchitecture(options = {}) {
       if (
         importerIsApp &&
         !importer.endsWith("/assemble-comipath-application.ts") &&
+        !importer.endsWith("/bind-browser-events.ts") &&
         /(^|\/)(infrastructure|repository|client|loader|optimizer)(\/|$)|(?:local-storage|gas-|http-|web-worker-|browser-)/.test(
           lowerImport,
         )

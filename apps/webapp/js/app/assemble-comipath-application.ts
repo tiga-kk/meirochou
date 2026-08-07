@@ -1,4 +1,4 @@
-import { ComiPathBrowserRuntime } from "../comipath-browser-runtime.js";
+import { BrowserEventBinding } from "./bind-browser-events";
 import { BrowserCircleCsvDownloader } from "../features/circle-data-source/infrastructure/browser-circle-csv-downloader";
 import { GasGoogleSheetCircleClient } from "../features/circle-data-source/infrastructure/gas-google-sheet-circle-client";
 import {
@@ -162,7 +162,7 @@ export function assembleComiPathApplication(
         : undefined,
   });
 
-  const browserRuntime = new ComiPathBrowserRuntime({
+  const browserRuntime: any = new BrowserEventBinding({
     alnsWorkerFactory: options.createAlnsWorker,
     circleDataSourceSession,
     circleDataSourceController,

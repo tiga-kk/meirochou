@@ -10,7 +10,7 @@ test("production event-day wiring does not depend on EventDayDataStore", () => {
     existsSync(new URL("../apps/webapp/js/event-day-data-store.ts", import.meta.url)),
     false,
   );
-  const runtime = read("apps/webapp/js/comipath-browser-runtime.js");
+  const runtime = read("apps/webapp/js/app/bind-browser-events.ts");
   const assembly = read("apps/webapp/js/app/assemble-comipath-application.ts");
   assert.doesNotMatch(runtime, /EventDayDataStore|DataManagerOptions/);
   assert.doesNotMatch(assembly, /EventDayDataStore|DataManagerOptions/);

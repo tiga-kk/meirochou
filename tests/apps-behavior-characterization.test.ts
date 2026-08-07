@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime.js";
+import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
 import { ChangeCircleStatusUseCase } from "../apps/webapp/js/features/circle-status/use-cases/change-circle-status";
 import type {
   CircleRecord,
@@ -35,7 +35,7 @@ function createProductionAppFixture() {
     postMessage: vi.fn(),
     terminate: vi.fn(),
   };
-  const app = new ComiPathBrowserRuntime({ alnsWorkerFactory: () => worker });
+  const app = new BrowserEventBinding({ alnsWorkerFactory: () => worker });
   vi.spyOn(app, "disposeSyncCoordinator");
   return { app, settings, addEventListener, resumeAddEventListener };
 }

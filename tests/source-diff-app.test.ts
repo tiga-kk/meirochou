@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ComiPathBrowserRuntime } from "../apps/webapp/js/comipath-browser-runtime";
+import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
 import type {
   EventDayRef,
   EventRegistryV1,
@@ -23,7 +23,7 @@ function createRegistry(): EventRegistryV1 {
 }
 
 describe("Circle Data Source Diff & Preview Dialog Integration", () => {
-  let app: ComiPathBrowserRuntime;
+  let app: BrowserEventBinding;
   let repo: EventDayRepository;
 
   beforeEach(async () => {
@@ -38,7 +38,7 @@ describe("Circle Data Source Diff & Preview Dialog Integration", () => {
     const storage = new StorageService();
     repo = new EventDayRepository(storage);
 
-    app = new ComiPathBrowserRuntime();
+    app = new BrowserEventBinding();
     app.eventRegistry = createRegistry();
     app.eventRegistryUrl = "";
     app.eventDayRepository = repo;
