@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 import "../components/comipath-settings";
 import "../components/navigation-resume-dialog";
 import "../components/source-diff-dialog";
@@ -59,7 +57,7 @@ import {
 } from "../shared/ui/management-view-model";
 
 /** Validates an event/day reference at the BrowserEventBinding's DOM event boundary. */
-function isEventDayRef(value) {
+function isEventDayRef(value: any) {
   return Boolean(
     value &&
       typeof value === "object" &&
@@ -70,7 +68,7 @@ function isEventDayRef(value) {
   );
 }
 
-function isDeleteScope(value) {
+function isDeleteScope(value: any) {
   if (!value || typeof value !== "object") return false;
   if (value.type === "all-events") return true;
   return (
@@ -81,7 +79,7 @@ function isDeleteScope(value) {
   );
 }
 
-function sameEventDayRef(left, right) {
+function sameEventDayRef(left: any, right: any) {
   return Boolean(
     left &&
       right &&
@@ -90,7 +88,7 @@ function sameEventDayRef(left, right) {
   );
 }
 
-function findAreaForSpace(space) {
+function findAreaForSpace(space: any) {
   if (!space || typeof space !== "string") return null;
 
   const cleanedSpace = space.trim();
@@ -104,12 +102,12 @@ function findAreaForSpace(space) {
       .getAllMapAreas()
       .find(
         (area) =>
-          area.prefixes.includes(prefixChar) && area.labels.includes(labelChar),
+          area.prefixes?.includes(prefixChar) && area.labels?.includes(labelChar),
       ) || null
   );
 }
 
-function areSpacesInSameArea(spaceA, spaceB) {
+function areSpacesInSameArea(spaceA: any, spaceB: any) {
   const areaA = findAreaForSpace(spaceA);
   const areaB = findAreaForSpace(spaceB);
   return Boolean(areaA && areaB && areaA.id === areaB.id);
@@ -121,7 +119,9 @@ const DEFAULT_NAVIGATION_OPTIMIZATION_TIME_LIMIT_MS = 10000;
  * アプリケーションのメインコントローラー
  */
 export class BrowserEventBinding {
-  constructor(options = {}) {
+  [key: string]: any;
+
+  constructor(options: any = {}) {
     this.started = false;
     this.stopped = false;
     this.ownedWorkers = new Set();
