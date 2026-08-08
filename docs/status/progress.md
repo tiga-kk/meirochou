@@ -8,7 +8,7 @@
 - ブランチ: `feature/phase-05d`
 - 追加計画作成前のHEAD: `6b1499bda9323acb8e77f4bfcd35007d1f8a5114`
 - 現在のフェーズ: Phase 5D リファクタリング完了作業
-- 次に着手するタスク: Task 8 Stage 8E（残るduplicate wrapperとsettings projectionの整理）
+- 次に着手するタスク: Task 8 Stage 8F（binder contractの型固定）
 - Task 8の基準コミット: `ac8f2b035b3bf22b3ed03221eceebb8ccbf3f63a`
 - 直近のTask 8 WIPコミット: `24cf35fa9724e4b433e2c2573bf8b17d173481c2`
 - Stage 8D-A実装完了HEAD: `d9978339613201b838a53ed4865fbb001b2f056c`
@@ -64,6 +64,14 @@ Stage 8D-Dは`a57688a`で完了した。resume startupの判定入口、snapshot
 focused tests、Route Guidance tests、architecture/typecheckが成功した。`tests/navigation-runtime-startup.test.ts`の削除済み`comipath-browser-runtime.js` import失敗は既存obsolete testとして切り分け済みで、今回の実装不合格には数えない。
 
 次の一回はStage 8Eで残るduplicate wrapperとsettings projectionを整理する。
+
+### Stage 8Eの状態
+
+Stage 8Eは`af51914`で完了した。Circle Data Source Sessionの動的wrapper、local deletionのbinder直叩き、settings source/delete projectionの重複を除去し、既存Controller/Sessionとpure model builderへ寄せた。outbox retry/discard、preview cancel、削除後のevent/day再選択とRoute Guidance invalidationの挙動を維持している。
+
+`npm run test:webapp`（71 files / 512 tests）、`npm run test:route-guidance`、architecture/typecheck、focused tests、`git diff --check`が成功した。
+
+次の一回はStage 8Fでbinder contractを型で固定する。
 
 ## 現在までに実装済みの主要部分
 
@@ -145,7 +153,7 @@ Task 7で得た検証結果は原因調査のbaselineとして利用するが、
 | Task 5 | 完了 | `ComiPathBrowserRuntime`を削除しbrowser bindingを明示化 |
 | Task 6 | 完了 | architecture guardrailとテスト境界を強化 |
 | Task 7 | 中断 | 最終検証中にbrowser binding ownershipとvisual snapshotの追加blockerを発見 |
-| Task 8 | 進行中 | Stage 8D-Dまで完了。次はStage 8Eでduplicate wrapperとsettings projectionを整理 |
+| Task 8 | 進行中 | Stage 8Eまで完了。次はStage 8Fでbinder contractを型で固定 |
 | Task 9 | 未着手 | 残ったbrowser event registrationをowner別に分割 |
 | Task 10 | 未着手 | visual snapshot 5件を根拠付きで解消 |
 | Task 11 | 未着手 | 修正後HEADでPhase 5D全体を再検証 |
