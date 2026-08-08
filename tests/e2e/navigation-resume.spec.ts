@@ -124,8 +124,29 @@ test("valid snapshot resumes in the dialog, preserves target, and reappears afte
   await expect(dialog).not.toHaveAttribute("open", "");
   await expect(page.locator("#target-space-heading")).toContainText("東ア23a");
   await expect
-    .poll(() => page.evaluate((key) => localStorage.getItem(key), SNAPSHOT_KEY))
-    .toBe(JSON.stringify(snapshot));
+    .poll(() =>
+      page.evaluate(
+        (key) => JSON.parse(localStorage.getItem(key) || "null"),
+        SNAPSHOT_KEY,
+      ),
+    )
+    .toMatchObject({
+      navState: { optimizationGeneration: 1 },
+      savedAt: expect.any(String),
+    });
+  const savedSnapshot = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key) || "null"),
+    SNAPSHOT_KEY,
+  );
+  expect(savedSnapshot).toEqual({
+    ...snapshot,
+    navState: {
+      ...snapshot.navState,
+      optimizationGeneration: 1,
+    },
+    savedAt: expect.any(String),
+  });
+  expect(Number.isNaN(Date.parse(savedSnapshot.savedAt))).toBe(false);
 
   await page.reload();
   await expect(page.locator("#navigation-resume-dialog")).toHaveAttribute(

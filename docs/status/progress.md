@@ -7,8 +7,8 @@
 - リポジトリ: `tiga-kk/meirochou`
 - ブランチ: `feature/phase-05d`
 - 追加計画作成前のHEAD: `6b1499bda9323acb8e77f4bfcd35007d1f8a5114`
-- 現在のフェーズ: Phase 5D リファクタリング完了作業
-- 次に着手するタスク: Task 11（Task 10未完了差分を含む最新HEADの再検証）
+- 現在のフェーズ: Phase 5D 完了
+- 次に着手するタスク: なし（Task 11完了。次フェーズは自動開始しない）
 - Task 8の基準コミット: `ac8f2b035b3bf22b3ed03221eceebb8ccbf3f63a`
 - 直近のTask 8 WIPコミット: `24cf35fa9724e4b433e2c2573bf8b17d173481c2`
 - Stage 8D-A実装完了HEAD: `d9978339613201b838a53ed4865fbb001b2f056c`
@@ -95,9 +95,9 @@ Stage 8Gの検証は、focused 46 tests、`npm run test:webapp`（72 files / 525
 
 ### Task 10の状態
 
-Task 10は未完了・保留である。開始時のCI相当fresh E2Eは17 failures / 21 passed / 8 skippedだった。Task 9後の`onclick`実装詳細待ちを現行のclick挙動へ合わせ、demo navigation state、demo-east timing profile、resume用実grid matrix、resumeのpoint identifier/number境界を補正した。対象unit/type検証とresume/candidateのsemantic確認は成功したが、5枚のsnapshotは現在表示を正しいbaselineと一意に決める証拠が不足しているため、更新していない。5枚は`UNKNOWN / blocked`としてTask 10 reportへ記録した。
+Task 10は完了した。開始時の5候補に加え、先行failure解消後に露出した`source-diff-dialog`と`route-comparison`も、CI整合履歴・DOM/CSS・現行specの状態を根拠に対象snapshotだけを更新した。toast非表示の意図はE2E assertionで固定し、Flow1の`isSale=x` fixture不整合は空欄へ修正した。対象Flowの更新なし検証は成功した。
 
-Task 10を完了扱いにはしない。ユーザー指示によりTask 11の再検証を先行する例外を記録する。Task 11でsnapshot failureが再現した場合は、Task 10へ戻る再開条件とし、Phase完了とは報告しない。
+Task 11は完了した。`npm run verify:webapp`、resume反復6/6、`npm run test:e2e:ci`（38 passed / 8 skipped）、public tree audit、差分検査を最新作業内容で確認した。resumeのsnapshot契約は`optimizationGeneration`と動的`savedAt`を正しく検証するよう補正し、full E2Eでflakyを再現しないことを確認した。
 
 ### Task 9の状態
 
@@ -184,10 +184,10 @@ Task 7で得た検証結果は原因調査のbaselineとして利用するが、
 | Task 4 | 完了 | `ComiPathDomCoordinator`をfeature別Viewへ解体 |
 | Task 5 | 完了 | `ComiPathBrowserRuntime`を削除しbrowser bindingを明示化 |
 | Task 6 | 完了 | architecture guardrailとテスト境界を強化 |
-| Task 7 | 中断 | 最終検証中にbrowser binding ownershipとvisual snapshotの追加blockerを発見 |
+| Task 7 | 中断 | 最終検証中にbrowser binding ownershipとvisual snapshotの追加blockerを発見し、Task 8〜11で解消 |
 | Task 8 | 完了 | Stage 8A〜8G完了。browser binding ownershipとarchitecture guardrailを確定 |
 | Task 9 | 完了 | browser event registrationをowner別に整理し、root binderをcompose/cleanupへ縮小 |
-| Task 10 | 保留 | semantic failureを修正。5 snapshotは根拠不足で未更新、Task 11後に再評価 |
-| Task 11 | 進行中 | Task 10未完了例外の最新HEADでPhase 5D全体を再検証 |
+| Task 10 | 完了 | 5候補と新規露出source-diff/route-comparisonを根拠付きでbaseline更新。Flow1 gallery fixture不整合を修正 |
+| Task 11 | 完了 | Phase 5D全体検証、CI相当E2E、public tree auditを最新HEADで完了 |
 
 タスク完了時はこの表と「次に着手するタスク」を実態に合わせて更新する。個別タスク文書へ進捗状態を重複して記録しない。

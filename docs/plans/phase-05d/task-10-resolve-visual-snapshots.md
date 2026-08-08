@@ -36,13 +36,17 @@ CI相当containerで対象E2Eを更新なし・`--retries=0`で実行した。5�
 
 | snapshot | 実測 | 分類 | snapshot未更新理由 |
 |---|---|---|---|
-| `settings-shell-source-manager.png` | 369x1265 expected / 369x1264 actual、5%差分 | `UNKNOWN / blocked` | semantic操作は継続するが、Task10のsemantic failure修正範囲から表示差分の正否を一意に決められないため |
-| `outbox-recovery-panel.png` | 343x131 expected / 343x151 actual、23%差分 | `UNKNOWN / blocked` | recovery表示の高さ差分は残るが、snapshotを合わせる根拠となるUI仕様変更を確認していないため |
-| `scoped-deletion-dialog.png` | 343x359 expected / 343x358 actual、5%差分 | `UNKNOWN / blocked` | 1pxを含む表示差分をsemantic修正として扱わず、baselineを変更しないため |
-| `navigation-map-catalog.png` | 369x884 expected / 369x865 actual、8%差分 | `UNKNOWN / blocked` | demo表示のsemantic assertionsは通過するが、catalog表示の正しい高さをこの作業範囲から一意に決められないため |
-| `navigation-map-route-candidate.png` | 369x1173 expected / 369x1154 actual、9%差分 | `UNKNOWN / blocked` | candidateの`#target-dist`、route overlay、selection assertionsは通過するが、baselineの正否を決められないため |
+| `settings-shell-source-manager.png` | 369x1265 expected / 369x1264 actual、5%差分。CI固定環境で対象更新を実行しFlow 1更新なしで通過 | `BASELINE_UPDATE` | actualはCI整合履歴`0a2c042`の画像とピクセル完全一致し、Task8基準以降に該当UIのCSS/component変更がないため |
+| `source-diff-dialog.png` | 393x727 expected / 393x727 actual、13,517 pixels（約5%）差分。Flow 1単独で更新後・更新なしともsnapshot部分を通過 | `BASELINE_UPDATE` | actualはCI整合履歴`0a2c042`の画像とピクセル完全一致し、`0a2c042`以降に該当UIのDOM/CSS変更がないため |
+| `outbox-recovery-panel.png` | 343x131 expected / 343x151 actual、23%差分。Flow5で`サーバーエラー (500)`を確認 | `BASELINE_UPDATE` | Flow5の500 fixtureは現行仕様どおり失敗entryを`lastError: http-500`として保持し、outbox component初版から存在する`errorLabel`を表示する。旧baselineはこの失敗メタデータ反映前の状態で生成されたと判断し、CI固定環境で対象testのみ更新 |
+| `scoped-deletion-dialog.png` | 343x359 expected / 343x358 actual、5%差分。CI固定環境で対象更新を実行しFlow 7更新なしで1 passed | `BASELINE_UPDATE` | actualはCI整合履歴`0a2c042`の画像とピクセル完全一致し、Task8基準以降に該当UIのCSS/component変更がないため |
+| `navigation-map-catalog.png` | 369x884 expected / 369x865 actual。toast非表示assertion追加後に対象更新、更新なし対象specがpassed | `BASELINE_UPDATE` | specは撮影前に`#toast`を非表示化し、semantic assertionsも通過。旧expectedだけtoastを含んでいたため更新した |
+| `navigation-map-route-candidate.png` | 369x1173 expected / 369x1154 actual。toast非表示assertion追加後に対象更新、更新なし対象specがpassed | `BASELINE_UPDATE` | specは撮影前に`#toast`を非表示化し、candidate route/selection assertionsも通過。旧expectedだけtoastを含んでいたため更新した |
+| `route-comparison.png` | 369x1289 expected / 369x1271 actual、旧expectedだけtoastあり。toast非表示assertion追加後に単一testを更新・更新なし再実行し、candidateとともにpassed | `BASELINE_UPDATE` | actualは現行specが意図するtoast非表示状態。route-comparison直前に`#toast`のhidden assertionを追加し、CI固定環境で対象snapshotだけを更新 |
 
-navigation-resumeはfixtureを実grid距離（`[0, 288, 288, 0]`）へ合わせ、demo-eastのALNS timing-profile境界を補完した結果、chromium/mobileとも4/4成功した。candidate flowの「距離 計算不可」は再現せず、semantic assertionsは成功している。以上のため、5枚のPNGは更新していない。今回のsemantic failure修正で解消しない5候補は`UNKNOWN / blocked`として残す。
+navigation-resumeはfixtureを実grid距離（`[0, 288, 288, 0]`）へ合わせ、demo-eastのALNS timing-profile境界を補完した結果、chromium/mobileとも4/4成功した。candidate flowの「距離 計算不可」は再現せず、semantic assertionsは成功している。5候補と新規露出source-diffは各対象FlowのCI固定環境で更新し、更新なしの対象Flowも通過した。navigation 2枚はtoast非表示assertionを追加して現行specの状態を固定した。後続再検証でroute-comparisonにも旧toast付きbaselineの差分が露出したため、同じ単一testでroute-comparison直前のhidden assertionを追加し、対象snapshotのみ更新、candidateとroute-comparisonの更新なし再実行を通過した。後段gallery件数failureは、CSV fixtureの`isSale=x`が現行仕様どおり自動購入済みへ遷移させ、`getUnvisited()`の結果を1件にしていたfixture不整合だったため、`isSale`を空に修正した。production codeとassertionは弱めず、更新なしFlow1・Flow5・Flow7とcandidate/route-comparison対象testはそれぞれ1 passedとなった。
+
+navigation-resumeのvalid snapshotでは、ALNS開始時に`NavigationState.optimizationGeneration`を世代1へ更新し、進捗保存時の`savedAt`を現在時刻へ更新する現行仕様を確認した。E2E fixtureの入力snapshotへ世代値を入れると世代2になるため、入力fixtureは旧形式のまま、保存後期待値だけ`optimizationGeneration: 1`を含め、`savedAt`はISO日時文字列として比較する修正を追加した。修正後のrepeat-each=3検証はchromium/mobile合計6/6 passed、full E2Eでもflakyなしで完了した。
 
 ## 履歴上の基準
 
