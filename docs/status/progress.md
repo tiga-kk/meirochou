@@ -8,7 +8,7 @@
 - ブランチ: `feature/phase-05d`
 - 追加計画作成前のHEAD: `6b1499bda9323acb8e77f4bfcd35007d1f8a5114`
 - 現在のフェーズ: Phase 5D リファクタリング完了作業
-- 次に着手するタスク: Task 8 Stage 8D-C（destination selectionのRoute Guidance移管）
+- 次に着手するタスク: Task 8 Stage 8D-D（resume/snapshot ownershipのRoute Guidance移管）
 - Task 8の基準コミット: `ac8f2b035b3bf22b3ed03221eceebb8ccbf3f63a`
 - 直近のTask 8 WIPコミット: `24cf35fa9724e4b433e2c2573bf8b17d173481c2`
 - Stage 8D-A実装完了HEAD: `d9978339613201b838a53ed4865fbb001b2f056c`
@@ -50,6 +50,12 @@ Stage 8D-Bは完了した。Circle Status保存後のpurchase/hold別Route Guida
 `BrowserEventBinding.handleAction()`からpurchase/hold固有のNavigationState遷移、assets取得、route geometry計算、Session commitを削除した。focused tests、Route Guidance tests、webapp全体テスト、architecture/typecheck、Phase 5D回帰テストが成功している。
 
 次の一回はStage 8D-Cでdestination selection / preview / compare / confirm / cancelを移管する。Stage 8D-D以降を同じ実装担当へまとめて渡さない。
+
+### Stage 8D-Cの状態
+
+Stage 8D-Cは`e2f0b62`で完了した。candidate route選択、preview、compare、confirm、cancel、通常の手動目的地変更を`ChangeDestinationUseCase`と`RouteGuidanceController`へ移管し、route計算失敗時のcurrent route保持、stale候補の無効化、cross-area判定を固定した。`BrowserEventBinding`からdestinationのroute計算、NavigationOperations、Session snapshot組立てを削除した。
+
+次の一回はStage 8D-Dでresume/snapshot ownershipを移管する。
 
 ## 現在までに実装済みの主要部分
 
@@ -131,7 +137,7 @@ Task 7で得た検証結果は原因調査のbaselineとして利用するが、
 | Task 5 | 完了 | `ComiPathBrowserRuntime`を削除しbrowser bindingを明示化 |
 | Task 6 | 完了 | architecture guardrailとテスト境界を強化 |
 | Task 7 | 中断 | 最終検証中にbrowser binding ownershipとvisual snapshotの追加blockerを発見 |
-| Task 8 | 進行中 | Stage 8D-Bまで完了。次はStage 8D-Cでdestination selectionをfeatureへ移す |
+| Task 8 | 進行中 | Stage 8D-Cまで完了。次はStage 8D-Dでresume/snapshot ownershipをfeatureへ移す |
 | Task 9 | 未着手 | 残ったbrowser event registrationをowner別に分割 |
 | Task 10 | 未着手 | visual snapshot 5件を根拠付きで解消 |
 | Task 11 | 未着手 | 修正後HEADでPhase 5D全体を再検証 |
