@@ -8,7 +8,7 @@
 - ブランチ: `feature/phase-05d`
 - 追加計画作成前のHEAD: `6b1499bda9323acb8e77f4bfcd35007d1f8a5114`
 - 現在のフェーズ: Phase 5D リファクタリング完了作業
-- 次に着手するタスク: Task 8 Stage 8F（binder contractの型固定）
+- 次に着手するタスク: Task 9（browser event bindingの責務別整理。Stage 8F blocker解消を兼ねる）
 - Task 8の基準コミット: `ac8f2b035b3bf22b3ed03221eceebb8ccbf3f63a`
 - 直近のTask 8 WIPコミット: `24cf35fa9724e4b433e2c2573bf8b17d173481c2`
 - Stage 8D-A実装完了HEAD: `d9978339613201b838a53ed4865fbb001b2f056c`
@@ -72,6 +72,14 @@ Stage 8Eは`af51914`で完了した。Circle Data Source Sessionの動的wrapper
 `npm run test:webapp`（71 files / 512 tests）、`npm run test:route-guidance`、architecture/typecheck、focused tests、`git diff --check`が成功した。
 
 次の一回はStage 8Fでbinder contractを型で固定する。
+
+### Stage 8Fの状態
+
+Stage 8Fは未完了・保留とした。`bind-browser-events.ts`から`@ts-nocheck`を外すと、binder本体だけでなく`DomRouteGuidanceView`の未整備なpublic surface、custom elementのDOM型、既存の未定義`handleResetHold()`参照まで同時に露出し、同じ初回implicit `any` blockerで2回停止した。未完了差分は基準HEADへ戻している。
+
+Task 11完了を優先するため、計画の依存順を一時的に調整し、Task 9でBinderを責務別functionへ縮小してからStage 8Fを再評価する。これはTask 9の「Task 8完了」前提に対する明示的なblocker例外であり、Stage 8Fを完了扱いにはしない。
+
+次の一回はTask 9でevent ownershipを整理し、残ったbinderの型付け面を縮小する。
 
 ## 現在までに実装済みの主要部分
 
@@ -153,8 +161,8 @@ Task 7で得た検証結果は原因調査のbaselineとして利用するが、
 | Task 5 | 完了 | `ComiPathBrowserRuntime`を削除しbrowser bindingを明示化 |
 | Task 6 | 完了 | architecture guardrailとテスト境界を強化 |
 | Task 7 | 中断 | 最終検証中にbrowser binding ownershipとvisual snapshotの追加blockerを発見 |
-| Task 8 | 進行中 | Stage 8Eまで完了。次はStage 8Fでbinder contractを型で固定 |
-| Task 9 | 未着手 | 残ったbrowser event registrationをowner別に分割 |
+| Task 8 | 保留 | Stage 8Eまで完了。Stage 8Fはbinder型境界のblockerで保留し、Task 9後に再評価 |
+| Task 9 | 進行中 | Stage 8F blocker解消を兼ねて残ったbrowser event registrationをowner別に整理 |
 | Task 10 | 未着手 | visual snapshot 5件を根拠付きで解消 |
 | Task 11 | 未着手 | 修正後HEADでPhase 5D全体を再検証 |
 
