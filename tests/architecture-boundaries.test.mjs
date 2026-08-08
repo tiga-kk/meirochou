@@ -274,4 +274,55 @@ describe("webapp architecture boundaries", () => {
       ),
     ).toHaveLength(4);
   });
+
+  it("rejects concrete infrastructure APIs from app binders", () => {
+    const result = scanFixture({
+      "app/bind-route-guidance-events.ts": `
+        import { LocalStorageDistanceMatrixRepository } from "../features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
+        import { MatrixRepository } from "../features/route-guidance/repository";
+        import { OptimizerClient } from "../features/route-guidance/client";
+        import { RouteMapAssetsLoader } from "../features/route-guidance/loader";
+        import { RouteOptimizer } from "../features/route-guidance/optimizer";
+        const storage = localStorage;
+        const worker = new Worker("optimizer.js");
+        void LocalStorageDistanceMatrixRepository;
+        void MatrixRepository;
+        void OptimizerClient;
+        void RouteMapAssetsLoader;
+        void RouteOptimizer;
+        void storage;
+        void worker;
+      `,
+    });
+
+    expect(
+      result.violations.filter(
+        (item) => item.ruleId === "application-imports-concrete-infrastructure",
+      ),
+    ).toHaveLength(7);
+  });
+
+  it("keeps browser-application runtime imports outside the binder guardrail", () => {
+    const result = scanFixture({
+      "app/browser-application.ts":
+        'import { HttpRouteMapAssetsLoader } from "../features/route-guidance/infrastructure/http-route-map-assets-loader";',
+    });
+
+    expect(result.violations).toEqual([]);
+  });
+
+  it("allows DOM listeners and feature public APIs from app binders", () => {
+    const result = scanFixture({
+      "features/route-guidance/public-api.ts":
+        "export type RouteGuidanceAction = () => void;",
+      "app/bind-route-guidance-events.ts": `
+        import type { RouteGuidanceAction } from "../features/route-guidance/public-api";
+        export function bind(document: Document, action: RouteGuidanceAction) {
+          document.addEventListener("click", action);
+        }
+      `,
+    });
+
+    expect(result.violations).toEqual([]);
+  });
 });

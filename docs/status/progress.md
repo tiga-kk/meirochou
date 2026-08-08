@@ -8,7 +8,7 @@
 - ブランチ: `feature/phase-05d`
 - 追加計画作成前のHEAD: `6b1499bda9323acb8e77f4bfcd35007d1f8a5114`
 - 現在のフェーズ: Phase 5D リファクタリング完了作業
-- 次に着手するタスク: Stage 8G（architecture guardrailとTask 8最終検証）
+- 次に着手するタスク: Task 10（visual snapshot 5件の根拠付き解消）
 - Task 8の基準コミット: `ac8f2b035b3bf22b3ed03221eceebb8ccbf3f63a`
 - 直近のTask 8 WIPコミット: `24cf35fa9724e4b433e2c2573bf8b17d173481c2`
 - Stage 8D-A実装完了HEAD: `d9978339613201b838a53ed4865fbb001b2f056c`
@@ -86,6 +86,12 @@ Task 9でevent ownershipを整理し、残ったbinderを責務別functionへ縮
 Stage 8Fは、Task 9後の縮小されたbinder contractを対象として完了した。`bind-browser-events.ts`と各`bind-*.ts`に`@ts-nocheck`、広い`any`、index signatureはなく、`bindBrowserEvents`の依存と戻り値は明示型である。`CustomEvent.detail`は`CustomEvent<unknown>`境界を維持し、business validationはapplication側へ委譲している。`browser-application.ts`の既存`@ts-nocheck`完全除去はStage 8Fのbinder contract対象外として保留する。
 
 `npm run test:webapp`（72 files / 522 tests）、`npm run test:route-guidance`（28 tests）、Phase 5D回帰（4 tests）、architecture/typecheck、build、`git diff --check`が成功した。独立レビューもPASSである。
+
+### Stage 8Gの状態
+
+Stage 8Gは、`bind-browser-events.ts`のconcrete infrastructure特例をarchitecture checkerから削除し、全`app/bind-*.ts`を同じguardrailの対象に戻して完了した。`localStorage`と`new Worker(...)`の直接利用を検出するnegative rule、concrete infrastructure importを検出するfixture、DOM listenerとfeature public APIを許可するpositive fixtureを追加した。runtime moduleである`browser-application.ts`の扱いは既存責務を維持するため明示fixtureで固定している。
+
+Stage 8Gの検証は、focused 46 tests、`npm run test:webapp`（72 files / 525 tests）、`npm run test:route-guidance`（28 tests）、Phase 5D回帰（4 tests）、architecture/typecheck、build、`git diff --check`が成功した。独立レビューではguardrailとfixtureはPASSで、進捗記録のテスト数のみ補正した。
 
 ### Task 9の状態
 
@@ -173,7 +179,7 @@ Task 7で得た検証結果は原因調査のbaselineとして利用するが、
 | Task 5 | 完了 | `ComiPathBrowserRuntime`を削除しbrowser bindingを明示化 |
 | Task 6 | 完了 | architecture guardrailとテスト境界を強化 |
 | Task 7 | 中断 | 最終検証中にbrowser binding ownershipとvisual snapshotの追加blockerを発見 |
-| Task 8 | 保留 | Stage 8Fまで完了。Stage 8Gのarchitecture guardrailと最終ownership検証が残る |
+| Task 8 | 完了 | Stage 8A〜8G完了。browser binding ownershipとarchitecture guardrailを確定 |
 | Task 9 | 完了 | browser event registrationをowner別に整理し、root binderをcompose/cleanupへ縮小 |
 | Task 10 | 未着手 | visual snapshot 5件を根拠付きで解消 |
 | Task 11 | 未着手 | 修正後HEADでPhase 5D全体を再検証 |

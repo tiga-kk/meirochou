@@ -383,6 +383,7 @@ export function scanWebappArchitecture(options = {}) {
     );
     const importerIsComponent = /(?:^|\/)components\//.test(importer);
     const importerIsApp = /(?:^|\/)app\//.test(importer);
+    const importerIsAppBinder = importerIsApp && fileBase.startsWith("bind-");
 
     if (importer.endsWith("/public-api.ts")) {
       const concreteExport = stripComments(source).match(
@@ -453,6 +454,28 @@ export function scanWebappArchitecture(options = {}) {
           importer,
           null,
           "Domain code cannot depend on browser or infrastructure APIs",
+        );
+      }
+    }
+
+    if (importerIsAppBinder) {
+      const binderSource = stripStringLiterals(stripComments(source));
+      if (/\blocalStorage\b/i.test(binderSource)) {
+        addViolation(
+          violations,
+          "application-imports-concrete-infrastructure",
+          importer,
+          null,
+          "App binders cannot access concrete infrastructure APIs",
+        );
+      }
+      if (/\bnew\s+Worker\s*\(/.test(binderSource)) {
+        addViolation(
+          violations,
+          "application-imports-concrete-infrastructure",
+          importer,
+          null,
+          "App binders cannot access concrete infrastructure APIs",
         );
       }
     }
@@ -586,7 +609,6 @@ export function scanWebappArchitecture(options = {}) {
       if (
         importerIsApp &&
         !importer.endsWith("/assemble-comipath-application.ts") &&
-        !importer.endsWith("/bind-browser-events.ts") &&
         !importer.endsWith("/browser-application.ts") &&
         /(^|\/)(infrastructure|repository|client|loader|optimizer)(\/|$)|(?:local-storage|gas-|http-|web-worker-|browser-)/.test(
           lowerImport,
