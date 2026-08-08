@@ -121,7 +121,7 @@ export function createBrowserEventBindingOptions(
     ),
     resumeGuidance: new ResumeRouteGuidanceUseCase(
       routeGuidanceSession,
-      routeGuidanceSnapshotRepository,
+      navigationRuntimeController,
       routeMapAssetsLoader,
       runtimeMapAreaCatalog,
     ),
@@ -141,6 +141,7 @@ export function createBrowserEventBindingOptions(
     invalidateGuidance: new InvalidateRouteGuidanceUseCase(
       routeGuidanceSession,
     ),
+    navigationRuntimeController,
   });
   const completeCircleVisitOperation =
     options.completeCircleVisit ??

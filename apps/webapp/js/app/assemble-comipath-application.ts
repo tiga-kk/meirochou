@@ -32,6 +32,7 @@ import {
   createActiveEventDayReader,
   createActiveEventDaySession,
   DomEventDaySelectorView,
+  type EventDayRef,
   type EventDayRepository,
   EventDaySelectorController,
   type EventDaySelectorView,
@@ -82,6 +83,8 @@ export function assembleComiPathApplication(
   options: AssembleComiPathApplicationOptions,
 ): StartableApplication & Record<string, unknown> {
   let browserRuntime: any;
+  let routeGuidanceController: RouteGuidanceController | null = null;
+  let currentRouteGuidanceBundleVersion: string | null = null;
   const storage = new StorageService();
   const repository =
     options.repository ?? new LocalStorageEventDayRepository(storage);
@@ -197,13 +200,31 @@ export function assembleComiPathApplication(
       ? { workerFactory: options.createAlnsWorker }
       : {}),
   });
+  const saveRouteGuidanceSnapshot = (eventDay: EventDayRef) => {
+    const bundleVersion = currentRouteGuidanceBundleVersion;
+    if (!routeGuidanceController || !bundleVersion) return;
+    try {
+      routeGuidanceController.saveSnapshot(eventDay, bundleVersion);
+    } catch (error) {
+      console.warn("Navigation snapshot could not be saved.", error);
+    }
+  };
+  const clearRouteGuidanceSnapshot = (eventDay: EventDayRef) => {
+    if (!routeGuidanceController) return;
+    try {
+      routeGuidanceController.clearSavedSnapshot(eventDay);
+    } catch (error) {
+      console.warn("Navigation snapshot could not be cleared.", error);
+    }
+  };
   const routeGuidanceSnapshotRepository = {
     loadSnapshot: () => null,
-    saveSnapshot: () => browserRuntime.saveNavigationSnapshot(),
-    deleteSnapshot: (ref: Parameters<BrowserEventBinding["clearNavigationSnapshot"]>[0]) =>
-      browserRuntime.clearNavigationSnapshot(ref),
+    saveSnapshot: (eventDay: EventDayRef) =>
+      saveRouteGuidanceSnapshot(eventDay),
+    deleteSnapshot: (eventDay: EventDayRef) =>
+      clearRouteGuidanceSnapshot(eventDay),
   };
-  const routeGuidanceController = new RouteGuidanceController({
+  routeGuidanceController = new RouteGuidanceController({
     startGuidance: new StartRouteGuidanceUseCase(
       routeGuidanceSession,
       routeMapAreaCatalog,
@@ -212,7 +233,7 @@ export function assembleComiPathApplication(
     ),
     resumeGuidance: new ResumeRouteGuidanceUseCase(
       routeGuidanceSession,
-      routeGuidanceSnapshotRepository,
+      navigationRuntimeController,
       routeMapAssetsLoader,
       routeMapAreaCatalog,
     ),
@@ -232,15 +253,16 @@ export function assembleComiPathApplication(
     invalidateGuidance: new InvalidateRouteGuidanceUseCase(
       routeGuidanceSession,
     ),
+    navigationRuntimeController,
   });
 
   const deleteLocalData = new DeleteLocalDataUseCase(
     repository,
     {
-      deleteActivitySnapshot: (ref) => browserRuntime.clearNavigationSnapshot(ref),
+      deleteActivitySnapshot: (ref) => clearRouteGuidanceSnapshot(ref),
       deleteAllRouteData: (ref) => {
-        browserRuntime.matrixRepository.deleteByEventDay(ref.eventId, ref.dayId);
-        browserRuntime.clearNavigationSnapshot(ref);
+        matrixRepository.deleteByEventDay(ref.eventId, ref.dayId);
+        clearRouteGuidanceSnapshot(ref);
       },
     },
     {
@@ -292,6 +314,8 @@ export function assembleComiPathApplication(
     browserRuntime: {
       start: async () => {
         await browserRuntime.start();
+        currentRouteGuidanceBundleVersion =
+          browserRuntime.currentManifest?.bundleVersion ?? null;
         const runtimeRegistry = browserRuntime.eventRegistry;
         const runtimeRegistryUrl = browserRuntime.eventRegistryUrl;
         if (runtimeRegistry) {
@@ -317,6 +341,8 @@ export function assembleComiPathApplication(
               afterSwitch: async (newRef, manifest) => {
                 runtimeMapAreaCatalog.replaceMapAreas(manifest.areas);
                 browserRuntime.currentManifest = manifest;
+                currentRouteGuidanceBundleVersion =
+                  manifest.bundleVersion ?? null;
                 const state = repository.load(newRef);
                 if (state) activeEventDaySession.setActiveEventDay(newRef, state);
               },

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { beforeEach, describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
 import { createBrowserEventBindingOptions } from "./helpers/browser-event-binding-fixture";
 import { LocalStorageDistanceMatrixRepository } from "../apps/webapp/js/features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
@@ -36,7 +36,6 @@ describe("Phase 5C Task 11: NavigationRuntimeController", () => {
     expect(app.navigationRuntimeController).toBeDefined();
     expect(app.snapshotRepository).toBeDefined();
     expect(app.matrixRepository).toBeDefined();
-    expect(app.orchestrationService).toBeDefined();
 
     expect(app.navigationRuntimeController.getSnapshotRepo()).toBe(
       app.snapshotRepository,
@@ -44,9 +43,7 @@ describe("Phase 5C Task 11: NavigationRuntimeController", () => {
     expect(app.navigationRuntimeController.getMatrixRepo()).toBe(
       app.matrixRepository,
     );
-    expect(app.navigationRuntimeController.getOrchestration()).toBe(
-      app.orchestrationService,
-    );
+    expect(app.navigationRuntimeController.getOrchestration()).toBeDefined();
 
     expect(app.localDataDeletionUseCase).toBe(
       dependencies.localDataDeletionUseCase,
@@ -328,5 +325,81 @@ describe("Phase 5C Task 11: NavigationRuntimeController", () => {
       "A-01",
       "A-02",
     ]);
+  });
+
+  test("invalidateActiveOptimization terminates the old worker and ignores stale progress callbacks", () => {
+    let postedMessage: unknown = null;
+    const fakeWorker = {
+      postMessage(msg: unknown) {
+        postedMessage = msg;
+      },
+      onmessage: null as ((ev: { data: unknown }) => void) | null,
+      terminate: vi.fn(),
+    };
+
+    const controller = new NavigationRuntimeController({
+      snapshotRepo: new LocalStorageNavigationSnapshotRepository(localStorage),
+      matrixRepo: new LocalStorageDistanceMatrixRepository(localStorage),
+      orchestration: new NavigationOrchestrationService(),
+      workerFactory: () => fakeWorker as unknown as Worker,
+    });
+
+    const onProgress = vi.fn();
+    const startedState = controller.launchAlnsOptimization(
+      {
+        navState: {
+          stage: "navigating" as const,
+          areaId: "e456",
+          currentPosition: null,
+          targetSpace: "A-01",
+          lockedFirstLeg: null,
+          provisionalOrder: ["A-01", "A-02"],
+          bestOrder: ["A-01", "A-02"],
+        },
+        areaId: "e456",
+        startDistanceToCircles: [0, 10],
+        pendingCircles: [
+          { space: "A-01", priority: 1 },
+          { space: "A-02", priority: 2 },
+        ],
+        distanceMatrix: [0, 10, 10, 0],
+        fixedFirstTarget: "A-01",
+        searchTimeLimitMs: 10000,
+        initialSolutions: [["A-01", "A-02"]],
+      },
+      onProgress,
+    );
+
+    const request = postedMessage as { jobId: string };
+    const staleHandler = fakeWorker.onmessage;
+    expect(startedState.optimizationGeneration).toBe(1);
+    expect(request.jobId).toBeTruthy();
+    expect(staleHandler).not.toBeNull();
+
+    controller.invalidateActiveOptimization();
+
+    expect(controller.getCurrentJobId()).toBeNull();
+    expect(fakeWorker.onmessage).toBeNull();
+    expect(fakeWorker.terminate).toHaveBeenCalledOnce();
+
+    staleHandler?.({
+      data: {
+        type: "progress",
+        stage: "time-decayed-alns",
+        jobId: request.jobId,
+        elapsedMs: 100,
+        searchTimeLimitMs: 10000,
+        best: {
+          score: 8,
+          cost: 8,
+          route: ["A-02", "A-01"],
+          completionTimesSec: [5, 15],
+          elapsedMs: 100,
+          optimizationProfileVersion: "v1",
+        },
+      },
+    });
+
+    expect(onProgress).not.toHaveBeenCalled();
   });
 });

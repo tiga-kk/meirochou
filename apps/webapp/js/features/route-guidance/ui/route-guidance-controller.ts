@@ -1,4 +1,10 @@
-import type { Circle, EventDayRef } from "../../event-day/public-api";
+import type {
+  Circle,
+  CircleVisitState,
+  EventDayRef,
+} from "../../event-day/public-api";
+import type { NavigationSnapshot } from "../infrastructure/local-storage-route-guidance-snapshot-repository";
+import type { RouteGuidanceRuntimeController } from "../infrastructure/route-guidance-runtime-controller";
 import type { RouteGuidanceSession } from "../domain/route-guidance-types";
 import type { ApplyOptimizedRouteOrderUseCase } from "../use-cases/apply-optimized-route-order";
 import type {
@@ -12,7 +18,10 @@ import type {
   FinishCurrentCircleUseCase,
 } from "../use-cases/finish-current-circle";
 import type { InvalidateRouteGuidanceUseCase } from "../use-cases/invalidate-route-guidance";
-import type { ResumeRouteGuidanceUseCase } from "../use-cases/resume-route-guidance";
+import type {
+  ResumeRouteGuidanceResult,
+  ResumeRouteGuidanceUseCase,
+} from "../use-cases/resume-route-guidance";
 import type { StartRouteGuidanceUseCase } from "../use-cases/start-route-guidance";
 
 export interface RouteGuidanceControllerDependencies {
@@ -23,7 +32,22 @@ export interface RouteGuidanceControllerDependencies {
   session?: RouteGuidanceSession;
   invalidateGuidance?: InvalidateRouteGuidanceUseCase;
   applyOptimizedOrder?: ApplyOptimizedRouteOrderUseCase;
+  navigationRuntimeController: RouteGuidanceRuntimeController;
 }
+
+export interface InitializeResumeStartupInput {
+  readonly eventDay: EventDayRef;
+  readonly bundleVersion: string;
+  readonly circleStates: Record<string, CircleVisitState>;
+  readonly pendingCircleSpaces: readonly string[];
+}
+
+export type InitializeResumeStartupResult =
+  | { readonly kind: "idle" }
+  | {
+      readonly kind: "ready";
+      readonly targetSpace: string;
+    };
 
 export class RouteGuidanceController {
   private optimizationTimeLimitMs: 5000 | 10000 | 15000 = 10000;
@@ -33,14 +57,43 @@ export class RouteGuidanceController {
   async resumeSavedGuidance(
     eventDay: EventDayRef,
     circles: readonly Circle[],
-  ): Promise<boolean> {
-    return this.deps.resumeGuidance.execute({ eventDay, circles });
+    circleStates: Record<string, CircleVisitState> = {},
+  ): Promise<ResumeRouteGuidanceResult> {
+    const result = await this.deps.resumeGuidance.execute({
+      eventDay,
+      circles,
+      circleStates,
+    });
+    if (result.kind === "resumed") {
+      this.setOptimizationTimeLimit(result.optimizationTimeLimitMs);
+    }
+    return result;
   }
 
   async startFromCurrentLocation(
     input: Parameters<StartRouteGuidanceUseCase["execute"]>[0],
   ): Promise<void> {
     return this.deps.startGuidance.execute(input);
+  }
+
+  initializeResumeStartup(
+    input: InitializeResumeStartupInput,
+  ): InitializeResumeStartupResult {
+    const startup = this.deps.navigationRuntimeController.initStartup({
+      eventId: input.eventDay.eventId,
+      dayId: input.eventDay.dayId,
+      bundleVersion: input.bundleVersion,
+      circleStates: input.circleStates,
+      pendingCircleSpaces: input.pendingCircleSpaces,
+    });
+    const targetSpace = startup.snapshot?.navState.targetSpace;
+    if (!startup.shouldShowResumeDialog || !targetSpace) {
+      return { kind: "idle" };
+    }
+    return {
+      kind: "ready",
+      targetSpace,
+    };
   }
 
   async selectDestination(
@@ -86,12 +139,51 @@ export class RouteGuidanceController {
     else this.requireSession().clear();
   }
 
+  resetRuntimeState(): void {
+    this.deps.navigationRuntimeController.invalidateActiveOptimization();
+    this.deps.navigationRuntimeController.setPendingResumeSnapshot(null);
+    this.deps.navigationRuntimeController.setMatrixRef(null);
+    this.reset();
+  }
+
   setOptimizationTimeLimit(value: 5000 | 10000 | 15000): void {
     this.optimizationTimeLimitMs = value;
   }
 
   getOptimizationTimeLimit(): 5000 | 10000 | 15000 {
     return this.optimizationTimeLimitMs;
+  }
+
+  saveSnapshot(
+    eventDay: EventDayRef,
+    bundleVersion: string,
+  ): NavigationSnapshot | null {
+    const navState = this.requireSession().getSnapshot().navigationState;
+    if (!bundleVersion || !navState?.areaId) return null;
+    const snapshot: NavigationSnapshot = {
+      schemaVersion: 1,
+      eventId: eventDay.eventId,
+      dayId: eventDay.dayId,
+      areaId: navState.areaId,
+      bundleVersion,
+      matrixRef: this.deps.navigationRuntimeController.getMatrixRef(),
+      navState,
+      optimizationTimeLimitMs: this.optimizationTimeLimitMs,
+      savedAt: new Date().toISOString(),
+    };
+    this.deps.navigationRuntimeController.saveSnapshot(
+      eventDay.eventId,
+      eventDay.dayId,
+      snapshot,
+    );
+    return snapshot;
+  }
+
+  clearSavedSnapshot(eventDay: EventDayRef): void {
+    this.deps.navigationRuntimeController.clearSnapshot(
+      eventDay.eventId,
+      eventDay.dayId,
+    );
   }
 
   async applyOptimizedOrder(

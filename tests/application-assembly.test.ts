@@ -40,6 +40,7 @@ const mockState = vi.hoisted(() => ({
   bindings: [] as Array<{
     clearNavigationSnapshot: ReturnType<typeof vi.fn>;
     matrixRepository: { deleteByEventDay: ReturnType<typeof vi.fn> };
+    currentManifest?: { bundleVersion?: string };
   }>,
 }));
 
@@ -55,6 +56,7 @@ vi.mock("../apps/webapp/js/app/bind-browser-events", () => ({
       mockState.bindings.push(this);
     }
     async start() {
+      this.currentManifest = { bundleVersion: "bundle-v1" };
       mockState.options[0].eventDayDependencies.backgroundProcess.start();
       mockState.workerFactories[0]?.();
     }
@@ -178,19 +180,77 @@ describe("application assembly", () => {
     });
 
     const binding = mockState.bindings[0];
+    const routeDependencies = mockState.options[0]
+      .routeGuidanceDependencies as any;
+    const clearSavedSnapshot = vi.spyOn(
+      routeDependencies.routeGuidanceController,
+      "clearSavedSnapshot",
+    );
+    const deleteByEventDay = vi.spyOn(
+      routeDependencies.matrixRepository,
+      "deleteByEventDay",
+    );
     const deletion = mockState.options[0].localDataDeletionUseCase;
     await deletion.execute({ kind: "activity", eventDay: ref });
-    expect(binding.clearNavigationSnapshot).toHaveBeenCalledWith(ref);
-    expect(binding.clearNavigationSnapshot).toHaveBeenCalledOnce();
+    expect(clearSavedSnapshot).toHaveBeenCalledWith(ref);
+    expect(clearSavedSnapshot).toHaveBeenCalledOnce();
+    expect(deleteByEventDay).not.toHaveBeenCalled();
+    expect(binding.clearNavigationSnapshot).not.toHaveBeenCalled();
     expect(binding.matrixRepository.deleteByEventDay).not.toHaveBeenCalled();
 
     await deletion.execute({ kind: "circle-source", eventDay: ref });
 
-    expect(binding.matrixRepository.deleteByEventDay).toHaveBeenCalledWith(
+    expect(deleteByEventDay).toHaveBeenCalledWith(
       ref.eventId,
       ref.dayId,
     );
-    expect(binding.clearNavigationSnapshot).toHaveBeenCalledTimes(2);
+    expect(clearSavedSnapshot).toHaveBeenCalledTimes(2);
+    expect(binding.clearNavigationSnapshot).not.toHaveBeenCalled();
+    expect(binding.matrixRepository.deleteByEventDay).not.toHaveBeenCalled();
     expect(state.gasOutbox).toEqual([]);
+  });
+
+  it("wires start snapshot persistence through the route guidance controller after startup", async () => {
+    const app = assembleComiPathApplication({
+      document: {} as Document,
+      window: {} as Window,
+    });
+    const routeDependencies = mockState.options[0]
+      .routeGuidanceDependencies as any;
+    const saveSnapshot = vi.spyOn(
+      routeDependencies.routeGuidanceController,
+      "saveSnapshot",
+    );
+    const clearSavedSnapshot = vi.spyOn(
+      routeDependencies.routeGuidanceController,
+      "clearSavedSnapshot",
+    );
+    const binding = mockState.bindings[0];
+    const startGuidance = routeDependencies.routeGuidanceController.deps
+      .startGuidance;
+    const snapshotRepository = startGuidance.snapshotRepo;
+    const ref: EventDayRef = { eventId: "demo-v1", dayId: "day1" };
+
+    await app.start();
+
+    snapshotRepository.saveSnapshot(ref, {
+      eventId: ref.eventId,
+      dayId: ref.dayId,
+      mapAreaId: "east",
+      startPosition: {
+        areaId: "east",
+        gridIndex: 0,
+        svgX: 10,
+        svgY: 20,
+        source: "manual-start",
+      },
+      targetSpace: "東A01a",
+      visitedSpaces: [],
+    });
+    snapshotRepository.deleteSnapshot(ref);
+
+    expect(saveSnapshot).toHaveBeenCalledWith(ref, "bundle-v1");
+    expect(clearSavedSnapshot).toHaveBeenCalledWith(ref);
+    expect(binding.clearNavigationSnapshot).not.toHaveBeenCalled();
   });
 });

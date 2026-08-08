@@ -104,6 +104,8 @@ describe("apps public behavior characterization", () => {
       "selectedRoute",
       "selectionState",
       "nextTarget",
+      "activeResumeSnapshot",
+      "navigationMatrixRef",
     ]) {
       expect(Object.hasOwn(app, property)).toBe(false);
     }
@@ -164,6 +166,82 @@ describe("apps public behavior characterization", () => {
       "経路の再構築に失敗したため、目的地を変更できません",
       "error",
     );
+  });
+
+  it("delegates resume startup initialization to the route guidance controller and only updates the dialog", async () => {
+    const repository = {
+      load: vi.fn(() => ({
+        ...createEmptyEventDayState(
+          { type: "csv", fileName: "circles.csv" },
+          "generation-1",
+          NOW,
+        ),
+        circles: [{ space: "E1-01", removedFromSource: false }],
+        circleStates: { "E1-01": "pending" },
+      })),
+      save: vi.fn(),
+      saveAndRememberLastOpened: vi.fn(),
+      listEventDays: vi.fn(() => [REF]),
+      getLastOpenedEventDay: vi.fn(() => REF),
+      rememberLastOpenedEventDay: vi.fn(),
+      deleteEventDay: vi.fn(),
+      listEventDaysForDeletion: vi.fn(() => []),
+      deleteAllEventDays: vi.fn(),
+    };
+    document.body.innerHTML = `
+      <button id="toggle-settings"></button><div id="settings-area"></div>
+      <button id="btn-search"></button><button id="btn-purchased"></button>
+      <button id="btn-hold"></button><button id="btn-reset-all"></button>
+      <select id="loc-ewsn"></select><select id="loc-label"></select>
+      <input id="loc-number" /><span id="header-area-mark"></span>
+      <span id="header-area-title"></span>
+      <div id="source-diff-dialog"></div>
+      <navigation-resume-dialog id="navigation-resume-dialog"></navigation-resume-dialog>`;
+    const options = createBrowserEventBindingOptions({ repository });
+    const app = new BrowserEventBinding(options);
+    const initializeResumeStartup = vi
+      .spyOn(app.routeGuidanceController, "initializeResumeStartup")
+      .mockReturnValue({
+        kind: "ready",
+        targetSpace: "E1-01",
+      });
+    const searchNextSpy = vi
+      .spyOn(app, "searchNext")
+      .mockImplementation(async () => {});
+
+    await app.init(
+      { bundleVersion: "bundle-v1", areas: [] },
+      REF,
+      {
+        registry: {
+          schemaVersion: 1,
+          events: [
+            {
+              eventId: REF.eventId,
+              displayName: "Demo",
+              mapBundle: "demo",
+              days: [{ dayId: REF.dayId, displayName: "Day 1" }],
+            },
+          ],
+        },
+        registryUrl: "",
+      },
+    );
+
+    const dialog = document.getElementById(
+      "navigation-resume-dialog",
+    ) as HTMLElement & { open?: boolean; targetSpace?: string; errorMessage?: string };
+
+    expect(initializeResumeStartup).toHaveBeenCalledWith({
+      eventDay: REF,
+      bundleVersion: "bundle-v1",
+      circleStates: { "E1-01": "pending" },
+      pendingCircleSpaces: ["E1-01"],
+    });
+    expect(dialog.targetSpace).toBe("E1-01");
+    expect(dialog.errorMessage).toBe("");
+    expect(dialog.open).toBe(true);
+    expect(searchNextSpy).not.toHaveBeenCalled();
   });
 
   it("binds each browser event once and stops sync coordination on dispose", () => {

@@ -88,8 +88,6 @@ function areSpacesInSameArea(spaceA, spaceB, mapAreaCatalog) {
   return Boolean(areaA && areaB && areaA.id === areaB.id);
 }
 
-const DEFAULT_NAVIGATION_OPTIMIZATION_TIME_LIMIT_MS = 10000;
-
 /**
  * アプリケーションのメインコントローラー
  */
@@ -220,10 +218,6 @@ export class BrowserEventBinding {
     this.currentManifest = null;
     this.transitionToken = 0;
     this.isTransitioning = false;
-    this.activeResumeSnapshot = null;
-    this.navigationMatrixRef = null;
-    this.optimizationTimeLimitMs =
-      DEFAULT_NAVIGATION_OPTIMIZATION_TIME_LIMIT_MS;
     this.sourceErrorMessage = "";
     this.outboxResultMessage = "";
     this.outboxErrorMessage = "";
@@ -861,19 +855,17 @@ export class BrowserEventBinding {
         )
         .map((c) => c.space);
 
-      const startupResult = this.navigationRuntimeController.initStartup({
-        eventId: this.activeRef.eventId,
-        dayId: this.activeRef.dayId,
+      const startupResult = this.routeGuidanceController.initializeResumeStartup({
+        eventDay: this.activeRef,
         bundleVersion: manifest?.bundleVersion || "",
         circleStates: this.activeState.circleStates,
         pendingCircleSpaces,
       });
 
-      if (startupResult.shouldShowResumeDialog && startupResult.snapshot) {
-        this.activeResumeSnapshot = startupResult.snapshot;
+      if (startupResult.kind === "ready") {
         const dialog = document.getElementById("navigation-resume-dialog");
         if (dialog) {
-          dialog.targetSpace = startupResult.snapshot.navState.targetSpace;
+          dialog.targetSpace = startupResult.targetSpace;
           dialog.errorMessage = "";
           dialog.open = true;
         }
@@ -961,26 +953,10 @@ export class BrowserEventBinding {
   saveNavigationSnapshot() {
     const activeRef = this.activeRef;
     const bundleVersion = this.currentManifest?.bundleVersion;
-    const navState = this.routeGuidanceSession.getSnapshot().navigationState;
-    if (!activeRef || !bundleVersion || !navState?.areaId) return;
+    if (!activeRef || !bundleVersion) return;
 
-    const snapshot = {
-      schemaVersion: 1,
-      eventId: activeRef.eventId,
-      dayId: activeRef.dayId,
-      areaId: navState.areaId,
-      bundleVersion,
-      matrixRef: this.navigationMatrixRef || null,
-      navState,
-      optimizationTimeLimitMs: this.optimizationTimeLimitMs,
-      savedAt: new Date().toISOString(),
-    };
     try {
-      this.navigationRuntimeController.saveSnapshot(
-        activeRef.eventId,
-        activeRef.dayId,
-        snapshot,
-      );
+      this.routeGuidanceController.saveSnapshot(activeRef, bundleVersion);
     } catch (error) {
       console.warn("Navigation snapshot could not be saved.", error);
       this.ui.showToast(
@@ -994,7 +970,7 @@ export class BrowserEventBinding {
   clearNavigationSnapshot(ref = this.activeRef) {
     if (!ref) return;
     try {
-      this.navigationRuntimeController.clearSnapshot(ref.eventId, ref.dayId);
+      this.routeGuidanceController.clearSavedSnapshot(ref);
     } catch (error) {
       console.warn("Navigation snapshot could not be cleared.", error);
       this.ui.showToast("案内状態の削除に失敗しました", "warning");
@@ -1016,16 +992,8 @@ export class BrowserEventBinding {
   }
 
   resetNavigationRuntimeState() {
-    this.navigationMatrixRef = null;
-    this.activeResumeSnapshot = null;
     this.currentStartSpace = "";
-    this.replaceRouteGuidanceSnapshot({
-      navigationState: null,
-      currentDestination: null,
-      currentRoute: null,
-      selectedDestination: null,
-      selectedRoute: null,
-    });
+    this.routeGuidanceController.resetRuntimeState();
   }
 
   /** Copy exact grid distance and adopted endpoint onto a circle view model. */
@@ -1274,7 +1242,7 @@ export class BrowserEventBinding {
       (e) => {
         const value = Number(e.detail?.searchTimeLimitMs);
         if ([5000, 10000, 15000].includes(value)) {
-          this.optimizationTimeLimitMs = value;
+          this.routeGuidanceController.setOptimizationTimeLimit(value);
           if (this.routeGuidanceSession.getSnapshot().navigationState)
             this.saveNavigationSnapshot();
         }
@@ -1777,246 +1745,39 @@ export class BrowserEventBinding {
    * 案内再開の確定処理
    */
   async handleResumeConfirm() {
-    if (!this.activeResumeSnapshot) return;
+    if (!this.activeRef || !this.activeState) return;
+    const resumeResult = await this.routeGuidanceController.resumeSavedGuidance(
+      this.activeRef,
+      this.wantToBuy,
+      this.activeState.circleStates,
+    );
 
-    const snapshot = this.activeResumeSnapshot;
-    const resumeResult =
-      this.navigationRuntimeController.resumeFromSnapshot(snapshot);
-
-    const targetSpace = resumeResult.navState.targetSpace;
-    const lockedLeg = resumeResult.navState.lockedFirstLeg;
-
-    const targetCircle = targetSpace
-      ? this.wantToBuy.find((c) => c.space === targetSpace) || null
-      : null;
-
-    if (!targetCircle) {
-      const dialog = document.getElementById("navigation-resume-dialog");
-      if (dialog) {
-        dialog.errorMessage =
-          "目的地が見つかりません。始点を再設定してください";
-      }
-      this.ui.showToast(
-        "目的地が見つかりません。始点を再設定してください",
-        "error",
-      );
-      return;
-    }
-
-    let route = null;
-    if (lockedLeg?.from) {
-      if (lockedLeg.from.type === "start") {
-        const area = this.routeMapAreaCatalog
-          .getAllMapAreas()
-          .find((a) => a.id === lockedLeg.from.areaId) ||
-          findAreaForSpace(targetCircle.space, this.routeMapAreaCatalog) ||
-          this.routeMapAreaCatalog.getAllMapAreas()[0] || {
-            id: lockedLeg.from.areaId,
-          };
-        const assets = area ? await this.loadGridRouteAssets(area) : null;
-        if (assets) {
-          route = planRouteFromGridIndex(
-            assets.pointsPayload,
-            assets.gridMeta,
-            assets.gridBytes,
-            lockedLeg.from.gridIndex,
-            targetCircle.space,
-          );
-        }
-      } else if (lockedLeg.from.type === "circle") {
-        route = await this.planGridRoute(
-          lockedLeg.from.space,
-          targetCircle.space,
-        );
-      }
-    }
-
-    // Geometry reconstruction failed: preserve activeResumeSnapshot so user can retry or reset start
-    if (!route) {
-      const dialog = document.getElementById("navigation-resume-dialog");
-      if (dialog) {
-        dialog.errorMessage =
-          "経路の再構築に失敗しました。始点を設定し直してください";
-      }
-      this.ui.showToast(
-        "経路の再構築に失敗しました。始点を設定し直してください",
-        "error",
-      );
-      return;
-    }
-
-    // Geometry reconstruction succeeded: dismiss dialog and discard snapshot lock
-    this.activeResumeSnapshot = null;
-    this.navigationMatrixRef = resumeResult.matrixRef;
-    this.optimizationTimeLimitMs = resumeResult.optimizationTimeLimitMs;
     const dialog = document.getElementById("navigation-resume-dialog");
+    if (resumeResult.kind === "idle") return;
+
+    if (resumeResult.kind === "failed") {
+      if (dialog) {
+        dialog.errorMessage = resumeResult.message;
+      }
+      this.ui.showToast(resumeResult.message, "error");
+      return;
+    }
+
     if (dialog) {
       dialog.errorMessage = "";
       dialog.open = false;
     }
-
+    const lockedLeg =
+      this.routeGuidanceSession.getSnapshot().navigationState?.lockedFirstLeg;
     this.currentStartSpace =
-      lockedLeg.from.type === "circle" ? lockedLeg.from.space : "";
-    const target = this.targetWithRoute(targetCircle, route);
-    this.replaceRouteGuidanceSnapshot({
-      navigationState: resumeResult.navState,
-      currentDestination: target,
-      currentRoute: route,
-      selectedDestination: target,
-      selectedRoute: route,
-      selectionStatus: "idle",
-    });
+      lockedLeg?.from?.type === "circle" ? lockedLeg.from.space : "";
     this.selectionMessage = "";
-
     this.ui.showNavigation(this.getNavigationContext("current"));
     this.ui.showToast(
-      `前回の案内（目的地: ${targetCircle.space}）を再開しました`,
+      `前回の案内（目的地: ${resumeResult.targetSpace}）を再開しました`,
     );
-
-    // Warm-start ALNS worker background optimization if matrix exists
-    if (!resumeResult.matrixRef) {
-      this.ui.showToast(
-        "距離行列が見つからないため、最適化を開始できませんでした",
-        "error",
-      );
-      return;
-    }
-
-    const storedMatrix = this.matrixRepository.load(resumeResult.matrixRef);
-    if (!storedMatrix) {
-      this.ui.showToast(
-        "保存済みの距離行列を読み込めないため、最適化を開始できませんでした",
-        "error",
-      );
-      return;
-    }
-
-    // Validate storedMatrix
-    const matrixAreaId = storedMatrix.areaId;
-    const matrixSpaces = storedMatrix.spaces;
-    const matrixSize = storedMatrix.size;
-    const distances = storedMatrix.distances;
-
-    const isMatrixValid =
-      typeof matrixAreaId === "string" &&
-      matrixAreaId === resumeResult.navState.areaId &&
-      Array.isArray(matrixSpaces) &&
-      Number.isInteger(matrixSize) &&
-      matrixSpaces.length === matrixSize &&
-      Array.isArray(distances) &&
-      distances.length === matrixSize * matrixSize;
-
-    if (!isMatrixValid || !matrixSpaces.includes(targetSpace)) {
-      this.ui.showToast(
-        "保存済みの距離行列が現在の案内状態と一致しません",
-        "error",
-      );
-      return;
-    }
-
-    // Filter pending circles present in stored matrix spaces
-    const pendingCircles = this.wantToBuy.filter(
-      (c) =>
-        matrixSpaces.includes(c.space) &&
-        (this.activeState?.circleStates[c.space] ?? "pending") === "pending",
-    );
-    const pendingSpaces = pendingCircles.map((c) => c.space);
-
-    // Sub-matrix extraction: N_sub x N_sub
-    const nSub = pendingSpaces.length;
-    const subDistances = new Array(nSub * nSub).fill(Infinity);
-    for (let i = 0; i < nSub; i++) {
-      const origI = matrixSpaces.indexOf(pendingSpaces[i]);
-      for (let j = 0; j < nSub; j++) {
-        const origJ = matrixSpaces.indexOf(pendingSpaces[j]);
-        subDistances[i * nSub + j] = distances[origI * matrixSize + origJ];
-      }
-    }
-
-    const startArea =
-      lockedLeg?.from?.type === "start"
-        ? this.routeMapAreaCatalog
-            .getAllMapAreas()
-            .find((a) => a.id === lockedLeg.from.areaId) ||
-          findAreaForSpace(targetCircle.space, this.routeMapAreaCatalog)
-        : lockedLeg?.from?.type === "circle"
-          ? findAreaForSpace(lockedLeg.from.space, this.routeMapAreaCatalog)
-          : null;
-
-    const assets = startArea ? await this.loadGridRouteAssets(startArea) : null;
-    const startIndex =
-      lockedLeg?.from?.type === "start"
-        ? lockedLeg.from.gridIndex
-        : lockedLeg?.from?.type === "circle" && assets
-          ? this.findPointPortalIndex(
-              assets.pointsPayload,
-              assets.gridMeta,
-              lockedLeg.from.space,
-            )
-          : null;
-    const endpointIndexes = assets
-      ? pendingCircles.map((circle) =>
-          this.findPointPortalIndex(
-            assets.pointsPayload,
-            assets.gridMeta,
-            circle.space,
-          ),
-        )
-      : [];
-
-    if (
-      !assets ||
-      startIndex === null ||
-      endpointIndexes.some((index) => index === null)
-    ) {
-      this.ui.showToast(
-        "始点距離の計算に失敗したため、最適化を開始できませんでした",
-        "error",
-      );
-      return;
-    }
-
-    const startDistanceToCircles = Array.from(
-      distancesFromStartToEndpoints(
-        startIndex,
-        {
-          grid: assets.gridBytes,
-          cols: assets.gridMeta.cols,
-          rows: assets.gridMeta.rows,
-          cellSize: assets.gridMeta.cell_size,
-        },
-        endpointIndexes,
-      ),
-    );
-
-    if (
-      startDistanceToCircles.some(
-        (distance) =>
-          typeof distance !== "number" ||
-          !Number.isFinite(distance) ||
-          distance < 0,
-      )
-    ) {
-      this.ui.showToast(
-        "始点距離が不正なため、最適化を開始できませんでした",
-        "error",
-      );
-      return;
-    }
-
-    try {
-      this.launchAlnsWorkerJob({
-        areaId: matrixAreaId,
-        startDistanceToCircles,
-        pendingCircles,
-        subDistances,
-        fixedFirstTarget: resumeResult.fixedFirstTarget,
-        searchTimeLimitMs: resumeResult.optimizationTimeLimitMs,
-        initialSolutions: resumeResult.initialSolutions,
-      });
-    } catch (error) {
-      console.error("Failed to start ALNS optimization", error);
-      this.ui.showToast("最適化の開始に失敗しました", "error");
+    if (resumeResult.warningMessage) {
+      this.ui.showToast(resumeResult.warningMessage, "error");
     }
   }
 
@@ -2085,35 +1846,13 @@ export class BrowserEventBinding {
     };
   }
 
-  /** Helper method to launch ALNS worker job and bind message handler. */
-  launchAlnsWorkerJob(params) {
-    const updatedNavState =
-      this.navigationRuntimeController.launchAlnsOptimization(
-        {
-          navState: this.routeGuidanceSession.getSnapshot().navigationState,
-          areaId: params.areaId,
-          startDistanceToCircles: params.startDistanceToCircles,
-          pendingCircles: params.pendingCircles,
-          distanceMatrix: params.subDistances,
-          fixedFirstTarget: params.fixedFirstTarget,
-          searchTimeLimitMs: params.searchTimeLimitMs,
-          initialSolutions: params.initialSolutions,
-        },
-        (nextNavState) => {
-          this.replaceRouteGuidanceSnapshot({ navigationState: nextNavState });
-          this.ui.showNavigation(this.getNavigationContext("current"));
-          this.saveNavigationSnapshot();
-        },
-      );
-    this.replaceRouteGuidanceSnapshot({ navigationState: updatedNavState });
-  }
-
   /**
    * 始点再設定処理（navigation stateのみ破棄し、circle stateとdistance matrixは保持）
    */
   handleResumeResetStart() {
     this.clearNavigationSnapshot();
-    this.resetNavigationRuntimeState();
+    this.routeGuidanceController.resetRuntimeState();
+    this.currentStartSpace = "";
 
     const dialog = document.getElementById("navigation-resume-dialog");
     if (dialog) {

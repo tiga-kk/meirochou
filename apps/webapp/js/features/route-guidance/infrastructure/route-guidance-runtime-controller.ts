@@ -65,6 +65,8 @@ export class RouteGuidanceRuntimeController {
   private worker: AlnsWorkerPort | null = null;
   private currentJobId: string | null = null;
   private currentGeneration = 0;
+  private pendingResumeSnapshot: NavigationSnapshot | null = null;
+  private matrixRef: string | null = null;
 
   constructor(deps: ControllerDependencies) {
     this.snapshotRepo = deps.snapshotRepo;
@@ -98,11 +100,34 @@ export class RouteGuidanceRuntimeController {
     return this.currentGeneration;
   }
 
+  getPendingResumeSnapshot(): NavigationSnapshot | null {
+    return this.pendingResumeSnapshot;
+  }
+
+  setPendingResumeSnapshot(snapshot: NavigationSnapshot | null): void {
+    this.pendingResumeSnapshot = snapshot;
+  }
+
+  getMatrixRef(): string | null {
+    return this.matrixRef;
+  }
+
+  setMatrixRef(matrixRef: string | null): void {
+    this.matrixRef = matrixRef;
+  }
+
+  invalidateActiveOptimization(): void {
+    this.currentJobId = null;
+    if (this.worker) {
+      this.worker.onmessage = null;
+      this.worker.terminate?.();
+      this.worker = null;
+    }
+  }
+
   /** Releases the optimizer worker owned by this Route Guidance runtime. */
   dispose(): void {
-    this.worker?.terminate?.();
-    this.worker = null;
-    this.currentJobId = null;
+    this.invalidateActiveOptimization();
   }
 
   startOptimization(navState: NavigationState): OptimizationStartResult {
@@ -211,6 +236,7 @@ export class RouteGuidanceRuntimeController {
   initStartup(input: StartupInitInput): StartupInitResult {
     const snapshot = this.snapshotRepo.loadByIds(input.eventId, input.dayId);
     if (!snapshot) {
+      this.pendingResumeSnapshot = null;
       return { shouldShowResumeDialog: false, snapshot: null };
     }
 
@@ -223,9 +249,11 @@ export class RouteGuidanceRuntimeController {
 
     if (!isValid) {
       this.snapshotRepo.clearByIds(input.eventId, input.dayId);
+      this.pendingResumeSnapshot = null;
       return { shouldShowResumeDialog: false, snapshot: null };
     }
 
+    this.pendingResumeSnapshot = snapshot;
     return { shouldShowResumeDialog: true, snapshot };
   }
 

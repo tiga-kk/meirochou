@@ -105,12 +105,21 @@ describe("RouteGuidanceController", () => {
     const resumeGuidance = { execute: vi.fn(async () => true) };
     const changeDestination = { execute: vi.fn(async () => {}) };
     const finishCircle = { execute: vi.fn(async () => {}) };
+    const navigationRuntimeController = {
+      initStartup: vi.fn(() => ({
+        shouldShowResumeDialog: true,
+        snapshot: {
+          navState: { targetSpace: "東A01a" },
+        },
+      })),
+    };
 
     const controller = new RouteGuidanceController({
       startGuidance: startGuidance as any,
       resumeGuidance: resumeGuidance as any,
       changeDestination: changeDestination as any,
       finishCircle: finishCircle as any,
+      navigationRuntimeController: navigationRuntimeController as any,
     });
 
     await controller.resumeSavedGuidance(
@@ -118,6 +127,24 @@ describe("RouteGuidanceController", () => {
       [],
     );
     expect(resumeGuidance.execute).toHaveBeenCalledOnce();
+    expect(
+      controller.initializeResumeStartup({
+        eventDay: { eventId: "c108", dayId: "day1" },
+        bundleVersion: "bundle-v1",
+        circleStates: { 東A01a: "pending" },
+        pendingCircleSpaces: ["東A01a"],
+      }),
+    ).toEqual({
+      kind: "ready",
+      targetSpace: "東A01a",
+    });
+    expect(navigationRuntimeController.initStartup).toHaveBeenCalledWith({
+      eventId: "c108",
+      dayId: "day1",
+      bundleVersion: "bundle-v1",
+      circleStates: { 東A01a: "pending" },
+      pendingCircleSpaces: ["東A01a"],
+    });
   });
 
   it("delegates the finish input and result without rebuilding guidance", async () => {
@@ -177,6 +204,34 @@ describe("RouteGuidanceController", () => {
       circles,
     });
     expect(changeDestination.invalidatePendingSelection).toHaveBeenCalledOnce();
+  });
+
+  it("invalidates the active runtime job before clearing resume state on reset", () => {
+    const session = { clear: vi.fn() };
+    const navigationRuntimeController = {
+      invalidateActiveOptimization: vi.fn(),
+      setPendingResumeSnapshot: vi.fn(),
+      setMatrixRef: vi.fn(),
+    };
+    const controller = new RouteGuidanceController({
+      startGuidance: {} as any,
+      resumeGuidance: {} as any,
+      changeDestination: {} as any,
+      finishCircle: {} as any,
+      session: session as any,
+      navigationRuntimeController: navigationRuntimeController as any,
+    });
+
+    controller.resetRuntimeState();
+
+    expect(
+      navigationRuntimeController.invalidateActiveOptimization,
+    ).toHaveBeenCalledOnce();
+    expect(
+      navigationRuntimeController.setPendingResumeSnapshot,
+    ).toHaveBeenCalledWith(null);
+    expect(navigationRuntimeController.setMatrixRef).toHaveBeenCalledWith(null);
+    expect(session.clear).toHaveBeenCalledOnce();
   });
 });
 
