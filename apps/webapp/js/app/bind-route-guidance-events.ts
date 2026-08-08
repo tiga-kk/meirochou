@@ -33,7 +33,9 @@ export function bindRouteGuidanceEvents(
   });
 
   listen(settings, "optimization-time-limit-change", (event) => {
-    application.handleOptimizationTimeLimitChange((event as CustomEvent).detail);
+    application.handleOptimizationTimeLimitChange(
+      (event as CustomEvent<unknown>).detail,
+    );
   });
 
   return () => {
