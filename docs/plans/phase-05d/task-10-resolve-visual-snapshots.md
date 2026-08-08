@@ -30,6 +30,20 @@ Task 8・9のDOM/event ownership修正で画面出力が変わった場合、Tas
 
 Task 7ではすべてretry後も同じ種類の差分が再現している。これはTask 10開始時点の調査候補として使うが、Task 8・9後にも必ず同じ5件が失敗すると仮定しない。
 
+## 現在差分での実測結果（2026-08-08）
+
+CI相当containerで対象E2Eを更新なし・`--retries=0`で実行した。5候補は次の結果となった。
+
+| snapshot | 実測 | 分類 | snapshot未更新理由 |
+|---|---|---|---|
+| `settings-shell-source-manager.png` | 369x1265 expected / 369x1264 actual、5%差分 | `UNKNOWN / blocked` | semantic操作は継続するが、Task10のsemantic failure修正範囲から表示差分の正否を一意に決められないため |
+| `outbox-recovery-panel.png` | 343x131 expected / 343x151 actual、23%差分 | `UNKNOWN / blocked` | recovery表示の高さ差分は残るが、snapshotを合わせる根拠となるUI仕様変更を確認していないため |
+| `scoped-deletion-dialog.png` | 343x359 expected / 343x358 actual、5%差分 | `UNKNOWN / blocked` | 1pxを含む表示差分をsemantic修正として扱わず、baselineを変更しないため |
+| `navigation-map-catalog.png` | 369x884 expected / 369x865 actual、8%差分 | `UNKNOWN / blocked` | demo表示のsemantic assertionsは通過するが、catalog表示の正しい高さをこの作業範囲から一意に決められないため |
+| `navigation-map-route-candidate.png` | 369x1173 expected / 369x1154 actual、9%差分 | `UNKNOWN / blocked` | candidateの`#target-dist`、route overlay、selection assertionsは通過するが、baselineの正否を決められないため |
+
+navigation-resumeはfixtureを実grid距離（`[0, 288, 288, 0]`）へ合わせ、demo-eastのALNS timing-profile境界を補完した結果、chromium/mobileとも4/4成功した。candidate flowの「距離 計算不可」は再現せず、semantic assertionsは成功している。以上のため、5枚のPNGは更新していない。今回のsemantic failure修正で解消しない5候補は`UNKNOWN / blocked`として残す。
+
 ## 履歴上の基準
 
 調査時は少なくとも次を比較する。

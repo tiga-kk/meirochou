@@ -12,6 +12,7 @@ export interface OptimizationTimingProfile {
 }
 
 export const SECONDS_PER_WEIGHTED_DISTANCE: Readonly<Record<string, number>> = {
+  "demo-east": 0.13184,
   e456: 0.13184,
   e7: 0.11288,
   s12: 0.15066,

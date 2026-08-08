@@ -1455,7 +1455,28 @@ export class BrowserApplication {
             }
             this.currentStartSpace = currentSpace;
             const target = this.targetWithRoute(path[1], route);
+            const area = findAreaForSpace(
+              currentSpace,
+              this.routeMapAreaCatalog,
+            );
             this.replaceRouteGuidanceSnapshot({
+              navigationState: {
+                stage: "navigating",
+                areaId: area?.id ?? null,
+                currentPosition: {
+                  areaId: area?.id ?? null,
+                  source: "arrived-circle",
+                  circleSpace: currentSpace,
+                },
+                targetSpace: target.space,
+                lockedFirstLeg: {
+                  from: { type: "circle", space: currentSpace },
+                  toSpace: target.space,
+                },
+                provisionalOrder: path.slice(1).map(({ space }) => space),
+                bestOrder: path.slice(1).map(({ space }) => space),
+                optimizationGeneration: 1,
+              },
               currentRoute: route,
               currentDestination: target,
               selectedDestination: target,

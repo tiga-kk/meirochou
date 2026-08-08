@@ -8,7 +8,7 @@
 - ブランチ: `feature/phase-05d`
 - 追加計画作成前のHEAD: `6b1499bda9323acb8e77f4bfcd35007d1f8a5114`
 - 現在のフェーズ: Phase 5D リファクタリング完了作業
-- 次に着手するタスク: Task 10（visual snapshot 5件の根拠付き解消）
+- 次に着手するタスク: Task 11（Task 10未完了差分を含む最新HEADの再検証）
 - Task 8の基準コミット: `ac8f2b035b3bf22b3ed03221eceebb8ccbf3f63a`
 - 直近のTask 8 WIPコミット: `24cf35fa9724e4b433e2c2573bf8b17d173481c2`
 - Stage 8D-A実装完了HEAD: `d9978339613201b838a53ed4865fbb001b2f056c`
@@ -92,6 +92,12 @@ Stage 8Fは、Task 9後の縮小されたbinder contractを対象として完了
 Stage 8Gは、`bind-browser-events.ts`のconcrete infrastructure特例をarchitecture checkerから削除し、全`app/bind-*.ts`を同じguardrailの対象に戻して完了した。`localStorage`と`new Worker(...)`の直接利用を検出するnegative rule、concrete infrastructure importを検出するfixture、DOM listenerとfeature public APIを許可するpositive fixtureを追加した。runtime moduleである`browser-application.ts`の扱いは既存責務を維持するため明示fixtureで固定している。
 
 Stage 8Gの検証は、focused 46 tests、`npm run test:webapp`（72 files / 525 tests）、`npm run test:route-guidance`（28 tests）、Phase 5D回帰（4 tests）、architecture/typecheck、build、`git diff --check`が成功した。独立レビューではguardrailとfixtureはPASSで、進捗記録のテスト数のみ補正した。
+
+### Task 10の状態
+
+Task 10は未完了・保留である。開始時のCI相当fresh E2Eは17 failures / 21 passed / 8 skippedだった。Task 9後の`onclick`実装詳細待ちを現行のclick挙動へ合わせ、demo navigation state、demo-east timing profile、resume用実grid matrix、resumeのpoint identifier/number境界を補正した。対象unit/type検証とresume/candidateのsemantic確認は成功したが、5枚のsnapshotは現在表示を正しいbaselineと一意に決める証拠が不足しているため、更新していない。5枚は`UNKNOWN / blocked`としてTask 10 reportへ記録した。
+
+Task 10を完了扱いにはしない。ユーザー指示によりTask 11の再検証を先行する例外を記録する。Task 11でsnapshot failureが再現した場合は、Task 10へ戻る再開条件とし、Phase完了とは報告しない。
 
 ### Task 9の状態
 
@@ -181,7 +187,7 @@ Task 7で得た検証結果は原因調査のbaselineとして利用するが、
 | Task 7 | 中断 | 最終検証中にbrowser binding ownershipとvisual snapshotの追加blockerを発見 |
 | Task 8 | 完了 | Stage 8A〜8G完了。browser binding ownershipとarchitecture guardrailを確定 |
 | Task 9 | 完了 | browser event registrationをowner別に整理し、root binderをcompose/cleanupへ縮小 |
-| Task 10 | 未着手 | visual snapshot 5件を根拠付きで解消 |
-| Task 11 | 未着手 | 修正後HEADでPhase 5D全体を再検証 |
+| Task 10 | 保留 | semantic failureを修正。5 snapshotは根拠不足で未更新、Task 11後に再評価 |
+| Task 11 | 進行中 | Task 10未完了例外の最新HEADでPhase 5D全体を再検証 |
 
 タスク完了時はこの表と「次に着手するタスク」を実態に合わせて更新する。個別タスク文書へ進捗状態を重複して記録しない。

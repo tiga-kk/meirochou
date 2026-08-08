@@ -18,6 +18,7 @@ import type {
   RouteGuidanceSession,
 } from "../domain/route-guidance-types";
 import type { RouteMapAssetsLoader } from "./route-map-assets-loader";
+import { parseSpace } from "../../../shared/domain/space-parser";
 
 export interface ResumeRouteGuidanceInput {
   readonly eventDay: EventDayRef;
@@ -116,8 +117,19 @@ function findPointPortalIndex(
   gridMeta: { cols: number; rows: number },
   space: string,
 ) {
+  const [, identifier, number] = parseSpace(space);
   const point = pointsPayload?.points?.find(
-    (candidate) => (candidate as { space?: string }).space === space,
+    (candidate) => {
+      const point = candidate as {
+        space?: string;
+        identifier?: string;
+        number?: string | number;
+      };
+      return (
+        point.space === space ||
+        (point.identifier === identifier && Number(point.number) === number)
+      );
+    },
   ) as
     | {
         portals?: Array<{ col?: number; row?: number }>;

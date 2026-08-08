@@ -16,8 +16,18 @@ export class InMemoryMapAreaCatalog implements MapAreaCatalog {
   }
 
   findMapAreaForCircleSpace(circleSpace: string): MapArea | null {
+    const exact = this.areas.find((a) => a.circleSpaces?.includes(circleSpace));
+    if (exact) return exact;
+
+    const cleaned = circleSpace.trim();
+    if (cleaned.length < 2) return null;
+    const prefix = cleaned[0];
+    const label = cleaned[1];
     return (
-      this.areas.find((a) => a.circleSpaces?.includes(circleSpace)) ?? null
+      this.areas.find(
+        (area) =>
+          area.prefixes?.includes(prefix) && area.labels?.includes(label),
+      ) ?? null
     );
   }
 

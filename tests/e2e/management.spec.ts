@@ -108,16 +108,6 @@ async function routeGas(
 }
 
 async function openSettings(page: Page): Promise<void> {
-  await expect
-    .poll(() =>
-      page
-        .locator("#toggle-settings")
-        .evaluate(
-          (element) =>
-            typeof (element as HTMLButtonElement).onclick === "function",
-        ),
-    )
-    .toBe(true);
   await page.locator("#toggle-settings").click();
   const settings = page.locator("#settings-area");
   await expect(settings).toHaveClass(/show/);

@@ -69,6 +69,18 @@ async function seedNavigation(page: Page): Promise<void> {
       );
       localStorage.setItem(stateKey, JSON.stringify(state));
       localStorage.setItem(snapshotKey, JSON.stringify(navSnapshot));
+      localStorage.setItem(
+        `comipath:matrix:${navSnapshot.matrixRef}`,
+        JSON.stringify({
+          schemaVersion: 1,
+          cacheKey: navSnapshot.matrixRef,
+          areaId: navSnapshot.areaId,
+          spaces: state.circles.map((circle) => circle.space),
+          size: state.circles.length,
+          distances: [0, 288, 288, 0],
+          createdAt: "2026-07-25T00:00:00.000Z",
+        }),
+      );
       // This is an unrelated localStorage sentinel, not a real matrix schema.
       localStorage.setItem(matrixKey, JSON.stringify({ retained: true }));
     },
