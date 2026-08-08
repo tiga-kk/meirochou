@@ -1,7 +1,11 @@
 import type { Circle, EventDayRef } from "../../event-day/public-api";
 import type { RouteGuidanceSession } from "../domain/route-guidance-types";
 import type { ApplyOptimizedRouteOrderUseCase } from "../use-cases/apply-optimized-route-order";
-import type { ChangeDestinationUseCase } from "../use-cases/change-destination";
+import type {
+  ChangeDestinationUseCase,
+  DestinationSelectionResult,
+  ManualDestinationResult,
+} from "../use-cases/change-destination";
 import type {
   FinishCurrentCircleInput,
   FinishCurrentCircleResult,
@@ -42,38 +46,33 @@ export class RouteGuidanceController {
   async selectDestination(
     circleSpace: string,
     circles: readonly Circle[],
-  ): Promise<void> {
+  ): Promise<DestinationSelectionResult> {
     return this.deps.changeDestination.execute({ circleSpace, circles });
   }
 
-  compareSelectedDestination(): void {
-    const session = this.requireSession();
-    const snapshot = session.getSnapshot();
-    if (!snapshot.selectedDestination || !snapshot.selectedRoute) return;
-    session.replaceSnapshot({ ...snapshot, selectionStatus: "comparing" });
+  compareSelectedDestination(): boolean {
+    return this.deps.changeDestination.compare();
   }
 
-  confirmSelectedDestination(): void {
-    const session = this.requireSession();
-    const snapshot = session.getSnapshot();
-    if (snapshot.selectionStatus !== "comparing") return;
-    if (!snapshot.selectedDestination || !snapshot.selectedRoute) return;
-    session.replaceSnapshot({
-      ...snapshot,
-      currentDestination: snapshot.selectedDestination,
-      currentRoute: snapshot.selectedRoute,
-      selectedDestination: null,
-      selectedRoute: null,
-      selectionStatus: "ready",
-    });
+  confirmSelectedDestination(): Circle | null {
+    return this.deps.changeDestination.confirm();
   }
 
-  cancelDestinationComparison(): void {
-    const session = this.requireSession();
-    const snapshot = session.getSnapshot();
-    if (snapshot.selectionStatus === "comparing") {
-      session.replaceSnapshot({ ...snapshot, selectionStatus: "ready" });
-    }
+  cancelDestinationComparison(): boolean {
+    return this.deps.changeDestination.cancelComparison();
+  }
+
+  /** Rebuilds and commits a manually selected destination. */
+  async setManualDestination(
+    circleSpace: string,
+    circles: readonly Circle[],
+  ): Promise<ManualDestinationResult> {
+    return this.deps.changeDestination.changeManually({ circleSpace, circles });
+  }
+
+  /** Invalidates a candidate calculation owned by a superseding workflow. */
+  invalidatePendingDestinationSelection(): void {
+    this.deps.changeDestination.invalidatePendingSelection();
   }
 
   async finishCurrentCircle(

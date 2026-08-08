@@ -136,6 +136,36 @@ describe("apps public behavior characterization", () => {
     });
   });
 
+  it("keeps the route reconstruction error for a failed manual destination calculation", async () => {
+    const { app } = createProductionAppFixture();
+    const circle = { space: "E1-02" };
+    app.activeEventDaySession.setActiveEventDay(REF, {
+      ...createEmptyEventDayState(
+        { type: "csv", fileName: "circles.csv" },
+        "generation-1",
+        NOW,
+      ),
+      circles: [circle],
+    });
+    app.ui.showLoading = vi.fn();
+    app.ui.showToast = vi.fn();
+    vi.spyOn(
+      app.routeGuidanceController,
+      "setManualDestination",
+    ).mockResolvedValue({
+      kind: "failed",
+      reason: "route-calculation",
+      error: new Error("assets unavailable"),
+    });
+
+    await app.handleSetNextTarget(circle);
+
+    expect(app.ui.showToast).toHaveBeenLastCalledWith(
+      "経路の再構築に失敗したため、目的地を変更できません",
+      "error",
+    );
+  });
+
   it("binds each browser event once and stops sync coordination on dispose", () => {
     const { app, addEventListener, resumeAddEventListener } =
       createProductionAppFixture();

@@ -1123,16 +1123,35 @@ test("webapp uses an exact numeric input for the current location", () => {
   );
 });
 
-test("webapp routes gallery target changes through navigation orchestration", () => {
+test("webapp delegates gallery target changes to Route Guidance", () => {
   const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
   const handler =
     appSource.match(
       /async\s+handleSetNextTarget\(circle\)[\s\S]*?\n\s*}\n\n\s*\/\*\*/,
     )?.[0] || "";
 
-  assert.match(handler, /orchestrationService\.handleManualTarget\(/);
+  assert.match(handler, /routeGuidanceController\.setManualDestination\(/);
+  assert.doesNotMatch(handler, /orchestrationService/);
+  assert.doesNotMatch(handler, /planRoute(?:FromGridIndex)?\(/);
+  assert.doesNotMatch(handler, /loadGridRouteAssets\(/);
   assert.doesNotMatch(handler, /rankCandidatesByGrid\(/);
   assert.doesNotMatch(handler, /updateCurrentLocation/);
+});
+
+test("webapp delegates destination selection and comparison to Route Guidance", () => {
+  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const handlers = appSource.slice(
+    appSource.indexOf("async handleSelectTarget(circle)"),
+    appSource.indexOf("async handleSetNextTarget(circle)"),
+  );
+
+  assert.match(handlers, /routeGuidanceController\.selectDestination\(/);
+  assert.match(handlers, /routeGuidanceController\.compareSelectedDestination\(/);
+  assert.match(handlers, /routeGuidanceController\.confirmSelectedDestination\(/);
+  assert.match(handlers, /routeGuidanceController\.cancelDestinationComparison\(/);
+  assert.doesNotMatch(handlers, /planGridRoute\(/);
+  assert.doesNotMatch(handlers, /replaceRouteGuidanceSnapshot\(/);
+  assert.doesNotMatch(handlers, /selectionToken/);
 });
 
 test("webapp delegates purchase and hold navigation to completeCircleVisit", () => {

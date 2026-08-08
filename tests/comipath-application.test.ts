@@ -54,7 +54,14 @@ describe("ComiPath application shell", () => {
       ownedEventListeners: [],
       ownedWorkers: new Set(),
       disposeSyncCoordinator() {},
-      navigationRuntimeController: { dispose() { disposeCalls++; } },
+      routeGuidanceController: {
+        invalidatePendingDestinationSelection() {},
+      },
+      navigationRuntimeController: {
+        dispose() {
+          disposeCalls++;
+        },
+      },
       settingsEscapeHandler: null,
     } as unknown as BrowserEventBinding;
 

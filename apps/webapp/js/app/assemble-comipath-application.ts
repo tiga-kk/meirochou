@@ -216,7 +216,12 @@ export function assembleComiPathApplication(
       routeMapAssetsLoader,
       routeMapAreaCatalog,
     ),
-    changeDestination: new ChangeDestinationUseCase(routeGuidanceSession),
+    changeDestination: new ChangeDestinationUseCase(
+      routeGuidanceSession,
+      routeMapAreaCatalog,
+      routeMapAssetsLoader,
+      orchestrationService,
+    ),
     finishCircle: new FinishCurrentCircleUseCase(
       routeGuidanceSession,
       routeMapAreaCatalog,
@@ -265,7 +270,6 @@ export function assembleComiPathApplication(
       routeMapAssetsLoader,
       snapshotRepository,
       matrixRepository,
-      orchestrationService,
       navigationRuntimeController,
       routeGuidanceController,
     },

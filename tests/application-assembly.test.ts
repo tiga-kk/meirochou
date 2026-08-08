@@ -22,7 +22,6 @@ interface BindingOptions {
     readonly routeMapAssetsLoader: unknown;
     readonly snapshotRepository: unknown;
     readonly matrixRepository: unknown;
-    readonly orchestrationService: unknown;
     readonly navigationRuntimeController: unknown;
     readonly routeGuidanceController: unknown;
   };
@@ -104,7 +103,6 @@ describe("application assembly", () => {
       routeMapAssetsLoader: expect.any(Object),
       snapshotRepository: expect.any(Object),
       matrixRepository: expect.any(Object),
-      orchestrationService: expect.any(Object),
       navigationRuntimeController: expect.any(Object),
       routeGuidanceController: expect.any(Object),
     });
@@ -122,7 +120,8 @@ describe("application assembly", () => {
       routeDependencies.routeMapAssetsLoader,
     );
     expect(finishUseCase.navigationOperations).toBe(
-      routeDependencies.orchestrationService,
+      routeDependencies.routeGuidanceController.deps.changeDestination
+        .navigationOperations,
     );
   });
 

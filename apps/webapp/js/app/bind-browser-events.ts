@@ -118,7 +118,6 @@ export class BrowserEventBinding {
       !routeGuidanceDependencies.routeMapAssetsLoader ||
       !routeGuidanceDependencies.snapshotRepository ||
       !routeGuidanceDependencies.matrixRepository ||
-      !routeGuidanceDependencies.orchestrationService ||
       !routeGuidanceDependencies.navigationRuntimeController ||
       !routeGuidanceDependencies.routeGuidanceController
     ) {
@@ -142,7 +141,6 @@ export class BrowserEventBinding {
     this.routeMapAssetsLoader = routeGuidanceDependencies.routeMapAssetsLoader;
     this.snapshotRepository = routeGuidanceDependencies.snapshotRepository;
     this.matrixRepository = routeGuidanceDependencies.matrixRepository;
-    this.orchestrationService = routeGuidanceDependencies.orchestrationService;
     this.navigationRuntimeController =
       routeGuidanceDependencies.navigationRuntimeController;
     this.routeGuidanceController = routeGuidanceDependencies.routeGuidanceController;
@@ -219,7 +217,6 @@ export class BrowserEventBinding {
     });
     this.currentStartSpace = "";
     this.selectionMessage = "";
-    this.selectionToken = 0;
     this.currentManifest = null;
     this.transitionToken = 0;
     this.isTransitioning = false;
@@ -899,7 +896,7 @@ export class BrowserEventBinding {
     if (this.stopped) return;
     this.stopped = true;
     this.transitionToken += 1;
-    this.selectionToken += 1;
+    this.routeGuidanceController.invalidatePendingDestinationSelection();
     this.managementSession?.stop();
     this.ui?.stop?.();
     this.disposeSyncCoordinator();
@@ -1065,100 +1062,52 @@ export class BrowserEventBinding {
     )
       return;
 
-    const token = ++this.selectionToken;
-    this.replaceRouteGuidanceSnapshot({
-      selectedDestination: circle,
-      selectedRoute: null,
-      selectionStatus: "loading",
-    });
     this.selectionMessage = "候補経路を計算中…";
+    const selection = this.routeGuidanceController.selectDestination(
+      circle.space,
+      this.wantToBuy,
+    );
     this.ui.showNavigation(this.getNavigationContext("preserve"));
-
-    const currentRoute = this.routeGuidanceSession.getSnapshot().currentRoute;
-    if (
-      !currentRoute ||
-      !areSpacesInSameArea(
-        this.currentStartSpace,
-        circle.space,
-        this.routeMapAreaCatalog,
-      )
-    ) {
-      if (token !== this.selectionToken) return;
-      this.replaceRouteGuidanceSnapshot({ selectionStatus: "error" });
-      this.selectionMessage = "同じ地図エリアの正式な経路を計算できません";
-      this.ui.showNavigation(this.getNavigationContext("preserve"));
-      return;
-    }
-
-    try {
-      const route = await this.planGridRoute(
-        this.currentStartSpace,
-        circle.space,
-        { startPosition: currentRoute.startPosition },
+    const result = await selection;
+    if (result.kind === "ignored" || result.kind === "stale") return;
+    if (result.kind === "route-unavailable") {
+      this.selectionMessage =
+        result.reason === "invalid-origin"
+          ? "同じ地図エリアの正式な経路を計算できません"
+          : "候補地点までの経路を探索できません";
+    } else if (result.kind === "failed") {
+      console.warn(
+        "Selected target route could not be calculated.",
+        result.error,
       );
-      if (token !== this.selectionToken) return;
-      if (!route) {
-        this.replaceRouteGuidanceSnapshot({ selectionStatus: "error" });
-        this.selectionMessage = "候補地点までの経路を探索できません";
-      } else {
-        this.replaceRouteGuidanceSnapshot({
-          selectedRoute: route,
-          selectedDestination: this.targetWithRoute(circle, route),
-          selectionStatus:
-            circle.space ===
-            this.routeGuidanceSession.getSnapshot().currentDestination?.space
-              ? "idle"
-              : "ready",
-        });
-        this.selectionMessage = "";
-      }
-    } catch (error) {
-      if (token !== this.selectionToken) return;
-      console.warn("Selected target route could not be calculated.", error);
-      this.replaceRouteGuidanceSnapshot({ selectionStatus: "error" });
       this.selectionMessage =
         "候補経路の読込に失敗しました。もう一度お試しください";
+    } else {
+      this.selectionMessage = "";
     }
-
-    const fitMode =
-      this.routeGuidanceSession.getSnapshot().selectionStatus === "ready"
-        ? "comparison"
-        : "preserve";
+    const fitMode = result.kind === "selected" ? "comparison" : "preserve";
     this.ui.showNavigation(this.getNavigationContext(fitMode));
   }
 
   /** Enter the two-route comparison state after a candidate route is ready. */
   handlePreviewRoute() {
-    const snapshot = this.routeGuidanceSession.getSnapshot();
-    if (snapshot.selectionStatus !== "ready" || !snapshot.selectedRoute) return;
-    this.replaceRouteGuidanceSnapshot({ selectionStatus: "comparing" });
+    if (!this.routeGuidanceController.compareSelectedDestination()) return;
     this.ui.showNavigation(this.getNavigationContext("comparison"));
   }
 
   /** Promote the compared candidate to the active destination without recalculation. */
   handleConfirmRoute() {
-    const snapshot = this.routeGuidanceSession.getSnapshot();
-    if (
-      snapshot.selectionStatus !== "comparing" ||
-      !snapshot.selectedDestination ||
-      !snapshot.selectedRoute
-    )
-      return;
-    this.replaceRouteGuidanceSnapshot({
-      currentDestination: snapshot.selectedDestination,
-      currentRoute: snapshot.selectedRoute,
-      selectionStatus: "idle",
-    });
+    const destination =
+      this.routeGuidanceController.confirmSelectedDestination();
+    if (!destination) return;
     this.selectionMessage = "";
     this.ui.showNavigation(this.getNavigationContext("current"));
-    this.ui.showToast(`目的地を ${snapshot.selectedDestination.space} に変更しました`);
+    this.ui.showToast(`目的地を ${destination.space} に変更しました`);
   }
 
   /** Leave comparison while retaining the selected target details. */
   handleCancelRoute() {
-    if (this.routeGuidanceSession.getSnapshot().selectionStatus !== "comparing")
-      return;
-    this.replaceRouteGuidanceSnapshot({ selectionStatus: "ready" });
+    if (!this.routeGuidanceController.cancelDestinationComparison()) return;
     this.ui.showNavigation(this.getNavigationContext("comparison"));
   }
 
@@ -1173,78 +1122,51 @@ export class BrowserEventBinding {
       return this.handleSetNextTargetDevDemo(circle);
     }
 
-    this.selectionToken += 1;
-    const currentNavigationState =
-      this.routeGuidanceSession.getSnapshot().navigationState;
-    const currentPosition = currentNavigationState?.currentPosition;
-    if (!currentNavigationState || !currentPosition) {
+    this.ui.showLoading();
+    const result = await this.routeGuidanceController.setManualDestination(
+      circle.space,
+      this.wantToBuy,
+    );
+    if (result.kind === "ignored" || result.kind === "stale") return;
+    if (result.kind === "missing-position") {
       this.ui.showToast(
         "現在地が確定していないため、目的地を変更できません",
         "error",
       );
       return;
     }
-
-    this.ui.showLoading();
-    let route = null;
-    try {
-      const lockedFrom = currentNavigationState.lockedFirstLeg?.from;
-      if (lockedFrom?.type === "start") {
-        const area = this.routeMapAreaCatalog
-          .getAllMapAreas()
-          .find((candidate) => candidate.id === lockedFrom.areaId);
-        const assets = area ? await this.loadGridRouteAssets(area) : null;
-        if (assets) {
-          route = planRouteFromGridIndex(
-            assets.pointsPayload,
-            assets.gridMeta,
-            assets.gridBytes,
-            currentPosition.gridIndex,
-            circle.space,
-          );
-        }
-      } else if (lockedFrom?.type === "circle") {
-        route = await this.planGridRoute(lockedFrom.space, circle.space);
-      }
-    } catch (error) {
-      console.warn(
-        "Selected target grid distance could not be calculated.",
-        error,
-      );
-    }
-    if (!route) {
+    if (result.kind === "route-unavailable") {
       this.ui.showToast(
         "経路の再構築に失敗したため、目的地を変更できません",
         "error",
       );
       return;
     }
-
-    let manualTargetResult;
-    try {
-      manualTargetResult = this.orchestrationService.handleManualTarget(
-        currentNavigationState,
-        circle.space,
-      );
-    } catch (error) {
-      console.warn("Manual target change could not be applied.", error);
-      this.ui.showToast("目的地を変更できませんでした", "error");
+    if (result.kind === "failed") {
+      if (result.reason === "route-calculation") {
+        console.warn(
+          "Selected target grid distance could not be calculated.",
+          result.error,
+        );
+        this.ui.showToast(
+          "経路の再構築に失敗したため、目的地を変更できません",
+          "error",
+        );
+      } else {
+        console.warn(
+          "Manual target change could not be applied.",
+          result.error,
+        );
+        this.ui.showToast("目的地を変更できませんでした", "error");
+      }
       return;
     }
-
+    const currentPosition =
+      this.routeGuidanceSession.getSnapshot().navigationState.currentPosition;
     this.currentStartSpace =
       currentPosition.source === "arrived-circle"
         ? currentPosition.circleSpace || ""
         : "";
-    const target = this.targetWithRoute(circle, route);
-    this.replaceRouteGuidanceSnapshot({
-      navigationState: manualTargetResult.navState,
-      currentRoute: route,
-      currentDestination: target,
-      selectedDestination: target,
-      selectedRoute: route,
-      selectionStatus: "idle",
-    });
     this.selectionMessage = "";
     this.ui.showNavigation(this.getNavigationContext("current"));
     this.ui.showToast(`目的地を ${circle.space} に設定しました`);
@@ -1270,7 +1192,7 @@ export class BrowserEventBinding {
 
   /** Legacy gallery target behavior used only by the dev UI fixture. */
   async handleSetNextTargetDevDemo(circle) {
-    this.selectionToken += 1;
+    this.routeGuidanceController.invalidatePendingDestinationSelection();
     const currentSpace = this.readCurrentSpace();
     if (!currentSpace) return;
 
@@ -1508,7 +1430,7 @@ export class BrowserEventBinding {
     const currentSpace = startSpace || this.readCurrentSpace();
     if (!currentSpace) return Promise.resolve();
 
-    this.selectionToken += 1;
+    this.routeGuidanceController.invalidatePendingDestinationSelection();
     this.ui.showLoading();
 
     // UI描画をブロックしないように非同期実行
@@ -1652,7 +1574,7 @@ export class BrowserEventBinding {
     const currentSpace = startSpace || this.readCurrentSpace();
     if (!currentSpace) return Promise.resolve();
 
-    this.selectionToken += 1;
+    this.routeGuidanceController.invalidatePendingDestinationSelection();
     this.ui.showLoading();
 
     return new Promise((resolve) =>

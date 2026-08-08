@@ -125,7 +125,12 @@ export function createBrowserEventBindingOptions(
       routeMapAssetsLoader,
       runtimeMapAreaCatalog,
     ),
-    changeDestination: new ChangeDestinationUseCase(routeGuidanceSession),
+    changeDestination: new ChangeDestinationUseCase(
+      routeGuidanceSession,
+      routeMapAreaCatalog,
+      routeMapAssetsLoader,
+      orchestrationService,
+    ),
     finishCircle: new FinishCurrentCircleUseCase(
       routeGuidanceSession,
       routeMapAreaCatalog,
@@ -162,7 +167,6 @@ export function createBrowserEventBindingOptions(
       routeMapAssetsLoader,
       snapshotRepository,
       matrixRepository,
-      orchestrationService,
       navigationRuntimeController,
       routeGuidanceController,
     },
