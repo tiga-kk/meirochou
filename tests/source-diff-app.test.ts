@@ -32,6 +32,13 @@ describe("Circle Data Source Diff & Preview Dialog Integration", () => {
       <button id="toggle-settings"></button>
       <comipath-settings id="settings-area"></comipath-settings>
       <source-diff-dialog id="source-diff-dialog"></source-diff-dialog>
+      <button id="btn-search"></button>
+      <button id="btn-purchased"></button>
+      <button id="btn-hold"></button>
+      <button id="btn-reset-all"></button>
+      <select id="loc-ewsn"></select>
+      <select id="loc-label"></select>
+      <input id="loc-number" />
       <div id="toast"></div>
     `;
 
@@ -95,12 +102,14 @@ describe("Circle Data Source Diff & Preview Dialog Integration", () => {
       expiresAt: new Date().toISOString(),
     });
 
-    app.session.onEventDayChange();
-    expect(app.session.getActivePreview?.() ?? null).toBeNull();
+    app.circleDataSourceSession.reset();
+    expect(app.circleDataSourceSession.getSnapshot().preview).toBeNull();
   });
 
   it("clears preview when settings panel is closed", async () => {
     const session = app.circleDataSourceSession ?? app.session;
+    app.setupEvents();
+    app.ui.els.settingsArea.open = true;
     session.setPreview({
       previewId: "prev-1",
       ref: { eventId: "C108", dayId: "day1" },
@@ -112,8 +121,8 @@ describe("Circle Data Source Diff & Preview Dialog Integration", () => {
       expiresAt: new Date().toISOString(),
     });
 
-    app.session.onSettingsClose();
-    expect(app.session.getActivePreview?.() ?? null).toBeNull();
+    document.getElementById("toggle-settings")?.click();
+    expect(app.circleDataSourceSession.getSnapshot().preview).toBeNull();
   });
 
   it("cancels active preview via CancelCircleDataPreviewUseCase", async () => {

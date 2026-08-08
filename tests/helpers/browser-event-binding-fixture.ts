@@ -18,7 +18,10 @@ import {
   type EventDayRepository,
 } from "../../apps/webapp/js/features/event-day/public-api";
 import { LocalStorageEventDayRepository } from "../../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
-import { DeleteLocalDataUseCase } from "../../apps/webapp/js/features/local-data-deletion/public-api";
+import {
+  DeleteLocalDataUseCase,
+  LocalDataDeletionController,
+} from "../../apps/webapp/js/features/local-data-deletion/public-api";
 import { HttpRouteMapAssetsLoader } from "../../apps/webapp/js/features/route-guidance/infrastructure/http-route-map-assets-loader";
 import { LocalStorageDistanceMatrixRepository } from "../../apps/webapp/js/features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
 import { LocalStorageRouteGuidanceSnapshotRepository } from "../../apps/webapp/js/features/route-guidance/infrastructure/local-storage-route-guidance-snapshot-repository";
@@ -90,6 +93,7 @@ export function createBrowserEventBindingOptions(
       sendPendingGasUpdates,
       new DiscardPendingGasUpdatesUseCase(repository, activeEventDaySession),
     );
+  const circleDataSourceSession = createCircleDataSourceSession();
   const routeGuidanceSession = createRouteGuidanceSession();
   const routeMapAreaCatalog = runtimeMapAreaCatalog;
   const routeMapAssetsLoader = new HttpRouteMapAssetsLoader();
@@ -155,12 +159,22 @@ export function createBrowserEventBindingOptions(
       ));
 
   return {
-    circleDataSourceSession: createCircleDataSourceSession(),
-    circleDataSourceController: { cancelPreview() {} },
+    circleDataSourceSession,
+    circleDataSourceController: {
+      start() {},
+      cancelCurrentRequest() {
+        circleDataSourceSession.setBusy(false);
+      },
+      cancelPreview() {
+        circleDataSourceSession.setPreview(null);
+      },
+    },
     completeCircleVisit: completeCircleVisitOperation,
-    localDataDeletionUseCase: new DeleteLocalDataUseCase(repository, {
-      deleteActivitySnapshot() {},
-      deleteAllRouteData() {},
+    localDataDeletionController: new LocalDataDeletionController({
+      deleteLocalData: new DeleteLocalDataUseCase(repository, {
+        deleteActivitySnapshot() {},
+        deleteAllRouteData() {},
+      }),
     }),
     routeGuidanceDependencies: {
       routeGuidanceSession,

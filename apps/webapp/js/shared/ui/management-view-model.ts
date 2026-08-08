@@ -88,6 +88,29 @@ export interface DeleteOptionViewModel {
   readonly blockedReason: string | null;
 }
 
+export interface SourceManagerPanelModelInput {
+  readonly activeRef: EventDayRef | null;
+  readonly activeRefLabel: string;
+  readonly activeState: LocalEventDayState | null;
+  readonly sourceDraft: {
+    readonly draftWebAppUrl: string;
+    readonly selectedSheetName: string;
+    readonly sheetNames: readonly string[];
+    readonly busy: boolean;
+    readonly errorMessage: string | null;
+  };
+  readonly transitionBusy: boolean;
+  readonly sourceErrorMessage?: string;
+}
+
+export interface StorageDeleteDialogModelInput {
+  readonly selectedScope: DeleteScope | null;
+  readonly deleteOptions: readonly DeleteOptionViewModel[];
+  readonly eventDayLabel: string;
+  readonly busy: boolean;
+  readonly errorMessage: string;
+}
+
 /** Fails closed if persisted data contains a variant outside the domain contract. */
 function unsupportedVariant(context: string): never {
   throw new Error(`Unsupported ${context}`);
@@ -208,6 +231,45 @@ export function formatSourceSummary(
     default:
       return unsupportedVariant("data source");
   }
+}
+
+/** Builds the source-manager settings panel model from persisted and draft state. */
+export function buildSourceManagerPanelModel(
+  input: SourceManagerPanelModelInput,
+) {
+  const { activeRef, activeRefLabel, activeState, sourceDraft } = input;
+  const sourceSummary = activeState
+    ? formatSourceSummary(activeState)
+    : {
+        typeLabel: "CSV",
+        detail: "empty.csv",
+        endpointSummary: null,
+        pendingCount: 0,
+      };
+  const pendingCount = activeState ? activeState.gasOutbox.length : 0;
+  const sourceType = activeState?.source.type === "gas" ? "gas" : "csv";
+  const activeCircleCount = activeState
+    ? activeState.circles.filter((circle) => !circle.removedFromSource).length
+    : 0;
+
+  return Object.freeze({
+    activeRef: activeRef ? freezeRef(activeRef) : null,
+    activeRefLabel,
+    source: sourceSummary,
+    sourceType,
+    gasUrlInput:
+      sourceDraft.draftWebAppUrl ||
+      (activeState?.source.type === "gas" ? activeState.source.gasUrl : ""),
+    selectedSheetName:
+      sourceDraft.selectedSheetName ||
+      (activeState?.source.type === "gas" ? activeState.source.sheetName : ""),
+    sheetNames: Object.freeze([...sourceDraft.sheetNames]),
+    pendingCount,
+    canExportCsv: activeCircleCount > 0,
+    busy: sourceDraft.busy || input.transitionBusy,
+    errorMessage:
+      sourceDraft.errorMessage || input.sourceErrorMessage || "",
+  });
 }
 
 /** Returns safe Japanese labels for fields that changed between two circles. */
@@ -425,4 +487,32 @@ export function buildDeleteOptions(
   ];
 
   return Object.freeze(options);
+}
+
+/** Builds the storage-delete dialog model from the selected scope and options. */
+export function buildStorageDeleteDialogModel(
+  input: StorageDeleteDialogModelInput,
+) {
+  const selectedScope = input.selectedScope;
+  const activeOption = selectedScope
+    ? input.deleteOptions.find((option) => {
+        if (option.scope.type !== selectedScope.type) return false;
+        if (selectedScope.type === "all-events") return true;
+        if (option.scope.type === "all-events") return false;
+        const selectedRef = selectedScope.ref;
+        return (
+          option.scope.ref.eventId === selectedRef.eventId &&
+          option.scope.ref.dayId === selectedRef.dayId
+        );
+      }) ?? null
+    : null;
+
+  return Object.freeze({
+    open: Boolean(selectedScope),
+    scope: selectedScope ? freezeDeleteScope(selectedScope) : null,
+    option: activeOption,
+    eventDayLabel: input.eventDayLabel,
+    busy: input.busy,
+    errorMessage: input.errorMessage,
+  });
 }

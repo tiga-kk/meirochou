@@ -80,6 +80,8 @@ function createSampleGasState(
 
 describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
   it("does not repaint settings after retry completion becomes stale", async () => {
+    document.body.innerHTML =
+      '<button id="toggle-settings"></button><comipath-settings id="settings-area"></comipath-settings><button id="btn-search"></button><button id="btn-purchased"></button><button id="btn-hold"></button><button id="btn-reset-all"></button><select id="loc-ewsn"></select><select id="loc-label"></select><input id="loc-number" /><div id="source-diff-dialog"></div><div id="navigation-resume-dialog"></div>';
     const app = new BrowserEventBinding(createBrowserEventBindingOptions());
     const ref = { eventId: "c104", dayId: "day1" };
     let resolveRetry: (summary: {
@@ -97,9 +99,11 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
     const updateSpy = vi
       .spyOn(app, "updateManagementModels")
       .mockImplementation(() => {});
+    app.setupEvents();
+    app.ui.els.settingsArea.open = true;
 
     const retryPromise = app.handleGasRetryRequest({ ref });
-    app.session.onSettingsClose();
+    document.getElementById("toggle-settings")?.click();
     resolveRetry({
       processedRefs: 1,
       sent: 0,
@@ -108,7 +112,7 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
     });
     await retryPromise;
 
-    expect(updateSpy).toHaveBeenCalledTimes(1);
+    expect(updateSpy).toHaveBeenCalledTimes(2);
   });
 
   it("rejects forged retry and discard event details at the ComiPathBrowserRuntime boundary", async () => {

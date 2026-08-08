@@ -42,7 +42,10 @@ import {
 } from "../features/event-day/public-api";
 import { loadRuntimeMapBundleManifestFromUrl, resolveEventMapManifestUrl } from "../features/event-day/infrastructure/http-map-manifest-loader";
 import { loadEventRegistryWithUrl } from "../features/event-day/infrastructure/http-event-registry-loader";
-import { DeleteLocalDataUseCase } from "../features/local-data-deletion/public-api";
+import {
+  DeleteLocalDataUseCase,
+  LocalDataDeletionController,
+} from "../features/local-data-deletion/public-api";
 import { runtimeMapAreaCatalog } from "../features/route-guidance/infrastructure/runtime-map-area-catalog";
 import type { MapAreaCatalog } from "../features/route-guidance/domain/map-area";
 import { HttpRouteMapAssetsLoader } from "../features/route-guidance/infrastructure/http-route-map-assets-loader";
@@ -83,8 +86,12 @@ export function assembleComiPathApplication(
   options: AssembleComiPathApplicationOptions,
 ): StartableApplication & Record<string, unknown> {
   let browserRuntime: any;
-  let routeGuidanceController: RouteGuidanceController | null = null;
   let currentRouteGuidanceBundleVersion: string | null = null;
+  let saveRouteGuidanceControllerSnapshot = (
+    _eventDay: EventDayRef,
+    _bundleVersion: string,
+  ) => {};
+  let clearRouteGuidanceControllerSnapshot = (_eventDay: EventDayRef) => {};
   const storage = new StorageService();
   const repository =
     options.repository ?? new LocalStorageEventDayRepository(storage);
@@ -202,17 +209,16 @@ export function assembleComiPathApplication(
   });
   const saveRouteGuidanceSnapshot = (eventDay: EventDayRef) => {
     const bundleVersion = currentRouteGuidanceBundleVersion;
-    if (!routeGuidanceController || !bundleVersion) return;
+    if (!bundleVersion) return;
     try {
-      routeGuidanceController.saveSnapshot(eventDay, bundleVersion);
+      saveRouteGuidanceControllerSnapshot(eventDay, bundleVersion);
     } catch (error) {
       console.warn("Navigation snapshot could not be saved.", error);
     }
   };
   const clearRouteGuidanceSnapshot = (eventDay: EventDayRef) => {
-    if (!routeGuidanceController) return;
     try {
-      routeGuidanceController.clearSavedSnapshot(eventDay);
+      clearRouteGuidanceControllerSnapshot(eventDay);
     } catch (error) {
       console.warn("Navigation snapshot could not be cleared.", error);
     }
@@ -224,7 +230,7 @@ export function assembleComiPathApplication(
     deleteSnapshot: (eventDay: EventDayRef) =>
       clearRouteGuidanceSnapshot(eventDay),
   };
-  routeGuidanceController = new RouteGuidanceController({
+  const routeGuidanceController = new RouteGuidanceController({
     startGuidance: new StartRouteGuidanceUseCase(
       routeGuidanceSession,
       routeMapAreaCatalog,
@@ -255,6 +261,10 @@ export function assembleComiPathApplication(
     ),
     navigationRuntimeController,
   });
+  saveRouteGuidanceControllerSnapshot = (eventDay, bundleVersion) =>
+    routeGuidanceController.saveSnapshot(eventDay, bundleVersion);
+  clearRouteGuidanceControllerSnapshot = (eventDay) =>
+    routeGuidanceController.clearSavedSnapshot(eventDay);
 
   const deleteLocalData = new DeleteLocalDataUseCase(
     repository,
@@ -273,6 +283,9 @@ export function assembleComiPathApplication(
           : `gen-${Date.now()}`,
     },
   );
+  const localDataDeletionController = new LocalDataDeletionController({
+    deleteLocalData,
+  });
 
   browserRuntime = new BrowserEventBinding({
     circleDataSourceSession,
@@ -285,7 +298,7 @@ export function assembleComiPathApplication(
           routeGuidanceController.finishCurrentCircle(finishInput),
         input,
       ),
-    localDataDeletionUseCase: deleteLocalData,
+    localDataDeletionController,
     routeGuidanceDependencies: {
       routeGuidanceSession,
       routeMapAreaCatalog,

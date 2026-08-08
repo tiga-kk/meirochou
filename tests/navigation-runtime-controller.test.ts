@@ -45,8 +45,8 @@ describe("Phase 5C Task 11: NavigationRuntimeController", () => {
     );
     expect(app.navigationRuntimeController.getOrchestration()).toBeDefined();
 
-    expect(app.localDataDeletionUseCase).toBe(
-      dependencies.localDataDeletionUseCase,
+    expect(app.localDataDeletionController).toBe(
+      dependencies.localDataDeletionController,
     );
   });
 

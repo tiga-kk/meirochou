@@ -25,8 +25,9 @@ interface BindingOptions {
     readonly navigationRuntimeController: unknown;
     readonly routeGuidanceController: unknown;
   };
-  readonly localDataDeletionUseCase: {
-    execute(scope: LocalDataDeletionScope): Promise<void>;
+  readonly localDataDeletionController: {
+    confirmDeletion(scope: LocalDataDeletionScope): Promise<void>;
+    selectDeletionScope(scope: LocalDataDeletionScope): void;
   };
   readonly eventDayDependencies: {
     readonly backgroundProcess: { start(): void; stop(): void };
@@ -190,15 +191,17 @@ describe("application assembly", () => {
       routeDependencies.matrixRepository,
       "deleteByEventDay",
     );
-    const deletion = mockState.options[0].localDataDeletionUseCase;
-    await deletion.execute({ kind: "activity", eventDay: ref });
+    const deletion = mockState.options[0].localDataDeletionController;
+    deletion.selectDeletionScope({ kind: "activity", eventDay: ref });
+    await deletion.confirmDeletion({ kind: "activity", eventDay: ref });
     expect(clearSavedSnapshot).toHaveBeenCalledWith(ref);
     expect(clearSavedSnapshot).toHaveBeenCalledOnce();
     expect(deleteByEventDay).not.toHaveBeenCalled();
     expect(binding.clearNavigationSnapshot).not.toHaveBeenCalled();
     expect(binding.matrixRepository.deleteByEventDay).not.toHaveBeenCalled();
 
-    await deletion.execute({ kind: "circle-source", eventDay: ref });
+    deletion.selectDeletionScope({ kind: "circle-source", eventDay: ref });
+    await deletion.confirmDeletion({ kind: "circle-source", eventDay: ref });
 
     expect(deleteByEventDay).toHaveBeenCalledWith(
       ref.eventId,

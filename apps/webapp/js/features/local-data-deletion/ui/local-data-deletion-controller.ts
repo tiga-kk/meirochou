@@ -28,6 +28,19 @@ function parseScope(value: unknown): LocalDataDeletionScope | null {
   }
   const input = value as Record<string, unknown>;
   if (input.kind === "all-event-days") return { kind: input.kind };
+  if (input.type === "all-events") return { kind: "all-event-days" };
+  if (
+    input.type === "circles" ||
+    input.type === "activity" ||
+    input.type === "event-day"
+  ) {
+    const eventDay = parseRef(input.ref);
+    if (!eventDay) return null;
+    return {
+      kind: input.type === "circles" ? "circle-source" : input.type,
+      eventDay,
+    };
+  }
   if (
     input.kind !== "circle-source" &&
     input.kind !== "activity" &&
@@ -49,6 +62,12 @@ export class LocalDataDeletionController {
 
   selectDeletionScope(detail: unknown): void {
     if (!this.stopped) this.selectedScope = parseScope(detail);
+  }
+
+  getSelectedScope(): LocalDataDeletionScope | null {
+    return this.selectedScope
+      ? { ...this.selectedScope, ...(this.selectedScope.kind === "all-event-days" ? {} : { eventDay: { ...this.selectedScope.eventDay } }) }
+      : null;
   }
 
   async confirmDeletion(detail: unknown): Promise<void> {

@@ -28,7 +28,8 @@ import {
   buildDeleteOptions,
   buildEventDayOptions,
   buildOutboxPanelModel,
-  formatSourceSummary,
+  buildSourceManagerPanelModel,
+  buildStorageDeleteDialogModel,
 } from "../shared/ui/management-view-model";
 
 /** Validates an event/day reference at the BrowserEventBinding's DOM event boundary. */
@@ -61,6 +62,17 @@ function sameEventDayRef(left, right) {
       left.eventId === right.eventId &&
       left.dayId === right.dayId,
   );
+}
+
+function toDeleteScope(scope) {
+  if (!scope) return null;
+  if (scope.kind === "all-event-days") {
+    return { type: "all-events" };
+  }
+  return {
+    type: scope.kind === "circle-source" ? "circles" : scope.kind,
+    ref: { ...scope.eventDay },
+  };
 }
 
 function findAreaForSpace(space, mapAreaCatalog) {
@@ -109,7 +121,7 @@ export class BrowserEventBinding {
       !options?.circleDataSourceSession ||
       !options?.circleDataSourceController ||
       !options?.completeCircleVisit ||
-      !options?.localDataDeletionUseCase ||
+      !options?.localDataDeletionController ||
       !routeGuidanceDependencies ||
       !routeGuidanceDependencies.routeGuidanceSession ||
       !routeGuidanceDependencies.routeMapAreaCatalog ||
@@ -132,7 +144,7 @@ export class BrowserEventBinding {
     this.completeCircleVisit = options.completeCircleVisit;
     this.eventRegistry = eventDayDependencies.eventRegistry ?? null;
     this.eventRegistryUrl = eventDayDependencies.eventRegistryUrl ?? null;
-    this.localDataDeletionUseCase = options.localDataDeletionUseCase;
+    this.localDataDeletionController = options.localDataDeletionController;
     this.spreadsheetTitle = "";
     this.routeGuidanceSession = routeGuidanceDependencies.routeGuidanceSession;
     this.routeMapAreaCatalog = routeGuidanceDependencies.routeMapAreaCatalog;
@@ -143,65 +155,9 @@ export class BrowserEventBinding {
       routeGuidanceDependencies.navigationRuntimeController;
     this.routeGuidanceController = routeGuidanceDependencies.routeGuidanceController;
     const baseSession = options.circleDataSourceSession;
+    this.circleDataSourceSession = baseSession;
+    this.session = baseSession;
     this.circleDataSourceController = options.circleDataSourceController;
-    let tokenSeq = 0;
-    const busyLanes = new Set();
-    let gasAbortController = null;
-    const rawSetBusy = baseSession.setBusy.bind(baseSession);
-
-    this.session = Object.assign(baseSession, {
-      setBusy: (lane, busy) => {
-        if (typeof lane === "boolean") {
-          busyLanes.clear();
-          if (lane) busyLanes.add("default");
-          rawSetBusy(lane);
-          return;
-        }
-        if (busy) {
-          busyLanes.add(lane);
-        } else {
-          busyLanes.delete(lane);
-        }
-        rawSetBusy(busyLanes.size > 0);
-      },
-      isBusy: (lane) => {
-        if (!lane) return baseSession.getSnapshot().busy;
-        return busyLanes.has(lane);
-      },
-      isAnyBusy: () => busyLanes.size > 0 || baseSession.getSnapshot().busy,
-      nextRequestToken: () => ++tokenSeq,
-      beginSourceRequest: () => {
-        this.session.abortGasRequest();
-        this.session.clearPreview();
-        this.session.setBusy("source-request", true);
-        return ++tokenSeq;
-      },
-      isLatestRequestToken: (token) => token === tokenSeq,
-      setGasAbortController: (ctrl) => {
-        gasAbortController = ctrl;
-      },
-      getGasAbortController: () => gasAbortController,
-      abortGasRequest: () => {
-        if (gasAbortController) {
-          gasAbortController.abort();
-          gasAbortController = null;
-        }
-      },
-      setActivePreview: (preview) => baseSession.setPreview(preview),
-      getActivePreview: () => baseSession.getSnapshot().preview,
-      clearPreview: () => baseSession.setPreview(null),
-      onEventDayChange: () => {
-        ++tokenSeq;
-        this.session.abortGasRequest();
-        this.session.clearPreview();
-        this.session.setBusy("source-request", false);
-      },
-      onSettingsClose: () => {
-        this.session.onEventDayChange();
-        busyLanes.clear();
-        baseSession.setBusy(false);
-      },
-    });
     this.ui = new DomRouteGuidanceView();
     this.activeEventDaySession.subscribe(() => {
       if (this.ui) {
@@ -222,8 +178,11 @@ export class BrowserEventBinding {
     this.outboxResultMessage = "";
     this.outboxErrorMessage = "";
     this.suppressSessionModelUpdates = false;
-    this.activeDeleteScope = null;
     this.deleteErrorMessage = "";
+    this.outboxRetryBusy = false;
+    this.outboxRequestVersion = 0;
+    this.localDeletionBusy = false;
+    this.localDeletionRequestVersion = 0;
     this.settingsEscapeHandler = null;
     this.ownedEventListeners = [];
     this.ownedTimers = new Set();
@@ -428,53 +387,28 @@ export class BrowserEventBinding {
       ? `${eventObj?.displayName || activeRef.eventId} ${activeRef.dayId}`
       : "";
 
-    const sourceSummary = activeState
-      ? formatSourceSummary(activeState)
-      : {
-          typeLabel: "CSV",
-          detail: "empty.csv",
-          endpointSummary: null,
-          pendingCount: 0,
-        };
+    const sourceSessionSnapshot = this.circleDataSourceSession.getSnapshot();
 
-    const pendingCount = activeState ? activeState.gasOutbox.length : 0;
-    const sourceType = activeState?.source.type === "gas" ? "gas" : "csv";
-    const activeCircleCount = activeState
-      ? activeState.circles.filter((circle) => !circle.removedFromSource).length
-      : 0;
-    const canExportCsv = activeCircleCount > 0;
-    const sourceSessionSnapshot = this.session.getSnapshot();
-
-    const sourceManagerModel = {
-      activeRef: activeRef ? { ...activeRef } : null,
+    const sourceManagerModel = buildSourceManagerPanelModel({
+      activeRef,
       activeRefLabel,
-      source: sourceSummary,
-      sourceType,
-      gasUrlInput:
-        sourceSessionSnapshot.draftWebAppUrl ||
-        (activeState?.source.type === "gas" ? activeState.source.gasUrl : ""),
-      selectedSheetName:
-        sourceSessionSnapshot.selectedSheetName ||
-        (activeState?.source.type === "gas"
-          ? activeState.source.sheetName
-          : ""),
-      sheetNames: sourceSessionSnapshot.sheetNames,
-      pendingCount,
-      canExportCsv,
-      busy:
-        this.session.isBusy("source-request") ||
-        this.session.isBusy("transition"),
-      errorMessage:
-        this.session.getSnapshot().errorMessage ||
-        this.sourceErrorMessage ||
-        "",
-    };
+      activeState,
+      sourceDraft: {
+        draftWebAppUrl: sourceSessionSnapshot.draftWebAppUrl,
+        selectedSheetName: sourceSessionSnapshot.selectedSheetName,
+        sheetNames: sourceSessionSnapshot.sheetNames,
+        busy: sourceSessionSnapshot.busy,
+        errorMessage: sourceSessionSnapshot.errorMessage,
+      },
+      transitionBusy: this.isTransitioning,
+      sourceErrorMessage: this.sourceErrorMessage,
+    });
 
     const outboxPanelModel = buildOutboxPanelModel(
       this.eventRegistry,
       states,
       {
-        processing: this.session.isBusy("outbox-retry"),
+        processing: this.outboxRetryBusy,
         resultMessage: this.outboxResultMessage || "",
         errorMessage: this.outboxErrorMessage || "",
       },
@@ -498,24 +432,15 @@ export class BrowserEventBinding {
         })
       : [];
 
-    const activeOption = this.activeDeleteScope
-      ? deleteOptions.find(
-          (opt) =>
-            opt.scope.type === this.activeDeleteScope.type &&
-            (opt.scope.type === "all-events" ||
-              (opt.scope.ref.eventId === this.activeDeleteScope.ref?.eventId &&
-                opt.scope.ref.dayId === this.activeDeleteScope.ref?.dayId)),
-        ) || null
-      : null;
-
-    const deleteDialogModel = {
-      open: Boolean(this.activeDeleteScope),
-      scope: this.activeDeleteScope,
-      option: activeOption,
+    const deleteDialogModel = buildStorageDeleteDialogModel({
+      selectedScope: toDeleteScope(
+        this.localDataDeletionController.getSelectedScope(),
+      ),
+      deleteOptions,
       eventDayLabel: activeRefLabel,
-      busy: this.session.isBusy("storage-delete"),
+      busy: this.localDeletionBusy,
       errorMessage: this.deleteErrorMessage || "",
-    };
+    });
 
     this.ui?.updateSettingsState({
       eventDayOptions: options,
@@ -530,7 +455,7 @@ export class BrowserEventBinding {
 
   openSourceDiffDialog(sourceLabel, diffViewModel, errorMessage = "") {
     const dialog = document.getElementById("source-diff-dialog");
-    const activePreview = this.session.getActivePreview();
+    const activePreview = this.circleDataSourceSession.getSnapshot().preview;
     if (!dialog || !activePreview) return;
 
     dialog.model = {
@@ -538,7 +463,7 @@ export class BrowserEventBinding {
       previewId: activePreview.previewId,
       sourceLabel,
       diff: diffViewModel,
-      busy: this.session.isBusy("preview-apply"),
+      busy: false,
       errorMessage,
     };
   }
@@ -557,10 +482,9 @@ export class BrowserEventBinding {
   }
 
   clearActivePreviewIfAny() {
-    const activePreview = this.session.getActivePreview();
+    const activePreview = this.circleDataSourceSession.getSnapshot().preview;
     if (activePreview) {
       this.circleDataSourceController?.cancelPreview(activePreview.previewId);
-      this.session.setPreview(null);
     }
     this.closeSourceDiffDialog();
   }
@@ -577,8 +501,8 @@ export class BrowserEventBinding {
     }
     const ref = detail.ref || undefined;
     this.suppressSessionModelUpdates = true;
-    const requestToken = this.session.nextRequestToken();
-    this.session.setBusy("outbox-retry", true);
+    const requestVersion = ++this.outboxRequestVersion;
+    this.outboxRetryBusy = true;
     this.outboxResultMessage = "";
     this.outboxErrorMessage = "";
     this.updateManagementModels();
@@ -587,19 +511,19 @@ export class BrowserEventBinding {
       const processed = this.pendingGasUpdatesController
         ? await this.pendingGasUpdatesController.retryAll(ref)
         : 0;
-      if (!this.session.isLatestRequestToken(requestToken)) return;
-      this.session.setBusy("outbox-retry", false);
+      if (requestVersion !== this.outboxRequestVersion) return;
+      this.outboxRetryBusy = false;
 
       this.ui.showToast(`GAS同期完了 (${processed}件送信)`);
       this.outboxResultMessage = `送信完了 (${processed}件)`;
     } catch (_error) {
-      if (!this.session.isLatestRequestToken(requestToken)) return;
-      this.session.setBusy("outbox-retry", false);
+      if (requestVersion !== this.outboxRequestVersion) return;
+      this.outboxRetryBusy = false;
       this.outboxErrorMessage = "再送処理中にエラーが発生しました。";
       this.ui.showToast("再送エラー", "error");
     } finally {
       this.suppressSessionModelUpdates = false;
-      if (this.session.isLatestRequestToken(requestToken)) {
+      if (requestVersion === this.outboxRequestVersion) {
         this.updateManagementModels();
         this.ui?.updateCounts?.(this);
       }
@@ -617,14 +541,14 @@ export class BrowserEventBinding {
     });
     if (!option || option.blocked) return;
 
-    this.activeDeleteScope = option.scope;
+    this.localDataDeletionController.selectDeletionScope(option.scope);
     this.deleteErrorMessage = "";
     this.updateManagementModels();
   }
 
   /** Closes the delete dialog without changing local data. */
   handleDeleteDialogCancel() {
-    this.activeDeleteScope = null;
+    this.localDataDeletionController.cancelDeletion();
     this.deleteErrorMessage = "";
     this.updateManagementModels();
   }
@@ -639,27 +563,20 @@ export class BrowserEventBinding {
       return;
     }
 
-    const token = this.session.nextRequestToken();
+    const requestVersion = ++this.localDeletionRequestVersion;
     const activeRefBeforeDelete = this.activeRef
       ? { ...this.activeRef }
       : null;
-    this.session.setBusy("storage-delete", true);
+    this.localDeletionBusy = true;
     this.deleteErrorMessage = "";
+    this.localDataDeletionController.selectDeletionScope(scope);
     this.updateManagementModels();
 
     try {
-      const deletionScope =
-        scope.type === "all-events"
-          ? { kind: "all-event-days" }
-          : {
-              kind: scope.type === "circles" ? "circle-source" : scope.type,
-              eventDay: scope.ref,
-            };
-      await this.localDataDeletionUseCase.execute(deletionScope);
-      if (!this.session.isLatestRequestToken(token)) return;
+      await this.localDataDeletionController.confirmDeletion(scope);
+      if (requestVersion !== this.localDeletionRequestVersion) return;
 
-      this.session.setBusy("storage-delete", false);
-      this.activeDeleteScope = null;
+      this.localDeletionBusy = false;
 
       const activeRefDeleted =
         scope.type === "all-events" ||
@@ -708,8 +625,8 @@ export class BrowserEventBinding {
       }
       this.ui.showToast("データを削除しました");
     } catch (_error) {
-      if (!this.session.isLatestRequestToken(token)) return;
-      this.session.setBusy("storage-delete", false);
+      if (requestVersion !== this.localDeletionRequestVersion) return;
+      this.localDeletionBusy = false;
       if (activeRefBeforeDelete && !this.activeRef) {
         renderMapBootstrapError(
           document,
@@ -1201,10 +1118,16 @@ export class BrowserEventBinding {
       const isOpen = !this.ui.els.settingsArea.open;
       if (!isOpen) {
         this.clearActivePreviewIfAny();
-        this.session.onSettingsClose();
+        this.circleDataSourceController.cancelCurrentRequest();
+        this.outboxRequestVersion += 1;
+        this.localDeletionRequestVersion += 1;
+        this.outboxRetryBusy = false;
+        this.localDeletionBusy = false;
+        this.localDataDeletionController.cancelDeletion();
         this.sourceErrorMessage = "";
         this.outboxResultMessage = "";
         this.outboxErrorMessage = "";
+        this.deleteErrorMessage = "";
         this.ui.setSettingsError("");
         this.updateManagementModels();
       }

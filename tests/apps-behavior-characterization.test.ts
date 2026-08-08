@@ -59,6 +59,16 @@ describe("apps public behavior characterization", () => {
     );
   });
 
+  it("does not mutate the injected circle data source session with binder-only wrapper methods", () => {
+    const options = createBrowserEventBindingOptions();
+
+    new BrowserEventBinding(options);
+
+    expect("nextRequestToken" in options.circleDataSourceSession).toBe(false);
+    expect("abortGasRequest" in options.circleDataSourceSession).toBe(false);
+    expect("onSettingsClose" in options.circleDataSourceSession).toBe(false);
+  });
+
   it("reads route guidance rendering state directly from the injected session", () => {
     const { app } = createProductionAppFixture();
     const activeState = {
