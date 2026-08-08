@@ -1,4 +1,4 @@
-import { BrowserEventBinding } from "./bind-browser-events";
+import { BrowserApplication } from "./browser-application";
 import {
   completeCircleVisit,
   type CompleteCircleVisitInput,
@@ -129,6 +129,11 @@ export function assembleComiPathApplication(
   const pendingGasUpdatesController = new PendingGasUpdatesController(
     sendPendingGasUpdates,
     discardPendingGasUpdates,
+    {
+      targetElement: options.targetElement ?? options.document,
+      onRetryRequest: (detail) => browserRuntime?.handleGasRetryRequest(detail),
+      onDiscardRequest: (detail) => browserRuntime?.handleGasDiscardRequest(detail),
+    },
   );
 
   // Event Day feature assembly
@@ -285,9 +290,21 @@ export function assembleComiPathApplication(
   );
   const localDataDeletionController = new LocalDataDeletionController({
     deleteLocalData,
+    targetElement: options.targetElement ?? options.document,
+    onScopeSelect: (detail) =>
+      browserRuntime?.handleDeleteOptionSelect(
+        detail && typeof detail === "object"
+          ? (detail as { scope?: unknown }).scope
+          : undefined,
+      ),
+    onDeleteRequest: (detail) =>
+      browserRuntime?.handleStorageDeleteRequest(detail),
+    onCancel: () => browserRuntime?.handleDeleteDialogCancel(),
   });
 
-  browserRuntime = new BrowserEventBinding({
+  browserRuntime = new BrowserApplication({
+    document: options.document,
+    window: options.window,
     circleDataSourceSession,
     circleDataSourceController,
     completeCircleVisit: (input: CompleteCircleVisitInput) =>

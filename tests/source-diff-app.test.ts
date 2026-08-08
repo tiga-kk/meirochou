@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
-import { createBrowserEventBindingOptions } from "./helpers/browser-event-binding-fixture";
+import { BrowserApplication } from "../apps/webapp/js/app/browser-application";
+import { createBrowserApplicationOptions } from "./helpers/browser-event-binding-fixture";
 import type {
   EventDayRef,
   EventRegistryV1,
@@ -24,7 +24,7 @@ function createRegistry(): EventRegistryV1 {
 }
 
 describe("Circle Data Source Diff & Preview Dialog Integration", () => {
-  let app: BrowserEventBinding;
+  let app: BrowserApplication;
   let repo: EventDayRepository;
 
   beforeEach(async () => {
@@ -46,7 +46,7 @@ describe("Circle Data Source Diff & Preview Dialog Integration", () => {
     const storage = new StorageService();
     repo = new EventDayRepository(storage);
 
-    app = new BrowserEventBinding(createBrowserEventBindingOptions({ repository: repo }));
+    app = new BrowserApplication(createBrowserApplicationOptions({ repository: repo }));
     app.eventRegistry = createRegistry();
     app.eventRegistryUrl = "";
 

@@ -45,8 +45,8 @@ const mockState = vi.hoisted(() => ({
   }>,
 }));
 
-vi.mock("../apps/webapp/js/app/bind-browser-events", () => ({
-  BrowserEventBinding: class {
+vi.mock("../apps/webapp/js/app/browser-application", () => ({
+  BrowserApplication: class {
     clearNavigationSnapshot = vi.fn();
     matrixRepository = { deleteByEventDay: vi.fn() };
 

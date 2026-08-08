@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
-import { createBrowserEventBindingOptions } from "./helpers/browser-event-binding-fixture";
+import { BrowserApplication } from "../apps/webapp/js/app/browser-application";
+import { createBrowserApplicationOptions } from "./helpers/browser-event-binding-fixture";
 import {
   CircleDataSourcePanel,
   type CircleDataSourcePanelModel,
@@ -66,14 +66,14 @@ function setupDOM() {
 }
 
 describe("CircleDataSource Orchestration & App Integration", () => {
-  let app: BrowserEventBinding;
+  let app: BrowserApplication;
 
   beforeEach(async () => {
     setupDOM();
     localStorage.clear();
     const storage = new StorageService();
     const repo = new EventDayRepository(storage);
-    app = new BrowserEventBinding(createBrowserEventBindingOptions({ repository: repo }));
+    app = new BrowserApplication(createBrowserApplicationOptions({ repository: repo }));
     app.eventRegistry = sampleRegistry;
     app.eventRegistryUrl = "/assets/events/manifest.json";
     repo.save(

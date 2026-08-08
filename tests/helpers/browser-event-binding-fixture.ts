@@ -46,7 +46,7 @@ import {
   type CompleteCircleVisitResult,
 } from "../../apps/webapp/js/app/complete-circle-visit";
 
-interface BrowserEventBindingFixtureOptions {
+interface BrowserApplicationFixtureOptions {
   readonly repository?: EventDayRepository;
   readonly activeEventDaySession?: ActiveEventDaySession;
   readonly activeEventDayReader?: ActiveEventDayReader;
@@ -59,8 +59,8 @@ interface BrowserEventBindingFixtureOptions {
 }
 
 /** Supplies the explicitly assembled dependencies required by the browser binder. */
-export function createBrowserEventBindingOptions(
-  options: BrowserEventBindingFixtureOptions = {},
+export function createBrowserApplicationOptions(
+  options: BrowserApplicationFixtureOptions = {},
 ) {
   const repository =
     options.repository ?? new LocalStorageEventDayRepository(new StorageService());
@@ -92,6 +92,11 @@ export function createBrowserEventBindingOptions(
     new PendingGasUpdatesController(
       sendPendingGasUpdates,
       new DiscardPendingGasUpdatesUseCase(repository, activeEventDaySession),
+      {
+        targetElement: document,
+        onRetryRequest() {},
+        onDiscardRequest() {},
+      },
     );
   const circleDataSourceSession = createCircleDataSourceSession();
   const routeGuidanceSession = createRouteGuidanceSession();
@@ -159,6 +164,8 @@ export function createBrowserEventBindingOptions(
       ));
 
   return {
+    document,
+    window,
     circleDataSourceSession,
     circleDataSourceController: {
       start() {},
@@ -175,6 +182,10 @@ export function createBrowserEventBindingOptions(
         deleteActivitySnapshot() {},
         deleteAllRouteData() {},
       }),
+      targetElement: document,
+      onScopeSelect() {},
+      onDeleteRequest() {},
+      onCancel() {},
     }),
     routeGuidanceDependencies: {
       routeGuidanceSession,

@@ -4,6 +4,10 @@ import type { DeleteLocalDataOperation } from "../use-cases/delete-local-data";
 
 export interface LocalDataDeletionControllerDependencies {
   readonly deleteLocalData: DeleteLocalDataOperation;
+  readonly targetElement?: EventTarget;
+  readonly onScopeSelect?: (detail: unknown) => void;
+  readonly onDeleteRequest?: (detail: unknown) => void | Promise<void>;
+  readonly onCancel?: () => void;
 }
 
 function parseRef(value: unknown): EventDayRef | null {
@@ -55,10 +59,32 @@ function parseScope(value: unknown): LocalDataDeletionScope | null {
 export class LocalDataDeletionController {
   private selectedScope: LocalDataDeletionScope | null = null;
   private stopped = false;
+  private eventCleanup: (() => void) | null = null;
 
   constructor(
     private readonly dependencies: LocalDataDeletionControllerDependencies,
   ) {}
+
+  start(): void {
+    this.stop();
+    this.stopped = false;
+    const { targetElement, onScopeSelect, onDeleteRequest, onCancel } =
+      this.dependencies;
+    if (!targetElement || !onScopeSelect || !onDeleteRequest || !onCancel) return;
+    const select = (event: Event) => onScopeSelect((event as CustomEvent).detail);
+    const request = (event: Event) =>
+      void onDeleteRequest((event as CustomEvent).detail);
+    const cancel = () => onCancel();
+    targetElement.addEventListener("delete-option-select", select);
+    targetElement.addEventListener("storage-delete-request", request);
+    targetElement.addEventListener("storage-delete-cancel", cancel);
+    this.eventCleanup = () => {
+      targetElement.removeEventListener("delete-option-select", select);
+      targetElement.removeEventListener("storage-delete-request", request);
+      targetElement.removeEventListener("storage-delete-cancel", cancel);
+      this.eventCleanup = null;
+    };
+  }
 
   selectDeletionScope(detail: unknown): void {
     if (!this.stopped) this.selectedScope = parseScope(detail);
@@ -83,6 +109,7 @@ export class LocalDataDeletionController {
   }
 
   stop(): void {
+    this.eventCleanup?.();
     this.stopped = true;
     this.selectedScope = null;
   }

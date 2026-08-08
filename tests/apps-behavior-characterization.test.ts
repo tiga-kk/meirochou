@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
-import { createBrowserEventBindingOptions } from "./helpers/browser-event-binding-fixture";
+import { BrowserApplication } from "../apps/webapp/js/app/browser-application";
+import { createBrowserApplicationOptions } from "./helpers/browser-event-binding-fixture";
 import { ChangeCircleStatusUseCase } from "../apps/webapp/js/features/circle-status/use-cases/change-circle-status";
 import type {
   CircleRecord,
@@ -36,8 +36,8 @@ function createProductionAppFixture() {
     postMessage: vi.fn(),
     terminate: vi.fn(),
   };
-  const app = new BrowserEventBinding({
-    ...createBrowserEventBindingOptions(),
+  const app = new BrowserApplication({
+    ...createBrowserApplicationOptions(),
     alnsWorkerFactory: () => worker,
   });
   vi.spyOn(app, "disposeSyncCoordinator");
@@ -54,15 +54,15 @@ function createGasState(): LocalEventDayState {
 
 describe("apps public behavior characterization", () => {
   it("requires non-route dependencies assembled outside the browser binder", () => {
-    expect(() => new BrowserEventBinding()).toThrow(
-      "BrowserEventBinding requires assembled dependencies",
+    expect(() => new BrowserApplication()).toThrow(
+      "BrowserApplication requires assembled dependencies",
     );
   });
 
   it("does not mutate the injected circle data source session with binder-only wrapper methods", () => {
-    const options = createBrowserEventBindingOptions();
+    const options = createBrowserApplicationOptions();
 
-    new BrowserEventBinding(options);
+    new BrowserApplication(options);
 
     expect("nextRequestToken" in options.circleDataSourceSession).toBe(false);
     expect("abortGasRequest" in options.circleDataSourceSession).toBe(false);
@@ -207,8 +207,8 @@ describe("apps public behavior characterization", () => {
       <span id="header-area-title"></span>
       <div id="source-diff-dialog"></div>
       <navigation-resume-dialog id="navigation-resume-dialog"></navigation-resume-dialog>`;
-    const options = createBrowserEventBindingOptions({ repository });
-    const app = new BrowserEventBinding(options);
+    const options = createBrowserApplicationOptions({ repository });
+    const app = new BrowserApplication(options);
     const initializeResumeStartup = vi
       .spyOn(app.routeGuidanceController, "initializeResumeStartup")
       .mockReturnValue({
@@ -257,6 +257,7 @@ describe("apps public behavior characterization", () => {
   it("binds each browser event once and stops sync coordination on dispose", () => {
     const { app, addEventListener, resumeAddEventListener } =
       createProductionAppFixture();
+    const documentAddEventListener = vi.spyOn(document, "addEventListener");
     app.setupEvents();
 
     expect(
@@ -266,7 +267,7 @@ describe("apps public behavior characterization", () => {
     ).toBeGreaterThanOrEqual(0);
 
     expect(
-      addEventListener.mock.calls.filter(
+      documentAddEventListener.mock.calls.filter(
         ([type]) => type === "storage-delete-request",
       ),
     ).toHaveLength(1);

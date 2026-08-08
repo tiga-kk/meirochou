@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import { createComiPathApplication } from "../apps/webapp/js/app/comipath-application";
-import { BrowserEventBinding } from "../apps/webapp/js/app/bind-browser-events";
+import { BrowserApplication } from "../apps/webapp/js/app/browser-application";
 
 describe("ComiPath application shell", () => {
   it("starts and stops the browser runtime exactly once", async () => {
@@ -63,10 +63,10 @@ describe("ComiPath application shell", () => {
         },
       },
       settingsEscapeHandler: null,
-    } as unknown as BrowserEventBinding;
+    } as unknown as BrowserApplication;
 
     const pending = new Promise<void>((resolve) => {
-      BrowserEventBinding.prototype.scheduleTimeout.call(
+      BrowserApplication.prototype.scheduleTimeout.call(
         fakeApp,
         () => {},
         60_000,
@@ -77,7 +77,7 @@ describe("ComiPath application shell", () => {
       );
     });
 
-    BrowserEventBinding.prototype.dispose.call(fakeApp);
+    BrowserApplication.prototype.dispose.call(fakeApp);
     await pending;
     expect(cancelled).toBe(true);
     expect(disposeCalls).toBe(1);

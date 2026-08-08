@@ -57,7 +57,7 @@ test("browser entrypoint owns startup side effects", () => {
     html,
     /<script\s+type="module"\s+src="js\/app\/browser-entrypoint\.ts"><\/script>/,
   );
-  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const appSource = read("apps/webapp/js/app/browser-application.ts");
   assert.doesNotMatch(appSource, /DOMContentLoaded/);
 });
 
@@ -76,7 +76,7 @@ test("Phase 2 keeps GAS sale actions outside the local data service", () => {
 });
 
 test("Phase 5C Task 1 removes persistent Undo/Redo controls from the UI", () => {
-  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const appSource = read("apps/webapp/js/app/browser-application.ts");
   const modalSource = read(
     "apps/webapp/js/features/circle-status/ui/dom-circle-gallery-view.ts",
   );
@@ -1077,7 +1077,7 @@ test("webapp route exposes the exact OCR points selected for both endpoint pins"
 });
 
 test("webapp next-target search ranks candidates with grid route assets", () => {
-  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const appSource = read("apps/webapp/js/app/browser-application.ts");
   const loaderSource = read(
     "apps/webapp/js/features/route-guidance/infrastructure/http-route-map-assets-loader.ts",
   );
@@ -1124,7 +1124,7 @@ test("webapp uses an exact numeric input for the current location", () => {
 });
 
 test("webapp delegates gallery target changes to Route Guidance", () => {
-  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const appSource = read("apps/webapp/js/app/browser-application.ts");
   const handler =
     appSource.match(
       /async\s+handleSetNextTarget\(circle\)[\s\S]*?\n\s*}\n\n\s*\/\*\*/,
@@ -1139,7 +1139,7 @@ test("webapp delegates gallery target changes to Route Guidance", () => {
 });
 
 test("webapp delegates destination selection and comparison to Route Guidance", () => {
-  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const appSource = read("apps/webapp/js/app/browser-application.ts");
   const handlers = appSource.slice(
     appSource.indexOf("async handleSelectTarget(circle)"),
     appSource.indexOf("async handleSetNextTarget(circle)"),
@@ -1155,7 +1155,7 @@ test("webapp delegates destination selection and comparison to Route Guidance", 
 });
 
 test("webapp delegates purchase and hold navigation to completeCircleVisit", () => {
-  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const appSource = read("apps/webapp/js/app/browser-application.ts");
 
   const purchaseHandler =
     appSource.match(
@@ -1177,7 +1177,7 @@ test("webapp delegates purchase and hold navigation to completeCircleVisit", () 
 });
 
 test("webapp opens an empty local event/day on a first visit", () => {
-  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const appSource = read("apps/webapp/js/app/browser-application.ts");
   const uiSource = read("apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts");
 
   assert.match(appSource, /CSVデータ未設定。空のイベント・日程で起動しました/);
@@ -1191,12 +1191,12 @@ test("webapp opens an empty local event/day on a first visit", () => {
 });
 
 test("webapp brings manually opened settings into view", () => {
-  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const appSource = read("apps/webapp/js/app/bind-settings-shell-events.ts");
   const uiSource = read("apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts");
 
   assert.match(
     appSource,
-    /toggleSettings\(document\.getElementById\(["']toggle-settings["']\)\)/,
+    /application\.toggleSettings\(settingsToggle\)/,
   );
   assert.match(
     uiSource,
@@ -1297,7 +1297,7 @@ test("webapp target view model exposes the source sheet name", () => {
 
 test("webapp renders spreadsheet and source-sheet titles in compact labels", () => {
   const html = read("apps/webapp/index.html");
-  const dataManagerSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const dataManagerSource = read("apps/webapp/js/app/browser-application.ts");
   const uiSource = read("apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts");
 
   assert.match(html, /id="spreadsheet-title"/);
@@ -1406,7 +1406,7 @@ test("webapp navigation map renders the configured map image", () => {
 });
 
 test("webapp initializes the injected map catalog before binding the manifest", () => {
-  const appSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const appSource = read("apps/webapp/js/app/browser-application.ts");
   const loadIndex = appSource.indexOf(
     "await loadRuntimeMapBundleManifestFromUrl",
   );
@@ -1424,7 +1424,7 @@ test("webapp initializes the injected map catalog before binding the manifest", 
   assert.ok(initializeBindingIndex > initializeIndex);
   assert.match(
     appSource,
-    /catch\s*\(error\)[\s\S]*renderMapBootstrapError\(document,\s*error\)/,
+    /catch\s*\(error\)[\s\S]*renderMapBootstrapError\(existingApp\.document,\s*error\)/,
   );
 });
 
@@ -1432,12 +1432,12 @@ test("webapp injects route guidance and delegates the start flow to its controll
   const assemblySource = read(
     "apps/webapp/js/app/assemble-comipath-application.ts",
   );
-  const bindingSource = read("apps/webapp/js/app/bind-browser-events.ts");
+  const bindingSource = read("apps/webapp/js/app/browser-application.ts");
   const controllerIndex = assemblySource.indexOf(
     "const routeGuidanceController = new RouteGuidanceController",
   );
   const bindingIndex = assemblySource.indexOf(
-    "browserRuntime = new BrowserEventBinding({",
+    "browserRuntime = new BrowserApplication({",
     controllerIndex,
   );
   const dependenciesIndex = assemblySource.indexOf(
