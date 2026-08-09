@@ -217,6 +217,92 @@
   background-color: rgba(183, 121, 31, 0.4);
 }
 
+.map-pin.itinerary-pin {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 0 2px #fff;
+}
+
+.route-itinerary-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 12px 24px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.route-itinerary-dialog {
+  width: min(420px, 100%);
+  max-height: 76vh;
+  overflow: auto;
+  padding: 16px;
+  border: 2px solid var(--ink);
+  background: var(--bg-card);
+  box-shadow: var(--shadow);
+}
+
+.route-itinerary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.route-itinerary-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.route-itinerary-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.route-itinerary-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--ink);
+  background: var(--panel);
+}
+
+.route-itinerary-list li.current {
+  border-width: 2px;
+  border-color: var(--primary);
+}
+
+.route-itinerary-number {
+  min-width: 2rem;
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-weight: 900;
+}
+
+.route-itinerary-current {
+  margin-left: auto;
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.route-itinerary-empty {
+  justify-content: center;
+  color: var(--text-sub);
+}
+
 .target-sheet-name {
   display: block;
   margin: 0.2rem 0 0.35rem;

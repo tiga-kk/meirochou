@@ -295,6 +295,7 @@ export class DomRouteMapView {
       selectedRoute = null,
       startSpace = "",
       selectionState = "idle",
+      itineraryEntries = [],
       fitMode = "current",
     } = context;
     this.lastNavigationTarget = currentTarget;
@@ -352,6 +353,22 @@ export class DomRouteMapView {
       button.className = `map-pin ${pin.state}`;
       button.dataset.space = pin.space;
       button.dataset.state = pin.baseState;
+      const itineraryEntry = itineraryEntries.find(
+        (entry) =>
+          entry.space === pin.space &&
+          findAreaForSpace(entry.space, this.mapAreaCatalog)?.id === area?.id,
+      );
+      if (itineraryEntry) {
+        button.classList.add("itinerary-pin");
+        button.dataset.itineraryIndex = String(itineraryEntry.index);
+        button.textContent = String(itineraryEntry.index);
+        button.setAttribute(
+          "aria-label",
+          `${itineraryEntry.index}番 ${pin.space}${
+            itineraryEntry.isCurrent ? "、現在の目的地" : ""
+          }`,
+        );
+      }
       button.style.left = `${pin.x}%`;
       button.style.top = `${pin.y}%`;
       this.applyPinSize(button, pin.state);

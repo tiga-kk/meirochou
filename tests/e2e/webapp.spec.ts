@@ -24,6 +24,44 @@ test("初回訪問では空のローカルイベント・日程で起動する",
   await expect(page.locator("#toast")).toContainText("CSVデータ未設定");
 });
 
+test("予定を開くと巡回順と地図pinの番号が一致し案内状態を変えない", async ({
+  page,
+}) => {
+  await page.goto("/?demo_ui=1");
+
+  await expect(page.locator("#target-space-heading")).not.toHaveText("---");
+  const beforeTarget = await page.locator("#target-space-heading").textContent();
+  await page.locator("#btn-open-itinerary").click();
+
+  const dialog = page.locator("#route-itinerary-dialog");
+  await expect(dialog.getByRole("dialog")).toBeVisible();
+  const entries = dialog.locator("[data-itinerary-index]");
+  await expect(entries).not.toHaveCount(0);
+  const entryIndexes = await entries.evaluateAll((items) =>
+    items.map((item) => item.getAttribute("data-itinerary-index")),
+  );
+  const pinIndexes = await page
+    .locator("#navigation-pin-layer .itinerary-pin")
+    .evaluateAll((pins) =>
+      pins
+        .map((pin) => pin.getAttribute("data-itinerary-index"))
+        .sort((left, right) => Number(left) - Number(right)),
+    );
+  expect(pinIndexes).toEqual(
+    entryIndexes.filter((index) => index !== null).sort((left, right) => Number(left) - Number(right)),
+  );
+  await expect(page.locator("#target-space-heading")).toHaveText(
+    beforeTarget || "",
+  );
+
+  await dialog.getByRole("button", { name: "予定を閉じる" }).click();
+  await expect(dialog.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator("#navigation-pin-layer .itinerary-pin")).toHaveCount(0);
+  await expect(page.locator("#target-space-heading")).toHaveText(
+    beforeTarget || "",
+  );
+});
+
 test("デモデータで地図・ピン・経路・ボトムシートを表示する", async ({
   page,
 }) => {

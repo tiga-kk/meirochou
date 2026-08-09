@@ -35,6 +35,15 @@
         <button type="button" id="btn-open-gallery" class="header-btn">一覧</button>
         <button
           type="button"
+          id="btn-open-itinerary"
+          class="header-btn"
+          aria-haspopup="dialog"
+          aria-controls="route-itinerary-dialog"
+        >
+          予定
+        </button>
+        <button
+          type="button"
           id="toggle-settings"
           class="settings-btn"
           aria-label="設定"
@@ -259,6 +268,7 @@
 
     <source-diff-dialog id="source-diff-dialog"></source-diff-dialog>
     <navigation-resume-dialog id="navigation-resume-dialog"></navigation-resume-dialog>
+    <route-itinerary-dialog id="route-itinerary-dialog"></route-itinerary-dialog>
     <div id="toast"></div>
 
     <!-- Main Script (Module) -->

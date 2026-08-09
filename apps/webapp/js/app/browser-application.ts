@@ -1,7 +1,10 @@
 import "../components/comipath-settings";
 import "../components/navigation-resume-dialog";
 import "../components/source-diff-dialog";
-import { DomRouteGuidanceView } from "../features/route-guidance/public-api";
+import {
+  DomRouteGuidanceView,
+  buildRouteItineraryModel,
+} from "../features/route-guidance/public-api";
 import { isDevDemoEnabled } from "../dev-demo-data.js";
 import {
   parseSpace,
@@ -31,7 +34,13 @@ import type { CircleStatusControllerPort as CircleStatusController } from "../fe
 import type { CircleDataSourceSession, CircleDataSourceController } from "../features/circle-data-source/public-api";
 import type { LocalDataDeletionController } from "../features/local-data-deletion/public-api";
 import type { MapArea, MapAreaCatalog, RouteMapAssetsLoader, RouteGuidanceController } from "../features/route-guidance/public-api";
-import type { RouteGuidanceSession, RouteGuidanceRuntimePort, GridMeta, PointsPayload } from "../features/route-guidance/public-api";
+import type {
+  RouteGuidanceSession,
+  RouteGuidanceRuntimePort,
+  GridMeta,
+  PointsPayload,
+  RouteItineraryEntry,
+} from "../features/route-guidance/public-api";
 import type { SwitchEventDayOperation } from "../features/event-day/public-api";
 import type { LocalDataDeletionScope } from "../features/local-data-deletion/public-api";
 import type { CompleteCircleVisitInput, CompleteCircleVisitResult } from "./complete-circle-visit";
@@ -97,6 +106,7 @@ type BrowserElement = HTMLElement & {
   errorMessage?: string;
   targetSpace?: string;
   model?: object;
+  entries?: readonly RouteItineraryEntry[];
   value?: string;
 };
 type BrowserInputElement = BrowserElement & { value: string };
@@ -265,6 +275,7 @@ export class BrowserApplication {
   circleDataSourceController: CircleDataSourceController;
   ui: BrowserUi;
   currentStartSpace: string;
+  itineraryOpen: boolean;
   selectionMessage: string;
   transitionToken: number;
   isTransitioning: boolean;
@@ -347,6 +358,7 @@ export class BrowserApplication {
         this.updateManagementModels();
     });
     this.currentStartSpace = "";
+    this.itineraryOpen = false;
     this.selectionMessage = "";
     this.currentManifest = null;
     this.transitionToken = 0;
@@ -839,6 +851,26 @@ export class BrowserApplication {
       onCancelRoute: () => this.handleCancelRoute(),
       onCloseRouteSelection: () => this.handleCloseRouteSelection(),
     });
+    const itineraryButton = this.document.getElementById("btn-open-itinerary");
+    const itineraryDialog = getBrowserElement<BrowserElement>(
+      this.document,
+      "route-itinerary-dialog",
+    );
+    if (itineraryButton && itineraryDialog) {
+      itineraryButton.onclick = () => {
+        itineraryDialog.entries = buildRouteItineraryModel(
+          this.routeGuidanceSession.getSnapshot(),
+          this.getUnvisited(),
+        );
+        this.itineraryOpen = true;
+        this.ui.showNavigation(this.getNavigationContext("preserve"));
+        itineraryDialog.open = true;
+      };
+      itineraryDialog.addEventListener("itinerary-close", () => {
+        this.itineraryOpen = false;
+        this.ui.showNavigation(this.getNavigationContext("preserve"));
+      });
+    }
     this.setupEvents();
 
     if (devDemoEnabled) {
@@ -953,6 +985,9 @@ export class BrowserApplication {
       nextTarget: this.getNextTarget(snapshot),
       selectionState: snapshot.selectionStatus,
       selectionMessage: this.selectionMessage,
+      itineraryEntries: this.itineraryOpen
+        ? buildRouteItineraryModel(snapshot, this.getUnvisited())
+        : [],
       fitMode,
     };
   }
