@@ -1,7 +1,6 @@
 // @ts-nocheck
 
 import { GestureZoomController } from "../../../utils/gesture-zoom-controller.js";
-import { runtimeMapAreaCatalog } from "../infrastructure/runtime-map-area-catalog";
 import {
   buildMapPins,
   buildMapPointIndex,
@@ -12,7 +11,7 @@ import {
 } from "./route-map-pin-model";
 import { buildRouteOverlaySvg } from "./route-overlay-svg";
 
-function findAreaForSpace(space) {
+function findAreaForSpace(space, mapAreaCatalog) {
   if (!space || typeof space !== "string") return null;
 
   const cleanedSpace = space.trim();
@@ -22,22 +21,22 @@ function findAreaForSpace(space) {
   const labelChar = cleanedSpace[1];
 
   return (
-    runtimeMapAreaCatalog.getAllMapAreas().find((area) => {
+    mapAreaCatalog.getAllMapAreas().find((area) => {
       const prefixMatch = area.prefixes.includes(prefixChar);
       return prefixMatch && area.labels.includes(labelChar);
     }) || null
   );
 }
 
-function areSpacesInSameArea(spaceA, spaceB) {
-  const areaA = findAreaForSpace(spaceA);
-  const areaB = findAreaForSpace(spaceB);
+function areSpacesInSameArea(spaceA, spaceB, mapAreaCatalog) {
+  const areaA = findAreaForSpace(spaceA, mapAreaCatalog);
+  const areaB = findAreaForSpace(spaceB, mapAreaCatalog);
   return Boolean(areaA && areaB && areaA.id === areaB.id);
 }
 
-export function getRouteStartSpaceForMap(startSpace, targetSpace) {
+export function getRouteStartSpaceForMap(startSpace, targetSpace, mapAreaCatalog) {
   if (!startSpace || !targetSpace) return "";
-  return areSpacesInSameArea(startSpace, targetSpace) ? startSpace : "";
+  return areSpacesInSameArea(startSpace, targetSpace, mapAreaCatalog) ? startSpace : "";
 }
 
 function readPixelBox(element) {
@@ -66,8 +65,9 @@ export function getPinSourceSize(state) {
  * メイン画面の地図表示、更新、リンク生成を担当
  */
 export class DomRouteMapView {
-  constructor(uiManager) {
+  constructor(uiManager, mapAreaCatalog) {
     this.uiManager = uiManager;
+    this.mapAreaCatalog = mapAreaCatalog;
     this.els = {
       mapContainer: document.getElementById("target-map-container"),
       navigationMap: document.getElementById("navigation-map"),
@@ -138,7 +138,7 @@ export class DomRouteMapView {
    * @param {string} space - サークルスペース文字列
    */
   updateMap(space) {
-    const area = findAreaForSpace(space);
+    const area = findAreaForSpace(space, this.mapAreaCatalog);
     if (!area) {
       if (this.els.navigationMap)
         this.els.navigationMap.classList.add("hidden");

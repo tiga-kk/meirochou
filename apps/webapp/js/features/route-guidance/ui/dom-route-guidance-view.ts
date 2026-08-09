@@ -5,7 +5,6 @@ import {
   DomCircleGalleryView,
   DomCircleProgressView,
 } from "../../circle-status/public-api";
-import { runtimeMapAreaCatalog } from "../infrastructure/runtime-map-area-catalog";
 import { DomRouteMapView } from "./dom-route-map-view";
 import { buildRouteGuidanceScreenModel } from "./route-guidance-screen-model";
 import { parseSpace } from "../../../shared/domain/space-parser";
@@ -16,16 +15,17 @@ import { DomUserNotificationView } from "../../../shared/ui/dom-user-notificatio
  * DOM操作、表示更新を担当
  */
 export class DomRouteGuidanceView {
-  constructor() {
+  constructor(mapAreaCatalog) {
+    this.mapAreaCatalog = mapAreaCatalog;
     this.dataManager = null;
     this.onSetNextTarget = null; // コールバック
     this.onSelectTarget = null;
     this.onPreviewRoute = null;
     this.onConfirmRoute = null;
     this.onCancelRoute = null;
-    this.statsRenderer = new DomCircleProgressView(this, runtimeMapAreaCatalog);
-    this.modalManager = new DomCircleGalleryView(runtimeMapAreaCatalog);
-    this.mapRenderer = new DomRouteMapView(this);
+    this.statsRenderer = new DomCircleProgressView(this, mapAreaCatalog);
+    this.modalManager = new DomCircleGalleryView(mapAreaCatalog);
+    this.mapRenderer = new DomRouteMapView(this, mapAreaCatalog);
 
     this.els = {
       spreadsheetTitle: document.getElementById("spreadsheet-title"),
@@ -121,8 +121,8 @@ export class DomRouteGuidanceView {
 
     // セレクトボックス初期化 (EWSN) - Runtime MapAreaCatalogを使用
     this.els.locEwsn.innerHTML = "";
-    if (runtimeMapAreaCatalog.getAllMapAreas()) {
-      runtimeMapAreaCatalog.getAllMapAreas().forEach((area) => {
+    if (this.mapAreaCatalog.getAllMapAreas()) {
+      this.mapAreaCatalog.getAllMapAreas().forEach((area) => {
         const opt = document.createElement("option");
         opt.value = area.id;
         opt.textContent = area.name;
@@ -195,8 +195,8 @@ export class DomRouteGuidanceView {
 
     // Runtime MapAreaCatalogから該当エリアを検索
     let labels = [];
-    if (runtimeMapAreaCatalog.getAllMapAreas()) {
-      const area = runtimeMapAreaCatalog
+    if (this.mapAreaCatalog.getAllMapAreas()) {
+      const area = this.mapAreaCatalog
         .getAllMapAreas()
         .find((a) => a.id === selected);
       if (area) {
@@ -218,7 +218,7 @@ export class DomRouteGuidanceView {
 
   /** Reflect the selected manifest area in the compact field header. */
   updateAreaHeader() {
-    const area = runtimeMapAreaCatalog
+    const area = this.mapAreaCatalog
       .getAllMapAreas()
       .find((candidate) => candidate.id === this.els.locEwsn.value);
     if (!area) return;
@@ -463,7 +463,7 @@ export class DomRouteGuidanceView {
   updateCurrentLocation(space) {
     const [ewsn, label, number] = parseSpace(
       space,
-      runtimeMapAreaCatalog.getAllMapAreas(),
+      this.mapAreaCatalog.getAllMapAreas(),
     );
     this.els.locEwsn.value = ewsn;
     this.updateLabelOptions(true);

@@ -62,6 +62,7 @@ import { RouteGuidanceNavigationOperations } from "../features/route-guidance/us
 import { createRouteGuidanceSession } from "../features/route-guidance/use-cases/route-guidance-session";
 import { StartRouteGuidanceUseCase } from "../features/route-guidance/use-cases/start-route-guidance";
 import type { MapBundleManifest } from "../features/event-day/domain/event-day-contracts";
+import type { MapBundleManifestV1 } from "../features/event-day/domain/application-contract-types";
 import { StorageService } from "../state/storage-service";
 import {
   createComiPathApplication,
@@ -82,10 +83,36 @@ export interface AssembleComiPathApplicationOptions {
   readonly targetElement?: HTMLElement | Window | Document;
 }
 
+export interface AssembledComiPathApplication extends StartableApplication {
+  readonly eventDaySelectorController: EventDaySelectorController | null;
+  readonly circleDataSourceController: CircleDataSourceController;
+  readonly previewCsvImport: PreviewCsvImportUseCase;
+  readonly previewGoogleSheetImport: PreviewGoogleSheetImportUseCase;
+  readonly applyCircleDataPreview: ApplyCircleDataPreviewUseCase;
+  readonly cancelCircleDataPreview: CancelCircleDataPreviewUseCase;
+  readonly exportCirclesToCsv: ExportCirclesToCsvUseCase;
+  readonly switchEventDay: SwitchEventDayUseCase | null;
+  readonly openInitialEventDay: OpenInitialEventDayUseCase;
+  readonly routeGuidanceController: RouteGuidanceController;
+  readonly routeGuidanceSession: ReturnType<typeof createRouteGuidanceSession>;
+}
+
+function toDomainMapManifest(manifest: MapBundleManifestV1): MapBundleManifest {
+  return {
+    schemaVersion: manifest.schemaVersion,
+    eventId: manifest.eventId,
+    displayName: manifest.displayName,
+    bundleVersion: manifest.bundleVersion,
+    areas: manifest.areas.map(
+      (area): MapBundleManifest["areas"][number] => ({ ...area }),
+    ),
+  };
+}
+
 /** Composition root for the browser runtime and feature infrastructure. */
 export function assembleComiPathApplication(
   options: AssembleComiPathApplicationOptions,
-): StartableApplication & Record<string, unknown> {
+): AssembledComiPathApplication {
   let browserRuntime: BrowserApplication | null = null;
   const storage = new StorageService();
   const repository =
@@ -200,8 +227,32 @@ export function assembleComiPathApplication(
   });
 
   const routeGuidanceSession = createRouteGuidanceSession();
-  const routeMapAreaCatalog =
-    runtimeMapAreaCatalog as unknown as MapAreaCatalog;
+  const routeMapAreaCatalog: MapAreaCatalog = {
+    getAllMapAreas: () => runtimeMapAreaCatalog.getAllMapAreas(),
+    getMapArea: (areaId) => runtimeMapAreaCatalog.getMapArea(areaId),
+    findMapAreaForCircleSpace: (circleSpace) =>
+      runtimeMapAreaCatalog.findMapAreaForCircleSpace(circleSpace),
+    initializeMapAreas: (areas) =>
+      runtimeMapAreaCatalog.initializeMapAreas(
+        areas.map((area) => ({
+          ...area,
+          id: area.id ?? area.areaId,
+          name: area.name ?? area.displayName ?? area.areaId,
+          prefixes: area.prefixes ?? [],
+          labels: area.labels ?? [],
+        })),
+      ),
+    replaceMapAreas: (areas) =>
+      runtimeMapAreaCatalog.replaceMapAreas(
+        areas.map((area) => ({
+          ...area,
+          id: area.id ?? area.areaId,
+          name: area.name ?? area.displayName ?? area.areaId,
+          prefixes: area.prefixes ?? [],
+          labels: area.labels ?? [],
+        })),
+      ),
+  };
   const routeMapAssetsLoader = new HttpRouteMapAssetsLoader();
   const snapshotRepository = new LocalStorageRouteGuidanceSnapshotRepository();
   const matrixRepository = new LocalStorageDistanceMatrixRepository();
@@ -384,14 +435,16 @@ export function assembleComiPathApplication(
           currentManifest: null,
           loadManifest: async (event, signal) =>
             runtimeRegistryUrl
-              ? ((await loadRuntimeMapBundleManifestFromUrl(
+              ? toDomainMapManifest(
+                  await loadRuntimeMapBundleManifestFromUrl(
                   resolveEventMapManifestUrl(runtimeRegistryUrl, event),
                   event.eventId,
                   {
                     fetcher: browserFetcher,
                     signal,
                   },
-                )) as unknown as MapBundleManifest)
+                ),
+                )
               : {
                   schemaVersion: 1,
                   eventId: event.eventId,
@@ -434,17 +487,23 @@ export function assembleComiPathApplication(
     },
   });
 
-  return Object.assign(baseApp, {
-    eventDaySelectorController,
+  return {
+    start: baseApp.start,
+    stop: baseApp.stop,
+    get eventDaySelectorController() {
+      return eventDaySelectorController;
+    },
     circleDataSourceController,
     previewCsvImport,
     previewGoogleSheetImport,
     applyCircleDataPreview,
     cancelCircleDataPreview,
     exportCirclesToCsv,
-    switchEventDay,
+    get switchEventDay() {
+      return switchEventDay;
+    },
     openInitialEventDay,
     routeGuidanceController,
     routeGuidanceSession,
-  }) as unknown as StartableApplication & Record<string, unknown>;
+  };
 }

@@ -1,14 +1,10 @@
 import { bindCircleStatusEvents } from "./bind-circle-status-events";
 import { bindRouteGuidanceEvents } from "./bind-route-guidance-events";
 import { bindSettingsShellEvents } from "./bind-settings-shell-events";
-
-type AppEventBindingApplication =
-  Parameters<typeof bindRouteGuidanceEvents>[0] &
-  Parameters<typeof bindCircleStatusEvents>[0] &
-  Parameters<typeof bindSettingsShellEvents>[0];
+import type { BrowserApplication } from "./browser-application";
 
 export interface BindBrowserEventsDependencies {
-  readonly application: AppEventBindingApplication;
+  readonly application: BrowserApplication;
   readonly document: Document;
 }
 

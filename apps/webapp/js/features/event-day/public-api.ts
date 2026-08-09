@@ -1,4 +1,5 @@
 export type { EventRegistry } from "./domain/event-day-contracts";
+export type { MapBundleManifest } from "./domain/event-day-contracts";
 export type {
   ActiveEventDaySnapshot,
   Circle,

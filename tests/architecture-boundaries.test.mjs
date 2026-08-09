@@ -302,13 +302,47 @@ describe("webapp architecture boundaries", () => {
     ).toHaveLength(7);
   });
 
-  it("keeps browser-application runtime imports outside the binder guardrail", () => {
+  it("rejects concrete infrastructure imports from browser-application", () => {
     const result = scanFixture({
       "app/browser-application.ts":
         'import { HttpRouteMapAssetsLoader } from "../features/route-guidance/infrastructure/http-route-map-assets-loader";',
     });
 
-    expect(result.violations).toEqual([]);
+    expect(result.violations.map((item) => item.ruleId)).toContain(
+      "application-imports-concrete-infrastructure",
+    );
+  });
+
+  it("rejects app feature deep imports while allowing public-api imports", () => {
+    const negative = scanFixture({
+      "app/browser-application.ts":
+        'import { x } from "../features/example/use-cases/read";',
+    });
+    expect(negative.violations.map((item) => item.ruleId)).toContain(
+      "application-imports-feature-deep-module",
+    );
+
+    const positive = scanFixture({
+      "features/example/public-api.ts": "export const x = 1;",
+      "app/browser-application.ts":
+        'import { x } from "../features/example/public-api"; void x;',
+    });
+    expect(positive.violations).toEqual([]);
+  });
+
+  it("rejects feature UI infrastructure imports and use-case browser APIs", () => {
+    const result = scanFixture({
+      "features/example/ui/view.ts":
+        'import { Repository } from "../infrastructure/repository";',
+      "features/example/use-cases/read.ts":
+        "export async function read() { return fetch('/data.json'); }",
+    });
+    expect(result.violations.map((item) => item.ruleId)).toEqual(
+      expect.arrayContaining([
+        "ui-imports-infrastructure",
+        "use-case-uses-browser-api",
+      ]),
+    );
   });
 
   it("allows DOM listeners and feature public APIs from app binders", () => {

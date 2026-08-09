@@ -5,7 +5,7 @@ import type {
 import type {
   FinishCurrentCircleInput,
   FinishCurrentCircleResult,
-} from "../features/route-guidance/use-cases/finish-current-circle";
+} from "../features/route-guidance/public-api";
 
 type ChangeStatusInput = Parameters<CircleStatusControllerPort["changeStatus"]>[0];
 

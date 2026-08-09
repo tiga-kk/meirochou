@@ -1078,11 +1078,12 @@ test("webapp route exposes the exact OCR points selected for both endpoint pins"
 
 test("webapp next-target search ranks candidates with grid route assets", () => {
   const appSource = read("apps/webapp/js/app/browser-application.ts");
+  const devRouteSource = read("apps/webapp/js/dev-demo-route-guidance.ts");
   const loaderSource = read(
     "apps/webapp/js/features/route-guidance/infrastructure/http-route-map-assets-loader.ts",
   );
 
-  assert.match(appSource, /rankCandidatesByGridDistance/);
+  assert.match(devRouteSource, /rankCandidatesByGridDistance/);
   assert.match(loaderSource, /globalThis\.fetch\.bind\(globalThis\)/);
   assert.match(loaderSource, /mapArea\.assets\.grid/);
   assert.doesNotMatch(loaderSource, /c108-/i);
@@ -1127,7 +1128,7 @@ test("webapp delegates gallery target changes to Route Guidance", () => {
   const appSource = read("apps/webapp/js/app/browser-application.ts");
   const handler =
     appSource.match(
-      /async\s+handleSetNextTarget\(circle\)[\s\S]*?\n\s*}\n\n\s*\/\*\*/,
+      /async\s+handleSetNextTarget\(circle[^)]*\)[\s\S]*?\n\s*}\n\n\s*\/\*\*/,
     )?.[0] || "";
 
   assert.match(handler, /routeGuidanceController\.setManualDestination\(/);
@@ -1141,8 +1142,8 @@ test("webapp delegates gallery target changes to Route Guidance", () => {
 test("webapp delegates destination selection and comparison to Route Guidance", () => {
   const appSource = read("apps/webapp/js/app/browser-application.ts");
   const handlers = appSource.slice(
-    appSource.indexOf("async handleSelectTarget(circle)"),
-    appSource.indexOf("async handleSetNextTarget(circle)"),
+    appSource.indexOf("async handleSelectTarget(circle"),
+    appSource.indexOf("async handleSetNextTarget(circle"),
   );
 
   assert.match(handlers, /routeGuidanceController\.selectDestination\(/);
@@ -1159,7 +1160,7 @@ test("webapp delegates purchase and hold navigation to completeCircleVisit", () 
 
   const purchaseHandler =
     appSource.match(
-      /async\s+handleAction\(type\)[\s\S]*?\n\s*}\n\n\s*\/\*\*/,
+      /async\s+handleAction\(type[^)]*\)[\s\S]*?\n\s*}\n\n\s*\/\*\*/,
     )?.[0] || "";
 
   assert.match(purchaseHandler, /await\s+this\.completeCircleVisit\(/);

@@ -1,7 +1,7 @@
 export * from "./domain/map-area";
-export * from "./domain/optimization/nearest-neighbor-order";
 export * from "./domain/route-guidance-types";
 export * from "./domain/routing/grid-route-types";
+export * from "./domain/optimization/nearest-neighbor-order";
 export * from "./ui/route-guidance-controller";
 export * from "./ui/route-guidance-screen-model";
 export * from "./use-cases/apply-optimized-route-order";
@@ -16,3 +16,5 @@ export * from "./use-cases/route-guidance-snapshot-repository";
 export * from "./use-cases/route-map-assets-loader";
 export * from "./use-cases/route-optimizer";
 export * from "./use-cases/start-route-guidance";
+export { DomRouteGuidanceView } from "./ui/dom-route-guidance-view";
+export { buildSpaceFromLocation } from "./ui/parse-current-location-form";

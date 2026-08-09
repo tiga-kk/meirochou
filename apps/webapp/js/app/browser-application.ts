@@ -1,23 +1,41 @@
-// @ts-nocheck
-
 import "../components/comipath-settings";
 import "../components/navigation-resume-dialog";
 import "../components/source-diff-dialog";
-import { DomRouteGuidanceView } from "../features/route-guidance/ui/dom-route-guidance-view";
+import { DomRouteGuidanceView } from "../features/route-guidance/public-api";
 import { isDevDemoEnabled } from "../dev-demo-data.js";
-import { renderMapBootstrapError } from "../features/event-day/infrastructure/http-map-manifest-loader";
 import {
   parseSpace,
-  solveNearestNeighbor,
-} from "../features/route-guidance/domain/optimization/nearest-neighbor-order";
+} from "../features/route-guidance/public-api";
+import { buildSpaceFromLocation } from "../features/route-guidance/public-api";
 import {
-  planRoute,
-  planRouteFromGridIndex,
-  rankCandidatesByGridDistance,
-} from "../features/route-guidance/domain/routing/grid-route-planner";
-import { buildSpaceFromLocation } from "../features/route-guidance/ui/parse-current-location-form";
-import type { MapBundleManifest } from "../features/event-day/domain/event-day-contracts";
-import type { EventRegistry } from "../features/event-day/public-api";
+  orderDevDemoCandidates,
+  planDevDemoRoute,
+  rankDevDemoCandidates,
+  type DevDemoRouteOptions,
+} from "../dev-demo-route-guidance.js";
+import type { MapBundleManifest } from "../features/event-day/public-api";
+import type {
+  ActiveEventDayReader,
+  ActiveEventDaySession,
+  Circle,
+  EventDayRef,
+  EventDayRepository,
+  EventRegistry,
+  LocalEventDayState,
+} from "../features/event-day/public-api";
+import type { PendingGasUpdateBackgroundProcess } from "../features/circle-status/public-api";
+import type { CircleStatusControllerPort as CircleStatusController } from "../features/circle-status/public-api";
+import type { CircleDataSourceSession, CircleDataSourceController } from "../features/circle-data-source/public-api";
+import type { LocalDataDeletionController } from "../features/local-data-deletion/public-api";
+import type { MapArea, MapAreaCatalog, RouteMapAssetsLoader, RouteGuidanceController } from "../features/route-guidance/public-api";
+import type { RouteGuidanceSession, RouteGuidanceRuntimePort, GridMeta, PointsPayload } from "../features/route-guidance/public-api";
+import type { SwitchEventDayOperation } from "../features/event-day/public-api";
+import type { LocalDataDeletionScope } from "../features/local-data-deletion/public-api";
+import type { CompleteCircleVisitInput, CompleteCircleVisitResult } from "./complete-circle-visit";
+import type { DeleteScope, ManagementEventDetailMap } from "../shared/ui/management-events";
+import type { RouteResult } from "../features/route-guidance/public-api";
+import type { SpaceArea } from "../shared/domain/space-parser";
+import type { SourceDiffViewModel } from "../shared/ui/management-view-model";
 import {
   buildDeleteOptions,
   buildEventDayOptions,
@@ -25,35 +43,33 @@ import {
   buildSourceManagerPanelModel,
   buildStorageDeleteDialogModel,
 } from "../shared/ui/management-view-model";
-import {
-  bindBrowserEvents,
-  type BindBrowserEventsDependencies,
-} from "./bind-browser-events";
+import { bindBrowserEvents } from "./bind-browser-events";
 
 /** Validates an event/day reference at the browser event boundary. */
-function isEventDayRef(value) {
-  return Boolean(
-    value &&
-      typeof value === "object" &&
-      typeof value.eventId === "string" &&
-      value.eventId.length > 0 &&
-      typeof value.dayId === "string" &&
-      value.dayId.length > 0,
-  );
-}
-
-function isDeleteScope(value) {
+function isEventDayRef(value: unknown): value is EventDayRef {
   if (!value || typeof value !== "object") return false;
-  if (value.type === "all-events") return true;
-  return (
-    (value.type === "circles" ||
-      value.type === "activity" ||
-      value.type === "event-day") &&
-    isEventDayRef(value.ref)
+  const ref = value as Partial<EventDayRef>;
+  return Boolean(
+    typeof ref.eventId === "string" &&
+      ref.eventId.length > 0 &&
+      typeof ref.dayId === "string" &&
+      ref.dayId.length > 0,
   );
 }
 
-function sameEventDayRef(left, right) {
+function isDeleteScope(value: unknown): value is DeleteScope {
+  if (!value || typeof value !== "object") return false;
+  const scope = value as { type?: string; ref?: unknown };
+  if (scope.type === "all-events") return true;
+  return (
+    (scope.type === "circles" ||
+      scope.type === "activity" ||
+      scope.type === "event-day") &&
+    isEventDayRef(scope.ref)
+  );
+}
+
+function sameEventDayRef(left: EventDayRef | null, right: EventDayRef | null) {
   return Boolean(
     left &&
       right &&
@@ -62,7 +78,7 @@ function sameEventDayRef(left, right) {
   );
 }
 
-function toDeleteScope(scope) {
+function toDeleteScope(scope: LocalDataDeletionScope | null): DeleteScope | null {
   if (!scope) return null;
   if (scope.kind === "all-event-days") {
     return { type: "all-events" };
@@ -70,10 +86,86 @@ function toDeleteScope(scope) {
   return {
     type: scope.kind === "circle-source" ? "circles" : scope.kind,
     ref: { ...scope.eventDay },
-  };
+  } as DeleteScope;
 }
 
-function findAreaForSpace(space, mapAreaCatalog) {
+type BrowserElement = HTMLElement & {
+  open?: boolean;
+  errorMessage?: string;
+  targetSpace?: string;
+  model?: object;
+  value?: string;
+};
+type BrowserInputElement = BrowserElement & { value: string };
+
+interface BrowserElements {
+  readonly settingsArea: (BrowserElement & {
+    deleteOptions?: readonly { scope: DeleteScope; blocked: boolean }[];
+  }) | null;
+  readonly targetSection: HTMLElement;
+  readonly targetEmpty: HTMLElement;
+}
+
+type BrowserUi = Omit<DomRouteGuidanceView, "toggleSettings"> & {
+  els: BrowserElements;
+  statsRenderer: {
+    setOnHoldListReset(callback: (() => void) | null): void;
+  } | null;
+  toggleSettings(target: Element | null): void;
+};
+
+function getBrowserElement<T extends BrowserElement>(document: Document, id: string): T | null {
+  return document.getElementById(id) as T | null;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function renderMapBootstrapError(targetDocument: Document, error: unknown): void {
+  const page = targetDocument.createElement("main");
+  page.className = "map-bootstrap-error";
+  page.setAttribute("role", "alert");
+  page.dataset.mapBootstrapError = "true";
+  const title = targetDocument.createElement("h1");
+  title.textContent = "地図設定を読み込めませんでした";
+  const guidance = targetDocument.createElement("p");
+  guidance.textContent =
+    "地図バンドルの配置と manifest.json を確認してから再読み込みしてください。";
+  const detail = targetDocument.createElement("pre");
+  detail.textContent = errorMessage(error);
+  page.append(title, guidance, detail);
+  targetDocument.body.replaceChildren(page);
+}
+
+function toSpaceAreas(mapAreaCatalog: MapAreaCatalog): readonly SpaceArea[] {
+  return mapAreaCatalog
+    .getAllMapAreas()
+    .filter(
+      (area): area is MapArea & { name: string; labels: readonly string[] } =>
+        typeof area.name === "string" && Array.isArray(area.labels),
+    )
+    .map((area) => ({
+      name: area.name,
+      prefixes: area.prefixes,
+      labels: area.labels,
+    }));
+}
+
+function pointMatchesSpace(
+  point: PointsPayload["points"][number],
+  space: string,
+  identifier: string,
+  number: number,
+): boolean {
+  const legacySpace = (point as typeof point & { space?: string }).space;
+  return (
+    legacySpace === space ||
+    (point.identifier === identifier && Number(point.number) === number)
+  );
+}
+
+function findAreaForSpace(space: string, mapAreaCatalog: MapAreaCatalog): MapArea | null {
   if (!space || typeof space !== "string") return null;
 
   const cleanedSpace = space.trim();
@@ -86,34 +178,113 @@ function findAreaForSpace(space, mapAreaCatalog) {
     mapAreaCatalog
       .getAllMapAreas()
       .find(
-        (area) =>
-          area.prefixes.includes(prefixChar) && area.labels.includes(labelChar),
+        (area: MapArea) =>
+          (area.prefixes ?? []).includes(prefixChar) &&
+          (area.labels ?? []).includes(labelChar),
       ) || null
   );
 }
 
-function areSpacesInSameArea(spaceA, spaceB, mapAreaCatalog) {
+function areSpacesInSameArea(spaceA: string, spaceB: string, mapAreaCatalog: MapAreaCatalog) {
   const areaA = findAreaForSpace(spaceA, mapAreaCatalog);
   const areaB = findAreaForSpace(spaceB, mapAreaCatalog);
   return Boolean(areaA && areaB && areaA.id === areaB.id);
+}
+
+interface BrowserApplicationOptions {
+  readonly document?: Document;
+  readonly window?: Window;
+  readonly eventDayDependencies: {
+    readonly repository: EventDayRepository;
+    readonly activeEventDaySession: ActiveEventDaySession;
+    readonly activeEventDayReader: ActiveEventDayReader;
+    readonly circleStatusController: CircleStatusController;
+    readonly pendingGasUpdatesController: PendingGasUpdatesControllerPort;
+    readonly backgroundProcess: PendingGasUpdateBackgroundProcess;
+    readonly eventDayTransition: SwitchEventDayOperation;
+    readonly eventRegistry?: EventRegistry;
+    readonly eventRegistryUrl?: string;
+  };
+  readonly routeGuidanceDependencies: {
+    readonly routeGuidanceSession: RouteGuidanceSession;
+    readonly routeMapAreaCatalog: MapAreaCatalog;
+    readonly routeMapAssetsLoader: RouteMapAssetsLoader;
+    readonly navigationRuntimeController: RouteGuidanceRuntimePort;
+    readonly routeGuidanceController: RouteGuidanceController;
+  };
+  readonly circleDataSourceSession: CircleDataSourceSession;
+  readonly circleDataSourceController: CircleDataSourceController;
+  readonly completeCircleVisit: (input: CompleteCircleVisitInput) => Promise<CompleteCircleVisitResult>;
+  readonly localDataDeletionController: LocalDataDeletionController;
+}
+
+interface PendingGasUpdatesControllerPort {
+  getViewState(): {
+    readonly busy: boolean;
+    readonly resultMessage: string;
+    readonly errorMessage: string;
+  };
+  invalidateRequests(): void;
+  start(): void;
+  stop(): void;
+  retryAll(eventDay?: EventDayRef): Promise<number | null>;
+  discardOne(eventDay: EventDayRef, updateId: string): void;
 }
 
 /**
  * アプリケーションのメインコントローラー
  */
 export class BrowserApplication {
+  started: boolean;
+  stopped: boolean;
+  document: Document;
+  window: Window;
+  eventDayRepository: EventDayRepository;
+  activeEventDaySession: ActiveEventDaySession;
+  activeEventDayReader: ActiveEventDayReader;
+  backgroundProcess: PendingGasUpdateBackgroundProcess;
+  circleStatusController: CircleStatusController;
+  pendingGasUpdatesController: PendingGasUpdatesControllerPort;
+  eventDayTransition: SwitchEventDayOperation;
+  completeCircleVisit: (input: CompleteCircleVisitInput) => Promise<CompleteCircleVisitResult>;
+  localDataDeletionController: LocalDataDeletionController;
+  spreadsheetTitle: string;
+  routeGuidanceSession: RouteGuidanceSession;
+  routeMapAreaCatalog: MapAreaCatalog;
+  routeMapAssetsLoader: RouteMapAssetsLoader;
+  navigationRuntimeController: RouteGuidanceRuntimePort;
+  routeGuidanceController: RouteGuidanceController;
+  circleDataSourceSession: CircleDataSourceSession;
+  session: CircleDataSourceSession;
+  circleDataSourceController: CircleDataSourceController;
+  ui: BrowserUi;
+  currentStartSpace: string;
+  selectionMessage: string;
+  transitionToken: number;
+  isTransitioning: boolean;
+  sourceErrorMessage: string;
+  suppressSessionModelUpdates: boolean;
+  ownedTimers: Set<ReturnType<typeof setTimeout>>;
+  ownedTimerCancels: Map<ReturnType<typeof setTimeout>, () => void>;
+  downloadAdapter: {
+    createObjectURL(blob: Blob): string;
+    revokeObjectURL(url: string): void;
+    click(url: string, filename: string): void;
+  };
+  eventBindingCleanup: (() => void) | null;
   eventRegistry: EventRegistry | null = null;
   eventRegistryUrl: string | null = null;
   currentManifest: MapBundleManifest | null = null;
 
-  constructor(options = {}) {
+  constructor(options?: BrowserApplicationOptions) {
     this.started = false;
     this.stopped = false;
-    this.document = options.document ?? globalThis.document;
-    this.window = options.window ?? globalThis.window;
+    this.document = options?.document ?? globalThis.document;
+    this.window = options?.window ?? globalThis.window;
     const eventDayDependencies = options?.eventDayDependencies;
     const routeGuidanceDependencies = options?.routeGuidanceDependencies;
     if (
+      !options ||
       !eventDayDependencies ||
       !eventDayDependencies.repository ||
       !eventDayDependencies.activeEventDaySession ||
@@ -158,7 +329,7 @@ export class BrowserApplication {
     this.circleDataSourceSession = baseSession;
     this.session = baseSession;
     this.circleDataSourceController = options.circleDataSourceController;
-    this.ui = new DomRouteGuidanceView();
+    this.ui = new DomRouteGuidanceView(this.routeMapAreaCatalog) as BrowserUi;
     this.activeEventDaySession.subscribe(() => {
       if (this.ui) {
         this.updateManagementModels();
@@ -195,7 +366,7 @@ export class BrowserApplication {
 
   }
 
-  showToast(message, type) {
+  showToast(message: string, type?: string) {
     this.ui?.showToast?.(message, type);
   }
 
@@ -203,9 +374,9 @@ export class BrowserApplication {
     return this.spreadsheetTitle || "";
   }
 
-  toggleSettings(target) {
+  toggleSettings(target: Element | null) {
     if (this.ui.els.settingsArea?.open) this.closeSettings();
-    this.ui.toggleSettings(target);
+    this.ui.toggleSettings(target ?? null);
   }
 
   closeSettings() {
@@ -219,15 +390,20 @@ export class BrowserApplication {
     this.updateManagementModels();
   }
 
-  showGalleryForArea(areaId) {
+  showGalleryForArea(areaId: string) {
     const area = this.routeMapAreaCatalog
       .getAllMapAreas()
       .find((candidate) => candidate.id === areaId);
     this.ui.showGallery(area?.name || areaId, false);
   }
 
-  handleOptimizationTimeLimitChange(detail) {
-    const value = Number(detail?.searchTimeLimitMs);
+  handleOptimizationTimeLimitChange(detail: unknown) {
+    const searchTimeLimitMs =
+      typeof detail === "object" && detail !== null &&
+      "searchTimeLimitMs" in detail
+        ? (detail as { readonly searchTimeLimitMs?: unknown }).searchTimeLimitMs
+        : undefined;
+    const value = Number(searchTimeLimitMs);
     if (value !== 5000 && value !== 10000 && value !== 15000) return;
     this.routeGuidanceController.setOptimizationTimeLimit(value);
     if (this.routeGuidanceSession.getSnapshot().navigationState) {
@@ -235,7 +411,7 @@ export class BrowserApplication {
     }
   }
 
-  scheduleTimeout(callback, delay, onCancel) {
+  scheduleTimeout(callback: () => void, delay: number, onCancel?: () => void) {
     const timer = setTimeout(() => {
       this.ownedTimers.delete(timer);
       this.ownedTimerCancels.delete(timer);
@@ -282,7 +458,7 @@ export class BrowserApplication {
   }
 
   /** Delegates event/day opening to the assembled validated transition. */
-  openEventDay(ref) {
+  openEventDay(ref: EventDayRef) {
     return this.eventDayTransition.execute(ref);
   }
 
@@ -294,12 +470,12 @@ export class BrowserApplication {
     this.backgroundProcess.stop();
   }
 
-  discardOutboxEntries(ref, ids) {
+  discardOutboxEntries(ref: EventDayRef, ids: readonly string[]) {
     for (const id of ids) this.pendingGasUpdatesController.discardOne(ref, id);
     return this.eventDayRepository.load(ref) ?? this.activeState;
   }
 
-  async addPurchased(space) {
+  async addPurchased(space: string) {
     if (!this.activeRef || !this.activeState) throw new Error("No event/day is open");
     const result = await this.completeCircleVisit({
       eventDay: this.activeRef,
@@ -310,7 +486,7 @@ export class BrowserApplication {
     return result.statusResult.state;
   }
 
-  async addHold(space) {
+  async addHold(space: string) {
     if (!this.activeRef || !this.activeState) throw new Error("No event/day is open");
     const result = await this.completeCircleVisit({
       eventDay: this.activeRef,
@@ -351,7 +527,10 @@ export class BrowserApplication {
         ref,
         state: this.eventDayRepository.load(ref),
       }))
-      .filter((item) => item.state !== null);
+      .filter(
+        (item): item is { ref: EventDayRef; state: LocalEventDayState } =>
+          item.state !== null,
+      );
 
     const options = buildEventDayOptions(
       this.eventRegistry,
@@ -381,7 +560,9 @@ export class BrowserApplication {
         selectedSheetName: sourceSessionSnapshot.selectedSheetName,
         sheetNames: sourceSessionSnapshot.sheetNames,
         busy: sourceSessionSnapshot.busy,
-        errorMessage: sourceSessionSnapshot.errorMessage,
+        errorMessage: sourceSessionSnapshot.errorCode
+          ? String(sourceSessionSnapshot.errorCode)
+          : null,
       },
       transitionBusy: this.isTransitioning,
       sourceErrorMessage: this.sourceErrorMessage,
@@ -436,8 +617,12 @@ export class BrowserApplication {
     });
   }
 
-  openSourceDiffDialog(sourceLabel, diffViewModel, errorMessage = "") {
-    const dialog = this.document.getElementById("source-diff-dialog");
+  openSourceDiffDialog(
+    sourceLabel: string,
+    diffViewModel: SourceDiffViewModel,
+    errorMessage = "",
+  ) {
+    const dialog = getBrowserElement(this.document, "source-diff-dialog");
     const activePreview = this.circleDataSourceSession.getSnapshot().preview;
     if (!dialog || !activePreview) return;
 
@@ -452,7 +637,7 @@ export class BrowserApplication {
   }
 
   closeSourceDiffDialog() {
-    const dialog = this.document.getElementById("source-diff-dialog");
+    const dialog = getBrowserElement(this.document, "source-diff-dialog");
     if (!dialog) return;
     if (dialog.model) {
       dialog.model = {
@@ -473,16 +658,17 @@ export class BrowserApplication {
   }
 
   /** Delegates outbox retry requests to the GasSyncCoordinator. */
-  async handleGasRetryRequest(detail) {
+  async handleGasRetryRequest(detail: unknown) {
+    if (!detail || typeof detail !== "object") return;
+    const refValue = (detail as { readonly ref?: unknown }).ref;
     if (
-      !detail ||
-      (detail.ref !== null &&
-        detail.ref !== undefined &&
-        !isEventDayRef(detail.ref))
+      refValue !== null &&
+      refValue !== undefined &&
+      !isEventDayRef(refValue)
     ) {
       return;
     }
-    const ref = detail.ref || undefined;
+    const ref = isEventDayRef(refValue) ? refValue : undefined;
     try {
       const processed = await this.pendingGasUpdatesController.retryAll(ref);
       if (processed === null) return;
@@ -495,12 +681,13 @@ export class BrowserApplication {
   }
 
   /** Opens the delete dialog for a chosen deletion scope. */
-  handleDeleteOptionSelect(scope) {
+  handleDeleteOptionSelect(scope: unknown) {
     if (!isDeleteScope(scope)) return;
     const options = this.ui.els.settingsArea?.deleteOptions || [];
     const option = options.find((candidate) => {
       if (candidate.scope.type !== scope.type) return false;
       if (scope.type === "all-events") return true;
+      if (candidate.scope.type === "all-events") return false;
       return sameEventDayRef(candidate.scope.ref, scope.ref);
     });
     if (!option || option.blocked) return;
@@ -516,11 +703,17 @@ export class BrowserApplication {
   }
 
   /** Verifies scope & confirmation and performs safe local data deletion. */
-  async handleStorageDeleteRequest(detail) {
-    if (!detail || typeof detail !== "object" || !isDeleteScope(detail.scope)) {
+  async handleStorageDeleteRequest(detail: unknown) {
+    if (!detail || typeof detail !== "object") return;
+    const input = detail as {
+      readonly scope?: unknown;
+      readonly confirmation?: unknown;
+    };
+    if (!isDeleteScope(input.scope) || typeof input.confirmation !== "string") {
       return;
     }
-    const { scope, confirmation } = detail;
+    const scope = input.scope;
+    const confirmation = input.confirmation;
     if (scope.type === "all-events" && confirmation !== "全イベントを削除") {
       return;
     }
@@ -548,12 +741,14 @@ export class BrowserApplication {
         this.activeEventDaySession.clearActiveEventDay();
 
         const remainingList = this.eventDayRepository.listEventDays();
+        const registry = this.eventRegistry;
+        if (!registry) return;
         const nextRef =
           remainingList.length > 0
             ? remainingList[0]
             : {
-                eventId: this.eventRegistry.events[0].eventId,
-                dayId: this.eventRegistry.events[0].days[0].dayId,
+                eventId: registry.events[0].eventId,
+                dayId: registry.events[0].days[0].dayId,
               };
         await this.eventDayTransition.execute(nextRef);
 
@@ -564,7 +759,7 @@ export class BrowserApplication {
           );
           return;
         }
-      } else if (activeRefSourceDeleted) {
+      } else if (activeRefSourceDeleted && activeRefBeforeDelete) {
         this.invalidateNavigationForSourceChange(activeRefBeforeDelete);
         this.ui.showTarget(null);
         this.updateManagementModels();
@@ -588,21 +783,28 @@ export class BrowserApplication {
   }
 
   /** Verifies exact confirmation text and discards selected outbox entries. */
-  async handleGasDiscardRequest(detail) {
+  async handleGasDiscardRequest(detail: unknown) {
+    if (!detail || typeof detail !== "object") return;
+    const input = detail as {
+      readonly ref?: unknown;
+      readonly ids?: unknown;
+      readonly confirmation?: unknown;
+    };
     if (
-      !isEventDayRef(detail?.ref) ||
-      !Array.isArray(detail.ids) ||
-      !detail.ids.every((id) => typeof id === "string" && id.length > 0) ||
-      detail.confirmation !== "未送信を破棄"
+      !isEventDayRef(input.ref) ||
+      !Array.isArray(input.ids) ||
+      !input.ids.every(
+        (id): id is string => typeof id === "string" && id.length > 0,
+      ) ||
+      input.confirmation !== "未送信を破棄"
     ) {
       return;
     }
 
     try {
       this.discardOutboxEntries(
-        detail.ref,
-        detail.ids,
-        new Date().toISOString(),
+        input.ref,
+        input.ids,
       );
       this.ui.showToast("未送信データを破棄しました");
     } catch (_error) {
@@ -631,8 +833,8 @@ export class BrowserApplication {
     }
 
     this.ui.init(this, {
-      onSetNextTarget: (circle) => this.handleSetNextTarget(circle),
-      onSelectTarget: (circle) => this.handleSelectTarget(circle),
+      onSetNextTarget: (circle: Circle) => this.handleSetNextTarget(circle),
+      onSelectTarget: (circle: Circle) => this.handleSelectTarget(circle),
       onPreviewRoute: () => this.handlePreviewRoute(),
       onConfirmRoute: () => this.handleConfirmRoute(),
       onCancelRoute: () => this.handleCancelRoute(),
@@ -654,25 +856,30 @@ export class BrowserApplication {
     this.startSyncCoordinator();
 
     // Load and validate the navigation snapshot after the active event/day and DOM are ready.
-    if (this.activeRef && this.activeState) {
-      const pendingCircleSpaces = this.activeState.circles
+    const activeState = this.activeState;
+    const activeRef = this.activeRef;
+    if (activeRef && activeState) {
+      const pendingCircleSpaces = activeState.circles
         .filter(
           (c) =>
             !c.removedFromSource &&
-            (this.activeState.circleStates[c.space] === undefined ||
-              this.activeState.circleStates[c.space] === "pending"),
+            activeState.circleStates[c.space] === undefined ||
+              String(activeState.circleStates[c.space]) === "pending",
         )
         .map((c) => c.space);
 
       const startupResult = this.routeGuidanceController.initializeResumeStartup({
-        eventDay: this.activeRef,
+        eventDay: activeRef,
         bundleVersion: manifest?.bundleVersion || "",
-        circleStates: this.activeState.circleStates,
+        circleStates: activeState.circleStates,
         pendingCircleSpaces,
       });
 
       if (startupResult.kind === "ready") {
-        const dialog = this.document.getElementById("navigation-resume-dialog");
+        const dialog = getBrowserElement(
+          this.document,
+          "navigation-resume-dialog",
+        );
         if (dialog) {
           dialog.targetSpace = startupResult.targetSpace;
           dialog.errorMessage = "";
@@ -698,8 +905,7 @@ export class BrowserApplication {
     this.stopped = true;
     this.transitionToken += 1;
     this.routeGuidanceController.invalidatePendingDestinationSelection();
-    this.managementSession?.stop();
-    this.ui?.stop?.();
+    // Management feature controllers own their event lifecycle.
     this.eventBindingCleanup?.();
     this.eventBindingCleanup = null;
     this.disposeSyncCoordinator();
@@ -713,7 +919,7 @@ export class BrowserApplication {
   }
 
   /** Atomically applies one Route Guidance state transition through its Session. */
-  replaceRouteGuidanceSnapshot(changes) {
+  replaceRouteGuidanceSnapshot(changes: object) {
     this.routeGuidanceSession.replaceSnapshot({
       ...this.routeGuidanceSession.getSnapshot(),
       ...changes,
@@ -722,8 +928,9 @@ export class BrowserApplication {
 
   /** Derives the next circle from the current Route Guidance order. */
   getNextTarget(snapshot = this.routeGuidanceSession.getSnapshot()) {
-    const nextSpace = snapshot.navigationState?.bestOrder.find(
-      (space) => space !== snapshot.navigationState.targetSpace,
+    const navigationState = snapshot.navigationState;
+    const nextSpace = navigationState?.bestOrder.find(
+      (space) => space !== navigationState.targetSpace,
     );
     return nextSpace
       ? this.wantToBuy.find((circle) => circle.space === nextSpace) || null
@@ -775,7 +982,7 @@ export class BrowserApplication {
   }
 
   /** Invalidate runtime navigation and caches after circle identity changes. */
-  invalidateNavigationForSourceChange(ref) {
+  invalidateNavigationForSourceChange(ref: EventDayRef) {
     try {
       this.routeGuidanceController.invalidatePersistence(ref, true);
     } catch (error) {
@@ -793,7 +1000,7 @@ export class BrowserApplication {
   }
 
   /** Copy exact grid distance and adopted endpoint onto a circle view model. */
-  targetWithRoute(target, route) {
+  targetWithRoute(target: Circle, route: RouteResult | null) {
     if (!target || !route) return target;
     return {
       ...target,
@@ -803,15 +1010,18 @@ export class BrowserApplication {
   }
 
   /** Resolve an exact same-area route using cached, runtime-validated assets. */
-  async planGridRoute(startSpace, targetSpace, options = {}) {
+  async planGridRoute(
+    startSpace: string,
+    targetSpace: string,
+    options: DevDemoRouteOptions = {},
+  ) {
     if (!areSpacesInSameArea(startSpace, targetSpace, this.routeMapAreaCatalog)) return null;
     const area = findAreaForSpace(startSpace, this.routeMapAreaCatalog);
+    if (!area) return null;
     const assets = await this.loadGridRouteAssets(area);
     if (!assets) return null;
-    return planRoute(
-      assets.pointsPayload,
-      assets.gridMeta,
-      assets.gridBytes,
+    return planDevDemoRoute(
+      assets,
       startSpace,
       targetSpace,
       options,
@@ -819,7 +1029,7 @@ export class BrowserApplication {
   }
 
   /** Select a pin without changing the active destination or route. */
-  async handleSelectTarget(circle) {
+  async handleSelectTarget(circle: Circle) {
     if (
       !circle ||
       this.routeGuidanceSession.getSnapshot().selectionStatus === "comparing"
@@ -878,7 +1088,7 @@ export class BrowserApplication {
   /**
    * 手動で目的地を設定
    */
-  async handleSetNextTarget(circle) {
+  async handleSetNextTarget(circle: Circle) {
     if (!circle) return;
 
     // The dev-only UI fixture intentionally has no production map bundle.
@@ -926,7 +1136,8 @@ export class BrowserApplication {
       return;
     }
     const currentPosition =
-      this.routeGuidanceSession.getSnapshot().navigationState.currentPosition;
+      this.routeGuidanceSession.getSnapshot().navigationState?.currentPosition;
+    if (!currentPosition) return;
     this.currentStartSpace =
       currentPosition.source === "arrived-circle"
         ? currentPosition.circleSpace || ""
@@ -938,14 +1149,18 @@ export class BrowserApplication {
   }
 
   readCurrentSpace() {
-    const areaId = this.document.getElementById("loc-ewsn").value;
+    const areaSelect = getBrowserElement<BrowserInputElement>(this.document, "loc-ewsn");
+    const labelInput = getBrowserElement<BrowserInputElement>(this.document, "loc-label");
+    const numberInput = getBrowserElement<BrowserInputElement>(this.document, "loc-number");
+    if (!areaSelect || !labelInput || !numberInput) return null;
+    const areaId = areaSelect.value;
     const area = this.routeMapAreaCatalog
       .getAllMapAreas()
       .find((candidate) => candidate.id === areaId);
     const currentSpace = buildSpaceFromLocation({
-      areaName: area?.prefixes[0] || "",
-      label: this.document.getElementById("loc-label").value,
-      number: this.document.getElementById("loc-number").value,
+      areaName: area?.prefixes?.[0] || "",
+      label: labelInput.value,
+      number: numberInput.value,
     });
 
     if (!currentSpace) {
@@ -955,7 +1170,7 @@ export class BrowserApplication {
   }
 
   /** Legacy gallery target behavior used only by the dev UI fixture. */
-  async handleSetNextTargetDevDemo(circle) {
+  async handleSetNextTargetDevDemo(circle: Circle) {
     this.routeGuidanceController.invalidatePendingDestinationSelection();
     const currentSpace = this.readCurrentSpace();
     if (!currentSpace) return;
@@ -996,7 +1211,7 @@ export class BrowserApplication {
     this.eventBindingCleanup?.();
     // The settings-shell binder forwards toggleSettings(this.document.getElementById("toggle-settings")).
     this.eventBindingCleanup = bindBrowserEvents({
-      application: this as unknown as BindBrowserEventsDependencies["application"],
+      application: this,
       document: this.document,
     }).stop;
   }
@@ -1010,18 +1225,19 @@ export class BrowserApplication {
     this.ui.showToast("GAS同期はPhase 2では利用できません");
   }
 
-  async loadGridRouteAssets(area) {
-    if (!area?.id) {
+  async loadGridRouteAssets(area: MapArea) {
+    const areaId = area?.id ?? area?.areaId;
+    if (!areaId) {
       return null;
     }
-    if (!area.pointsFile || !area.gridMetaFile || !area.gridFile) return null;
+    if (!area.assets) return null;
     try {
       const assets = await this.routeMapAssetsLoader.loadMapAssets({
-        areaId: area.id,
+        areaId,
         assets: {
-          points: area.pointsFile,
-          gridMeta: area.gridMetaFile,
-          grid: area.gridFile,
+          points: area.assets.points,
+          gridMeta: area.assets.gridMeta,
+          grid: area.assets.grid,
         },
       });
       return {
@@ -1035,12 +1251,12 @@ export class BrowserApplication {
     }
   }
 
-  async rankCandidatesByGrid(currentSpace, candidates) {
+  async rankCandidatesByGrid(currentSpace: string, candidates: readonly Circle[]) {
     const area = findAreaForSpace(currentSpace, this.routeMapAreaCatalog);
     if (!area) return null;
 
-    const sameAreaCandidates = [];
-    const otherCandidates = [];
+    const sameAreaCandidates: Circle[] = [];
+    const otherCandidates: Circle[] = [];
     candidates.forEach((candidate) => {
       if (
         areSpacesInSameArea(
@@ -1059,33 +1275,13 @@ export class BrowserApplication {
     const assets = await this.loadGridRouteAssets(area);
     if (!assets) return null;
 
-    const ranked = rankCandidatesByGridDistance(
-      assets.pointsPayload,
-      assets.gridMeta,
-      assets.gridBytes,
+    return rankDevDemoCandidates(
+      assets,
       currentSpace,
       sameAreaCandidates,
+      otherCandidates,
+      toSpaceAreas(this.routeMapAreaCatalog),
     );
-    const reachable = ranked
-      .filter((item) => Number.isFinite(item.distance))
-      .map((item) => ({
-        ...item.candidate,
-        gridDistance: Math.round(item.distance),
-        ...(item.position ? { mapPosition: item.position } : {}),
-      }));
-
-    if (reachable.length === 0) return null;
-
-    const unreachable = ranked
-      .filter((item) => !Number.isFinite(item.distance))
-      .map((item) => item.candidate);
-    const fallbackRemainder = solveNearestNeighbor(
-      currentSpace,
-      [...unreachable, ...otherCandidates],
-      this.routeMapAreaCatalog.getAllMapAreas(),
-    ).slice(1);
-
-    return [...reachable, ...fallbackRemainder];
   }
 
   /**
@@ -1110,7 +1306,7 @@ export class BrowserApplication {
     this.ui.showLoading();
 
     // UI描画をブロックしないように非同期実行
-    return new Promise((resolve) =>
+    return new Promise<void>((resolve) =>
       this.scheduleTimeout(
         async () => {
           const allCandidates = this.getUnvisited();
@@ -1125,6 +1321,13 @@ export class BrowserApplication {
           }
 
           try {
+            const areaInput = getBrowserElement<BrowserInputElement>(this.document, "loc-ewsn");
+            const labelInput = getBrowserElement<BrowserInputElement>(this.document, "loc-label");
+            const numberInput = getBrowserElement<BrowserInputElement>(this.document, "loc-number");
+            if (!areaInput || !labelInput || !numberInput) {
+              resolve();
+              return;
+            }
             await this.routeGuidanceController.startFromCurrentLocation({
               eventDay: this.activeRef || {
                 eventId: this.currentManifest?.eventId || "runtime",
@@ -1132,16 +1335,19 @@ export class BrowserApplication {
               },
               bundleVersion: this.currentManifest?.bundleVersion || "unknown",
               currentLocation: {
-                areaId: this.document.getElementById("loc-ewsn").value,
-                label: this.document.getElementById("loc-label").value,
-                number: this.document.getElementById("loc-number").value,
+                areaId: areaInput.value,
+                label: labelInput.value,
+                number: numberInput.value,
               },
               pendingCircles: allCandidates,
+              matrixRef: this.navigationRuntimeController.getMatrixRef(),
+              optimizationTimeLimitMs:
+                this.routeGuidanceController.getOptimizationTimeLimit(),
             });
           } catch (error) {
             console.warn("Route guidance could not be started.", error);
             if (
-              error?.message?.includes(
+              errorMessage(error).includes(
                 "No pending route guidance target is available",
               )
             ) {
@@ -1185,7 +1391,7 @@ export class BrowserApplication {
     this.routeGuidanceController.invalidatePendingDestinationSelection();
     this.ui.showLoading();
 
-    return new Promise((resolve) =>
+    return new Promise<void>((resolve) =>
       this.scheduleTimeout(
         async () => {
           const candidates = this.getUnvisited();
@@ -1220,10 +1426,10 @@ export class BrowserApplication {
           try {
             path = gridRanked
               ? [{ space: currentSpace, isStart: true }, ...gridRanked]
-              : solveNearestNeighbor(
+              : orderDevDemoCandidates(
                   currentSpace,
                   candidates,
-                  this.routeMapAreaCatalog.getAllMapAreas(),
+                  toSpaceAreas(this.routeMapAreaCatalog),
                 );
           } catch (error) {
             console.warn(
@@ -1287,22 +1493,25 @@ export class BrowserApplication {
   /**
    * 購入・保留アクション
    */
-  async handleAction(type) {
+  async handleAction(type: string) {
     const guidanceSnapshot = this.routeGuidanceSession.getSnapshot();
     if (guidanceSnapshot.selectionStatus === "comparing") return;
     if (type !== "purchase" && type !== "hold") return;
     const actionTarget =
       guidanceSnapshot.selectedDestination || guidanceSnapshot.currentDestination;
     if (!actionTarget) return;
+    const activeRef = this.activeRef;
+    const activeState = this.activeState;
+    if (!activeRef || !activeState) return;
 
     const space = actionTarget.space;
     let visitResult;
     try {
       visitResult = await this.completeCircleVisit({
-        eventDay: this.activeRef,
+        eventDay: activeRef,
         circleSpace: space,
         nextStatus: type === "purchase" ? "purchased" : "held",
-        expectedSourceGeneration: this.activeState.sourceGeneration,
+        expectedSourceGeneration: activeState.sourceGeneration,
       });
     } catch (error) {
       this.reportLocalMutationFailure(error);
@@ -1374,8 +1583,12 @@ export class BrowserApplication {
     }
   }
 
+  handleResetHold(): void {
+    this.resetAll();
+  }
+
   /** Show a recoverable diagnostic when the local mutation could not be saved. */
-  reportLocalMutationFailure(error) {
+  reportLocalMutationFailure(error: unknown) {
     console.error("Failed to save local purchase state:", error);
     this.ui.showToast(
       "端末への保存に失敗しました。操作は反映されていません。",
@@ -1413,7 +1626,10 @@ export class BrowserApplication {
       this.activeState.circleStates,
     );
 
-    const dialog = this.document.getElementById("navigation-resume-dialog");
+    const dialog = getBrowserElement(
+      this.document,
+      "navigation-resume-dialog",
+    );
     if (resumeResult.kind === "idle") return;
 
     if (resumeResult.kind === "failed") {
@@ -1442,16 +1658,14 @@ export class BrowserApplication {
     }
   }
 
-  findPointPortalIndex(pointsPayload, gridMeta, space) {
+  findPointPortalIndex(pointsPayload: PointsPayload, gridMeta: GridMeta, space: string) {
     const [, identifier, number] = parseSpace(
       space,
-      this.routeMapAreaCatalog.getAllMapAreas(),
+      toSpaceAreas(this.routeMapAreaCatalog),
     );
     const point = pointsPayload?.points?.find(
       (candidate) =>
-        candidate.space === space ||
-        (candidate.identifier === identifier &&
-          Number(candidate.number) === number),
+        pointMatchesSpace(candidate, space, identifier, number),
     );
     const portal = point?.portals?.[0];
     if (
@@ -1468,16 +1682,14 @@ export class BrowserApplication {
     return portal.row * gridMeta.cols + portal.col;
   }
 
-  findPointPortalPosition(pointsPayload, gridMeta, space) {
+  findPointPortalPosition(pointsPayload: PointsPayload, gridMeta: GridMeta, space: string) {
     const [, identifier, number] = parseSpace(
       space,
-      this.routeMapAreaCatalog.getAllMapAreas(),
+      toSpaceAreas(this.routeMapAreaCatalog),
     );
     const point = pointsPayload?.points?.find(
       (candidate) =>
-        candidate.space === space ||
-        (candidate.identifier === identifier &&
-          Number(candidate.number) === number),
+        pointMatchesSpace(candidate, space, identifier, number),
     );
     const centerX = Number(point?.center_x);
     const centerY = Number(point?.center_y);
@@ -1515,7 +1727,10 @@ export class BrowserApplication {
     this.routeGuidanceController.resetRuntimeState();
     this.currentStartSpace = "";
 
-    const dialog = this.document.getElementById("navigation-resume-dialog");
+    const dialog = getBrowserElement(
+      this.document,
+      "navigation-resume-dialog",
+    );
     if (dialog) {
       dialog.errorMessage = "";
       dialog.open = false;
@@ -1525,7 +1740,7 @@ export class BrowserApplication {
   }
 
   /** Continue the legacy purchase/hold demo flow without entering production navigation. */
-  handleDevDemoAction(space) {
+  handleDevDemoAction(space: string) {
     return this.searchNextDevDemo(space, false);
   }
 }

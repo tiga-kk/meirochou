@@ -480,6 +480,19 @@ export function scanWebappArchitecture(options = {}) {
       }
     }
 
+    if (importerIsUseCase) {
+      const useCaseSource = stripStringLiterals(stripComments(source));
+      if (/\bfetch\s*\(|\blocalStorage\b|\bnew\s+Worker\s*\(/i.test(useCaseSource)) {
+        addViolation(
+          violations,
+          "use-case-uses-browser-api",
+          importer,
+          null,
+          "Use cases cannot own concrete browser APIs",
+        );
+      }
+    }
+
     const vagueParts = fileBase.replace(/\.[^.]+$/, "").split("-");
     for (const part of vagueParts) {
       if (VAGUE_NAME_PARTS.has(part) && !isLegacy) {
@@ -546,6 +559,36 @@ export function scanWebappArchitecture(options = {}) {
       const dependencyPath = `${importedPath} ${imported ?? ""}`;
       const lowerImport = importedPath.toLowerCase();
       if (
+        importerIsApp &&
+        !importer.endsWith("/assemble-comipath-application.ts") &&
+        /(?:^|\/)features\/[^/]+\/(?:domain|use-cases|ui|infrastructure)(?:\/|$)/.test(
+          importedPath,
+        )
+      ) {
+        addViolation(
+          violations,
+          "application-imports-feature-deep-module",
+          importer,
+          imported,
+          "App modules must use feature public-api contracts",
+        );
+      }
+      if (
+        feature &&
+        new RegExp(`(?:^|/)features/${feature}/ui/`).test(importer) &&
+        new RegExp(`(?:^|/)features/${feature}/infrastructure/`).test(
+          importedPath,
+        )
+      ) {
+        addViolation(
+          violations,
+          "ui-imports-infrastructure",
+          importer,
+          imported,
+          "Feature UI cannot import same-feature concrete infrastructure",
+        );
+      }
+      if (
         importerIsDomain &&
         /(^|\/)(infrastructure|ui|components)(\/|$)|(^|\/)shared\/(browser|ui)(\/|$)/.test(
           dependencyPath,
@@ -609,8 +652,7 @@ export function scanWebappArchitecture(options = {}) {
       if (
         importerIsApp &&
         !importer.endsWith("/assemble-comipath-application.ts") &&
-        !importer.endsWith("/browser-application.ts") &&
-        /(^|\/)(infrastructure|repository|client|loader|optimizer)(\/|$)|(?:local-storage|gas-|http-|web-worker-|browser-)/.test(
+        /(^|\/)(infrastructure|repository|client|loader|optimizer)(\/|$)|(?:local-storage|gas-|http-|web-worker-)/.test(
           lowerImport,
         )
       ) {

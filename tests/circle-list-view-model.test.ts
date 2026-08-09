@@ -4,7 +4,16 @@ import type {
   CircleRecord,
   CircleStateOverrides,
 } from "../apps/webapp/js/features/event-day/domain/application-contract-types";
-import { CircleStateUndoService } from "../apps/webapp/js/state/circle-state-undo-service";
+import { ChangeCircleStatusUseCase } from "../apps/webapp/js/features/circle-status/use-cases/change-circle-status";
+import { UndoCircleStatusChangeUseCase } from "../apps/webapp/js/features/circle-status/use-cases/undo-circle-status-change";
+import { CircleStatusController } from "../apps/webapp/js/features/circle-status/ui/circle-status-controller";
+import type {
+  ActiveEventDaySession,
+  EventDayRef,
+  EventDayRepository,
+  LocalEventDayState,
+} from "../apps/webapp/js/features/event-day/public-api";
+import { createEmptyEventDayState } from "../apps/webapp/js/state/storage-schema";
 import {
   buildAllCircleList,
   buildUnpurchasedCircleList,
@@ -74,51 +83,162 @@ describe("Phase 5C Task 3: Circle List View Model", () => {
   });
 });
 
-describe("Phase 5C Task 3: CircleStateUndoService", () => {
+describe("Phase 5C Task 3: Circle status undo lifecycle", () => {
+  const eventDay: EventDayRef = { eventId: "c108", dayId: "day1" };
+  const createdAt = "2026-08-04T00:00:00.000Z";
+
+  function createUndoFixture() {
+    let state: LocalEventDayState = {
+      ...createEmptyEventDayState(
+        { type: "csv", fileName: "demo.csv" },
+        "gen-1",
+        createdAt,
+      ),
+      circles: [{ space: "A01" }],
+    };
+    const repository: EventDayRepository = {
+      load: () => state,
+      save: (_ref, nextState) => {
+        state = nextState;
+      },
+    };
+    const session: ActiveEventDaySession = {
+      getActiveEventDay: () => null,
+      replaceActiveEventDayState: () => {},
+      setActiveEventDay: () => {},
+      clearActiveEventDay: () => {},
+      subscribe: () => () => {},
+    };
+    return { repository, session, getState: () => state };
+  }
+
+  function issueToken(fixture: ReturnType<typeof createUndoFixture>) {
+    return new ChangeCircleStatusUseCase(
+      fixture.repository,
+      fixture.session,
+      undefined,
+      { createUndoId: () => "undo-1" },
+    ).execute({
+      eventDay,
+      circleSpace: "A01",
+      nextStatus: "held",
+      expectedSourceGeneration: "gen-1",
+      changedAt: createdAt,
+    }).undoToken;
+  }
+
   test("issues a token that can be retrieved before TTL expires", () => {
-    const svc = new CircleStateUndoService(5000);
-    const nowMs = Date.now();
+    const fixture = createUndoFixture();
+    const token = issueToken(fixture);
 
-    const token = svc.issue("A-01", "pending", "held", nowMs);
-    expect(token.space).toBe("A-01");
-    expect(token.before).toBe("pending");
-    expect(token.after).toBe("held");
-    expect(token.createdAtMs).toBe(nowMs);
-
-    expect(svc.getCurrentToken()).toEqual(token);
+    expect(token).toMatchObject({
+      undoId: "undo-1",
+      circleSpace: "A01",
+      previousStatus: "pending",
+      currentStatus: "held",
+      createdAt,
+    });
   });
 
-  test("consume returns the token and clears it", () => {
-    const svc = new CircleStateUndoService(5000);
-    svc.issue("A-01", "pending", "held", Date.now());
+  test("undo consumes the token and clears the controller state", () => {
+    const fixture = createUndoFixture();
+    const controller = new CircleStatusController(
+      new ChangeCircleStatusUseCase(
+        fixture.repository,
+        fixture.session,
+        undefined,
+        { createUndoId: () => "undo-consume" },
+      ),
+      new UndoCircleStatusChangeUseCase(
+        fixture.repository,
+        fixture.session,
+      ),
+    );
 
-    const consumed = svc.consume();
-    expect(consumed?.space).toBe("A-01");
-    expect(svc.getCurrentToken()).toBeNull();
+    controller.changeStatus({
+      eventDay,
+      circleSpace: "A01",
+      nextStatus: "held",
+      expectedSourceGeneration: "gen-1",
+    });
+
+    expect(controller.undo()).toBe(true);
+    expect(controller.getLastUndoToken()).toBeNull();
+    expect(fixture.getState().circleStates.A01).toBeUndefined();
   });
 
   test("issuing a new token replaces the previous one", () => {
-    const svc = new CircleStateUndoService(5000);
-    svc.issue("A-01", "pending", "held", Date.now());
-    svc.issue("A-02", "pending", "excluded", Date.now());
+    const fixture = createUndoFixture();
+    const change = new ChangeCircleStatusUseCase(
+      fixture.repository,
+      fixture.session,
+      undefined,
+      { createUndoId: (() => {
+        let sequence = 0;
+        return () => `undo-${++sequence}`;
+      })() },
+    );
+    const controller = new CircleStatusController(
+      change,
+      new UndoCircleStatusChangeUseCase(fixture.repository, fixture.session),
+    );
 
-    const token = svc.getCurrentToken();
-    expect(token?.space).toBe("A-02");
+    controller.changeStatus({
+      eventDay,
+      circleSpace: "A01",
+      nextStatus: "held",
+      expectedSourceGeneration: "gen-1",
+    });
+    controller.changeStatus({
+      eventDay,
+      circleSpace: "A01",
+      nextStatus: "purchased",
+      expectedSourceGeneration: "gen-1",
+    });
+
+    expect(controller.getLastUndoToken()?.undoId).toBe("undo-2");
   });
 
-  test("clearPending removes the token", () => {
-    const svc = new CircleStateUndoService(5000);
-    svc.issue("A-01", "pending", "held", Date.now());
-    svc.clearPending();
+  test("failed undo clears the expired token", () => {
+    const fixture = createUndoFixture();
+    const controller = new CircleStatusController(
+      new ChangeCircleStatusUseCase(
+        fixture.repository,
+        fixture.session,
+        undefined,
+        { createUndoId: () => "undo-controller" },
+      ),
+      new UndoCircleStatusChangeUseCase(
+        fixture.repository,
+        fixture.session,
+        undefined,
+        { now: () => "2026-08-04T00:00:00.051Z", ttlMs: 50 },
+      ),
+    );
 
-    expect(svc.getCurrentToken()).toBeNull();
+    controller.changeStatus({
+      eventDay,
+      circleSpace: "A01",
+      nextStatus: "held",
+      expectedSourceGeneration: "gen-1",
+    });
+    expect(controller.getLastUndoToken()).not.toBeNull();
+    expect(controller.undo()).toBe(false);
+    expect(controller.getLastUndoToken()).toBeNull();
   });
 
-  test("token expires after TTL and returns null", async () => {
-    const svc = new CircleStateUndoService(50); // 50ms TTL for test speed
-    svc.issue("A-01", "pending", "held", Date.now());
+  test("token expires after TTL and rejects the undo", () => {
+    const fixture = createUndoFixture();
+    const token = issueToken(fixture);
+    if (!token) throw new Error("Expected undo token");
+    const undo = new UndoCircleStatusChangeUseCase(
+      fixture.repository,
+      fixture.session,
+      undefined,
+      { now: () => "2026-08-04T00:00:00.051Z", ttlMs: 50 },
+    );
 
-    await new Promise((r) => setTimeout(r, 80));
-    expect(svc.getCurrentToken()).toBeNull();
+    expect(() => undo.execute({ undoToken: token })).toThrow("expired");
+    expect(fixture.getState().circleStates.A01).toBe("held");
   });
 });
