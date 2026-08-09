@@ -119,6 +119,9 @@ test("valid snapshot resumes in the dialog, preserves target, and reappears afte
   const dialog = page.locator("#navigation-resume-dialog");
   await expect(dialog).toHaveAttribute("open", "");
   await expect(dialog).toContainText("東ア23a");
+  await expect(page.locator("#target-space-heading")).not.toContainText(
+    "東ア23a",
+  );
 
   await dialog.locator("button.btn-primary").click();
   await expect(dialog).not.toHaveAttribute("open", "");
