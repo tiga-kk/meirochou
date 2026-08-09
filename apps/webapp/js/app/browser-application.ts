@@ -517,16 +517,6 @@ export class BrowserApplication {
     return purchased;
   }
 
-  async flushActiveOutbox() {
-    if (!this.activeRef) return { sent: 0, pending: 0, error: null };
-    const sent =
-      (await this.pendingGasUpdatesController.retryAll(this.activeRef, {
-        updateViewState: false,
-      })) ?? 0;
-    const pending = this.activeState?.gasOutbox.length ?? 0;
-    return { sent, pending, error: pending ? new Error("Pending GAS updates remain") : null };
-  }
-
   /** Rebuild the management selector and source manager models from registry and local state. */
   updateManagementModels() {
     if (!this.eventRegistry) return;
@@ -1532,10 +1522,6 @@ export class BrowserApplication {
       type === "purchase" ? `${space} 購入！` : `${space} 保留`,
     );
 
-    if (this.activeState?.source.type === "gas") {
-      this.flushOutboxWithDiagnostic();
-    }
-
     this.ui.updateCounts(this);
     this.updateManagementModels();
     this.ui.updateCurrentLocation(space); // 現在地を更新
@@ -1580,9 +1566,6 @@ export class BrowserApplication {
         this.reportLocalMutationFailure(error);
         return;
       }
-      if (this.activeState?.source.type === "gas") {
-        this.flushOutboxWithDiagnostic();
-      }
       this.clearNavigationSnapshot();
       this.resetNavigationRuntimeState();
       this.ui.updateCounts(this);
@@ -1604,25 +1587,6 @@ export class BrowserApplication {
       "端末への保存に失敗しました。操作は反映されていません。",
       "error",
     );
-  }
-
-  /** Process GAS after local success and report failures without rolling back. */
-  async flushOutboxWithDiagnostic() {
-    try {
-      const result = await this.flushActiveOutbox();
-      if (result.error) {
-        this.ui.showToast(
-          "GAS同期に失敗しました。未送信データは端末に保持されています。",
-          "warning",
-        );
-      }
-    } catch (error) {
-      console.error("Failed to process GAS outbox:", error);
-      this.ui.showToast(
-        "GAS同期に失敗しました。未送信データは端末に保持されています。",
-        "warning",
-      );
-    }
   }
 
   /**

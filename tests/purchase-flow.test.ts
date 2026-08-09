@@ -42,7 +42,11 @@ class MockStorageAdapter implements StorageAdapter {
 const REF: EventDayRef = { eventId: "C108", dayId: "day1" };
 const NOW = "2026-07-23T09:00:00.000Z";
 
-function createSetup(source: LocalEventDayState["source"], adapter = new MockStorageAdapter()) {
+function createSetup(
+  source: LocalEventDayState["source"],
+  adapter = new MockStorageAdapter(),
+  circles = [{ space: "A-01", priority: 1 }],
+) {
   const repository = new LocalStorageEventDayRepository(new StorageService(adapter));
   const session = createActiveEventDaySession();
   const fetcher = vi.fn<typeof fetch>();
@@ -57,7 +61,7 @@ function createSetup(source: LocalEventDayState["source"], adapter = new MockSto
   const pending = new PendingGasUpdatesController(send, discard);
   const state = {
     ...createEmptyEventDayState(source, "generation-1", NOW),
-    circles: [{ space: "A-01", priority: 1 }],
+    circles,
   };
   repository.saveAndRememberLastOpened(REF, state);
   session.setActiveEventDay(REF, state);
@@ -229,9 +233,210 @@ describe("circle-status production integration", () => {
     expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("purchased");
     expect(fixture.repository.load(REF)?.gasOutbox).toHaveLength(1);
     expect(fixture.app.ui.showToast).toHaveBeenCalledWith("A-01 購入！");
-    expect(fixture.app.ui.showToast).toHaveBeenCalledWith(
+    expect(fixture.app.ui.showToast).not.toHaveBeenCalledWith(
       "GAS同期に失敗しました。未送信データは端末に保持されています。",
       "warning",
     );
+  });
+
+  test("keeps two-circle purchase progress independent from failed GAS delivery", async () => {
+    const fixture = createSetup(
+      {
+        type: "gas",
+        gasUrl: "https://example.test/gas",
+        sheetName: "Day1",
+      },
+      new MockStorageAdapter(),
+      [
+        { space: "東A01a", priority: 1 },
+        { space: "東A02b", priority: 2 },
+      ],
+    );
+    fixture.app.routeMapAreaCatalog.replaceMapAreas([
+      { id: "east", prefixes: ["東"], labels: ["A"] },
+    ]);
+    vi.spyOn(fixture.app.routeMapAssetsLoader, "loadMapAssets").mockResolvedValue({
+      points: {
+        image: { width: 30, height: 10 },
+        points: [
+          {
+            identifier: "A",
+            number: 1,
+            center_x: 15,
+            center_y: 5,
+            portals: [{ col: 1, row: 0, x: 15, y: 5 }],
+          },
+          {
+            identifier: "A",
+            number: 2,
+            center_x: 25,
+            center_y: 5,
+            portals: [{ col: 2, row: 0, x: 25, y: 5 }],
+          },
+        ],
+      },
+      gridMetadata: {
+        width: 30,
+        height: 10,
+        cell_size: 10,
+        cols: 3,
+        rows: 1,
+      },
+      gridBytes: new Uint8Array([1, 1, 1]),
+    });
+    fixture.fetcher.mockRejectedValue(new Error("Network connection lost"));
+    const currentRoute = {
+      cost: 10,
+      cells: [
+        { col: 0, row: 0 },
+        { col: 1, row: 0 },
+      ],
+      points: [
+        { x: 5, y: 5 },
+        { x: 15, y: 5 },
+      ],
+      startPosition: { x: 5, y: 5 },
+      targetPosition: { x: 15, y: 5 },
+      image: { width: 30, height: 10 },
+    };
+    fixture.app.routeGuidanceSession.replaceSnapshot({
+      navigationState: {
+        stage: "navigating",
+        areaId: "east",
+        currentPosition: {
+          areaId: "east",
+          gridIndex: 0,
+          svgX: 5,
+          svgY: 5,
+          source: "manual-start",
+        },
+        targetSpace: "東A01a",
+        lockedFirstLeg: {
+          from: { type: "start", areaId: "east", gridIndex: 0 },
+          toSpace: "東A01a",
+        },
+        provisionalOrder: ["東A01a", "東A02b"],
+        bestOrder: ["東A01a", "東A02b"],
+        optimizationGeneration: 1,
+      },
+      currentDestination: { space: "東A01a" },
+      currentRoute,
+      selectedDestination: { space: "東A01a" },
+      selectedRoute: currentRoute,
+      selectionStatus: "idle",
+      routeOptimizationGeneration: 1,
+    });
+
+    await fixture.app.handleAction("purchase");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(fixture.repository.load(REF)?.circleStates["東A01a"]).toBe("purchased");
+    expect(fixture.repository.load(REF)?.gasOutbox).toHaveLength(1);
+    expect(fixture.fetcher).toHaveBeenCalledOnce();
+    expect(fixture.app.routeGuidanceSession.getSnapshot().navigationState).toMatchObject({
+      stage: "navigating",
+      targetSpace: "東A02b",
+    });
+    expect(fixture.app.ui.showNavigation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        currentTarget: expect.objectContaining({ space: "東A02b" }),
+      }),
+    );
+  });
+
+  test("keeps purchase progress when background notification throws synchronously", async () => {
+    const fixture = createSetup({
+      type: "gas",
+      gasUrl: "https://example.test/gas",
+      sheetName: "Day1",
+    }, new MockStorageAdapter(), [
+      { space: "東A01a", priority: 1 },
+      { space: "東A02b", priority: 2 },
+    ]);
+    fixture.app.routeMapAreaCatalog.replaceMapAreas([
+      { id: "east", prefixes: ["東"], labels: ["A"] },
+    ]);
+    vi.spyOn(fixture.app.routeMapAssetsLoader, "loadMapAssets").mockResolvedValue({
+      points: {
+        image: { width: 30, height: 10 },
+        points: [
+          {
+            identifier: "A",
+            number: 1,
+            center_x: 15,
+            center_y: 5,
+            portals: [{ col: 1, row: 0, x: 15, y: 5 }],
+          },
+          {
+            identifier: "A",
+            number: 2,
+            center_x: 25,
+            center_y: 5,
+            portals: [{ col: 2, row: 0, x: 25, y: 5 }],
+          },
+        ],
+      },
+      gridMetadata: {
+        width: 30,
+        height: 10,
+        cell_size: 10,
+        cols: 3,
+        rows: 1,
+      },
+      gridBytes: new Uint8Array([1, 1, 1]),
+    });
+    const currentRoute = {
+      cost: 10,
+      cells: [
+        { col: 0, row: 0 },
+        { col: 1, row: 0 },
+      ],
+      points: [
+        { x: 5, y: 5 },
+        { x: 15, y: 5 },
+      ],
+      startPosition: { x: 5, y: 5 },
+      targetPosition: { x: 15, y: 5 },
+      image: { width: 30, height: 10 },
+    };
+    fixture.app.routeGuidanceSession.replaceSnapshot({
+      navigationState: {
+        stage: "navigating",
+        areaId: "east",
+        currentPosition: {
+          areaId: "east",
+          gridIndex: 0,
+          svgX: 5,
+          svgY: 5,
+          source: "manual-start",
+        },
+        targetSpace: "東A01a",
+        lockedFirstLeg: {
+          from: { type: "start", areaId: "east", gridIndex: 0 },
+          toSpace: "東A01a",
+        },
+        provisionalOrder: ["東A01a", "東A02b"],
+        bestOrder: ["東A01a", "東A02b"],
+        optimizationGeneration: 1,
+      },
+      currentDestination: { space: "東A01a" },
+      currentRoute,
+      selectedDestination: { space: "東A01a" },
+      selectedRoute: currentRoute,
+      selectionStatus: "idle",
+      routeOptimizationGeneration: 1,
+    });
+    fixture.app.backgroundProcess.requestSend = vi.fn(() => {
+      throw new Error("background unavailable");
+    });
+
+    await fixture.app.handleAction("purchase");
+
+    expect(fixture.repository.load(REF)?.circleStates["東A01a"]).toBe("purchased");
+    expect(fixture.app.ui.showToast).toHaveBeenCalledWith("東A01a 購入！");
+    expect(fixture.app.routeGuidanceSession.getSnapshot().navigationState).toMatchObject({
+      stage: "navigating",
+      targetSpace: "東A02b",
+    });
   });
 });

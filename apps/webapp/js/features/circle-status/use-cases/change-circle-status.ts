@@ -88,7 +88,11 @@ export class ChangeCircleStatusUseCase {
 
     // Trigger background process if pending update queued
     if (pendingGasUpdateId && this.backgroundProcess) {
-      this.backgroundProcess.requestSend();
+      try {
+        this.backgroundProcess.requestSend();
+      } catch {
+        // Local mutation is already committed; background delivery is best effort.
+      }
     }
 
     return {
