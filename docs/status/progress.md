@@ -9,12 +9,14 @@
 - 追加計画作成前のHEAD: `6b1499bda9323acb8e77f4bfcd35007d1f8a5114`
 - 現在のフェーズ: Phase 5D 追加修正中
 - 次に着手するタスク: Task 12（残存する責務境界とテスト漏れを解消する）
-- Task 12の基準HEAD: `9098ebe88e37332ce8e7a14d5d08497ee28ca03b`
+- Task 12の診断対象コードHEAD: `9098ebe88e37332ce8e7a14d5d08497ee28ca03b`
 - Task 12計画: `docs/plans/phase-05d/task-12-finish-responsibility-boundaries-and-test-coverage.md`
 - Task 8の基準コミット: `ac8f2b035b3bf22b3ed03221eceebb8ccbf3f63a`
 - 直近のTask 8 WIPコミット: `24cf35fa9724e4b433e2c2573bf8b17d173481c2`
 - Stage 8D-A実装完了HEAD: `d9978339613201b838a53ed4865fbb001b2f056c`
 - Stage 8D-B補足計画: `docs/plans/phase-05d/task-08-stage-8d-b-route-reconstruction.md`
+
+Task 12の実装開始SHAは固定しない。開始時に最新remote `feature/phase-05d`を取得し、production/test差分が進んでいれば計画前提を再評価する。
 
 ## Task 11後の独立レビュー
 
@@ -22,17 +24,22 @@ Task 11 HEAD `9098ebe88e37332ce8e7a14d5d08497ee28ca03b`では、GitHub Actions W
 
 確認した主な問題:
 
-1. Task 9で`bind-browser-events.ts`から削除した約1800行の責務の多くが、新規`browser-application.ts`へ移動している。`BrowserApplication`は`// @ts-nocheck`のまま、Event Day Repository/Session、registry/manifest、Route Guidance assets/route planner/snapshot/matrix、settings/outbox/deletion等を広く所有している。
+1. Task 9で`bind-browser-events.ts`から削除した責務の多くが`browser-application.ts`へ移動している。`BrowserApplication`は`// @ts-nocheck`のまま、Event Day Repository/Session、registry/manifest、Route Guidance assets/route planner/snapshot/matrix、settings/outbox/deletion等を広く所有している。
 2. architecture checkerは`browser-application.ts`を非composition-root app moduleのconcrete infrastructure検査から明示的に除外し、architecture testもその例外を正しいものとして固定している。
-3. initial event/day openを`BrowserApplication.bootstrapApp()/init()/openEventDay()`と`EventDaySelectorController.start()`の二経路が扱っており、ownerが一本化されていない。
+3. initial event/day openを`BrowserApplication.bootstrapApp()/init()/openEventDay()`と`EventDaySelectorController.start()`の二経路が扱っており、ownerが一本化されていない。さらに`SwitchEventDayUseCase.execute()`はRepositoryのlast-opened Refがrequested Refと同じ場合に早期returnするため、durable last-openedとruntime初期化済み状態を同一視するとstartup manifest validationを飛ばす危険がある。
 4. `SwitchEventDayUseCase`はmanifest loaderを注入できる一方、未注入時に`globalThis.fetch`を直接使うHTTP fallbackを持つ。
-5. Route Guidanceには簡易`NavigationSnapshot` contractとLocalStorage用の実snapshot contractが二種類あり、composition rootが簡易snapshotの引数を使わずController側のsaveを呼ぶadapterで接続している。
+5. Route Guidance snapshot contractは、簡易`NavigationSnapshot`、LocalStorage用の実`NavigationSnapshot`、`ResumeRouteGuidanceUseCase`内の`ResumeNavigationSnapshot`の実質3系統があり、composition rootは簡易snapshotの引数を使わずController側のsaveを呼ぶadapterで接続している。
 6. `RouteGuidanceController`が同featureの`infrastructure/local-storage-route-guidance-snapshot-repository`と`infrastructure/route-guidance-runtime-controller`へ直接依存している。
-7. composition rootに`browserRuntime: any`、後から差し替えるsnapshot callback、`Record<string, unknown>` cast等が残る。
-8. `tests/navigation-runtime-startup.test.ts`が削除済み`comipath-browser-runtime.js`をimportしたまま残るが、`test:webapp`の手書きfile listから漏れているためCIで検出されない。
-9. `tests/comipath-application-responsibility.test.mjs`は特定fileの200行上限だけを確認しており、別名の大きなapplication classへ責務を移す実装を防止できない。
+7. Route Guidanceのpoints/grid runtime validationを行う`parsePointsPayload()` / `parseGridMeta()`がEvent Day infrastructureに残り、Route Guidance HTTP loader自体はJSONを型castするだけである。BrowserApplicationからparser呼出だけを消すと既存validationを失う。
+8. composition rootに`browserRuntime: any`、後から差し替えるsnapshot callback、`Record<string, unknown>` cast、start後生成値と一致しない可能性がある公開戻り値等が残る。
+9. Pending GAS Update / Local Data Deletionのrequest version、busy、result/error等のfeature固有mutable stateが`BrowserApplication`に残っている。
+10. `tests/navigation-runtime-startup.test.ts`が削除済み`comipath-browser-runtime.js`をimportしたまま残るだけでなく、distance matrix、navigation runtime/state、route module boundary、Task 10 demo regression等を含む複数の現行webapp testが`test:webapp`の手書きfile listから漏れている。現在のCI GREENは全test discoveryの証拠になっていない。
+11. `tests/comipath-application-responsibility.test.mjs`は特定fileの200行上限だけを確認しており、別名の大きなapplication classへ責務を移す実装を防止できない。
+12. dev demo用route処理と`tests/task10-demo-route-regression.test.mjs`が`BrowserApplication`のprivate寄り実装へ結び付いており、production境界修正時にchecker例外や不要なpublic API拡大を誘発する危険がある。
 
 これらはTask 10のsnapshot判断やTask 11のテスト実行結果を無効にするものではない。Task 11はそのHEADでの検証実績として維持する。ただしTask 12でproduction/test/architecture checkerを変更するため、Phase 5Dの最終完了証拠はTask 12後に再取得する。
+
+Task 12の詳細な実装contract、Stage順序、受入条件は`docs/plans/phase-05d/task-12-finish-responsibility-boundaries-and-test-coverage.md`を正本とする。
 
 ## Task 8 WIPの再開状態
 
@@ -155,9 +162,9 @@ Task 8 Stage 8A〜8D-Aまででconcrete dependency assemblyとRoute Guidance sta
 
 したがって問題は「行数が多いこと」ではなく、Task 5で意図したbrowser binding境界まで責務移管がまだ完了していないことである。
 
-さらに現行`check-webapp-architecture.mjs`では、非composition-root app moduleのconcrete infrastructure検査から`bind-browser-events.ts`だけが明示的に除外されている。この例外はStage 8Gで、binderが実際に最終境界へ縮小した後に削除する。
+さらに当時の`check-webapp-architecture.mjs`では、非composition-root app moduleのconcrete infrastructure検査から`bind-browser-events.ts`だけが明示的に除外されていた。この例外はStage 8Gで、binderが最終境界へ縮小した後に削除した。
 
-Task 8で所有権を修復し、Task 9で残った純粋なevent registrationをowner別に分割する。
+Task 8で所有権を修復し、Task 9で残った純粋なevent registrationをowner別に分割した。
 
 ### 2. visual snapshot 5件がCI固定環境で安定して失敗する
 
@@ -188,13 +195,13 @@ Task 8で所有権を修復し、Task 9で残った純粋なevent registration�
 
 履歴上、`0a2c04286d804f4041508622ef48e2cd7ff9cdbf`で今回対象を含むmobile snapshotがCI renderingへ明示的に揃えられている。Phase 5D中に一部management snapshotはさらに更新されている一方、route guidance側にはPhase baseからbaseline画像が変わっていない対象もある。このため全snapshotの一括更新は行わない。
 
-Task 10で5枚を個別に`REGRESSION`または`BASELINE_UPDATE`へ分類し、根拠に応じてproduction修正またはCI固定環境での限定baseline更新を行う。
+Task 10で対象snapshotを個別に調査し、根拠に応じてproduction修正またはCI固定環境での限定baseline更新を行った。
 
 ## Task 7の扱い
 
-Task 7は「失敗」でも「完了」でもなく、最終検証中に既存計画外のblockerを発見した状態とする。
+Task 7は最終検証中に既存計画外のblockerを発見した状態として記録する。
 
-Task 7で得た検証結果は原因調査のbaselineとして利用するが、Task 8〜10でproduction/test snapshotが変わるためPhase完了の最終証拠にはしない。Task 11でfull verificationを再実行する。
+Task 7で得た検証結果は原因調査のbaselineとして利用し、Task 8〜11で追加blockerを解消した。Task 12でさらにproduction/test/architecture checkerを変更するため、Phase完了の最終証拠はTask 12後に再取得する。
 
 ## タスク状態
 
@@ -209,8 +216,8 @@ Task 7で得た検証結果は原因調査のbaselineとして利用するが、
 | Task 7 | 中断 | 最終検証中にbrowser binding ownershipとvisual snapshotの追加blockerを発見し、Task 8〜11で解消 |
 | Task 8 | 完了 | Stage 8A〜8G完了。browser binding ownershipとarchitecture guardrailを確定 |
 | Task 9 | 完了 | browser event registrationをowner別に整理し、root binderをcompose/cleanupへ縮小 |
-| Task 10 | 完了 | 5候補と新規露出source-diff/route-comparisonを根拠付きでbaseline更新。Flow1 gallery fixture不整合を修正 |
+| Task 10 | 完了 | 既知候補と新規露出snapshotを根拠付きで解消。Flow1 gallery fixture不整合を修正 |
 | Task 11 | 完了 | `9098ebe`でPhase全体検証、CI相当E2E、public tree auditを実行。Task 12後に最終検証を再取得する |
-| Task 12 | 未着手 | Task 11後の独立レビューで確認した残存application責務、dependency direction、snapshot contract、test実行漏れを解消 |
+| Task 12 | 未着手 | Task 11後の独立レビューで確認した残存application責務、Event Day startup、feature request ownership、Route Guidance snapshot/asset boundary、test discovery漏れを解消 |
 
 タスク完了時はこの表と「次に着手するタスク」を実態に合わせて更新する。個別タスク文書へ進捗状態を重複して記録しない。
