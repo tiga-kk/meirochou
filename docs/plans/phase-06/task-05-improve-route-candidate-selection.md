@@ -26,6 +26,8 @@
 - `apps/webapp/js/app/browser-application.ts`
 - `apps/webapp/index.html`
 - `apps/webapp/css/target.css`
+- `tests/route-guidance-controller.test.ts`
+- `tests/e2e/webapp.spec.ts`
 
 ## 対象ファイル
 
@@ -43,7 +45,7 @@
 - `apps/webapp/js/features/route-guidance/ui/dom-route-map-view.ts`
 - `apps/webapp/js/app/browser-application.ts`
 - `tests/route-guidance-controller.test.ts`
-- `tests/route-guidance-controller.test.ts`以外の既存候補選択test/E2E testで必要なもの
+- `tests/e2e/webapp.spec.ts`
 
 ### 削除
 
@@ -82,6 +84,7 @@
 - confirm→`idle`: candidateがcurrentへ昇格しpanelが閉じる。
 - candidate計算失敗: current routeを消さず、panel内で失敗を示す。
 - Controller経由で取消できることを確認し、BrowserApplicationやViewからUse Caseを直接呼ぶテストにしない。
+- E2Eでは実際の地図pin→候補panel→比較→戻る/閉じる/確定のDOM配線を通し、Controller unit testだけで本番接続を証明したことにしない。
 
 ## 検証コマンド
 
