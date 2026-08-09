@@ -1,18 +1,38 @@
 # 進捗
 
-更新日: 2026-08-08
+更新日: 2026-08-09
 
 ## 現在の対象
 
 - リポジトリ: `tiga-kk/meirochou`
 - ブランチ: `feature/phase-05d`
 - 追加計画作成前のHEAD: `6b1499bda9323acb8e77f4bfcd35007d1f8a5114`
-- 現在のフェーズ: Phase 5D 完了
-- 次に着手するタスク: なし（Task 11完了。次フェーズは自動開始しない）
+- 現在のフェーズ: Phase 5D 追加修正中
+- 次に着手するタスク: Task 12（残存する責務境界とテスト漏れを解消する）
+- Task 12の基準HEAD: `9098ebe88e37332ce8e7a14d5d08497ee28ca03b`
+- Task 12計画: `docs/plans/phase-05d/task-12-finish-responsibility-boundaries-and-test-coverage.md`
 - Task 8の基準コミット: `ac8f2b035b3bf22b3ed03221eceebb8ccbf3f63a`
 - 直近のTask 8 WIPコミット: `24cf35fa9724e4b433e2c2573bf8b17d173481c2`
 - Stage 8D-A実装完了HEAD: `d9978339613201b838a53ed4865fbb001b2f056c`
 - Stage 8D-B補足計画: `docs/plans/phase-05d/task-08-stage-8d-b-route-reconstruction.md`
+
+## Task 11後の独立レビュー
+
+Task 11 HEAD `9098ebe88e37332ce8e7a14d5d08497ee28ca03b`では、GitHub Actions Webapp CI、`npm run verify:webapp`、CI相当E2E等はGREENである。ただし、Phase 5Dの責務分離を独立に再確認した結果、CI GREENだけでは検出されない残存問題を確認したため、Phase完了判定を再度開いた。
+
+確認した主な問題:
+
+1. Task 9で`bind-browser-events.ts`から削除した約1800行の責務の多くが、新規`browser-application.ts`へ移動している。`BrowserApplication`は`// @ts-nocheck`のまま、Event Day Repository/Session、registry/manifest、Route Guidance assets/route planner/snapshot/matrix、settings/outbox/deletion等を広く所有している。
+2. architecture checkerは`browser-application.ts`を非composition-root app moduleのconcrete infrastructure検査から明示的に除外し、architecture testもその例外を正しいものとして固定している。
+3. initial event/day openを`BrowserApplication.bootstrapApp()/init()/openEventDay()`と`EventDaySelectorController.start()`の二経路が扱っており、ownerが一本化されていない。
+4. `SwitchEventDayUseCase`はmanifest loaderを注入できる一方、未注入時に`globalThis.fetch`を直接使うHTTP fallbackを持つ。
+5. Route Guidanceには簡易`NavigationSnapshot` contractとLocalStorage用の実snapshot contractが二種類あり、composition rootが簡易snapshotの引数を使わずController側のsaveを呼ぶadapterで接続している。
+6. `RouteGuidanceController`が同featureの`infrastructure/local-storage-route-guidance-snapshot-repository`と`infrastructure/route-guidance-runtime-controller`へ直接依存している。
+7. composition rootに`browserRuntime: any`、後から差し替えるsnapshot callback、`Record<string, unknown>` cast等が残る。
+8. `tests/navigation-runtime-startup.test.ts`が削除済み`comipath-browser-runtime.js`をimportしたまま残るが、`test:webapp`の手書きfile listから漏れているためCIで検出されない。
+9. `tests/comipath-application-responsibility.test.mjs`は特定fileの200行上限だけを確認しており、別名の大きなapplication classへ責務を移す実装を防止できない。
+
+これらはTask 10のsnapshot判断やTask 11のテスト実行結果を無効にするものではない。Task 11はそのHEADでの検証実績として維持する。ただしTask 12でproduction/test/architecture checkerを変更するため、Phase 5Dの最終完了証拠はTask 12後に再取得する。
 
 ## Task 8 WIPの再開状態
 
@@ -98,6 +118,8 @@ Stage 8Gの検証は、focused 46 tests、`npm run test:webapp`（72 files / 525
 Task 10は完了した。開始時の5候補に加え、先行failure解消後に露出した`source-diff-dialog`と`route-comparison`も、CI整合履歴・DOM/CSS・現行specの状態を根拠に対象snapshotだけを更新した。toast非表示の意図はE2E assertionで固定し、Flow1の`isSale=x` fixture不整合は空欄へ修正した。対象Flowの更新なし検証は成功した。
 
 Task 11は完了した。`npm run verify:webapp`、resume反復6/6、`npm run test:e2e:ci`（38 passed / 8 skipped）、public tree audit、差分検査を最新作業内容で確認した。resumeのsnapshot契約は`optimizationGeneration`と動的`savedAt`を正しく検証するよう補正し、full E2Eでflakyを再現しないことを確認した。
+
+Task 11の検証結果は`9098ebe`時点のbaselineとして有効である。ただしTask 12でproduction/test/architecture checkerを変更するため、Phase 5Dの最終完了判定にはTask 12後の再検証を使用する。
 
 ### Task 9の状態
 
@@ -188,6 +210,7 @@ Task 7で得た検証結果は原因調査のbaselineとして利用するが、
 | Task 8 | 完了 | Stage 8A〜8G完了。browser binding ownershipとarchitecture guardrailを確定 |
 | Task 9 | 完了 | browser event registrationをowner別に整理し、root binderをcompose/cleanupへ縮小 |
 | Task 10 | 完了 | 5候補と新規露出source-diff/route-comparisonを根拠付きでbaseline更新。Flow1 gallery fixture不整合を修正 |
-| Task 11 | 完了 | Phase 5D全体検証、CI相当E2E、public tree auditを最新HEADで完了 |
+| Task 11 | 完了 | `9098ebe`でPhase全体検証、CI相当E2E、public tree auditを実行。Task 12後に最終検証を再取得する |
+| Task 12 | 未着手 | Task 11後の独立レビューで確認した残存application責務、dependency direction、snapshot contract、test実行漏れを解消 |
 
 タスク完了時はこの表と「次に着手するタスク」を実態に合わせて更新する。個別タスク文書へ進捗状態を重複して記録しない。
