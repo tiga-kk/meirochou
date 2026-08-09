@@ -243,7 +243,7 @@ describe("circle-status production integration", () => {
     const fixture = createSetup(
       {
         type: "gas",
-        gasUrl: "https://example.test/gas",
+        gasUrl: "https://script.google.com/macros/s/test/exec",
         sheetName: "Day1",
       },
       new MockStorageAdapter(),
