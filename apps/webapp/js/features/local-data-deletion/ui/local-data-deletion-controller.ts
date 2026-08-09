@@ -8,6 +8,13 @@ export interface LocalDataDeletionControllerDependencies {
   readonly onScopeSelect?: (detail: unknown) => void;
   readonly onDeleteRequest?: (detail: unknown) => void | Promise<void>;
   readonly onCancel?: () => void;
+  readonly onStateChange?: () => void;
+  readonly onDeleted?: (scope: LocalDataDeletionScope) => void | Promise<void>;
+}
+
+export interface LocalDataDeletionViewState {
+  readonly busy: boolean;
+  readonly errorMessage: string;
 }
 
 function parseRef(value: unknown): EventDayRef | null {
@@ -60,6 +67,9 @@ export class LocalDataDeletionController {
   private selectedScope: LocalDataDeletionScope | null = null;
   private stopped = false;
   private eventCleanup: (() => void) | null = null;
+  private requestVersion = 0;
+  private busy = false;
+  private errorMessage = "";
 
   constructor(
     private readonly dependencies: LocalDataDeletionControllerDependencies,
@@ -96,21 +106,53 @@ export class LocalDataDeletionController {
       : null;
   }
 
-  async confirmDeletion(detail: unknown): Promise<void> {
-    if (this.stopped) return;
+  getViewState(): LocalDataDeletionViewState {
+    return { busy: this.busy, errorMessage: this.errorMessage };
+  }
+
+  invalidateRequests(): void {
+    this.requestVersion += 1;
+    this.busy = false;
+    this.dependencies.onStateChange?.();
+  }
+
+  async confirmDeletion(detail: unknown): Promise<boolean> {
+    if (this.stopped) return false;
     const scope = parseScope(detail) ?? this.selectedScope;
     if (!scope) throw new Error("Invalid deletion scope");
-    await this.dependencies.deleteLocalData.execute(scope);
-    this.selectedScope = null;
+    const requestVersion = ++this.requestVersion;
+    this.busy = true;
+    this.errorMessage = "";
+    this.dependencies.onStateChange?.();
+    try {
+      await this.dependencies.deleteLocalData.execute(scope);
+      if (requestVersion !== this.requestVersion) return false;
+      this.busy = false;
+      this.selectedScope = null;
+      this.dependencies.onStateChange?.();
+      await this.dependencies.onDeleted?.(scope);
+      return true;
+    } catch (error) {
+      if (requestVersion === this.requestVersion) {
+        this.busy = false;
+        this.errorMessage = "データの削除に失敗しました。";
+        this.dependencies.onStateChange?.();
+      }
+      throw error;
+    }
   }
 
   cancelDeletion(): void {
+    this.invalidateRequests();
     this.selectedScope = null;
+    this.errorMessage = "";
+    this.dependencies.onStateChange?.();
   }
 
   stop(): void {
     this.eventCleanup?.();
     this.stopped = true;
     this.selectedScope = null;
+    this.invalidateRequests();
   }
 }

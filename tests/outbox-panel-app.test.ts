@@ -84,16 +84,11 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
       '<button id="toggle-settings"></button><comipath-settings id="settings-area"></comipath-settings><button id="btn-search"></button><button id="btn-purchased"></button><button id="btn-hold"></button><button id="btn-reset-all"></button><select id="loc-ewsn"></select><select id="loc-label"></select><input id="loc-number" /><div id="source-diff-dialog"></div><div id="navigation-resume-dialog"></div>';
     const app = new BrowserApplication(createBrowserApplicationOptions());
     const ref = { eventId: "c104", dayId: "day1" };
-    let resolveRetry: (summary: {
-      processedRefs: number;
-      sent: number;
-      pending: number;
-      failures: never[];
-    }) => void = () => {};
+    let resolveRetry: () => void = () => {};
     vi.spyOn(app.pendingGasUpdatesController, "retryAll").mockImplementation(
       () =>
         new Promise((resolve) => {
-          resolveRetry = (s) => resolve(s.sent);
+          resolveRetry = () => resolve(null);
         }),
     );
     const updateSpy = vi
@@ -104,12 +99,7 @@ describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
 
     const retryPromise = app.handleGasRetryRequest({ ref });
     document.getElementById("toggle-settings")?.click();
-    resolveRetry({
-      processedRefs: 1,
-      sent: 0,
-      pending: 1,
-      failures: [],
-    });
+    resolveRetry();
     await retryPromise;
 
     expect(updateSpy).toHaveBeenCalledTimes(2);

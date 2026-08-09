@@ -64,4 +64,28 @@ describe("PendingGasUpdatesController", () => {
     controller.stop();
     expect(removeEventListener).toHaveBeenCalledTimes(4);
   });
+
+  it("ignores retry completion after stop", async () => {
+    let resolveSend: (value: { processedCount: number }) => void = () => {};
+    const controller = new PendingGasUpdatesController(
+      {
+        execute: () =>
+          new Promise((resolve) => {
+            resolveSend = resolve;
+          }),
+      },
+      { execute: vi.fn() },
+    );
+
+    const retry = controller.retryAll();
+    controller.stop();
+    resolveSend({ processedCount: 1 });
+
+    await expect(retry).resolves.toBeNull();
+    expect(controller.getViewState()).toEqual({
+      busy: false,
+      resultMessage: "",
+      errorMessage: "",
+    });
+  });
 });

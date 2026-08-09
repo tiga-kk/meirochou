@@ -173,14 +173,7 @@ export class BrowserApplication {
     this.transitionToken = 0;
     this.isTransitioning = false;
     this.sourceErrorMessage = "";
-    this.outboxResultMessage = "";
-    this.outboxErrorMessage = "";
     this.suppressSessionModelUpdates = false;
-    this.deleteErrorMessage = "";
-    this.outboxRetryBusy = false;
-    this.outboxRequestVersion = 0;
-    this.localDeletionBusy = false;
-    this.localDeletionRequestVersion = 0;
     this.ownedTimers = new Set();
     this.ownedTimerCancels = new Map();
     this.downloadAdapter = {
@@ -216,15 +209,10 @@ export class BrowserApplication {
   closeSettings() {
     this.clearActivePreviewIfAny();
     this.circleDataSourceController.cancelCurrentRequest();
-    this.outboxRequestVersion += 1;
-    this.localDeletionRequestVersion += 1;
-    this.outboxRetryBusy = false;
-    this.localDeletionBusy = false;
+    this.pendingGasUpdatesController.invalidateRequests?.();
+    this.localDataDeletionController.invalidateRequests?.();
     this.localDataDeletionController.cancelDeletion();
     this.sourceErrorMessage = "";
-    this.outboxResultMessage = "";
-    this.outboxErrorMessage = "";
-    this.deleteErrorMessage = "";
     this.ui.setSettingsError("");
     this.updateManagementModels();
   }
@@ -347,7 +335,7 @@ export class BrowserApplication {
 
   async flushActiveOutbox() {
     if (!this.activeRef) return { sent: 0, pending: 0, error: null };
-    const sent = await this.pendingGasUpdatesController.retryAll(this.activeRef);
+    const sent = (await this.pendingGasUpdatesController.retryAll(this.activeRef)) ?? 0;
     const pending = this.activeState?.gasOutbox.length ?? 0;
     return { sent, pending, error: pending ? new Error("Pending GAS updates remain") : null };
   }
@@ -401,9 +389,9 @@ export class BrowserApplication {
       this.eventRegistry,
       states,
       {
-        processing: this.outboxRetryBusy,
-        resultMessage: this.outboxResultMessage || "",
-        errorMessage: this.outboxErrorMessage || "",
+        processing: this.pendingGasUpdatesController.getViewState().busy,
+        resultMessage: this.pendingGasUpdatesController.getViewState().resultMessage,
+        errorMessage: this.pendingGasUpdatesController.getViewState().errorMessage,
       },
     );
 
@@ -431,8 +419,8 @@ export class BrowserApplication {
       ),
       deleteOptions,
       eventDayLabel: activeRefLabel,
-      busy: this.localDeletionBusy,
-      errorMessage: this.deleteErrorMessage || "",
+      busy: this.localDataDeletionController.getViewState().busy,
+      errorMessage: this.localDataDeletionController.getViewState().errorMessage,
     });
 
     this.ui?.updateSettingsState({
@@ -493,34 +481,15 @@ export class BrowserApplication {
       return;
     }
     const ref = detail.ref || undefined;
-    this.suppressSessionModelUpdates = true;
-    const requestVersion = ++this.outboxRequestVersion;
-    this.outboxRetryBusy = true;
-    this.outboxResultMessage = "";
-    this.outboxErrorMessage = "";
-    this.updateManagementModels();
-
     try {
-      const processed = this.pendingGasUpdatesController
-        ? await this.pendingGasUpdatesController.retryAll(ref)
-        : 0;
-      if (requestVersion !== this.outboxRequestVersion) return;
-      this.outboxRetryBusy = false;
-
+      const processed = await this.pendingGasUpdatesController.retryAll(ref);
+      if (processed === null) return;
       this.ui.showToast(`GAS同期完了 (${processed}件送信)`);
-      this.outboxResultMessage = `送信完了 (${processed}件)`;
     } catch (_error) {
-      if (requestVersion !== this.outboxRequestVersion) return;
-      this.outboxRetryBusy = false;
-      this.outboxErrorMessage = "再送処理中にエラーが発生しました。";
       this.ui.showToast("再送エラー", "error");
-    } finally {
-      this.suppressSessionModelUpdates = false;
-      if (requestVersion === this.outboxRequestVersion) {
-        this.updateManagementModels();
-        this.ui?.updateCounts?.(this);
-      }
     }
+    this.updateManagementModels();
+    this.ui?.updateCounts?.(this);
   }
 
   /** Opens the delete dialog for a chosen deletion scope. */
@@ -535,14 +504,12 @@ export class BrowserApplication {
     if (!option || option.blocked) return;
 
     this.localDataDeletionController.selectDeletionScope(option.scope);
-    this.deleteErrorMessage = "";
     this.updateManagementModels();
   }
 
   /** Closes the delete dialog without changing local data. */
   handleDeleteDialogCancel() {
     this.localDataDeletionController.cancelDeletion();
-    this.deleteErrorMessage = "";
     this.updateManagementModels();
   }
 
@@ -556,20 +523,14 @@ export class BrowserApplication {
       return;
     }
 
-    const requestVersion = ++this.localDeletionRequestVersion;
     const activeRefBeforeDelete = this.activeRef
       ? { ...this.activeRef }
       : null;
-    this.localDeletionBusy = true;
-    this.deleteErrorMessage = "";
     this.localDataDeletionController.selectDeletionScope(scope);
     this.updateManagementModels();
 
     try {
-      await this.localDataDeletionController.confirmDeletion(scope);
-      if (requestVersion !== this.localDeletionRequestVersion) return;
-
-      this.localDeletionBusy = false;
+      if (!(await this.localDataDeletionController.confirmDeletion(scope))) return;
 
       const activeRefDeleted =
         scope.type === "all-events" ||
@@ -612,8 +573,6 @@ export class BrowserApplication {
       }
       this.ui.showToast("データを削除しました");
     } catch (_error) {
-      if (requestVersion !== this.localDeletionRequestVersion) return;
-      this.localDeletionBusy = false;
       if (activeRefBeforeDelete && !this.activeRef) {
         renderMapBootstrapError(
           this.document,
@@ -621,7 +580,6 @@ export class BrowserApplication {
         );
         return;
       }
-      this.deleteErrorMessage = "データの削除に失敗しました。";
       this.updateManagementModels();
       this.ui.showToast("削除エラー", "error");
     }
@@ -644,11 +602,8 @@ export class BrowserApplication {
         detail.ids,
         new Date().toISOString(),
       );
-      this.outboxResultMessage = "選択した未送信データを破棄しました";
-      this.outboxErrorMessage = "";
       this.ui.showToast("未送信データを破棄しました");
     } catch (_error) {
-      this.outboxErrorMessage = "未送信データの破棄に失敗しました";
       this.ui.showToast("破棄エラー", "error");
     } finally {
       this.updateManagementModels();

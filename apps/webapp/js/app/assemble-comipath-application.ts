@@ -134,6 +134,7 @@ export function assembleComiPathApplication(
       targetElement: options.targetElement ?? options.document,
       onRetryRequest: (detail) => browserRuntime?.handleGasRetryRequest(detail),
       onDiscardRequest: (detail) => browserRuntime?.handleGasDiscardRequest(detail),
+      onStateChange: () => browserRuntime?.updateManagementModels?.(),
     },
   );
 
@@ -307,6 +308,7 @@ export function assembleComiPathApplication(
     onDeleteRequest: (detail) =>
       browserRuntime?.handleStorageDeleteRequest(detail),
     onCancel: () => browserRuntime?.handleDeleteDialogCancel(),
+    onStateChange: () => browserRuntime?.updateManagementModels?.(),
   });
 
   browserRuntime = new BrowserApplication({
