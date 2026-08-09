@@ -62,6 +62,46 @@ test("予定を開くと巡回順と地図pinの番号が一致し案内状態�
   );
 });
 
+test("使い方をheaderから開き、本文を拡大表示して閉じられる", async ({
+  page,
+}) => {
+  await page.goto("/?demo_ui=1");
+
+  const guideButton = page.locator("#btn-open-user-guide");
+  await guideButton.click();
+  const guide = page.locator("#user-guide-dialog");
+  const dialog = guide.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(guide.getByRole("heading", { name: "CSVを使う" })).toBeVisible();
+  await expect(guide.getByRole("heading", { name: "Google Spreadsheet / GASを使う" })).toBeVisible();
+  await expect(guide.getByRole("heading", { name: "地図と経路変更" })).toBeVisible();
+  await expect(guide.getByRole("heading", { name: "一覧とスワイプ" })).toBeVisible();
+  await expect(guide.getByRole("heading", { name: "未送信GASデータ" })).toBeVisible();
+
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "200%";
+  });
+  const scrollMetrics = await guide.locator(".user-guide-body").evaluate((body) => {
+    const dialogElement = body.closest<HTMLElement>(".user-guide-dialog");
+    const dialogStyle = dialogElement ? getComputedStyle(dialogElement) : null;
+    const bodyStyle = getComputedStyle(body);
+    return {
+      dialogMaxHeight: dialogStyle?.maxHeight,
+      dialogOverflow: dialogStyle?.overflow,
+      bodyOverflowY: bodyStyle.overflowY,
+      bodyCanScroll: body.scrollHeight > body.clientHeight,
+    };
+  });
+  expect(scrollMetrics.dialogMaxHeight).not.toBe("none");
+  expect(scrollMetrics.dialogOverflow).toBe("hidden");
+  expect(["auto", "scroll"]).toContain(scrollMetrics.bodyOverflowY);
+  expect(scrollMetrics.bodyCanScroll).toBe(true);
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(guideButton).toBeFocused();
+});
+
 test("デモデータで地図・ピン・経路・ボトムシートを表示する", async ({
   page,
 }) => {

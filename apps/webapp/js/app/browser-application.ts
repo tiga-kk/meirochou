@@ -1,6 +1,7 @@
 import "../components/comipath-settings";
 import "../components/navigation-resume-dialog";
 import "../components/source-diff-dialog";
+import "../components/user-guide-dialog";
 import {
   DomRouteGuidanceView,
   buildRouteItineraryModel,
@@ -893,6 +894,16 @@ export class BrowserApplication {
         this.itineraryOpen = false;
         this.ui.showNavigation(this.getNavigationContext("preserve"));
       });
+    }
+    const userGuideButton = this.document.getElementById("btn-open-user-guide");
+    const userGuideDialog = getBrowserElement<BrowserElement>(
+      this.document,
+      "user-guide-dialog",
+    );
+    if (userGuideButton && userGuideDialog) {
+      userGuideButton.onclick = () => {
+        userGuideDialog.open = true;
+      };
     }
     this.setupEvents();
 
