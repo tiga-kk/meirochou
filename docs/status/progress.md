@@ -133,7 +133,7 @@ Task 11の検証結果は`9098ebe`時点のbaselineとして有効である。�
 
 Task 12は完了した。Stage 12A〜12Fで、BrowserApplicationの型境界、Event Day startup transition、Pending GAS request state、Route Guidanceのsnapshot/map asset境界、architecture checker、webapp test discoveryを整理した。デモ用manifest接続、起動失敗時の診断画面、地図領域の受け渡し、自動GAS送信と手動再送の表示状態分離も追加のE2E回帰修正として完了している。
 
-最終検証は、`npm run test:webapp`、`npm run test:route-guidance`、`npm run test:phase-05d-regressions`、`npm run check:webapp`、`npm run build:webapp`、`npm run verify:webapp:build`、`npm run verify:gas`、`npm run test:e2e:ci`（38 passed / 8 skipped）、`node scripts/audit-public-tree.mjs`、`git diff --check`で成功した。レビュー指摘対応として、resume pending filterの括弧と`removedFromSource=true`かつ明示的`pending`のfocused test、`startFromCurrentLocation()`のController所有入力境界、demo regression testの`BrowserApplication.prototype`依存を修正した。追加のfocused検証は26 tests passed、architecture/typecheck、CI相当E2Eは`status: passed`・失敗なしである。検証済みremote HEADは`16ba2f1`である。
+最終検証は、`npm run test:webapp`、`npm run test:route-guidance`、`npm run test:phase-05d-regressions`、`npm run check:webapp`、`npm run build:webapp`、`npm run verify:webapp:build`、`npm run verify:gas`、`npm run test:e2e:ci`（38 passed / 8 skipped）、`node scripts/audit-public-tree.mjs`、`git diff --check`で成功した。レビュー指摘対応として、resume pending filterの括弧と`removedFromSource=true`かつ明示的`pending`のfocused test、`startFromCurrentLocation()`のController所有入力境界、demo regression testの`BrowserApplication.prototype`依存を修正した。追加のfocused検証は27 tests passed、architecture/typecheck、CI相当E2Eは`status: passed`・失敗なしである。検証済みremote HEADは`d003c16`である。
 
 ### Task 9の状態
 
