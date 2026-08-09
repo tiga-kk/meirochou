@@ -178,6 +178,51 @@ describe("apps public behavior characterization", () => {
     );
   });
 
+  it("excludes removed circles from resume candidates even when their state is pending", async () => {
+    const { app } = createProductionAppFixture();
+    app.activeEventDaySession.setActiveEventDay(REF, {
+      ...createEmptyEventDayState(
+        { type: "csv", fileName: "circles.csv" },
+        "generation-1",
+        NOW,
+      ),
+      circles: [
+        { space: "E1-00", removedFromSource: true },
+        { space: "E1-01", removedFromSource: false },
+      ],
+      circleStates: { "E1-00": "pending", "E1-01": "pending" },
+    });
+    const initializeResumeStartup = vi
+      .spyOn(app.routeGuidanceController, "initializeResumeStartup")
+      .mockReturnValue({ kind: "idle" });
+
+    await app.init(
+      { bundleVersion: "bundle-v1", areas: [] },
+      REF,
+      {
+        registry: {
+          schemaVersion: 1,
+          events: [
+            {
+              eventId: REF.eventId,
+              displayName: "Demo",
+              mapBundle: "demo",
+              days: [{ dayId: REF.dayId, displayName: "Day 1" }],
+            },
+          ],
+        },
+        registryUrl: "",
+      },
+    );
+
+    expect(initializeResumeStartup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        circleStates: { "E1-00": "pending", "E1-01": "pending" },
+        pendingCircleSpaces: ["E1-01"],
+      }),
+    );
+  });
+
   it("delegates resume startup initialization to the route guidance controller and only updates the dialog", async () => {
     const repository = {
       load: vi.fn(() => ({
@@ -186,11 +231,8 @@ describe("apps public behavior characterization", () => {
           "generation-1",
           NOW,
         ),
-        circles: [
-          { space: "E1-00", removedFromSource: true },
-          { space: "E1-01", removedFromSource: false },
-        ],
-        circleStates: { "E1-00": "pending", "E1-01": "pending" },
+        circles: [{ space: "E1-01", removedFromSource: false }],
+        circleStates: { "E1-01": "pending" },
       })),
       save: vi.fn(),
       saveAndRememberLastOpened: vi.fn(),
@@ -252,7 +294,7 @@ describe("apps public behavior characterization", () => {
     expect(initializeResumeStartup).toHaveBeenCalledWith({
       eventDay: REF,
       bundleVersion: "bundle-v1",
-      circleStates: { "E1-00": "pending", "E1-01": "pending" },
+      circleStates: { "E1-01": "pending" },
       pendingCircleSpaces: ["E1-01"],
     });
     expect(dialog.targetSpace).toBe("E1-01");
