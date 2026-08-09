@@ -215,6 +215,20 @@ export class ChangeDestinationUseCase {
     return true;
   }
 
+  /** Cancels candidate selection and invalidates any late route calculation. */
+  cancelSelection(): boolean {
+    const snapshot = this.session.getSnapshot();
+    if (snapshot.selectionStatus === "idle") return false;
+    this.selectionToken += 1;
+    this.session.replaceSnapshot({
+      ...snapshot,
+      selectedDestination: snapshot.currentDestination,
+      selectedRoute: snapshot.currentRoute,
+      selectionStatus: "idle",
+    });
+    return true;
+  }
+
   /** Invalidates an in-flight candidate calculation. */
   invalidatePendingSelection(): void {
     this.selectionToken += 1;

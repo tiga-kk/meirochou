@@ -125,9 +125,15 @@
                   <i class="fa-brands fa-twitter"></i> Link
                 </a>
                 <div id="route-selection-controls" class="route-selection-controls hidden">
-                  <button type="button" id="btn-preview-route" class="btn btn-primary" disabled>
-                    <i class="fa-solid fa-route"></i> 経路変更
-                  </button>
+                  <div class="candidate-selection-label">候補</div>
+                  <div class="candidate-selection-actions">
+                    <button type="button" id="btn-preview-route" class="btn btn-primary" disabled>
+                      <i class="fa-solid fa-route"></i> 経路を比較
+                    </button>
+                    <button type="button" id="btn-close-route-selection" class="btn btn-secondary">
+                      閉じる
+                    </button>
+                  </div>
                   <p id="route-selection-message" class="route-selection-message" aria-live="polite"></p>
                 </div>
               </div>

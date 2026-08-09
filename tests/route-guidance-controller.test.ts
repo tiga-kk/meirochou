@@ -192,6 +192,7 @@ describe("RouteGuidanceController", () => {
       compare: vi.fn(() => true),
       confirm: vi.fn(() => circles[1]),
       cancelComparison: vi.fn(() => true),
+      cancelSelection: vi.fn(() => true),
       changeManually: vi.fn(async () => ({ kind: "changed" as const })),
       invalidatePendingSelection: vi.fn(),
     };
@@ -216,6 +217,8 @@ describe("RouteGuidanceController", () => {
     expect(changeDestination.compare).toHaveBeenCalledOnce();
     expect(changeDestination.confirm).toHaveBeenCalledOnce();
     expect(changeDestination.cancelComparison).toHaveBeenCalledOnce();
+    expect(controller.cancelDestinationSelection()).toBe(true);
+    expect(changeDestination.cancelSelection).toHaveBeenCalledOnce();
     expect(changeDestination.changeManually).toHaveBeenCalledWith({
       circleSpace: circles[1].space,
       circles,
@@ -433,6 +436,35 @@ describe("ChangeDestinationUseCase", () => {
       selectedRoute: ready.selectedRoute,
       selectionStatus: "ready",
     });
+  });
+
+  it("closes a loading candidate and ignores its late route result", async () => {
+    let resolveLoad!: (assets: typeof routeAssets) => void;
+    const pendingLoad = new Promise<typeof routeAssets>((resolve) => {
+      resolveLoad = resolve;
+    });
+    const { session, useCase } = createChangeDestinationFixture({
+      loadMapAssets: vi.fn(() => pendingLoad),
+    });
+    const before = session.getSnapshot();
+    const selection = useCase.execute({ circleSpace: circles[1].space, circles });
+
+    await vi.waitFor(() =>
+      expect(session.getSnapshot().selectionStatus).toBe("loading"),
+    );
+    expect(useCase.cancelSelection()).toBe(true);
+    expect(session.getSnapshot()).toMatchObject({
+      currentDestination: before.currentDestination,
+      currentRoute: before.currentRoute,
+      selectedDestination: before.currentDestination,
+      selectedRoute: before.currentRoute,
+      navigationState: before.navigationState,
+      selectionStatus: "idle",
+    });
+
+    resolveLoad(routeAssets);
+    await expect(selection).resolves.toEqual({ kind: "stale" });
+    expect(session.getSnapshot().selectionStatus).toBe("idle");
   });
 
   it("commits a manually changed route and navigation state together", async () => {

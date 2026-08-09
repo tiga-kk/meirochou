@@ -56,6 +56,9 @@ export class DomRouteGuidanceView {
       ),
       routeSelectionMessage: document.getElementById("route-selection-message"),
       btnPreviewRoute: document.getElementById("btn-preview-route"),
+      btnCloseRouteSelection: document.getElementById(
+        "btn-close-route-selection",
+      ),
       routeChangeConfirmation: document.getElementById(
         "route-change-confirmation",
       ),
@@ -99,6 +102,7 @@ export class DomRouteGuidanceView {
     this.onPreviewRoute = callbacks.onPreviewRoute || null;
     this.onConfirmRoute = callbacks.onConfirmRoute || null;
     this.onCancelRoute = callbacks.onCancelRoute || null;
+    this.onCloseRouteSelection = callbacks.onCloseRouteSelection || null;
 
     // サブマネージャーの初期化
     this.modalManager.setOnSetNextTargetCallback(this.onSetNextTarget);
@@ -151,6 +155,10 @@ export class DomRouteGuidanceView {
     }
     if (this.els.btnCancelRoute) {
       this.els.btnCancelRoute.onclick = () => this.onCancelRoute?.();
+    }
+    if (this.els.btnCloseRouteSelection) {
+      this.els.btnCloseRouteSelection.onclick = () =>
+        this.onCloseRouteSelection?.();
     }
   }
 
@@ -244,6 +252,7 @@ export class DomRouteGuidanceView {
 
     if (!currentTarget) {
       // 全完了時の表示
+      this.els.targetSection.classList.remove("candidate-selection");
       this.els.heading.textContent = "COMPLETE";
       if (this.els.targetStatusLabel)
         this.els.targetStatusLabel.textContent = "完了";
@@ -294,12 +303,13 @@ export class DomRouteGuidanceView {
       startSpace,
       isPreview ? null : nextTarget,
       {
-        statusLabel: isPreview ? "選択中" : "次の目的地",
+        statusLabel: isPreview ? "候補" : "次の目的地",
         distanceLabel,
       },
     );
 
     const comparing = selectionState === "comparing";
+    this.els.targetSection.classList.toggle("candidate-selection", isPreview);
     this.els.routeSelectionControls?.classList.toggle(
       "hidden",
       !isPreview || comparing,
@@ -311,6 +321,9 @@ export class DomRouteGuidanceView {
       this.els.routeSelectionMessage.textContent =
         selectionMessage ||
         (selectionState === "loading" ? "候補経路を計算中…" : "");
+    }
+    if (this.els.btnCloseRouteSelection) {
+      this.els.btnCloseRouteSelection.disabled = comparing;
     }
     this.els.routeChangeConfirmation?.classList.toggle("hidden", !comparing);
     if (comparing) {

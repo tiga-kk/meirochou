@@ -357,7 +357,17 @@ export class DomRouteMapView {
       this.applyPinSize(button, pin.state);
       button.setAttribute(
         "aria-label",
-        pin.state === "start" ? `出発地点 ${pin.space}` : pin.space,
+        pin.state === "start"
+          ? `出発地点 ${pin.space}`
+          : pin.state === "next"
+            ? `現在の目的地 ${pin.space}`
+            : pin.state === "selected"
+              ? `候補選択中 ${pin.space}`
+              : pin.state === "done"
+                ? `購入済み ${pin.space}`
+                : pin.state === "hold"
+                  ? `保留中 ${pin.space}`
+                  : `候補として選択可能 ${pin.space}`,
       );
       if (pin.circle && selectionState !== "comparing") {
         button.onclick = (event) => {

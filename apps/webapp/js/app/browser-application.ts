@@ -837,6 +837,7 @@ export class BrowserApplication {
       onPreviewRoute: () => this.handlePreviewRoute(),
       onConfirmRoute: () => this.handleConfirmRoute(),
       onCancelRoute: () => this.handleCancelRoute(),
+      onCloseRouteSelection: () => this.handleCloseRouteSelection(),
     });
     this.setupEvents();
 
@@ -1086,6 +1087,13 @@ export class BrowserApplication {
   handleCancelRoute() {
     if (!this.routeGuidanceController.cancelDestinationComparison()) return;
     this.ui.showNavigation(this.getNavigationContext("comparison"));
+  }
+
+  /** Close the candidate panel and invalidate any pending candidate route. */
+  handleCloseRouteSelection() {
+    if (!this.routeGuidanceController.cancelDestinationSelection()) return;
+    this.selectionMessage = "";
+    this.ui.showNavigation(this.getNavigationContext("current"));
   }
 
   /**

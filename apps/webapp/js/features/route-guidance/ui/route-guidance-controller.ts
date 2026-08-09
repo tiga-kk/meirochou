@@ -124,6 +124,10 @@ export class RouteGuidanceController {
     return this.deps.changeDestination.cancelComparison();
   }
 
+  cancelDestinationSelection(): boolean {
+    return this.deps.changeDestination.cancelSelection();
+  }
+
   /** Rebuilds and commits a manually selected destination. */
   async setManualDestination(
     circleSpace: string,
