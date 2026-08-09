@@ -415,12 +415,23 @@ export function setupResizableMap(container, header) {
 /**
  * スワイプアクションを設定
  */
-export function setupSwipeAction(element, callback) {
+export function setupSwipeAction(element, callback, options = {}) {
   let startX = 0;
   let startY = 0;
   let currentX = 0;
   let isSwiping = false;
-  const threshold = 100; // アクション発火閾値
+  let gestureAxis = null;
+  let allowedDirection = "both";
+  let callbackStarted = false;
+  const resistance = Math.max(0, Math.min(options.resistance ?? 0.6, 1));
+  const getAllowedDirection = options.getAllowedDirection || (() => "both");
+
+  const reset = () => {
+    element.style.transform = "";
+    element.style.opacity = "1";
+    element.style.transition = "transform 0.3s ease-out, opacity 0.3s";
+    callbackStarted = false;
+  };
 
   element.addEventListener(
     "touchstart",
@@ -429,6 +440,9 @@ export function setupSwipeAction(element, callback) {
       startY = e.touches[0].clientY;
       currentX = 0;
       isSwiping = false;
+      gestureAxis = null;
+      callbackStarted = false;
+      allowedDirection = getAllowedDirection(element) || "both";
       element.style.transition = "none";
     },
     { passive: true },
@@ -442,20 +456,27 @@ export function setupSwipeAction(element, callback) {
       const deltaX = x - startX;
       const deltaY = y - startY;
 
-      if (!isSwiping && Math.abs(deltaY) > Math.abs(deltaX)) {
+      if (!gestureAxis && Math.max(Math.abs(deltaX), Math.abs(deltaY)) > 8) {
+        gestureAxis = Math.abs(deltaY) > Math.abs(deltaX) ? "vertical" : "horizontal";
+      }
+      if (gestureAxis === "vertical") {
         return;
       }
 
-      if (!isSwiping && Math.abs(deltaX) > 10) {
+      if (!isSwiping && gestureAxis === "horizontal") {
         isSwiping = true;
       }
 
       if (isSwiping) {
         if (e.cancelable) e.preventDefault();
-        currentX = deltaX;
-        element.style.transform = `translateX(${deltaX}px)`;
+        currentX = deltaX * resistance;
+        element.style.transform = `translateX(${currentX}px)`;
 
-        if (Math.abs(deltaX) > threshold) {
+        const threshold = Math.max(
+          options.minimumThreshold ?? 100,
+          Math.min((element.getBoundingClientRect().width || 0) * 0.4, 180),
+        );
+        if (Math.abs(currentX) > threshold) {
           element.style.opacity = "0.6";
         } else {
           element.style.opacity = "1";
@@ -466,23 +487,31 @@ export function setupSwipeAction(element, callback) {
   );
 
   element.addEventListener("touchend", () => {
-    element.style.transition = "transform 0.3s ease-out, opacity 0.3s";
-    element.style.opacity = "1";
-
     if (isSwiping) {
-      if (Math.abs(currentX) > threshold) {
-        const direction = currentX > 0 ? 1 : -1;
-        element.style.transform = `translateX(${direction * 100}%)`;
-        setTimeout(() => {
-          callback();
-          setTimeout(() => {
-            if (element.parentNode) element.style.transform = "";
-          }, 500);
-        }, 50);
-      } else {
-        element.style.transform = "";
+      const threshold = Math.max(
+        options.minimumThreshold ?? 100,
+        Math.min((element.getBoundingClientRect().width || 0) * 0.4, 180),
+      );
+      const direction = currentX > 0 ? "right" : "left";
+      const permitted = allowedDirection === "both" || allowedDirection === direction;
+      if (!callbackStarted && permitted && Math.abs(currentX) > threshold) {
+        callbackStarted = true;
+        const directionSign = currentX > 0 ? 1 : -1;
+        element.style.transform = `translateX(${directionSign * 100}%)`;
+        try {
+          const result = callback();
+          if (result && typeof result.then === "function") {
+            result.then(reset, reset);
+          } else {
+            setTimeout(reset, 500);
+          }
+        } catch {
+          reset();
+        }
       }
     }
+    if (!callbackStarted) reset();
     isSwiping = false;
+    gestureAxis = null;
   });
 }

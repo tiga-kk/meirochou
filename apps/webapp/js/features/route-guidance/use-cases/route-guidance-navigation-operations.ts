@@ -301,6 +301,21 @@ export class RouteGuidanceNavigationOperations {
     });
   }
 
+  /** Removes a non-current purchased circle from future order views only. */
+  removePurchasedSpace(
+    navState: NavigationState,
+    purchasedSpace: string,
+  ): NavigationState {
+    if (!purchasedSpace || purchasedSpace === navState.targetSpace) return navState;
+    return Object.freeze({
+      ...navState,
+      provisionalOrder: Object.freeze(
+        removeFromOrder(navState.provisionalOrder, purchasedSpace),
+      ),
+      bestOrder: Object.freeze(removeFromOrder(navState.bestOrder, purchasedSpace)),
+    });
+  }
+
   /**
    * 手動目的地変更。マトリクス再生成は発生させず、新 target を fixedFirstTarget として更新する。
    */

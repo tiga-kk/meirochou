@@ -501,6 +501,29 @@ export class BrowserApplication {
       nextStatus: "purchased",
       expectedSourceGeneration: this.activeState.sourceGeneration,
     });
+    const routeResult = result.routeGuidanceResult;
+    this.ui.updateCounts(this);
+    this.updateManagementModels();
+    if (routeResult.kind === "ignored") {
+      this.routeGuidanceController.removePurchasedSpaceFromOrder(space);
+      this.ui.showNavigation(this.getNavigationContext("preserve"));
+      this.saveNavigationSnapshot();
+    } else if (routeResult.kind === "advanced") {
+      this.ui.updateCurrentLocation(space);
+      this.ui.showNavigation(this.getNavigationContext("current"));
+      this.saveNavigationSnapshot();
+    } else if (routeResult.kind === "finished") {
+      this.ui.updateCurrentLocation(space);
+      this.ui.showTarget(null);
+      this.saveNavigationSnapshot();
+    } else if (routeResult.kind === "failed") {
+      this.ui.showToast(
+        routeResult.reason === "arrival-position-unavailable"
+          ? "現在地を確定できないため、次の案内へ進めません"
+          : "次の目的地への経路を再構築できませんでした。現在の案内を保持します",
+        "error",
+      );
+    }
     return result.statusResult.state;
   }
 
@@ -1567,14 +1590,21 @@ export class BrowserApplication {
 
     this.ui.updateCounts(this);
     this.updateManagementModels();
-    this.ui.updateCurrentLocation(space); // 現在地を更新
-
     if (isDevDemoEnabled(this.window.location)) {
       void this.handleDevDemoAction(space);
       return;
     }
 
     const routeResult = visitResult.routeGuidanceResult;
+    if (routeResult.kind !== "ignored") {
+      this.ui.updateCurrentLocation(space); // 現在地を更新
+    }
+    if (type === "purchase" && routeResult.kind === "ignored") {
+      this.routeGuidanceController.removePurchasedSpaceFromOrder(space);
+      this.ui.showNavigation(this.getNavigationContext("preserve"));
+      this.saveNavigationSnapshot();
+      return;
+    }
     if (routeResult.kind === "advanced") {
       this.ui.showNavigation(this.getNavigationContext("current"));
       this.saveNavigationSnapshot();

@@ -291,6 +291,7 @@ export function assembleComiPathApplication(
       orchestrationService,
     ),
     session: routeGuidanceSession,
+    navigationOperations: orchestrationService,
     invalidateGuidance: new InvalidateRouteGuidanceUseCase(
       routeGuidanceSession,
     ),

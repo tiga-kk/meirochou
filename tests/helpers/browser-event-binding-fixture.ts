@@ -134,6 +134,7 @@ export function createBrowserApplicationOptions(
       orchestrationService,
     ),
     session: routeGuidanceSession,
+    navigationOperations: orchestrationService,
     invalidateGuidance: new InvalidateRouteGuidanceUseCase(
       routeGuidanceSession,
     ),

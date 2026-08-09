@@ -23,6 +23,7 @@ import type {
   ResumeRouteGuidanceUseCase,
 } from "../use-cases/resume-route-guidance";
 import type { StartRouteGuidanceUseCase } from "../use-cases/start-route-guidance";
+import type { RouteGuidanceNavigationOperations } from "../use-cases/route-guidance-navigation-operations";
 
 export interface RouteGuidanceControllerDependencies {
   startGuidance: StartRouteGuidanceUseCase;
@@ -33,6 +34,7 @@ export interface RouteGuidanceControllerDependencies {
   invalidateGuidance?: InvalidateRouteGuidanceUseCase;
   applyOptimizedOrder?: ApplyOptimizedRouteOrderUseCase;
   navigationRuntimeController: RouteGuidanceRuntimePort;
+  navigationOperations?: RouteGuidanceNavigationOperations;
 }
 
 export interface InitializeResumeStartupInput {
@@ -126,6 +128,21 @@ export class RouteGuidanceController {
 
   cancelDestinationSelection(): boolean {
     return this.deps.changeDestination.cancelSelection();
+  }
+
+  removePurchasedSpaceFromOrder(space: string): boolean {
+    const session = this.deps.session;
+    const operations = this.deps.navigationOperations;
+    const snapshot = session?.getSnapshot();
+    if (!session || !operations || !snapshot?.navigationState) return false;
+    session.replaceSnapshot({
+      ...snapshot,
+      navigationState: operations.removePurchasedSpace(
+        snapshot.navigationState,
+        space,
+      ),
+    });
+    return true;
   }
 
   /** Rebuilds and commits a manually selected destination. */

@@ -346,6 +346,112 @@ describe("circle-status production integration", () => {
     );
   });
 
+  test("removes a non-current gallery purchase from future navigation order", async () => {
+    const fixture = createSetup(
+      { type: "csv", fileName: "day1.csv" },
+      new MockStorageAdapter(),
+      [
+        { space: "東A01a", priority: 1 },
+        { space: "東A02b", priority: 2 },
+      ],
+    );
+    const currentRoute = {
+      cost: 10,
+      cells: [{ col: 0, row: 0 }, { col: 1, row: 0 }],
+      points: [{ x: 5, y: 5 }, { x: 15, y: 5 }],
+      startPosition: { x: 5, y: 5 },
+      targetPosition: { x: 15, y: 5 },
+      image: { width: 30, height: 10 },
+    };
+    fixture.app.routeGuidanceSession.replaceSnapshot({
+      navigationState: {
+        stage: "navigating",
+        areaId: "east",
+        currentPosition: {
+          areaId: "east",
+          gridIndex: 0,
+          svgX: 5,
+          svgY: 5,
+          source: "manual-start",
+        },
+        targetSpace: "東A01a",
+        lockedFirstLeg: {
+          from: { type: "start", areaId: "east", gridIndex: 0 },
+          toSpace: "東A01a",
+        },
+        provisionalOrder: ["東A01a", "東A02b"],
+        bestOrder: ["東A01a", "東A02b"],
+        optimizationGeneration: 1,
+      },
+      currentDestination: { space: "東A01a" },
+      currentRoute,
+      selectedDestination: { space: "東A01a" },
+      selectedRoute: currentRoute,
+      selectionStatus: "idle",
+      routeOptimizationGeneration: 1,
+    });
+    fixture.app.routeMapAreaCatalog.replaceMapAreas([
+      { id: "east", prefixes: ["東"], labels: ["A"] },
+    ]);
+    vi.spyOn(fixture.app.routeMapAssetsLoader, "loadMapAssets").mockResolvedValue({
+      points: {
+        image: { width: 30, height: 10 },
+        points: [
+          {
+            identifier: "A",
+            number: 1,
+            center_x: 15,
+            center_y: 5,
+            portals: [{ col: 1, row: 0, x: 15, y: 5 }],
+          },
+          {
+            identifier: "A",
+            number: 2,
+            center_x: 25,
+            center_y: 5,
+            portals: [{ col: 2, row: 0, x: 25, y: 5 }],
+          },
+        ],
+      },
+      gridMetadata: {
+        width: 30,
+        height: 10,
+        cell_size: 10,
+        cols: 3,
+        rows: 1,
+      },
+      gridBytes: new Uint8Array([1, 1, 1]),
+    });
+    const saveSnapshot = vi.spyOn(fixture.app, "saveNavigationSnapshot");
+
+    await fixture.app.addPurchased("東A02b");
+
+    const snapshot = fixture.app.routeGuidanceSession.getSnapshot();
+    expect(fixture.repository.load(REF)?.circleStates["東A02b"]).toBe("purchased");
+    expect(snapshot.navigationState).toMatchObject({
+      targetSpace: "東A01a",
+      lockedFirstLeg: { toSpace: "東A01a" },
+      bestOrder: ["東A01a"],
+      provisionalOrder: ["東A01a"],
+    });
+    expect(snapshot.currentDestination).toEqual({ space: "東A01a" });
+    expect(snapshot.currentRoute).toEqual(currentRoute);
+    expect(saveSnapshot).toHaveBeenCalledOnce();
+
+    await fixture.app.addPurchased("東A01a");
+
+    const finishedSnapshot = fixture.app.routeGuidanceSession.getSnapshot();
+    expect(fixture.repository.load(REF)?.circleStates).toMatchObject({
+      "東A01a": "purchased",
+      "東A02b": "purchased",
+    });
+    expect(finishedSnapshot.navigationState?.targetSpace).toBeNull();
+    expect(finishedSnapshot.currentDestination).toBeNull();
+    expect(finishedSnapshot.currentRoute).toBeNull();
+    expect(finishedSnapshot.navigationState?.bestOrder).not.toContain("東A02b");
+    expect(finishedSnapshot.navigationState?.provisionalOrder).not.toContain("東A02b");
+  });
+
   test("keeps purchase progress when background notification throws synchronously", async () => {
     const fixture = createSetup({
       type: "gas",
