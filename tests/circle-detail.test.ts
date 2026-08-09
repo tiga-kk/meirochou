@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, test, vi } from "vitest";
 import { CircleDetailDialog } from "../apps/webapp/js/components/circle-detail-dialog";
-import type { CircleRecord } from "../apps/webapp/js/types/domain";
+import type { CircleRecord } from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 
 describe("Phase 5C Task 3: Circle Detail Dialog Component", () => {
   const sampleCircle: CircleRecord = {

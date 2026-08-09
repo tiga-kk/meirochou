@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import "../apps/webapp/js/components/storage-delete-dialog";
 import type { StorageDeleteDialog } from "../apps/webapp/js/components/storage-delete-dialog";
-import type { ManagementEventDetailMap } from "../apps/webapp/js/ui/management-events";
+import type { ManagementEventDetailMap } from "../apps/webapp/js/shared/ui/management-events";
 
 describe("StorageDeleteDialog Component (Lit)", () => {
   it("renders closed when model is closed or null", async () => {

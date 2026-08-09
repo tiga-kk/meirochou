@@ -1,14 +1,14 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
-  SourceManager,
-  SourceManagerModel,
-} from "../apps/webapp/js/components/source-manager";
-import type { SourceSummaryViewModel } from "../apps/webapp/js/ui/management-view-model";
-import "../apps/webapp/js/components/source-manager";
+  CircleDataSourcePanel,
+  CircleDataSourcePanelModel,
+} from "../apps/webapp/js/components/circle-data-source-panel";
+import type { SourceSummaryViewModel } from "../apps/webapp/js/shared/ui/management-view-model";
+import "../apps/webapp/js/components/circle-data-source-panel";
 
-describe("SourceManager Component", () => {
-  let element: SourceManager;
+describe("CircleDataSourcePanel Component", () => {
+  let element: CircleDataSourcePanel;
 
   const sampleCsvSource: SourceSummaryViewModel = {
     typeLabel: "CSV",
@@ -17,7 +17,7 @@ describe("SourceManager Component", () => {
     pendingCount: 0,
   };
 
-  const defaultModel: SourceManagerModel = {
+  const defaultModel: CircleDataSourcePanelModel = {
     activeRef: { eventId: "c104", dayId: "day1" },
     activeRefLabel: "C104 1日目",
     source: sampleCsvSource,
@@ -33,7 +33,7 @@ describe("SourceManager Component", () => {
 
   beforeEach(async () => {
     document.body.innerHTML = "";
-    element = document.createElement("source-manager") as SourceManager;
+    element = document.createElement("source-manager") as CircleDataSourcePanel;
     element.model = defaultModel;
     document.body.appendChild(element);
     await element.updateComplete;
@@ -161,6 +161,48 @@ describe("SourceManager Component", () => {
     await element.updateComplete;
 
     expect(element.querySelector("#gas-sheet-select")).toBeNull();
+  });
+
+  it("keeps dirty GAS inputs when a busy model rerender supplies empty values", async () => {
+    const initialUrl =
+      "https://script.google.com/macros/s/AKfycbx_INITIAL/exec";
+    element.model = {
+      ...defaultModel,
+      sourceType: "gas",
+      gasUrlInput: initialUrl,
+      sheetNames: ["配置シート1"],
+      selectedSheetName: "配置シート1",
+    };
+    await element.updateComplete;
+
+    const urlInput = element.querySelector<HTMLInputElement>("#gas-url-input");
+    const sheetSelect = element.querySelector<HTMLSelectElement>(
+      "#gas-sheet-select",
+    );
+    expect(urlInput).not.toBeNull();
+    expect(sheetSelect).not.toBeNull();
+    if (!urlInput || !sheetSelect) return;
+
+    const draftUrl = "https://script.google.com/macros/s/AKfycbx_DRAFT/exec";
+    urlInput.value = draftUrl;
+    urlInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await element.updateComplete;
+    sheetSelect.value = "配置シート1";
+    sheetSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await element.updateComplete;
+
+    element.model = {
+      ...element.model,
+      busy: true,
+      gasUrlInput: "",
+      selectedSheetName: "",
+      sheetNames: [],
+    };
+    await element.updateComplete;
+
+    expect(element.querySelector<HTMLInputElement>("#gas-url-input")?.value).toBe(
+      draftUrl,
+    );
   });
 
   it("dispatches gas-preview-request when sheet is selected and preview button clicked", async () => {

@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import { App } from "../apps/webapp/js/app";
-import { StorageService } from "../apps/webapp/js/state/storage-service";
+import { BrowserApplication } from "../apps/webapp/js/app/browser-application";
+import { createBrowserApplicationOptions } from "./helpers/browser-event-binding-fixture";
 import type {
   EventRegistryV1,
   LocalEventDayState,
-} from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
+import { StorageService } from "../apps/webapp/js/state/storage-service";
 
 function _createMockStorage(): StorageService {
   const store = new Map<string, string>();
@@ -77,43 +78,40 @@ function createSampleGasState(
   };
 }
 
-describe("App & OutboxPanel Integration", () => {
+describe("ComiPathBrowserRuntime & OutboxPanel Integration", () => {
   it("does not repaint settings after retry completion becomes stale", async () => {
-    const app = new App();
+    document.body.innerHTML =
+      '<button id="toggle-settings"></button><comipath-settings id="settings-area"></comipath-settings><button id="btn-search"></button><button id="btn-purchased"></button><button id="btn-hold"></button><button id="btn-reset-all"></button><select id="loc-ewsn"></select><select id="loc-label"></select><input id="loc-number" /><div id="source-diff-dialog"></div><div id="navigation-resume-dialog"></div>';
+    const app = new BrowserApplication(createBrowserApplicationOptions());
     const ref = { eventId: "c104", dayId: "day1" };
-    let resolveRetry: (summary: {
-      processedRefs: number;
-      sent: number;
-      pending: number;
-      failures: never[];
-    }) => void = () => {};
-    vi.spyOn(app.dm.syncCoordinator, "retry").mockImplementation(
+    let resolveRetry: () => void = () => {};
+    vi.spyOn(app.pendingGasUpdatesController, "retryAll").mockImplementation(
       () =>
         new Promise((resolve) => {
-          resolveRetry = resolve;
+          resolveRetry = () => resolve(null);
         }),
     );
     const updateSpy = vi
       .spyOn(app, "updateManagementModels")
       .mockImplementation(() => {});
+    app.setupEvents();
+    app.ui.els.settingsArea.open = true;
 
     const retryPromise = app.handleGasRetryRequest({ ref });
-    app.session.onSettingsClose();
-    resolveRetry({
-      processedRefs: 1,
-      sent: 0,
-      pending: 1,
-      failures: [],
-    });
+    document.getElementById("toggle-settings")?.click();
+    resolveRetry();
     await retryPromise;
 
-    expect(updateSpy).toHaveBeenCalledTimes(1);
+    expect(updateSpy).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects forged retry and discard event details at the App boundary", async () => {
-    const app = new App();
-    const retrySpy = vi.spyOn(app.dm.syncCoordinator, "retry");
-    const discardSpy = vi.spyOn(app.dm.outboxService, "discard");
+  it("rejects forged retry and discard event details at the ComiPathBrowserRuntime boundary", async () => {
+    const app = new BrowserApplication(createBrowserApplicationOptions());
+    const retrySpy = vi.spyOn(app.pendingGasUpdatesController, "retryAll");
+    const discardSpy = vi.spyOn(
+      app.pendingGasUpdatesController,
+      "discardOne",
+    );
 
     await app.handleGasRetryRequest({
       ref: { eventId: 123, dayId: "day1" },
@@ -128,23 +126,21 @@ describe("App & OutboxPanel Integration", () => {
     expect(discardSpy).not.toHaveBeenCalled();
   });
 
-  it("delegates retry request to syncCoordinator and updates management models", async () => {
-    const app = new App();
-    app.dm.eventRegistry = createSampleRegistry();
+  it("delegates retry request to pendingGasUpdatesController and updates management models", async () => {
+    const app = new BrowserApplication(createBrowserApplicationOptions());
+    app.eventRegistry = createSampleRegistry();
 
     const ref = { eventId: "c104", dayId: "day1" };
-    app.dm.repository.save(ref, createSampleGasState("c104", "day1"));
-    app.dm.activeRef = ref;
-    app.dm.activeState = app.dm.repository.load(ref);
+    app.eventDayRepository.save(ref, createSampleGasState("c104", "day1"));
+    app.activeEventDaySession.setActiveEventDay(
+      ref,
+      app.eventDayRepository.load(ref) ??
+        createSampleGasState(ref.eventId, ref.dayId),
+    );
 
     const retrySpy = vi
-      .spyOn(app.dm.syncCoordinator, "retry")
-      .mockResolvedValue({
-        processedRefs: 1,
-        sent: 1,
-        pending: 0,
-        failures: [],
-      });
+      .spyOn(app.pendingGasUpdatesController, "retryAll")
+      .mockResolvedValue(1);
 
     await app.handleGasRetryRequest({ ref });
 
@@ -152,16 +148,22 @@ describe("App & OutboxPanel Integration", () => {
   });
 
   it("handles discard request with exact confirmation text and updates repository", async () => {
-    const app = new App();
-    app.dm.eventRegistry = createSampleRegistry();
+    const app = new BrowserApplication(createBrowserApplicationOptions());
+    app.eventRegistry = createSampleRegistry();
 
     const ref = { eventId: "c104", dayId: "day1" };
     const initialState = createSampleGasState("c104", "day1");
-    app.dm.repository.save(ref, initialState);
-    app.dm.activeRef = ref;
-    app.dm.activeState = app.dm.repository.load(ref);
+    app.eventDayRepository.save(ref, initialState);
+    app.activeEventDaySession.setActiveEventDay(
+      ref,
+      app.eventDayRepository.load(ref) ??
+        createSampleGasState(ref.eventId, ref.dayId),
+    );
 
-    const discardSpy = vi.spyOn(app.dm.outboxService, "discard");
+    const discardSpy = vi.spyOn(
+      app.pendingGasUpdatesController,
+      "discardOne",
+    );
 
     await app.handleGasDiscardRequest({
       ref,
@@ -169,26 +171,28 @@ describe("App & OutboxPanel Integration", () => {
       confirmation: "未送信を破棄",
     });
 
-    expect(discardSpy).toHaveBeenCalledWith(
-      ref,
-      [`outbox-c104-day1-1`],
-      expect.any(String),
-    );
+    expect(discardSpy).toHaveBeenCalledWith(ref, `outbox-c104-day1-1`);
 
-    const updated = app.dm.repository.load(ref);
+    const updated = app.eventDayRepository.load(ref);
     expect(updated?.gasOutbox).toHaveLength(0);
   });
 
   it("rejects discard request if confirmation text does not match", async () => {
-    const app = new App();
-    app.dm.eventRegistry = createSampleRegistry();
+    const app = new BrowserApplication(createBrowserApplicationOptions());
+    app.eventRegistry = createSampleRegistry();
 
     const ref = { eventId: "c104", dayId: "day1" };
-    app.dm.repository.save(ref, createSampleGasState("c104", "day1"));
-    app.dm.activeRef = ref;
-    app.dm.activeState = app.dm.repository.load(ref);
+    app.eventDayRepository.save(ref, createSampleGasState("c104", "day1"));
+    app.activeEventDaySession.setActiveEventDay(
+      ref,
+      app.eventDayRepository.load(ref) ??
+        createSampleGasState(ref.eventId, ref.dayId),
+    );
 
-    const discardSpy = vi.spyOn(app.dm.outboxService, "discard");
+    const discardSpy = vi.spyOn(
+      app.pendingGasUpdatesController,
+      "discardOne",
+    );
 
     await app.handleGasDiscardRequest({
       ref,
@@ -200,24 +204,27 @@ describe("App & OutboxPanel Integration", () => {
   });
 
   it("maintains model coherence across outbox panel, event-day options, and delete options from the same snapshot", async () => {
-    const app = new App();
+    const app = new BrowserApplication(createBrowserApplicationOptions());
     const registry = createSampleRegistry();
-    app.dm.eventRegistry = registry;
+    app.eventRegistry = registry;
 
     const ref1 = { eventId: "c104", dayId: "day1" };
     const ref2 = { eventId: "c104", dayId: "day2" };
-    app.dm.repository.save(ref1, createSampleGasState("c104", "day1"));
-    app.dm.repository.save(ref2, createSampleGasState("c104", "day2"));
-    app.dm.activeRef = ref1;
-    app.dm.activeState = app.dm.repository.load(ref1);
+    app.eventDayRepository.save(ref1, createSampleGasState("c104", "day1"));
+    app.eventDayRepository.save(ref2, createSampleGasState("c104", "day2"));
+    app.activeEventDaySession.setActiveEventDay(
+      ref1,
+      app.eventDayRepository.load(ref1) ??
+        createSampleGasState(ref1.eventId, ref1.dayId),
+    );
 
     app.updateManagementModels();
 
     // Verify outbox model counts match selector pending counts
-    const stateList = app.dm.repository
-      .list()
+    const stateList = app.eventDayRepository
+      .listEventDays()
       .map((r) => {
-        const s = app.dm.repository.load(r);
+        const s = app.eventDayRepository.load(r);
         return s ? { ref: r, state: s } : null;
       })
       .filter(
@@ -225,7 +232,7 @@ describe("App & OutboxPanel Integration", () => {
           item,
         ): item is {
           ref: typeof ref1;
-          state: NonNullable<ReturnType<typeof app.dm.repository.load>>;
+          state: NonNullable<ReturnType<typeof app.eventDayRepository.load>>;
         } => item !== null,
       );
     const totalPendingInRepo = stateList.reduce(

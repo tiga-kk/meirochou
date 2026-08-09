@@ -4,18 +4,20 @@ import type {
   GasOutboxEntry,
   LocalEventDayState,
   SourceDiff,
-} from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import {
   dispatchManagementEvent,
   type ManagementEventDetailMap,
-} from "../apps/webapp/js/ui/management-events";
+} from "../apps/webapp/js/shared/ui/management-events";
 import {
   buildDeleteOptions,
   buildEventDayOptions,
+  buildSourceManagerPanelModel,
+  buildStorageDeleteDialogModel,
   formatOutbox,
   formatSourceDiff,
   formatSourceSummary,
-} from "../apps/webapp/js/ui/management-view-model";
+} from "../apps/webapp/js/shared/ui/management-view-model";
 
 const sampleRegistry: EventRegistryV1 = {
   schemaVersion: 1,
@@ -238,6 +240,69 @@ describe("formatSourceSummary", () => {
   });
 });
 
+describe("buildSourceManagerPanelModel", () => {
+  it("builds the settings source panel model from persisted state and session draft", () => {
+    const model = buildSourceManagerPanelModel({
+      activeRef: { eventId: "c104", dayId: "day1" },
+      activeRefLabel: "コミックマーケット104 1日目 (日)",
+      activeState: sampleGasState,
+      sourceDraft: {
+        draftWebAppUrl: "",
+        selectedSheetName: "",
+        sheetNames: ["配置シート1", "配置シート2"],
+        busy: true,
+        errorMessage: null,
+      },
+      transitionBusy: false,
+    });
+
+    expect(model).toEqual({
+      activeRef: { eventId: "c104", dayId: "day1" },
+      activeRefLabel: "コミックマーケット104 1日目 (日)",
+      source: {
+        typeLabel: "Googleスプレッドシート",
+        detail: "配置シート1",
+        endpointSummary: "script.google.com",
+        pendingCount: 1,
+      },
+      sourceType: "gas",
+      gasUrlInput:
+        "https://script.google.com/macros/s/AKfycbx_SECRET_DEPLOYMENT_ID_12345/exec?token=SECRET_QUERY_TOKEN#secret_fragment",
+      selectedSheetName: "配置シート1",
+      sheetNames: ["配置シート1", "配置シート2"],
+      pendingCount: 1,
+      canExportCsv: true,
+      busy: true,
+      errorMessage: "",
+    });
+  });
+
+  it("prefers the in-flight draft and transition busy state over persisted source values", () => {
+    const model = buildSourceManagerPanelModel({
+      activeRef: { eventId: "c104", dayId: "day1" },
+      activeRefLabel: "コミックマーケット104 1日目 (日)",
+      activeState: sampleGasState,
+      sourceDraft: {
+        draftWebAppUrl:
+          "https://script.google.com/macros/s/AKfycbx_NEW_DEPLOYMENT/exec",
+        selectedSheetName: "差し替え候補",
+        sheetNames: [],
+        busy: false,
+        errorMessage: "network_error",
+      },
+      transitionBusy: true,
+      sourceErrorMessage: "フォールバック表示",
+    });
+
+    expect(model.gasUrlInput).toBe(
+      "https://script.google.com/macros/s/AKfycbx_NEW_DEPLOYMENT/exec",
+    );
+    expect(model.selectedSheetName).toBe("差し替え候補");
+    expect(model.busy).toBe(true);
+    expect(model.errorMessage).toBe("network_error");
+  });
+});
+
 describe("formatSourceDiff", () => {
   it("formats source diff with added, updated, and removed circles", () => {
     const diff: SourceDiff = {
@@ -442,6 +507,67 @@ describe("buildDeleteOptions", () => {
     expect(Object.isFrozen(circlesScope)).toBe(true);
     expect(Object.isFrozen(circlesScope.ref)).toBe(true);
     expect(Object.isFrozen(options[3].scope)).toBe(true);
+  });
+});
+
+describe("buildStorageDeleteDialogModel", () => {
+  it("builds a closed delete dialog when no scope is selected", () => {
+    const options = buildDeleteOptions({
+      selected: { eventId: "c104", dayId: "day1" },
+      eventDayCount: 2,
+      activeCircleCount: 1,
+      activityCount: 1,
+      selectedPendingCount: 0,
+      totalPendingCount: 0,
+    });
+
+    const model = buildStorageDeleteDialogModel({
+      selectedScope: null,
+      deleteOptions: options,
+      eventDayLabel: "コミックマーケット104 1日目 (日)",
+      busy: false,
+      errorMessage: "",
+    });
+
+    expect(model).toEqual({
+      open: false,
+      scope: null,
+      option: null,
+      eventDayLabel: "コミックマーケット104 1日目 (日)",
+      busy: false,
+      errorMessage: "",
+    });
+  });
+
+  it("selects the matching delete option for the chosen scope", () => {
+    const options = buildDeleteOptions({
+      selected: { eventId: "c104", dayId: "day1" },
+      eventDayCount: 2,
+      activeCircleCount: 1,
+      activityCount: 3,
+      selectedPendingCount: 0,
+      totalPendingCount: 0,
+    });
+
+    const model = buildStorageDeleteDialogModel({
+      selectedScope: {
+        type: "activity",
+        ref: { eventId: "c104", dayId: "day1" },
+      },
+      deleteOptions: options,
+      eventDayLabel: "コミックマーケット104 1日目 (日)",
+      busy: true,
+      errorMessage: "削除エラー",
+    });
+
+    expect(model.open).toBe(true);
+    expect(model.scope).toEqual({
+      type: "activity",
+      ref: { eventId: "c104", dayId: "day1" },
+    });
+    expect(model.option?.label).toContain("購入・チェック履歴の削除");
+    expect(model.busy).toBe(true);
+    expect(model.errorMessage).toBe("削除エラー");
   });
 });
 

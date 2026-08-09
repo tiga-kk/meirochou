@@ -1,8 +1,3 @@
-import {
-  parseDayId,
-  parseEventId,
-  parseSourceGeneration,
-} from "../types/boundary-parsers";
 import type {
   CircleRecord,
   CircleStateOverrides,
@@ -12,7 +7,12 @@ import type {
   GasDataSource,
   GasOutboxEntry,
   LocalEventDayState,
-} from "../types/domain";
+} from "../features/event-day/domain/application-contract-types";
+import {
+  parseDayId,
+  parseEventId,
+  parseSourceGeneration,
+} from "../features/event-day/infrastructure/application-boundary-parsers";
 
 export class StorageSchemaError extends Error {
   constructor(message: string) {

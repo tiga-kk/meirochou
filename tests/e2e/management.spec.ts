@@ -108,16 +108,6 @@ async function routeGas(
 }
 
 async function openSettings(page: Page): Promise<void> {
-  await expect
-    .poll(() =>
-      page
-        .locator("#toggle-settings")
-        .evaluate(
-          (element) =>
-            typeof (element as HTMLButtonElement).onclick === "function",
-        ),
-    )
-    .toBe(true);
   await page.locator("#toggle-settings").click();
   const settings = page.locator("#settings-area");
   await expect(settings).toHaveClass(/show/);
@@ -166,7 +156,7 @@ test.describe("Mobile Management Flows", () => {
 
     const sourceManager = page.locator("source-manager");
     const csvContent =
-      "space,priority,isSale,account,tweet,memo\r\n東ア01a,1,x,@test,tweet1,memo1\r\n東ア02b,2,,,,\r\n";
+      "space,priority,isSale,account,tweet,memo\r\n東ア01a,1,,@test,tweet1,memo1\r\n東ア02b,2,,,,\r\n";
     await sourceManager.locator('input[type="file"]').setInputFiles({
       name: "circles.csv",
       mimeType: "text/csv",
@@ -448,6 +438,7 @@ test.describe("Mobile Management Flows", () => {
     await openSettings(page);
     const outboxPanel = page.locator("outbox-panel");
     await expect(outboxPanel).toContainText("GAS同期 キュー管理 (1件)");
+    await expect(outboxPanel).toContainText("サーバーエラー (500)");
     await expect(outboxPanel.locator(".outbox-panel")).toHaveScreenshot(
       "outbox-recovery-panel.png",
     );

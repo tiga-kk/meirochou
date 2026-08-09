@@ -94,6 +94,7 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   await page
     .locator("#toast")
     .evaluate((toast) => toast.classList.remove("show"));
+  await expect(page.locator("#toast")).toBeHidden();
   await expect(page.locator("#next-target")).toHaveScreenshot(
     "navigation-map-catalog.png",
   );
@@ -191,6 +192,7 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   await page
     .locator("#toast")
     .evaluate((toast) => toast.classList.remove("show"));
+  await expect(page.locator("#toast")).toBeHidden();
   await expect(page.locator("#next-target")).toHaveScreenshot(
     "navigation-map-route-candidate.png",
   );
@@ -209,6 +211,7 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   ).toHaveCSS("stroke-dasharray", "22px, 14px");
   await expect(page.locator("#btn-purchased")).toBeDisabled();
   await expect(page.locator("#btn-hold")).toBeDisabled();
+  await expect(page.locator("#toast")).toBeHidden();
   await expect(page.locator("#next-target")).toHaveScreenshot(
     "route-comparison.png",
   );

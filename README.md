@@ -66,4 +66,14 @@ npm run dev:webapp
 npm run build:webapp    # 本番ビルド
 npm run verify          # ユニットテスト・型チェック・ビルド検証
 npm run test:e2e        # モバイルChromium E2Eテスト
+npm run test:e2e:ci     # GitHub Actionsと同じPlaywrightコンテナでE2E
 ```
+
+visual snapshotを更新するときも、GitHub Actionsと同じ環境を使う。
+
+```bash
+npm run test:e2e:ci:update
+```
+
+`test:e2e:ci`にはDockerと、CIで固定している
+`mcr.microsoft.com/playwright:v1.61.1-noble`、Node.js `22.14.0`、npm `10.9.2`が必要になる。

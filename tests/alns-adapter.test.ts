@@ -3,8 +3,8 @@ import { describe, expect, test } from "vitest";
 import {
   TimeDecayedAlnsSolver,
   validateSearchTimeLimit,
-} from "../apps/webapp/js/routing/alns-solver";
-import type { TimeDecayedAlnsProblem } from "../apps/webapp/js/routing/time-decayed-objective";
+} from "../apps/webapp/js/features/route-guidance/domain/optimization/alns-solver";
+import type { TimeDecayedAlnsProblem } from "../apps/webapp/js/features/route-guidance/domain/optimization/time-decayed-objective";
 
 function makeProblem(
   overrides: Partial<TimeDecayedAlnsProblem> = {},

@@ -1,11 +1,11 @@
 // @vitest-environment node
 import { describe, expect, test } from "vitest";
-import { NavigationOrchestrationService } from "../apps/webapp/js/navigation/navigation-orchestration";
-import { createInitialNavigationState } from "../apps/webapp/js/state/navigation-state";
 import type {
   CircleRecord,
   ConfirmedPosition,
-} from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/event-day/domain/application-contract-types";
+import { createInitialNavigationState } from "../apps/webapp/js/features/route-guidance/domain/navigation-state";
+import { RouteGuidanceNavigationOperations as NavigationOrchestrationService } from "../apps/webapp/js/features/route-guidance/use-cases/route-guidance-navigation-operations";
 
 const startPos: ConfirmedPosition = {
   areaId: "e456",

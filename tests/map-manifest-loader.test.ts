@@ -5,7 +5,7 @@ import {
   loadEventMapBundleManifestFromUrl,
   loadMapBundleManifest,
   renderMapBootstrapError,
-} from "../apps/webapp/js/map-manifest-loader";
+} from "../apps/webapp/js/features/event-day/infrastructure/http-map-manifest-loader";
 
 const manifestPayload = {
   schemaVersion: 1,

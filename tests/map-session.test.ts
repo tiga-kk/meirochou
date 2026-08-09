@@ -1,12 +1,12 @@
 // @vitest-environment node
 import { describe, expect, test } from "vitest";
+import type { ConfirmedPosition } from "../apps/webapp/js/features/event-day/domain/application-contract-types";
 import {
   createMapSession,
   type MapSession,
   switchMapArea,
-} from "../apps/webapp/js/navigation/map-session";
-import { createInitialNavigationState } from "../apps/webapp/js/state/navigation-state";
-import type { ConfirmedPosition } from "../apps/webapp/js/types/domain";
+} from "../apps/webapp/js/features/route-guidance/domain/map-session";
+import { createInitialNavigationState } from "../apps/webapp/js/features/route-guidance/domain/navigation-state";
 
 const startPos: ConfirmedPosition = {
   areaId: "area1",

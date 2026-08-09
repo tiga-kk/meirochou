@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, test } from "vitest";
-import type { StoredDistanceMatrix } from "../apps/webapp/js/routing/distance-matrix";
-import { LocalStorageDistanceMatrixRepository } from "../apps/webapp/js/routing/distance-matrix-repository";
+import type { StoredDistanceMatrix } from "../apps/webapp/js/features/route-guidance/domain/routing/distance-matrix";
+import { LocalStorageDistanceMatrixRepository } from "../apps/webapp/js/features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
 
 /** 最小限のStoredDistanceMatrix fixture */
 function makeMatrix(cacheKey: string, areaId: string): StoredDistanceMatrix {

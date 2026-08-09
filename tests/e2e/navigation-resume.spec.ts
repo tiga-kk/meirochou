@@ -69,6 +69,18 @@ async function seedNavigation(page: Page): Promise<void> {
       );
       localStorage.setItem(stateKey, JSON.stringify(state));
       localStorage.setItem(snapshotKey, JSON.stringify(navSnapshot));
+      localStorage.setItem(
+        `comipath:matrix:${navSnapshot.matrixRef}`,
+        JSON.stringify({
+          schemaVersion: 1,
+          cacheKey: navSnapshot.matrixRef,
+          areaId: navSnapshot.areaId,
+          spaces: state.circles.map((circle) => circle.space),
+          size: state.circles.length,
+          distances: [0, 288, 288, 0],
+          createdAt: "2026-07-25T00:00:00.000Z",
+        }),
+      );
       // This is an unrelated localStorage sentinel, not a real matrix schema.
       localStorage.setItem(matrixKey, JSON.stringify({ retained: true }));
     },
@@ -107,13 +119,37 @@ test("valid snapshot resumes in the dialog, preserves target, and reappears afte
   const dialog = page.locator("#navigation-resume-dialog");
   await expect(dialog).toHaveAttribute("open", "");
   await expect(dialog).toContainText("東ア23a");
+  await expect(page.locator("#target-space-heading")).not.toContainText(
+    "東ア23a",
+  );
 
   await dialog.locator("button.btn-primary").click();
   await expect(dialog).not.toHaveAttribute("open", "");
   await expect(page.locator("#target-space-heading")).toContainText("東ア23a");
   await expect
-    .poll(() => page.evaluate((key) => localStorage.getItem(key), SNAPSHOT_KEY))
-    .toBe(JSON.stringify(snapshot));
+    .poll(() =>
+      page.evaluate(
+        (key) => JSON.parse(localStorage.getItem(key) || "null"),
+        SNAPSHOT_KEY,
+      ),
+    )
+    .toMatchObject({
+      navState: { optimizationGeneration: 1 },
+      savedAt: expect.any(String),
+    });
+  const savedSnapshot = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key) || "null"),
+    SNAPSHOT_KEY,
+  );
+  expect(savedSnapshot).toEqual({
+    ...snapshot,
+    navState: {
+      ...snapshot.navState,
+      optimizationGeneration: 1,
+    },
+    savedAt: expect.any(String),
+  });
+  expect(Number.isNaN(Date.parse(savedSnapshot.savedAt))).toBe(false);
 
   await page.reload();
   await expect(page.locator("#navigation-resume-dialog")).toHaveAttribute(

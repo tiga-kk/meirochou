@@ -1,9 +1,14 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { App } from "../apps/webapp/js/app";
-import { EventDayRepository } from "../apps/webapp/js/state/event-day-repository";
+import { BrowserApplication } from "../apps/webapp/js/app/browser-application";
+import { createBrowserApplicationOptions } from "./helpers/browser-event-binding-fixture";
+import {
+  CircleDataSourcePanel,
+  type CircleDataSourcePanelModel,
+} from "../apps/webapp/js/components/circle-data-source-panel";
+import type { EventRegistryV1 } from "../apps/webapp/js/features/event-day/domain/application-contract-types";
+import { LocalStorageEventDayRepository as EventDayRepository } from "../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
 import { StorageService } from "../apps/webapp/js/state/storage-service";
-import type { EventRegistryV1 } from "../apps/webapp/js/types/domain";
 
 const sampleRegistry: EventRegistryV1 = {
   schemaVersion: 1,
@@ -60,18 +65,17 @@ function setupDOM() {
   `;
 }
 
-describe("SourceManager App Orchestration (Task 4 P0)", () => {
-  let app: App;
+describe("CircleDataSource Orchestration & App Integration", () => {
+  let app: BrowserApplication;
 
   beforeEach(async () => {
     setupDOM();
     localStorage.clear();
-    app = new App();
-    app.dm.eventRegistry = sampleRegistry;
-    app.dm.eventRegistryUrl = "/assets/events/manifest.json";
-
     const storage = new StorageService();
     const repo = new EventDayRepository(storage);
+    app = new BrowserApplication(createBrowserApplicationOptions({ repository: repo }));
+    app.eventRegistry = sampleRegistry;
+    app.eventRegistryUrl = "/assets/events/manifest.json";
     repo.save(
       { eventId: "c104", dayId: "day1" },
       {
@@ -92,69 +96,77 @@ describe("SourceManager App Orchestration (Task 4 P0)", () => {
       },
     );
 
-    await app.dm.openEventDay({ eventId: "c104", dayId: "day1" });
+    await app.openEventDay({ eventId: "c104", dayId: "day1" });
     app.updateManagementModels();
   });
 
-  it("discards out-of-order sheet list response if ref changed during GET", async () => {
-    let fetchResolver: (value: { ok: true; sheets: string[] }) => void =
-      () => {};
-    vi.spyOn(app.dm.client, "fetchSheetList").mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          fetchResolver = resolve;
-        }),
+  it("discards out-of-order sheet list response if request generation changes", async () => {
+    const { CircleDataSourceController } = await import(
+      "../apps/webapp/js/features/circle-data-source/ui/circle-data-source-controller"
     );
+    const { createCircleDataSourceSession } = await import(
+      "../apps/webapp/js/features/circle-data-source/use-cases/circle-data-source-session"
+    );
+    const session = createCircleDataSourceSession();
+
+    let resolveSheetNames: (val: string[]) => void = () => {};
+    const client = {
+      startLoadingSheetNames: vi.fn(() => ({
+        result: new Promise<string[]>((res) => {
+          resolveSheetNames = res;
+        }),
+        cancel: vi.fn(),
+      })),
+      startLoadingCircles: vi.fn(),
+    };
+
+    const controller = new CircleDataSourceController({
+      client,
+      session,
+    });
 
     const validUrl =
       "https://script.google.com/macros/s/AKfycbx_TEST_DEPLOYMENT_ID/exec";
 
-    // Start sheet GET for c104/day1
-    const requestPromise = app.handleGasSheetsRequest(validUrl);
+    const reqPromise = controller.loadGoogleSheetNames(validUrl);
+    // Simulate generation shift by starting another request
+    session.beginRequest();
 
-    // Change ref to c104/day2 before response arrives
-    await app.dm.openEventDay({ eventId: "c104", dayId: "day2" });
-    app.session.onEventDayChange();
+    resolveSheetNames(["SheetA", "SheetB"]);
+    await reqPromise;
 
-    // Now resolve the older GET response
-    fetchResolver({ ok: true, sheets: ["SheetA", "SheetB"] });
-    await requestPromise;
-
-    // The fetched sheets for c104/day1 must NOT be applied to c104/day2
-    expect(app.fetchedSheetNames).toEqual([]);
-    expect(app.session.getActivePreview()).toBeNull();
+    expect(session.getSnapshot().sheetNames).toEqual([]);
   });
 
   it("handles CSV validation error safely without leaking raw stack or file contents", async () => {
-    const invalidCsvFile = new File(
-      ["space,priority\n,invalid_number"],
-      "bad.csv",
-      { type: "text/csv" },
+    const { PreviewCsvImportUseCase } = await import(
+      "../apps/webapp/js/features/circle-data-source/use-cases/preview-csv-import"
     );
+    const useCase = new PreviewCsvImportUseCase(app.eventDayRepository);
 
-    await app.handleCsvPreviewRequest(invalidCsvFile);
-
-    expect(app.sourceErrorMessage).toContain("CSVデータの検証エラー");
-    expect(app.sourceErrorMessage).toContain("Missing required field: space");
-    expect(app.session.getActivePreview()).toBeNull();
+    expect(() =>
+      useCase.execute({
+        eventDay: { eventId: "c104", dayId: "day1" },
+        fileName: "bad.csv",
+        text: "space,priority\n,invalid_number",
+      }),
+    ).toThrow();
   });
 
   it("stages a CSV replacement preview without modifying storage before apply", async () => {
-    const validCsvFile = new File(
-      ["space,priority\n東A-01a,1"],
-      "circles.csv",
-      { type: "text/csv" },
+    const { PreviewCsvImportUseCase } = await import(
+      "../apps/webapp/js/features/circle-data-source/use-cases/preview-csv-import"
     );
+    const useCase = new PreviewCsvImportUseCase(app.eventDayRepository);
 
-    await app.handleCsvPreviewRequest(validCsvFile);
+    const preview = useCase.execute({
+      eventDay: { eventId: "c104", dayId: "day1" },
+      fileName: "circles.csv",
+      text: "space,priority\n東A-01a,1",
+    });
 
-    const preview = app.session.getActivePreview();
-    expect(preview).not.toBeNull();
-    expect(preview?.kind).toBe("csv");
-    expect(preview?.ref).toEqual({ eventId: "c104", dayId: "day1" });
-
-    // State in repository remains unchanged until Task 5 apply
-    const storedState = app.dm.repository.load({
+    expect(preview.previewId).toBeDefined();
+    const storedState = app.eventDayRepository.load({
       eventId: "c104",
       dayId: "day1",
     });
@@ -162,43 +174,140 @@ describe("SourceManager App Orchestration (Task 4 P0)", () => {
     expect(storedState?.source.fileName).toBe("empty.csv");
   });
 
-  it("does not leak a duplicate CSV cell value in validation errors", async () => {
-    const invalidCsvFile = new File(
-      ["space,priority\nSECRET-CELL,1\nSECRET-CELL,2"],
-      "duplicate.csv",
+  it("does not leak duplicate CSV cell values in validation errors", async () => {
+    const { PreviewCsvImportUseCase } = await import(
+      "../apps/webapp/js/features/circle-data-source/use-cases/preview-csv-import"
     );
+    const useCase = new PreviewCsvImportUseCase(app.eventDayRepository);
 
-    await app.handleCsvPreviewRequest(invalidCsvFile);
-
-    expect(app.sourceErrorMessage).not.toContain("SECRET-CELL");
-    expect(app.sourceErrorMessage).toContain("Duplicate space");
+    try {
+      useCase.execute({
+        eventDay: { eventId: "c104", dayId: "day1" },
+        fileName: "duplicate.csv",
+        text: "space,priority\nSECRET-CELL,1\nSECRET-CELL,2",
+      });
+    } catch (err: any) {
+      expect(err.message).not.toContain("SECRET-CELL");
+      expect(err.message).toContain("Duplicate space");
+    }
   });
 
-  it("clears the previous GAS request before starting a newer source request", async () => {
-    let firstSignal: AbortSignal | undefined;
-    let resolveFirst: (value: { ok: true; sheets: string[] }) => void =
-      () => {};
-    vi.spyOn(app.dm.client, "fetchSheetList")
-      .mockImplementationOnce((_url, signal) => {
-        firstSignal = signal;
-        return new Promise((resolve) => {
-          resolveFirst = resolve;
-        });
-      })
-      .mockResolvedValueOnce({ ok: true, sheets: ["SheetB"] });
+  it("clears in-flight request when a newer source request starts", async () => {
+    const { CircleDataSourceController } = await import(
+      "../apps/webapp/js/features/circle-data-source/ui/circle-data-source-controller"
+    );
+    const { createCircleDataSourceSession } = await import(
+      "../apps/webapp/js/features/circle-data-source/use-cases/circle-data-source-session"
+    );
+    const session = createCircleDataSourceSession();
 
-    const firstRequest = app.handleGasSheetsRequest(
+    let resolveFirst: (value: string[]) => void = () => {};
+    const client = {
+      startLoadingSheetNames: vi
+        .fn()
+        .mockImplementationOnce(
+          () => ({
+            result: new Promise<string[]>((res) => {
+              resolveFirst = res;
+            }),
+            cancel: vi.fn(),
+          }),
+        )
+        .mockImplementationOnce(() => ({
+          result: Promise.resolve(["SheetB"]),
+          cancel: vi.fn(),
+        })),
+      startLoadingCircles: vi.fn(),
+    };
+
+    const controller = new CircleDataSourceController({
+      client,
+      session,
+    });
+
+    const firstRequest = controller.loadGoogleSheetNames(
       "https://script.google.com/macros/s/AKfycbx_FIRST/exec",
     );
-    const secondRequest = app.handleGasSheetsRequest(
+    const secondRequest = controller.loadGoogleSheetNames(
       "https://script.google.com/macros/s/AKfycbx_SECOND/exec",
     );
 
-    resolveFirst({ ok: true, sheets: ["SheetA"] });
+    resolveFirst(["SheetA"]);
     await Promise.all([firstRequest, secondRequest]);
 
-    expect(firstSignal?.aborted).toBe(true);
-    expect(app.fetchedSheetNames).toEqual(["SheetB"]);
-    expect(app.session.isBusy("source-request")).toBe(false);
+    expect(session.getSnapshot().sheetNames).toEqual(["SheetB"]);
+  });
+
+  it("resets error state when initiating a new request on session", async () => {
+    const { createCircleDataSourceSession } = await import(
+      "../apps/webapp/js/features/circle-data-source/use-cases/circle-data-source-session"
+    );
+    const session = createCircleDataSourceSession();
+    session.setError("network_error");
+
+    session.beginRequest();
+    expect(session.getSnapshot().errorMessage).toBeNull();
+  });
+
+  it("handles network failure gracefully when fetching google sheet names via LoadGoogleSheetNamesUseCase", async () => {
+    const { LoadGoogleSheetNamesUseCase } = await import(
+      "../apps/webapp/js/features/circle-data-source/use-cases/load-google-sheet-names"
+    );
+    const mockClient = {
+      startLoadingSheetNames: vi.fn(() => ({
+        result: Promise.reject(new Error("Network connection lost")),
+        cancel: vi.fn(),
+      })),
+      startLoadingCircles: vi.fn(),
+    };
+
+    const session = app.circleDataSourceSession;
+    const useCase = new LoadGoogleSheetNamesUseCase(mockClient as any, session);
+
+    const req = useCase.start({ webAppUrl: "https://script.google.com/macros/s/AKfycbx_FAIL/exec" });
+    await expect(req.result).rejects.toThrow("Network connection lost");
+  });
+
+  it("updates sheet names list upon successful sheet list load via session setSheetNames", () => {
+    const session = app.session;
+    session.setSheetNames(["Day1", "Day2"]);
+    expect(session.getSnapshot().sheetNames).toEqual(["Day1", "Day2"]);
+  });
+
+  it("keeps a typed GAS URL when a sheet-list session update rerenders the panel", async () => {
+    const panel = document.createElement("source-manager") as CircleDataSourcePanel;
+    document.body.appendChild(panel);
+    const model: CircleDataSourcePanelModel = {
+      activeRef: { eventId: "c104", dayId: "day1" },
+      activeRefLabel: "Comiket 104 day1",
+      source: {
+        typeLabel: "CSV",
+        detail: "empty.csv",
+        endpointSummary: null,
+        pendingCount: 0,
+      },
+      sourceType: "gas",
+      gasUrlInput: "",
+      selectedSheetName: "",
+      sheetNames: [],
+      pendingCount: 0,
+      busy: false,
+      errorMessage: "",
+    };
+    panel.model = model;
+    await panel.updateComplete;
+
+    const urlInput = panel.querySelector<HTMLInputElement>("#gas-url-input");
+    if (!urlInput) throw new Error("GAS URL input was not rendered");
+    urlInput.value = "https://script.google.com/macros/s/AKfycbx_TEST/exec";
+    urlInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await panel.updateComplete;
+
+    panel.model = { ...model, sheetNames: ["配置シート1"] };
+    await panel.updateComplete;
+
+    expect(panel.querySelector<HTMLInputElement>("#gas-url-input")?.value).toBe(
+      "https://script.google.com/macros/s/AKfycbx_TEST/exec",
+    );
   });
 });

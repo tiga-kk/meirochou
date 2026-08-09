@@ -1,269 +1,237 @@
 // @vitest-environment happy-dom
 import { describe, expect, test, vi } from "vitest";
-import { App } from "../apps/webapp/js/app";
-import { DataManager } from "../apps/webapp/js/data-manager";
-import { EventDayRepository } from "../apps/webapp/js/state/event-day-repository";
-import { getCircleVisitState } from "../apps/webapp/js/state/storage-schema";
+import { BrowserApplication } from "../apps/webapp/js/app/browser-application";
+import { createBrowserApplicationOptions } from "./helpers/browser-event-binding-fixture";
+import { GasApiClient } from "../apps/webapp/js/api/gas-api-client";
+import { GasPendingUpdateDelivery } from "../apps/webapp/js/features/circle-status/infrastructure/gas-pending-update-delivery";
+import { CircleStatusController } from "../apps/webapp/js/features/circle-status/ui/circle-status-controller";
+import { PendingGasUpdatesController } from "../apps/webapp/js/features/circle-status/ui/pending-gas-updates-controller";
+import { ChangeCircleStatusUseCase } from "../apps/webapp/js/features/circle-status/use-cases/change-circle-status";
+import { DiscardPendingGasUpdatesUseCase } from "../apps/webapp/js/features/circle-status/use-cases/discard-pending-gas-updates";
+import { DefaultPendingGasUpdateBackgroundProcess } from "../apps/webapp/js/features/circle-status/use-cases/pending-gas-update-background-process";
+import { SendPendingGasUpdatesUseCase } from "../apps/webapp/js/features/circle-status/use-cases/send-pending-gas-updates";
+import { UndoCircleStatusChangeUseCase } from "../apps/webapp/js/features/circle-status/use-cases/undo-circle-status-change";
+import {
+  createActiveEventDaySession,
+  type EventDayRef,
+  type LocalEventDayState,
+} from "../apps/webapp/js/features/event-day/public-api";
+import { LocalStorageEventDayRepository } from "../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
+import { createEmptyEventDayState } from "../apps/webapp/js/state/storage-schema";
 import {
   type StorageAdapter,
   StorageService,
 } from "../apps/webapp/js/state/storage-service";
-import type {
-  EventDayRef,
-  EventRegistryV1,
-  GasDataSource,
-  LocalEventDayState,
-} from "../apps/webapp/js/types/domain";
 
 class MockStorageAdapter implements StorageAdapter {
-  public map = new Map<string, string>();
-  public failWrites = false;
+  readonly map = new Map<string, string>();
+  failWrites = false;
 
   getItem(key: string): string | null {
     return this.map.get(key) ?? null;
   }
-
   setItem(key: string, value: string): void {
     if (this.failWrites) throw new Error("storage quota exceeded");
     this.map.set(key, value);
   }
-
   removeItem(key: string): void {
     this.map.delete(key);
   }
 }
 
-function createRegistry(): EventRegistryV1 {
-  return {
-    schemaVersion: 1,
-    events: [
-      {
-        eventId: "C108",
-        displayName: "Comiket 108",
-        mapBundle: "demo-v1",
-        days: [{ dayId: "day1", displayName: "1日目" }],
-      },
-    ],
+const REF: EventDayRef = { eventId: "C108", dayId: "day1" };
+const NOW = "2026-07-23T09:00:00.000Z";
+
+function createSetup(source: LocalEventDayState["source"], adapter = new MockStorageAdapter()) {
+  const repository = new LocalStorageEventDayRepository(new StorageService(adapter));
+  const session = createActiveEventDaySession();
+  const fetcher = vi.fn<typeof fetch>();
+  const delivery = new GasPendingUpdateDelivery(new GasApiClient({ fetcher }));
+  const send = new SendPendingGasUpdatesUseCase(repository, session, delivery);
+  const discard = new DiscardPendingGasUpdatesUseCase(repository, session);
+  const background = new DefaultPendingGasUpdateBackgroundProcess(send);
+  const status = new CircleStatusController(
+    new ChangeCircleStatusUseCase(repository, session, background),
+    new UndoCircleStatusChangeUseCase(repository, session),
+  );
+  const pending = new PendingGasUpdatesController(send, discard);
+  const state = {
+    ...createEmptyEventDayState(source, "generation-1", NOW),
+    circles: [{ space: "A-01", priority: 1 }],
   };
-}
-
-function createSetup(adapter = new MockStorageAdapter()) {
-  const now = new Date("2026-07-23T09:00:00.000Z");
-  const storage = new StorageService(adapter);
-  const repository = new EventDayRepository(storage);
-
-  const fetchSpy = vi.fn();
-  const manager = new DataManager(storage, {
-    now: () => now,
+  repository.saveAndRememberLastOpened(REF, state);
+  session.setActiveEventDay(REF, state);
+  const bindingOptions = createBrowserApplicationOptions({
     repository,
+    activeEventDaySession: session,
+    circleStatusController: status,
+    pendingGasUpdatesController: pending,
+    backgroundProcess: background,
   });
-  manager.eventRegistry = createRegistry();
-
-  // Inject spy client
-  (
-    manager.client as unknown as { fetch: (input: unknown) => Promise<unknown> }
-  ).fetch = fetchSpy;
-
-  return { adapter, repository, manager, fetchSpy, getNow: () => now };
+  const completeCircleVisitOperation = vi.fn(
+    bindingOptions.completeCircleVisit,
+  );
+  const app = new BrowserApplication({
+    ...bindingOptions,
+    completeCircleVisit: completeCircleVisitOperation,
+  });
+  app.routeGuidanceSession.replaceSnapshot({
+    ...app.routeGuidanceSession.getSnapshot(),
+    selectedDestination: { space: "A-01", sheetName: "Day1" },
+    currentDestination: null,
+  });
+  app.ui.showToast = vi.fn();
+  app.ui.updateCounts = vi.fn();
+  app.ui.updateCurrentLocation = vi.fn();
+  app.ui.showNavigation = vi.fn();
+  app.ui.showTarget = vi.fn();
+  app.searchNext = vi.fn();
+  return {
+    adapter,
+    repository,
+    session,
+    fetcher,
+    app,
+    completeCircleVisitOperation,
+  };
 }
 
-describe("Phase 3 Task 5: Integration and App purchase flows", () => {
-  const ref: EventDayRef = { eventId: "C108", dayId: "day1" };
-  const gasSource: GasDataSource = {
-    type: "gas",
-    gasUrl: "https://script.google.com/macros/s/AKfycbx_test/exec",
-    sheetName: "Day1",
-  };
+describe("circle-status production integration", () => {
+  test("routes a purchase through the injected plain operation", async () => {
+    const fixture = createSetup({ type: "csv", fileName: "day1.csv" });
 
-  test("Step 2: Save-before-send integration test", async () => {
-    const { repository, manager, fetchSpy } = createSetup();
+    await fixture.app.handleAction("purchase");
 
-    const gasState: LocalEventDayState = {
-      schemaVersion: 2,
-      source: gasSource,
-      sourceGeneration: "gen-1",
-      circles: [{ space: "A-01", priority: 1 }],
-      circleStates: {},
-      gasOutbox: [],
-      timestamps: {
-        createdAt: "2026-07-21T07:45:00.000Z",
-        updatedAt: "2026-07-21T07:45:00.000Z",
-        sourceUpdatedAt: "2026-07-21T07:45:00.000Z",
-      },
-    };
-    repository.save(ref, gasState);
-    await manager.openEventDay(ref);
-
-    // Reject fetch network call
-    fetchSpy.mockRejectedValue(new Error("Network connection lost"));
-
-    // 1. Call setPurchased
-    const result = manager.setPurchased("A-01", true);
-    expect(getCircleVisitState(result.state.circleStates, "A-01")).toBe(
-      "purchased",
-    );
-
-    // At the moment setPurchased finishes, repository MUST contain the purchase AND outbox entry
-    const saved = repository.load(ref);
-    expect(
-      saved ? getCircleVisitState(saved.circleStates, "A-01") : "pending",
-    ).toBe("purchased");
-    expect(saved?.gasOutbox).toHaveLength(1);
-    expect(saved?.gasOutbox[0].space).toBe("A-01");
-    expect(saved?.gasOutbox[0].purchased).toBe(true);
-
-    // Now flush outbox (simulating async background sending)
-    const flushRes = await manager.flushActiveOutbox();
-    expect(flushRes.sent).toBe(0);
-    expect(flushRes.pending).toBe(1);
-
-    // Verify purchase state remains intact in LocalStorage after POST failure
-    const finalSaved = repository.load(ref);
-    expect(
-      finalSaved
-        ? getCircleVisitState(finalSaved.circleStates, "A-01")
-        : "pending",
-    ).toBe("purchased");
-    expect(finalSaved?.gasOutbox[0].attempts).toBe(1);
-    expect(finalSaved?.gasOutbox[0].lastError).toBe("network");
+    expect(fixture.completeCircleVisitOperation).toHaveBeenCalledWith({
+      eventDay: REF,
+      circleSpace: "A-01",
+      nextStatus: "purchased",
+      expectedSourceGeneration: "generation-1",
+    });
+    expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("purchased");
   });
 
-  test("Step 3: Storage failure in DataManager/App produces local error without network call", async () => {
-    const { adapter, repository, manager, fetchSpy } = createSetup();
-
-    const gasState: LocalEventDayState = {
-      schemaVersion: 2,
-      source: gasSource,
-      sourceGeneration: "gen-1",
-      circles: [{ space: "A-01", priority: 1 }],
-      circleStates: {},
-      gasOutbox: [],
-      timestamps: {
-        createdAt: "2026-07-21T07:45:00.000Z",
-        updatedAt: "2026-07-21T07:45:00.000Z",
-        sourceUpdatedAt: "2026-07-21T07:45:00.000Z",
-      },
+  test("reaches the real FinishCurrentCircleUseCase and shared Session", async () => {
+    const fixture = createSetup({ type: "csv", fileName: "day1.csv" });
+    fixture.app.routeMapAreaCatalog.replaceMapAreas([{ id: "east" }]);
+    const loadMapAssets = vi
+      .spyOn(fixture.app.routeMapAssetsLoader, "loadMapAssets")
+      .mockResolvedValue({
+        points: { image: { width: 20, height: 10 }, points: [] },
+        gridMetadata: {
+          width: 20,
+          height: 10,
+          cell_size: 10,
+          cols: 2,
+          rows: 1,
+        },
+        gridBytes: new Uint8Array([1, 1]),
+      });
+    const currentRoute = {
+      cost: 10,
+      cells: [
+        { col: 0, row: 0 },
+        { col: 1, row: 0 },
+      ],
+      points: [
+        { x: 5, y: 5 },
+        { x: 15, y: 5 },
+      ],
+      startPosition: { x: 5, y: 5 },
+      targetPosition: { x: 75, y: 50 },
+      image: { width: 20, height: 10 },
     };
-    repository.save(ref, gasState);
-    await manager.openEventDay(ref);
+    fixture.app.routeGuidanceSession.replaceSnapshot({
+      navigationState: {
+        stage: "navigating",
+        areaId: "east",
+        currentPosition: {
+          areaId: "east",
+          gridIndex: 0,
+          svgX: 25,
+          svgY: 50,
+          source: "manual-start",
+        },
+        targetSpace: "A-01",
+        lockedFirstLeg: {
+          from: { type: "start", areaId: "east", gridIndex: 0 },
+          toSpace: "A-01",
+        },
+        provisionalOrder: ["A-01"],
+        bestOrder: ["A-01"],
+        optimizationGeneration: 1,
+      },
+      currentDestination: { space: "A-01", sheetName: "Day1" },
+      currentRoute,
+      selectedDestination: { space: "A-01", sheetName: "Day1" },
+      selectedRoute: currentRoute,
+      selectionStatus: "ready",
+      routeOptimizationGeneration: 1,
+    });
 
-    adapter.failWrites = true;
+    await fixture.app.handleAction("purchase");
 
-    expect(() => manager.setPurchased("A-01", true)).toThrow(
-      "Failed to save event day state",
-    );
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(manager.purchasedList).toEqual([]);
-  });
-
-  test("Step 3: App reports local save failure instead of success", async () => {
-    const { adapter, repository, manager } = createSetup();
-    repository.save(ref, {
-      schemaVersion: 2,
-      source: gasSource,
-      sourceGeneration: "gen-1",
-      circles: [{ space: "A-01", priority: 1 }],
-      circleStates: {},
-      gasOutbox: [],
-      timestamps: {
-        createdAt: "2026-07-21T07:45:00.000Z",
-        updatedAt: "2026-07-21T07:45:00.000Z",
-        sourceUpdatedAt: "2026-07-21T07:45:00.000Z",
+    expect(loadMapAssets).toHaveBeenCalledOnce();
+    expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("purchased");
+    expect(fixture.app.routeGuidanceSession.getSnapshot().navigationState).toMatchObject({
+      stage: "idle",
+      targetSpace: null,
+      currentPosition: {
+        gridIndex: 1,
+        svgX: 75,
+        svgY: 50,
+        source: "arrived-circle",
+        circleSpace: "A-01",
       },
     });
-    await manager.openEventDay(ref);
-    adapter.failWrites = true;
+  });
 
-    const app = new App();
-    app.dm = manager;
-    app.selectionState = "idle";
-    app.selectedTarget = { space: "A-01", sheetName: "Day1" };
-    app.currentTarget = null;
-    app.searchNext = vi.fn();
-    app.ui.showToast = vi.fn();
-    app.ui.updateCounts = vi.fn();
-    app.ui.updateCurrentLocation = vi.fn();
+  test("saves a purchase before attempting GAS delivery", async () => {
+    const fixture = createSetup({
+      type: "gas",
+      gasUrl: "https://example.test/gas",
+      sheetName: "Day1",
+    });
+    fixture.fetcher.mockResolvedValue({ ok: true, json: async () => ({}) } as Response);
 
-    await app.handleAction("purchase");
+    await fixture.app.handleAction("purchase");
 
-    expect(app.ui.showToast).toHaveBeenCalledWith(
+    expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("purchased");
+    expect(fixture.repository.load(REF)?.gasOutbox).toHaveLength(1);
+    expect(fixture.app.ui.showToast).toHaveBeenCalledWith("A-01 購入！");
+  });
+
+  test("reports local save failure without calling GAS or claiming success", async () => {
+    const fixture = createSetup({ type: "csv", fileName: "day1.csv" });
+    fixture.adapter.failWrites = true;
+
+    await fixture.app.handleAction("purchase");
+
+    expect(fixture.fetcher).not.toHaveBeenCalled();
+    expect(fixture.app.ui.showToast).toHaveBeenCalledWith(
       "端末への保存に失敗しました。操作は反映されていません。",
       "error",
     );
-    expect(app.ui.showToast).not.toHaveBeenCalledWith("A-01 購入！");
-    expect(manager.purchasedList).toEqual([]);
+    expect(fixture.app.ui.showToast).not.toHaveBeenCalledWith("A-01 購入！");
   });
 
-  test("Step 7: App reports a later GAS failure while keeping local success", async () => {
-    const { repository, manager, fetchSpy } = createSetup();
-    repository.save(ref, {
-      schemaVersion: 2,
-      source: gasSource,
-      sourceGeneration: "gen-1",
-      circles: [{ space: "A-01", priority: 1 }],
-      circleStates: {},
-      gasOutbox: [],
-      timestamps: {
-        createdAt: "2026-07-21T07:45:00.000Z",
-        updatedAt: "2026-07-21T07:45:00.000Z",
-        sourceUpdatedAt: "2026-07-21T07:45:00.000Z",
-      },
+  test("keeps the local purchase when a later GAS request fails", async () => {
+    const fixture = createSetup({
+      type: "gas",
+      gasUrl: "https://example.test/gas",
+      sheetName: "Day1",
     });
-    await manager.openEventDay(ref);
-    fetchSpy.mockRejectedValue(new Error("Network connection lost"));
+    fixture.fetcher.mockRejectedValue(new Error("Network connection lost"));
 
-    const app = new App();
-    app.dm = manager;
-    app.selectionState = "idle";
-    app.selectedTarget = { space: "A-01", sheetName: "Day1" };
-    app.currentTarget = null;
-    app.searchNext = vi.fn();
-    app.ui.showToast = vi.fn();
-    app.ui.updateCounts = vi.fn();
-    app.ui.updateCurrentLocation = vi.fn();
+    await fixture.app.handleAction("purchase");
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-    await app.handleAction("purchase");
-    await manager.flushActiveOutbox();
-
-    expect(app.ui.showToast).toHaveBeenCalledWith("A-01 購入！");
-    expect(app.ui.showToast).toHaveBeenCalledWith(
+    expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("purchased");
+    expect(fixture.repository.load(REF)?.gasOutbox).toHaveLength(1);
+    expect(fixture.app.ui.showToast).toHaveBeenCalledWith("A-01 購入！");
+    expect(fixture.app.ui.showToast).toHaveBeenCalledWith(
       "GAS同期に失敗しました。未送信データは端末に保持されています。",
       "warning",
     );
-    expect(manager.purchasedList).toEqual(["A-01"]);
-  });
-
-  test("Task 6 Step 3: App startup ordering, zero GET calls, non-blocking start", async () => {
-    const { repository, manager, fetchSpy } = createSetup();
-    repository.save(ref, {
-      schemaVersion: 2,
-      source: gasSource,
-      sourceGeneration: "gen-1",
-      circles: [{ space: "A-01", priority: 1 }],
-      circleStates: {},
-      gasOutbox: [],
-      timestamps: {
-        createdAt: "2026-07-21T07:45:00.000Z",
-        updatedAt: "2026-07-21T07:45:00.000Z",
-        sourceUpdatedAt: "2026-07-21T07:45:00.000Z",
-      },
-    });
-
-    const app = new App();
-    app.dm = manager;
-    app.ui.init = vi.fn();
-    app.setupEvents = vi.fn();
-    app.ui.updateCounts = vi.fn();
-    app.ui.showToast = vi.fn();
-    app.searchNext = vi.fn();
-    const startSyncSpy = vi.spyOn(manager.syncCoordinator, "start");
-
-    // App opens cached GAS state and starts background sync only after local init
-    await app.init({ eventId: "C108", areas: [] });
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(startSyncSpy).toHaveBeenCalledTimes(1);
-
-    // Dispose clean up
-    app.dispose();
   });
 });
