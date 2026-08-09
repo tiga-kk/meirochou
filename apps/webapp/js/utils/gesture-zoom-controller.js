@@ -147,7 +147,19 @@ export class GestureZoomController {
   }
 
   startInertia() {
-    if (Math.abs(this.vx) <= 0.1 && Math.abs(this.vy) <= 0.1) return;
+    const curW = this.layout.imageWidth * this.state.scale;
+    const curH = this.layout.imageHeight * this.state.scale;
+    const winW = this.layout.containerWidth;
+    const winH = this.layout.containerHeight;
+    const outOfBounds =
+      (winW >= curW
+        ? this.state.x > 0
+        : this.state.x > 0 || this.state.x < winW - curW) ||
+      (winH >= curH
+        ? this.state.y > 0
+        : this.state.y > 0 || this.state.y < winH - curH);
+    if (Math.abs(this.vx) <= 0.1 && Math.abs(this.vy) <= 0.1 && !outOfBounds)
+      return;
     if (this.rafId === null) {
       this.rafId = requestAnimationFrame(() => this.animate());
     }

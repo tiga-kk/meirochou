@@ -204,4 +204,18 @@ describe("GestureZoomController", () => {
     expect(containerReads.mock.calls.length).toBe(containerReadsAfterStart);
     expect(imageReads.mock.calls.length).toBe(imageReadsAfterStart);
   });
+
+  it("settles a bounds violation after a low-speed pointer release", () => {
+    const { container, controller } = createController();
+
+    container.dispatchEvent(pointerEvent("pointerdown", 1, 10, 10));
+    controller.setTransform({ scale: 1, x: 20, y: 0 });
+    container.dispatchEvent(pointerEvent("pointerup", 1, 10, 10));
+
+    expect(controller.rafId).not.toBeNull();
+    for (let frame = 0; frame < 20; frame += 1) flushRaf();
+
+    expect(controller.state.x).toBeLessThan(1);
+    expect(controller.state.x).toBeGreaterThanOrEqual(0);
+  });
 });
