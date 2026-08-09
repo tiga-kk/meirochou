@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { InMemoryMapAreaCatalog } from "../apps/webapp/js/features/route-guidance/infrastructure/in-memory-map-area-catalog";
 import { RouteGuidanceController } from "../apps/webapp/js/features/route-guidance/ui/route-guidance-controller";
 import { ChangeDestinationUseCase } from "../apps/webapp/js/features/route-guidance/use-cases/change-destination";
+import { FinishCurrentCircleUseCase } from "../apps/webapp/js/features/route-guidance/use-cases/finish-current-circle";
 import { RouteGuidanceNavigationOperations } from "../apps/webapp/js/features/route-guidance/use-cases/route-guidance-navigation-operations";
 import { createRouteGuidanceSession } from "../apps/webapp/js/features/route-guidance/use-cases/route-guidance-session";
 
@@ -463,5 +464,76 @@ describe("ChangeDestinationUseCase", () => {
     expect(snapshot.selectedDestination).toEqual(snapshot.currentDestination);
     expect(snapshot.selectedRoute).toEqual(snapshot.currentRoute);
     expect(snapshot.selectionStatus).toBe("idle");
+  });
+
+  it("confirms a candidate by updating navigation and session state together", async () => {
+    const { session, useCase } = createChangeDestinationFixture();
+
+    await useCase.execute({ circleSpace: circles[1].space, circles });
+    useCase.compare();
+
+    expect(useCase.confirm()).toEqual(
+      expect.objectContaining({ space: circles[1].space }),
+    );
+    expect(session.getSnapshot()).toMatchObject({
+      navigationState: {
+        targetSpace: circles[1].space,
+        lockedFirstLeg: { toSpace: circles[1].space },
+      },
+      currentDestination: { space: circles[1].space },
+      selectedDestination: { space: circles[1].space },
+      selectionStatus: "idle",
+    });
+    expect(session.getSnapshot().selectedRoute).toEqual(
+      session.getSnapshot().currentRoute,
+    );
+  });
+
+  it("advances purchase after confirming a changed destination", async () => {
+    const { session, useCase } = createChangeDestinationFixture();
+    await useCase.execute({ circleSpace: circles[1].space, circles });
+    useCase.compare();
+    expect(useCase.confirm()).toEqual(
+      expect.objectContaining({ space: circles[1].space }),
+    );
+
+    const finish = new FinishCurrentCircleUseCase(
+      session,
+      new InMemoryMapAreaCatalog([
+        { areaId: "east", circleSpaces: circles.map((circle) => circle.space) },
+      ]),
+      { loadMapAssets: vi.fn(async () => routeAssets), clearCachedMapAssets() {} },
+      new RouteGuidanceNavigationOperations(),
+    );
+
+    await expect(
+      finish.execute({
+        action: "purchase",
+        completedSpace: circles[1].space,
+        remainingCircles: [circles[0], circles[2]],
+      }),
+    ).resolves.toEqual({ kind: "advanced" });
+    expect(session.getSnapshot()).toMatchObject({
+      navigationState: { targetSpace: circles[0].space },
+      currentDestination: { space: circles[0].space },
+      selectionStatus: "idle",
+    });
+  });
+
+  it("keeps the confirmed state when navigation cannot accept the candidate", async () => {
+    const { session, useCase } = createChangeDestinationFixture();
+    await useCase.execute({ circleSpace: circles[1].space, circles });
+    useCase.compare();
+    session.replaceSnapshot({
+      ...session.getSnapshot(),
+      navigationState: {
+        ...session.getSnapshot().navigationState!,
+        stage: "idle",
+      },
+    });
+    const before = session.getSnapshot();
+
+    expect(useCase.confirm()).toBeNull();
+    expect(session.getSnapshot()).toEqual(before);
   });
 });

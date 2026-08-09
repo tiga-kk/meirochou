@@ -166,6 +166,7 @@ describe("StartRouteGuidanceUseCase", () => {
       mapPosition: { x: 75, y: 50 },
     });
     expect(snapshot.selectedDestination).toBe(snapshot.currentDestination);
+    expect(snapshot.selectionStatus).toBe("idle");
     expect(snapshotRepo.saveSnapshot).toHaveBeenCalledOnce();
   });
 

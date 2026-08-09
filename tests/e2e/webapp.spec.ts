@@ -185,10 +185,7 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   );
   await expect(page.locator("#btn-preview-route")).toBeEnabled();
   await expect(page.locator('[data-route-kind="current"]')).toBeVisible();
-  await expect(page.locator('[data-route-kind="candidate"]')).toBeVisible();
-  await expect(
-    page.locator('[data-route-kind="candidate"] .route-overlay-line'),
-  ).toHaveCSS("stroke-dasharray", "22px, 14px");
+  await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
   await page
     .locator("#toast")
     .evaluate((toast) => toast.classList.remove("show"));
@@ -218,7 +215,7 @@ test("ピンの候補経路を比較してから目的地を変更する", async
 
   await page.locator("#btn-cancel-route-change").click();
   await expect(page.locator("#route-change-confirmation")).toBeHidden();
-  await expect(page.locator('[data-route-kind="candidate"]')).toBeVisible();
+  await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
   await expect(heading).toHaveText(originalTarget || "");
 
   await page.locator("#btn-preview-route").click();

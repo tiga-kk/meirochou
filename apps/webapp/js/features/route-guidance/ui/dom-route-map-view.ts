@@ -342,7 +342,7 @@ export class DomRouteMapView {
 
     this.els.pinLayer.innerHTML = "";
     this.renderRouteOverlay(currentRoute, "current");
-    if (selectionState === "ready" || selectionState === "comparing") {
+    if (selectionState === "comparing") {
       this.renderRouteOverlay(selectedRoute, "candidate");
     }
 

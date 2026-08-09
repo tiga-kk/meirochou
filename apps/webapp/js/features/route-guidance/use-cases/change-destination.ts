@@ -179,10 +179,29 @@ export class ChangeDestinationUseCase {
     ) {
       return null;
     }
+    let nextNavigationState: NavigationState;
+    try {
+      nextNavigationState = this.navigationOperations.handleManualTarget(
+        snapshot.navigationState!,
+        snapshot.selectedDestination.space,
+      ).navState;
+    } catch {
+      return null;
+    }
+    if (
+      nextNavigationState.targetSpace !== snapshot.selectedDestination.space ||
+      nextNavigationState.lockedFirstLeg?.toSpace !==
+        snapshot.selectedDestination.space
+    ) {
+      return null;
+    }
     this.session.replaceSnapshot({
       ...snapshot,
+      navigationState: nextNavigationState,
       currentDestination: snapshot.selectedDestination,
       currentRoute: snapshot.selectedRoute,
+      selectedDestination: snapshot.selectedDestination,
+      selectedRoute: snapshot.selectedRoute,
       selectionStatus: "idle",
     });
     return snapshot.selectedDestination;

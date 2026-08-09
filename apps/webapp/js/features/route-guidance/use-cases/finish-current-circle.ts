@@ -173,7 +173,7 @@ export class FinishCurrentCircleUseCase {
       currentRoute: route,
       selectedDestination: target,
       selectedRoute: route,
-      selectionStatus: "ready",
+      selectionStatus: "idle",
     });
     return { kind: "advanced" };
   }

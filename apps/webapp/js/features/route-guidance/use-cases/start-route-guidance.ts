@@ -222,7 +222,7 @@ export class StartRouteGuidanceUseCase {
       currentRoute: firstRoute,
       selectedDestination: displayFirstCircle,
       selectedRoute: firstRoute,
-      selectionStatus: "ready" as const,
+      selectionStatus: "idle" as const,
       routeOptimizationGeneration: 1,
     };
 
