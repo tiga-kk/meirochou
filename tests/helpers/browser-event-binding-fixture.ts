@@ -17,6 +17,7 @@ import {
   type ActiveEventDaySession,
   type EventDayRepository,
 } from "../../apps/webapp/js/features/event-day/public-api";
+import type { SwitchEventDayOperation } from "../../apps/webapp/js/features/event-day/use-cases/switch-event-day";
 import { LocalStorageEventDayRepository } from "../../apps/webapp/js/features/event-day/infrastructure/local-storage-event-day-repository";
 import {
   DeleteLocalDataUseCase,
@@ -56,6 +57,7 @@ interface BrowserApplicationFixtureOptions {
   readonly completeCircleVisit?: (
     input: CompleteCircleVisitInput,
   ) => Promise<CompleteCircleVisitResult>;
+  readonly eventDayTransition?: SwitchEventDayOperation;
 }
 
 /** Supplies the explicitly assembled dependencies required by the browser binder. */
@@ -162,6 +164,28 @@ export function createBrowserApplicationOptions(
           routeGuidanceController.finishCurrentCircle(finishInput),
         input,
       ));
+  const eventDayTransition =
+    options.eventDayTransition ?? {
+      execute: async (ref: EventDayRef) => {
+        const state =
+          repository.load(ref) ??
+          {
+            schemaVersion: 2,
+            source: { type: "csv", fileName: "empty.csv" },
+            sourceGeneration: "fixture",
+            circles: [],
+            circleStates: {},
+            gasOutbox: [],
+            timestamps: {
+              createdAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-01T00:00:00.000Z",
+              sourceUpdatedAt: "2026-01-01T00:00:00.000Z",
+            },
+          };
+        repository.saveAndRememberLastOpened(ref, state);
+        activeEventDaySession.setActiveEventDay(ref, state);
+      },
+    } satisfies SwitchEventDayOperation;
 
   return {
     document,
@@ -196,13 +220,14 @@ export function createBrowserApplicationOptions(
       navigationRuntimeController,
       routeGuidanceController,
     },
-    eventDayDependencies: {
+      eventDayDependencies: {
       repository,
       activeEventDaySession,
       activeEventDayReader,
       circleStatusController,
       pendingGasUpdatesController,
-      backgroundProcess,
+        backgroundProcess,
+        eventDayTransition,
       loadEventRegistry: async () => {
         throw new Error("Event registry is not configured for this test");
       },

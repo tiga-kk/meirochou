@@ -55,7 +55,6 @@ const REGISTRY: EventRegistry = {
     },
   ],
 };
-const REGISTRY_URL = "https://example.test/assets/events/manifest.json";
 const MANIFEST = {
   schemaVersion: 1 as const,
   eventId: "C108",
@@ -84,7 +83,6 @@ function createFixture(adapter = new MockStorageAdapter()) {
   const switchEventDay = new SwitchEventDayUseCase({
     repository,
     registry: REGISTRY,
-    registryUrl: REGISTRY_URL,
     currentManifest: MANIFEST,
     loadManifest: async () => MANIFEST,
     collaborators: {

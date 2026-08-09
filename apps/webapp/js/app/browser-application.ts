@@ -4,16 +4,8 @@ import "../components/comipath-settings";
 import "../components/navigation-resume-dialog";
 import "../components/source-diff-dialog";
 import { DomRouteGuidanceView } from "../features/route-guidance/ui/dom-route-guidance-view";
-import { createDevDemoData, isDevDemoEnabled } from "../dev-demo-data.js";
-import {
-  parseGridMeta,
-  parsePointsPayload,
-} from "../features/event-day/infrastructure/application-boundary-parsers";
-import {
-  loadRuntimeMapBundleManifestFromUrl,
-  renderMapBootstrapError,
-  resolveEventMapManifestUrl,
-} from "../features/event-day/infrastructure/http-map-manifest-loader";
+import { isDevDemoEnabled } from "../dev-demo-data.js";
+import { renderMapBootstrapError } from "../features/event-day/infrastructure/http-map-manifest-loader";
 import {
   parseSpace,
   solveNearestNeighbor,
@@ -123,7 +115,7 @@ export class BrowserApplication {
       !eventDayDependencies.circleStatusController ||
       !eventDayDependencies.pendingGasUpdatesController ||
       !eventDayDependencies.backgroundProcess ||
-      !eventDayDependencies.loadEventRegistry ||
+      !eventDayDependencies.eventDayTransition ||
       !options?.circleDataSourceSession ||
       !options?.circleDataSourceController ||
       !options?.completeCircleVisit ||
@@ -146,7 +138,7 @@ export class BrowserApplication {
     this.circleStatusController = eventDayDependencies.circleStatusController;
     this.pendingGasUpdatesController =
       eventDayDependencies.pendingGasUpdatesController;
-    this.loadEventRegistryOperation = eventDayDependencies.loadEventRegistry;
+    this.eventDayTransition = eventDayDependencies.eventDayTransition;
     this.completeCircleVisit = options.completeCircleVisit;
     this.eventRegistry = eventDayDependencies.eventRegistry ?? null;
     this.eventRegistryUrl = eventDayDependencies.eventRegistryUrl ?? null;
@@ -268,7 +260,7 @@ export class BrowserApplication {
     if (this.started) return;
     this.started = true;
     try {
-      await bootstrapApp(this);
+      await this.init(this.currentManifest);
     } catch (error) {
       this.started = false;
       throw error;
@@ -299,41 +291,9 @@ export class BrowserApplication {
     return [...this.activeEventDayReader.getPendingCircles()];
   }
 
-  async loadEventRegistry() {
-    if (this.eventRegistry) {
-      return { registry: this.eventRegistry, registryUrl: this.eventRegistryUrl ?? "" };
-    }
-    const loaded = await this.loadEventRegistryOperation();
-    this.eventRegistry = loaded.registry;
-    this.eventRegistryUrl = loaded.registryUrl;
-    return loaded;
-  }
-
-  async openEventDay(ref) {
-    const event = this.eventRegistry?.events.find(
-      (candidate) => candidate.eventId === ref.eventId,
-    );
-    if (!event?.days.some((day) => day.dayId === ref.dayId)) {
-      throw new Error("Event/Day not found in registry");
-    }
-    const state =
-      this.eventDayRepository.load(ref) ??
-      {
-        schemaVersion: 2,
-        source: { type: "csv", fileName: "empty.csv" },
-        sourceGeneration: `source-${Date.now()}`,
-        circles: [],
-        circleStates: {},
-        gasOutbox: [],
-        timestamps: {
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          sourceUpdatedAt: new Date().toISOString(),
-        },
-      };
-    this.eventDayRepository.saveAndRememberLastOpened(ref, state);
-    this.activeEventDaySession.setActiveEventDay(ref, state);
-    return state;
+  /** Delegates event/day opening to the assembled validated transition. */
+  openEventDay(ref) {
+    return this.eventDayTransition.execute(ref);
   }
 
   startSyncCoordinator() {
@@ -632,13 +592,7 @@ export class BrowserApplication {
                 eventId: this.eventRegistry.events[0].eventId,
                 dayId: this.eventRegistry.events[0].days[0].dayId,
               };
-        const nextState = this.eventDayRepository.load(nextRef);
-        if (nextState) {
-          this.eventDayRepository.rememberLastOpenedEventDay(nextRef);
-          this.activeEventDaySession.setActiveEventDay(nextRef, nextState);
-        } else {
-          await this.openEventDay(nextRef);
-        }
+        await this.eventDayTransition.execute(nextRef);
 
         if (!this.activeRef) {
           renderMapBootstrapError(
@@ -705,68 +659,16 @@ export class BrowserApplication {
   /**
    * 初期化実行
    */
-  async init(manifest, initialRef = null, loadedRegistry = null) {
-    if (loadedRegistry) {
-      this.eventRegistry = loadedRegistry.registry;
-      this.eventRegistryUrl = loadedRegistry.registryUrl;
-    } else {
-      await this.loadEventRegistry();
-    }
-
+  async init(manifest = this.currentManifest) {
     const devDemoEnabled = isDevDemoEnabled(this.window.location);
     if (devDemoEnabled) {
-      const demoData = createDevDemoData();
-      this.spreadsheetTitle = demoData.spreadsheetTitle;
-      const demoRef = { eventId: "demo-v1", dayId: "day1" };
-      const now = new Date().toISOString();
-      const purchased = new Set(demoData.purchasedList);
-      const held = new Set(demoData.holdList);
-      const circleStates = {};
-      for (const circle of demoData.wantToBuy) {
-        if (purchased.has(circle.space))
-          circleStates[circle.space] = "purchased";
-        else if (held.has(circle.space)) circleStates[circle.space] = "held";
-      }
-      const demoState = {
-        schemaVersion: 2,
-        source: { type: "csv", fileName: "demo-ui.csv" },
-        sourceGeneration: "demo-ui",
-        circles: demoData.wantToBuy,
-        circleStates,
-        gasOutbox: [],
-        timestamps: { createdAt: now, updatedAt: now, sourceUpdatedAt: now },
-      };
-      this.eventDayRepository.save(demoRef, demoState);
-      this.activeEventDaySession.setActiveEventDay(demoRef, demoState);
+      this.spreadsheetTitle = "C108 サークル巡回リスト";
     } else {
-      const isRegisteredRef = (ref) => {
-        const event = this.eventRegistry?.events.find(
-          (candidate) => candidate.eventId === ref?.eventId,
+      if (!this.activeRef || !this.activeState) {
+        renderMapBootstrapError(
+          this.document,
+          new Error("No active event/day after startup transition"),
         );
-        return Boolean(event?.days.some((day) => day.dayId === ref?.dayId));
-      };
-      let activeRef = initialRef || this.eventDayRepository.getLastOpenedEventDay();
-      if (!activeRef || !isRegisteredRef(activeRef)) {
-        const defaultEvent = this.eventRegistry?.events[0];
-        if (!defaultEvent || defaultEvent.days.length === 0) {
-          renderMapBootstrapError(
-            this.document,
-            new Error("Event registry has no selectable event/day"),
-          );
-          return;
-        }
-        activeRef = {
-          eventId: defaultEvent.eventId,
-          dayId: defaultEvent.days[0].dayId,
-        };
-      }
-
-      try {
-        await this.openEventDay(activeRef);
-        this.currentManifest = manifest;
-      } catch (error) {
-        console.error("Failed to open initial event day:", error);
-        renderMapBootstrapError(this.document, error);
         return;
       }
     }
@@ -1738,58 +1640,4 @@ export class BrowserApplication {
   handleDevDemoAction(space) {
     return this.searchNextDevDemo(space, false);
   }
-}
-
-/** Load the selected map bundle via event registry before creating application controllers. */
-async function bootstrapApp(existingApp) {
-  let manifest;
-  let registry;
-  let registryUrl;
-  let targetRef;
-  try {
-    ({ registry, registryUrl } = await existingApp.loadEventRegistry());
-    targetRef = existingApp.eventDayRepository.getLastOpenedEventDay();
-
-    const isValidRef =
-      targetRef &&
-      registry.events.some(
-        (e) =>
-          e.eventId === targetRef.eventId &&
-          e.days.some((d) => d.dayId === targetRef.dayId),
-      );
-
-    if (!isValidRef) {
-      const defaultEvent = registry.events[0];
-      targetRef = {
-        eventId: defaultEvent.eventId,
-        dayId: defaultEvent.days[0].dayId,
-      };
-    }
-
-    const event = registry.events.find((e) => e.eventId === targetRef.eventId);
-    if (!event) throw new Error("Last-opened event is not in registry");
-    if (registryUrl) {
-      const manifestUrl = resolveEventMapManifestUrl(registryUrl, event);
-      manifest = await loadRuntimeMapBundleManifestFromUrl(
-        manifestUrl,
-        event.eventId,
-      );
-    } else {
-      manifest =
-        existingApp.currentManifest ??
-        {
-          schemaVersion: 1,
-          eventId: event.eventId,
-          displayName: event.displayName,
-          areas: [],
-        };
-    }
-    existingApp.routeMapAreaCatalog.initializeMapAreas(manifest.areas);
-  } catch (error) {
-    console.error("Map bundle initialization failed.", error);
-    renderMapBootstrapError(existingApp.document, error);
-    return;
-  }
-
-  await existingApp.init(manifest, targetRef, { registry, registryUrl });
 }

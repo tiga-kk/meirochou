@@ -16,6 +16,7 @@ import {
   type PreparedEventDayTransition,
 } from "../apps/webapp/js/features/event-day/use-cases/switch-event-day";
 import { StorageService } from "../apps/webapp/js/state/storage-service";
+import { createActiveEventDaySession } from "../apps/webapp/js/features/event-day/use-cases/active-event-day-session";
 
 const registryUrl = "http://localhost:5173/assets/events/manifest.json";
 
@@ -115,6 +116,13 @@ const resolvedManifestC105: MapBundleManifestV1 = {
     },
   ],
 };
+
+const createManifestLoader = (fetcher: typeof fetch) =>
+  (event: (typeof sampleRegistry.events)[number], signal?: AbortSignal) =>
+    loadMapBundleManifestFromUrl(
+      resolveEventMapManifestUrl(registryUrl, event),
+      { fetcher, signal },
+    );
 
 class MemoryStorage {
   private data = new Map<string, string>();
@@ -229,6 +237,95 @@ describe("map-manifest-loader url resolution and loading", () => {
 });
 
 describe("EventDayTransitionService prepare", () => {
+  it("prepares and activates a durable same-ref startup when runtime is empty", async () => {
+    const repo = new EventDayRepository(new StorageService(new MemoryStorage()));
+    const session = createActiveEventDaySession();
+    const ref = { eventId: "c104", dayId: "day1" };
+    repo.saveAndRememberLastOpened(ref, {
+      schemaVersion: 2,
+      source: { type: "csv", fileName: "saved.csv" },
+      sourceGeneration: "saved",
+      circles: [],
+      circleStates: {},
+      gasOutbox: [],
+      timestamps: {
+        createdAt: "2026-07-23T00:00:00Z",
+        updatedAt: "2026-07-23T00:00:00Z",
+        sourceUpdatedAt: "2026-07-23T00:00:00Z",
+      },
+    });
+    const loadManifest = vi.fn(async () => resolvedManifestC104);
+    const service = new EventDayTransitionService({
+      repository: repo,
+      registry: sampleRegistry,
+      activeEventDaySession: session,
+      loadManifest,
+      collaborators: {
+        afterSwitch: async (nextRef, _manifest, state) =>
+          session.setActiveEventDay(nextRef, state),
+      },
+    });
+
+    await service.execute(ref);
+
+    expect(loadManifest).toHaveBeenCalledOnce();
+    expect(session.getActiveEventDay()).toMatchObject({ ref });
+  });
+
+  it("skips a same-ref transition only when runtime already has that ref active", async () => {
+    const repo = new EventDayRepository(new StorageService(new MemoryStorage()));
+    const session = createActiveEventDaySession();
+    const ref = { eventId: "c104", dayId: "day1" };
+    const state = {
+      schemaVersion: 2 as const,
+      source: { type: "csv" as const, fileName: "saved.csv" },
+      sourceGeneration: "saved",
+      circles: [],
+      circleStates: {},
+      gasOutbox: [],
+      timestamps: {
+        createdAt: "2026-07-23T00:00:00Z",
+        updatedAt: "2026-07-23T00:00:00Z",
+        sourceUpdatedAt: "2026-07-23T00:00:00Z",
+      },
+    };
+    repo.saveAndRememberLastOpened(ref, state);
+    session.setActiveEventDay(ref, state);
+    const loadManifest = vi.fn(async () => resolvedManifestC104);
+    const afterSwitch = vi.fn(async () => {});
+    const service = new EventDayTransitionService({
+      repository: repo,
+      registry: sampleRegistry,
+      activeEventDaySession: session,
+      loadManifest,
+      collaborators: { afterSwitch },
+    });
+
+    await service.execute(ref);
+
+    expect(loadManifest).not.toHaveBeenCalled();
+    expect(afterSwitch).not.toHaveBeenCalled();
+  });
+
+  it("does not commit or activate when manifest preparation fails", async () => {
+    const repo = new EventDayRepository(new StorageService(new MemoryStorage()));
+    const session = createActiveEventDaySession();
+    const ref = { eventId: "c104", dayId: "day1" };
+    const service = new EventDayTransitionService({
+      repository: repo,
+      registry: sampleRegistry,
+      activeEventDaySession: session,
+      loadManifest: async () => {
+        throw new Error("manifest unavailable");
+      },
+    });
+
+    await expect(service.execute(ref)).rejects.toThrow("manifest unavailable");
+    expect(repo.load(ref)).toBeNull();
+    expect(repo.getLastOpenedEventDay()).toBeNull();
+    expect(session.getActiveEventDay()).toBeNull();
+  });
+
   it("prepares a transition for a registered ref without mutating storage", async () => {
     const storageService = new StorageService(new MemoryStorage());
     const repo = new EventDayRepository(storageService);
@@ -244,8 +341,7 @@ describe("EventDayTransitionService prepare", () => {
       {
         repository: repo,
         registry: sampleRegistry,
-        registryUrl,
-        fetcher: mockFetcher,
+        loadManifest: createManifestLoader(mockFetcher),
       },
     );
 
@@ -276,9 +372,8 @@ describe("EventDayTransitionService prepare", () => {
       {
         repository: repo,
         registry: sampleRegistry,
-        registryUrl,
         currentManifest: resolvedManifestC104,
-        fetcher: mockFetcher,
+        loadManifest: createManifestLoader(mockFetcher),
       },
     );
 
@@ -302,9 +397,8 @@ describe("EventDayTransitionService prepare", () => {
       {
         repository: repo,
         registry: sampleRegistry,
-        registryUrl,
         currentManifest: resolvedManifestC104,
-        fetcher: mockFetcher,
+        loadManifest: createManifestLoader(mockFetcher),
       },
     );
 
@@ -328,8 +422,7 @@ describe("EventDayTransitionService prepare", () => {
       {
         repository: repo,
         registry: sampleRegistry,
-        registryUrl,
-        fetcher: mockFetcher,
+        loadManifest: createManifestLoader(mockFetcher),
       },
     );
 
@@ -346,7 +439,7 @@ describe("EventDayTransitionService prepare", () => {
       {
         repository: repo,
         registry: sampleRegistry,
-        registryUrl,
+        loadManifest: async () => rawManifestC104,
       },
     );
     await expect(
@@ -370,8 +463,7 @@ describe("EventDayTransitionService prepare", () => {
       {
         repository: repo,
         registry: sampleRegistry,
-        registryUrl,
-        fetcher: mockFetcher,
+        loadManifest: createManifestLoader(mockFetcher),
       },
     );
 
@@ -403,8 +495,7 @@ describe("EventDayTransitionService prepare", () => {
       {
         repository: repo,
         registry: sampleRegistry,
-        registryUrl,
-        fetcher: mockFetcher,
+        loadManifest: createManifestLoader(mockFetcher),
       },
     );
 
@@ -435,7 +526,7 @@ describe("EventDayTransitionService commit & rollback", () => {
       {
         repository: repo,
         registry: sampleRegistry,
-        registryUrl,
+        loadManifest: async () => rawManifestC104,
         currentManifest: resolvedManifestC104,
       },
     );
@@ -479,7 +570,7 @@ describe("EventDayTransitionService commit & rollback", () => {
       {
         repository: repo,
         registry: sampleRegistry,
-        registryUrl,
+        loadManifest: async () => rawManifestC104,
         currentManifest: resolvedManifestC104,
       },
     );

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { BrowserApplication } from "../apps/webapp/js/app/browser-application";
 import { createBrowserApplicationOptions } from "./helpers/browser-event-binding-fixture";
 import type {
@@ -49,6 +49,7 @@ function createSampleState(eventId: string, dayId: string): LocalEventDayState {
 describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
   it("handles storage-delete-request for active event-day and falls back to default event/day", async () => {
     const app = new BrowserApplication(createBrowserApplicationOptions());
+    const transition = vi.spyOn(app.eventDayTransition, "execute");
     app.eventRegistry = createSampleRegistry();
 
     const ref1 = { eventId: "c104", dayId: "day1" };
@@ -72,6 +73,7 @@ describe("ComiPathBrowserRuntime & Storage Deletion Integration", () => {
 
     expect(app.eventDayRepository.load(ref1)).toBeNull();
     expect(app.activeRef).toEqual(ref2);
+    expect(transition).toHaveBeenCalledWith(ref2);
   });
 
   it("does not switch active state when deleting a non-active event-day", async () => {

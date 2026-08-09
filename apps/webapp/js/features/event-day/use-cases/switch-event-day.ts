@@ -9,6 +9,7 @@ import type {
   LocalEventDayState,
 } from "../domain/event-day-types";
 import type { EventDayRepository } from "./event-day-repository";
+import type { ActiveEventDaySession } from "./active-event-day-session";
 
 function createEmptyState(
   sourceGeneration: string,
@@ -35,6 +36,7 @@ export interface SwitchEventDayCollaborators {
   afterSwitch?: (
     newRef: EventDayRef,
     manifest: MapBundleManifest,
+    state: LocalEventDayState,
   ) => Promise<void>;
   onSwitchFailure?: (requestedRef: EventDayRef, error: unknown) => void;
 }
@@ -44,21 +46,16 @@ export interface SwitchEventDayOptions {
   readonly createSourceGeneration?: () => string;
   readonly currentManifest?: MapBundleManifest | null;
   readonly createToken?: () => string;
-  readonly fetcher?: typeof fetch;
-  readonly loadManifest?: (
+  readonly loadManifest: (
     event: EventRegistryEntry,
     signal?: AbortSignal,
   ) => Promise<MapBundleManifest>;
-  readonly resolveManifestUrl?: (
-    registryUrl: string,
-    event: EventRegistryEntry,
-  ) => string;
 }
 
 export interface SwitchEventDayDependencies extends SwitchEventDayOptions {
   readonly repository: EventDayRepository;
   readonly registry: EventRegistry;
-  readonly registryUrl?: string;
+  readonly activeEventDaySession?: ActiveEventDaySession;
   readonly collaborators?: SwitchEventDayCollaborators;
 }
 
@@ -91,24 +88,17 @@ export class SwitchEventDayUseCase implements SwitchEventDayOperation {
   private readonly now: () => string;
   private readonly createSourceGeneration: () => string;
   private readonly createToken: () => string;
-  private readonly fetcher: typeof fetch | null;
-  private readonly loadManifest:
-    | ((
-        event: EventRegistryEntry,
-        signal?: AbortSignal,
-      ) => Promise<MapBundleManifest>)
-    | null;
+  private readonly loadManifest: (
+    event: EventRegistryEntry,
+    signal?: AbortSignal,
+  ) => Promise<MapBundleManifest>;
   private readonly registry: EventRegistry;
   private readonly collaborators: SwitchEventDayCollaborators;
-  private readonly registryUrl: string | null;
-  private readonly resolveManifestUrl:
-    | ((registryUrl: string, event: EventRegistryEntry) => string)
-    | null;
+  private readonly activeEventDaySession: ActiveEventDaySession | null;
 
   constructor(dependencies: SwitchEventDayDependencies) {
     this.repository = dependencies.repository;
     this.registry = dependencies.registry;
-    this.registryUrl = dependencies.registryUrl ?? null;
     this.collaborators = dependencies.collaborators ?? {};
     const resolvedOptions = dependencies;
     this.currentManifest = resolvedOptions.currentManifest ?? null;
@@ -120,20 +110,15 @@ export class SwitchEventDayUseCase implements SwitchEventDayOperation {
     this.createToken =
       resolvedOptions.createToken ??
       (() => `event-day-token-${Date.now()}-${++this.tokenSequence}`);
-    this.fetcher =
-      resolvedOptions.fetcher ??
-      (globalThis.fetch ? globalThis.fetch.bind(globalThis) : null);
-    this.loadManifest = resolvedOptions.loadManifest ?? null;
-    this.resolveManifestUrl =
-      resolvedOptions.resolveManifestUrl ??
-      ((url, event) => new URL(event.mapBundle, url).href);
+    this.loadManifest = resolvedOptions.loadManifest;
+    this.activeEventDaySession = dependencies.activeEventDaySession ?? null;
   }
 
   async execute(input: SwitchEventDayInput): Promise<void> {
     const requestedRef = parseRef(input);
     if (this.switching)
       throw new Error("Event/day switch is already in progress");
-    const currentRef = this.repository.getLastOpenedEventDay();
+    const currentRef = this.activeEventDaySession?.getActiveEventDay()?.ref ?? null;
     if (
       currentRef &&
       currentRef.eventId === requestedRef.eventId &&
@@ -147,7 +132,11 @@ export class SwitchEventDayUseCase implements SwitchEventDayOperation {
       if (currentRef) await collaborators.beforeSwitch?.(currentRef);
       const prepared = await this.prepare(requestedRef);
       this.commit(prepared);
-      await collaborators.afterSwitch?.(requestedRef, prepared.manifest);
+      await collaborators.afterSwitch?.(
+        requestedRef,
+        prepared.manifest,
+        prepared.state,
+      );
     } catch (error: unknown) {
       this.getCollaborators().onSwitchFailure?.(requestedRef, error);
       throw error;
@@ -203,13 +192,9 @@ export class SwitchEventDayUseCase implements SwitchEventDayOperation {
     signal?: AbortSignal,
   ): Promise<MapBundleManifest> {
     if (this.currentManifest?.eventId === eventId) return this.currentManifest;
-    if (!this.loadManifest && (!this.registryUrl || !this.fetcher))
-      throw new Error("Event manifest loader is required");
     const sequence = ++this.prepareSequence;
     this.activePrepareSequence = sequence;
-    const manifest = this.loadManifest
-      ? await this.loadManifest(event, signal)
-      : await this.fetchManifest(event, signal);
+    const manifest = await this.loadManifest(event, signal);
     if (manifest.eventId !== eventId)
       throw new Error(
         `Manifest eventId mismatch: expected '${eventId}', got '${manifest.eventId}'`,
@@ -217,38 +202,6 @@ export class SwitchEventDayUseCase implements SwitchEventDayOperation {
     if (sequence !== this.activePrepareSequence)
       throw new Error("Transition preparation was superseded");
     return manifest;
-  }
-
-  private async fetchManifest(
-    event: EventRegistryEntry,
-    signal?: AbortSignal,
-  ): Promise<MapBundleManifest> {
-    if (!this.registryUrl || !this.fetcher || !this.resolveManifestUrl)
-      throw new Error("Event manifest loader is required");
-    const response = await this.fetcher(
-      this.resolveManifestUrl(this.registryUrl, event),
-      { signal },
-    );
-    if (!response.ok)
-      throw new Error(`Manifest request failed (${response.status})`);
-    const manifest = (await response.json()) as MapBundleManifest;
-    const base = new URL(".", this.resolveManifestUrl(this.registryUrl, event));
-    return {
-      ...manifest,
-      areas: manifest.areas.map((area) => {
-        const copy = { ...area };
-        for (const key of [
-          "mapFile",
-          "pointsFile",
-          "gridMetaFile",
-          "gridFile",
-        ]) {
-          if (typeof copy[key] === "string")
-            copy[key] = new URL(copy[key], base).href;
-        }
-        return copy;
-      }),
-    };
   }
 
   private getCollaborators(): SwitchEventDayCollaborators {

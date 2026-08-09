@@ -1407,25 +1407,14 @@ test("webapp navigation map renders the configured map image", () => {
 
 test("webapp initializes the injected map catalog before binding the manifest", () => {
   const appSource = read("apps/webapp/js/app/browser-application.ts");
-  const loadIndex = appSource.indexOf(
-    "await loadRuntimeMapBundleManifestFromUrl",
-  );
-  const initializeIndex = appSource.indexOf(
-    "existingApp.routeMapAreaCatalog.initializeMapAreas",
-    loadIndex,
-  );
-  const initializeBindingIndex = appSource.indexOf(
-    "await existingApp.init(",
-    initializeIndex,
+  const assemblySource = read(
+    "apps/webapp/js/app/assemble-comipath-application.ts",
   );
 
-  assert.ok(loadIndex >= 0);
-  assert.ok(initializeIndex > loadIndex);
-  assert.ok(initializeBindingIndex > initializeIndex);
-  assert.match(
-    appSource,
-    /catch\s*\(error\)[\s\S]*renderMapBootstrapError\(existingApp\.document,\s*error\)/,
-  );
+  assert.doesNotMatch(appSource, /loadRuntimeMapBundleManifestFromUrl/);
+  assert.doesNotMatch(appSource, /saveAndRememberLastOpened/);
+  assert.match(assemblySource, /afterSwitch: async \(newRef, manifest, state\)/);
+  assert.match(assemblySource, /activeEventDaySession\.setActiveEventDay\(newRef, state\)/);
 });
 
 test("webapp injects route guidance and delegates the start flow to its controller", () => {

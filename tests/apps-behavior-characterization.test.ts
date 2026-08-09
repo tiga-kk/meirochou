@@ -218,6 +218,10 @@ describe("apps public behavior characterization", () => {
     const searchNextSpy = vi
       .spyOn(app, "searchNext")
       .mockImplementation(async () => {});
+    app.activeEventDaySession.setActiveEventDay(
+      REF,
+      repository.load(REF)!,
+    );
 
     await app.init(
       { bundleVersion: "bundle-v1", areas: [] },

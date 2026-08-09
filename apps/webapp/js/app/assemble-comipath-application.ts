@@ -1,4 +1,5 @@
 import { BrowserApplication } from "./browser-application";
+import { createDevDemoData, isDevDemoEnabled } from "../dev-demo-data.js";
 import {
   completeCircleVisit,
   type CompleteCircleVisitInput,
@@ -140,6 +141,12 @@ export function assembleComiPathApplication(
   const openInitialEventDay = new OpenInitialEventDayUseCase(repository);
   let eventDaySelectorController: EventDaySelectorController | null = null;
   let switchEventDay: SwitchEventDayUseCase | null = null;
+  const eventDayTransition = {
+    execute: (input: EventDayRef) => {
+      if (!switchEventDay) throw new Error("Event day transition is not ready");
+      return switchEventDay.execute(input);
+    },
+  };
 
   // Route Guidance invalidation fallback if not provided
   const routeGuidanceInvalidation: RouteGuidanceInvalidation =
@@ -333,68 +340,126 @@ export function assembleComiPathApplication(
       pendingGasUpdatesController,
       backgroundProcess,
       eventRegistry: options.registry,
-      loadEventRegistry: () =>
-        options.registry
-          ? Promise.resolve({ registry: options.registry, registryUrl: "" })
-          : loadEventRegistryWithUrl(),
+      eventDayTransition,
     },
   });
 
   const baseApp = createComiPathApplication({
     browserRuntime: {
       start: async () => {
+        const demoEnabled = isDevDemoEnabled(options.window.location);
+        const browserFetcher = options.window.fetch?.bind(options.window);
+        const loaded = options.registry
+          ? { registry: options.registry, registryUrl: "" }
+          : demoEnabled
+            ? {
+                registry: {
+                  schemaVersion: 1 as const,
+                  events: [
+                    {
+                      eventId: "demo-v1",
+                      displayName: "Demo Event",
+                      mapBundle: "demo",
+                      days: [{ dayId: "day1", displayName: "Day 1" }],
+                    },
+                  ],
+                },
+                registryUrl: "",
+              }
+            : browserFetcher
+              ? await loadEventRegistryWithUrl(undefined, browserFetcher)
+              : {
+                  registry: {
+                    schemaVersion: 1 as const,
+                    events: [
+                      {
+                        eventId: "demo-v1",
+                        displayName: "Demo Event",
+                        mapBundle: "demo",
+                        days: [{ dayId: "day1", displayName: "Day 1" }],
+                      },
+                    ],
+                  },
+                  registryUrl: "",
+                };
+        browserRuntime.eventRegistry = loaded.registry;
+        browserRuntime.eventRegistryUrl = loaded.registryUrl;
+
+        if (demoEnabled) {
+          const demoData = createDevDemoData();
+          const purchased = new Set<string>(demoData.purchasedList);
+          const held = new Set<string>(demoData.holdList);
+          const circleStates: Record<string, "purchased" | "held"> = {};
+          for (const circle of demoData.wantToBuy) {
+            if (purchased.has(circle.space)) circleStates[circle.space] = "purchased";
+            else if (held.has(circle.space)) circleStates[circle.space] = "held";
+          }
+          const now = new Date().toISOString();
+          repository.save(
+            { eventId: "demo-v1", dayId: "day1" },
+            {
+              schemaVersion: 2,
+              source: { type: "csv", fileName: "demo-ui.csv" },
+              sourceGeneration: "demo-ui",
+              circles: demoData.wantToBuy,
+              circleStates,
+              gasOutbox: [],
+              timestamps: { createdAt: now, updatedAt: now, sourceUpdatedAt: now },
+            },
+          );
+        }
+
+        const runtimeRegistry = loaded.registry;
+        const runtimeRegistryUrl = loaded.registryUrl;
+        switchEventDay = new SwitchEventDayUseCase({
+          repository,
+          registry: runtimeRegistry,
+          activeEventDaySession,
+          currentManifest: null,
+          loadManifest: async (event, signal) =>
+            runtimeRegistryUrl
+              ? ((await loadRuntimeMapBundleManifestFromUrl(
+                  resolveEventMapManifestUrl(runtimeRegistryUrl, event),
+                  event.eventId,
+                  {
+                    fetcher: browserFetcher,
+                    signal,
+                  },
+                )) as unknown as MapBundleManifest)
+              : {
+                  schemaVersion: 1,
+                  eventId: event.eventId,
+                  displayName: event.displayName,
+                  areas: [],
+                },
+          collaborators: {
+            afterSwitch: async (newRef, manifest, state) => {
+              runtimeMapAreaCatalog.replaceMapAreas(manifest.areas);
+              browserRuntime.currentManifest = manifest;
+              currentRouteGuidanceBundleVersion = manifest.bundleVersion ?? null;
+              activeEventDaySession.setActiveEventDay(newRef, state);
+            },
+          },
+        });
+        eventDaySelectorController = new EventDaySelectorController({
+          switchEventDay,
+          openInitialEventDay,
+          registry: runtimeRegistry,
+          view:
+            options.eventDayView ??
+            new DomEventDaySelectorView(
+              typeof options.document.querySelector === "function"
+                ? options.document.querySelector("event-day-selector")
+                : null,
+            ),
+          repository,
+          activeEventDaySession,
+          targetElement: options.targetElement ?? options.document,
+        });
+        await eventDaySelectorController.start();
         await browserRuntime.start();
         currentRouteGuidanceBundleVersion =
           browserRuntime.currentManifest?.bundleVersion ?? null;
-        const runtimeRegistry = browserRuntime.eventRegistry;
-        const runtimeRegistryUrl = browserRuntime.eventRegistryUrl;
-        if (runtimeRegistry) {
-          switchEventDay = new SwitchEventDayUseCase({
-            repository,
-            registry: runtimeRegistry,
-            ...(runtimeRegistryUrl ? { registryUrl: runtimeRegistryUrl } : {}),
-            currentManifest: browserRuntime.currentManifest,
-            ...(runtimeRegistryUrl
-              ? {
-                  loadManifest: async (event: Parameters<typeof resolveEventMapManifestUrl>[1], signal?: AbortSignal) =>
-                    (await loadRuntimeMapBundleManifestFromUrl(
-                      resolveEventMapManifestUrl(runtimeRegistryUrl, event),
-                      event.eventId,
-                      {
-                        fetcher: options.window.fetch?.bind(options.window),
-                        signal,
-                      },
-                    )) as unknown as MapBundleManifest,
-                }
-              : {}),
-            collaborators: {
-              afterSwitch: async (newRef, manifest) => {
-                runtimeMapAreaCatalog.replaceMapAreas(manifest.areas);
-                browserRuntime.currentManifest = manifest;
-                currentRouteGuidanceBundleVersion =
-                  manifest.bundleVersion ?? null;
-                const state = repository.load(newRef);
-                if (state) activeEventDaySession.setActiveEventDay(newRef, state);
-              },
-            },
-          });
-          eventDaySelectorController = new EventDaySelectorController({
-            switchEventDay,
-            openInitialEventDay,
-            registry: runtimeRegistry,
-            view:
-              options.eventDayView ??
-              new DomEventDaySelectorView(
-                typeof options.document.querySelector === "function"
-                  ? options.document.querySelector("event-day-selector")
-                  : null,
-              ),
-            repository,
-            activeEventDaySession,
-            targetElement: options.targetElement ?? options.document,
-          });
-          await eventDaySelectorController.start();
-        }
         circleDataSourceController.start();
         return undefined;
       },

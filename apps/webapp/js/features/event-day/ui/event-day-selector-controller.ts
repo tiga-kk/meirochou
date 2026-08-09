@@ -113,15 +113,7 @@ export class EventDaySelectorController {
 
     view.showBusy?.(true);
     try {
-      const state = repository?.load(initial.ref) ?? null;
-      if (state) {
-        this.dependencies.activeEventDaySession?.setActiveEventDay(
-          initial.ref,
-          state,
-        );
-      } else {
-        await this.dependencies.switchEventDay.execute(initial.ref);
-      }
+      await this.dependencies.switchEventDay.execute(initial.ref);
       if (!this.stopped) view.showSuccess?.();
     } catch (error: unknown) {
       if (!this.stopped) {

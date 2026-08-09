@@ -4,7 +4,6 @@ import type { EventDayRepository } from "./event-day-repository";
 
 export interface OpenInitialEventDayResult {
   readonly ref: EventDayRef;
-  readonly existing: boolean;
 }
 
 /** Resolves the durable last-opened event/day, or the first registry option. */
@@ -28,8 +27,8 @@ export class OpenInitialEventDayUseCase {
           candidate.eventId === ref.eventId && candidate.dayId === ref.dayId,
       )
     ) {
-      return { ref: candidates[0], existing: false };
+      return { ref: candidates[0] };
     }
-    return { ref, existing: this.repository.load(ref) !== null };
+    return { ref };
   }
 }
