@@ -54,6 +54,13 @@ test("予定を開くと巡回順と地図pinの番号が一致し案内状態�
       .filter((index) => index !== null)
       .sort((left, right) => Number(left) - Number(right)),
   );
+  for (const index of pinIndexes) {
+    await expect(
+      page.locator(
+        `#navigation-pin-layer .itinerary-pin[data-itinerary-index="${index}"]`,
+      ),
+    ).toHaveAccessibleName(new RegExp(`^${index}番、`));
+  }
   await expect(page.locator("#target-space-heading")).toHaveText(
     beforeTarget || "",
   );
@@ -526,6 +533,13 @@ test("一覧から目的地を選び購入・保留状態を更新する", async
     page.locator("#gallery-grid .no-image-placeholder"),
   ).toContainText("No Image");
   await expect(page.locator("#gallery-grid .gallery-item img")).toHaveCount(2);
+  const buyButton = page.locator("#gallery-grid .gallery-btn-buy").first();
+  const buyButtonSize = await buyButton.evaluate((button) => {
+    const rect = button.getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
+  });
+  expect(buyButtonSize.width).toBeGreaterThanOrEqual(44);
+  expect(buyButtonSize.height).toBeGreaterThanOrEqual(44);
   await page
     .locator("#toast")
     .evaluate((toast) => toast.classList.remove("show"));

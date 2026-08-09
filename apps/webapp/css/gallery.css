@@ -180,6 +180,8 @@
   border: 1px solid var(--ink);
   border-radius: 0;
   padding: 4px 10px;
+  min-width: 44px;
+  min-height: 44px;
   font-size: 0.8rem;
   cursor: pointer;
   flex-shrink: 0;

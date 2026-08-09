@@ -372,8 +372,7 @@ export class DomRouteMapView {
       button.style.left = `${pin.x}%`;
       button.style.top = `${pin.y}%`;
       this.applyPinSize(button, pin.state);
-      button.setAttribute(
-        "aria-label",
+      const normalPinLabel =
         pin.state === "start"
           ? `出発地点 ${pin.space}`
           : pin.state === "next"
@@ -384,7 +383,12 @@ export class DomRouteMapView {
                 ? `購入済み ${pin.space}`
                 : pin.state === "hold"
                   ? `保留中 ${pin.space}`
-                  : `候補として選択可能 ${pin.space}`,
+                  : `候補として選択可能 ${pin.space}`;
+      button.setAttribute(
+        "aria-label",
+        itineraryEntry
+          ? `${itineraryEntry.index}番、${normalPinLabel}`
+          : normalPinLabel,
       );
       if (pin.circle && selectionState !== "comparing") {
         button.onclick = (event) => {
