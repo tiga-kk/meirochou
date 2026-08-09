@@ -13,6 +13,7 @@
 
 ## 前提と依存関係
 
+- Task 5完了後に実施する。Task 5と同じ`dom-route-map-view.ts`と`browser-application.ts`を変更するため、Task 5の確定DOM/状態契約を先に取り込む。
 - Task 4のheader/案内バーに「予定」導線を追加できる余地がある。
 - `NavigationState.bestOrder`を正本とし、空の場合のみ`provisionalOrder`へfallbackする。
 

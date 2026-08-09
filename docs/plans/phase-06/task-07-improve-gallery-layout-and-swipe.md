@@ -14,6 +14,7 @@
 ## 前提と依存関係
 
 - Task 1、2の購入処理契約を維持する。
+- Task 3完了後に実施する。Task 3と同じ`gesture-zoom-controller.js`を変更するため、Pointer Events化後の公開契約を前提にする。
 - 既存の画像ロード後`wide`判定を再利用する。
 
 ## 読むべき文書と既存実装
@@ -55,9 +56,10 @@
 8. 発火閾値は固定100pxだけに依存せずカード幅を考慮する。ただし小さいカードでも誤発火しない下限を持つ。
 9. 閾値未満のtouch/pointer endではCSS transitionで元位置へ戻す。
 10. 購入成立時の最終退場animationはCSS transform/opacityで行い、状態更新callbackは1回だけ呼ぶ。
-11. `DomCircleGalleryView`へページロード中一度だけの`hasShownSwipeHint`状態を持たせ、最初の一覧表示で説明用overlayを表示する。
-12. hintは左カードが左へ、右カードが右へ動く短いCSS animationと「左右にスワイプして購入済みにできます」相当の説明を表示し、実データのcallbackを呼ばない。
-13. hintは数秒後またはユーザー操作で消え、同じページロード中は再表示しない。
+11. 一覧の初回説明を同じブラウザで一度だけ表示する。既存にUI preference用storage helperがあれば再利用し、なければUI専用LocalStorage key `comipath:ui:v1:gallery-swipe-hint-seen`だけを追加する。event/day state schemaへ混ぜない。
+12. 最初の一覧表示で未表示なら説明用overlayを表示し、表示開始時にseen stateを保存する。
+13. hintは左カードが左へ、右カードが右へ動く短いCSS animationと「左右にスワイプして購入済みにできます」相当の説明を表示し、実データのcallbackを呼ばない。
+14. hintは数秒後またはユーザー操作で消え、再読み込み後も表示済みなら再表示しない。
 
 ## テスト方針
 
@@ -66,7 +68,7 @@
 - 左列のright swipe、右列のleft swipeではcallbackを呼ばない。
 - 許可方向で閾値超過時だけcallbackを1回呼ぶ。
 - 縦スクロール優先の動きは購入swipeへ誤判定しない。
-- 初回hintは1回だけ表示し、購入callbackを発火しない。
+- 初回hintは同じブラウザで1回だけ表示し、再読み込み後は表示しない。購入callbackを発火しない。
 
 ## 検証コマンド
 
