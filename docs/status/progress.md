@@ -7,10 +7,11 @@
 - リポジトリ: `tiga-kk/meirochou`
 - ブランチ: `feature/phase-05d`
 - 追加計画作成前のHEAD: `6b1499bda9323acb8e77f4bfcd35007d1f8a5114`
-- 現在のフェーズ: Phase 5D 追加修正中
-- 次に着手するタスク: Task 12（残存する責務境界とテスト漏れを解消する）
+- 現在のフェーズ: Phase 5D 完了
+- 次に着手するタスク: なし（次Phaseは自動開始しない）
 - Task 12の診断対象コードHEAD: `9098ebe88e37332ce8e7a14d5d08497ee28ca03b`
 - Task 12計画: `docs/plans/phase-05d/task-12-finish-responsibility-boundaries-and-test-coverage.md`
+- Task 12の完了コミット: `7928cc986f29d7abec5767dfdb4cbc27f4881684`
 - Task 8の基準コミット: `ac8f2b035b3bf22b3ed03221eceebb8ccbf3f63a`
 - 直近のTask 8 WIPコミット: `24cf35fa9724e4b433e2c2573bf8b17d173481c2`
 - Stage 8D-A実装完了HEAD: `d9978339613201b838a53ed4865fbb001b2f056c`
@@ -128,6 +129,12 @@ Task 11は完了した。`npm run verify:webapp`、resume反復6/6、`npm run te
 
 Task 11の検証結果は`9098ebe`時点のbaselineとして有効である。ただしTask 12でproduction/test/architecture checkerを変更するため、Phase 5Dの最終完了判定にはTask 12後の再検証を使用する。
 
+### Task 12の状態
+
+Task 12は完了した。Stage 12A〜12Fで、BrowserApplicationの型境界、Event Day startup transition、Pending GAS request state、Route Guidanceのsnapshot/map asset境界、architecture checker、webapp test discoveryを整理した。デモ用manifest接続、起動失敗時の診断画面、地図領域の受け渡し、自動GAS送信と手動再送の表示状態分離も追加のE2E回帰修正として完了している。
+
+最終検証は、`npm run test:webapp`、`npm run test:route-guidance`、`npm run test:phase-05d-regressions`、`npm run check:webapp`、`npm run build:webapp`、`npm run verify:webapp:build`、`npm run verify:gas`、`npm run test:e2e:ci`（38 passed / 8 skipped）、`node scripts/audit-public-tree.mjs`、`git diff --check`で成功した。検証済みremote HEADは`7928cc9`である。
+
 ### Task 9の状態
 
 Task 9は未完了だった`BrowserEventBinding`実装を`browser-application.ts`へ分離し、`bind-browser-events.ts`をapp-owned listenerのcompose/cleanupだけへ縮小して完了した。Route Guidance、circle status/page action、settings shellのapp-owned listenerを責務別binderへ分け、GAS outboxとlocal deletionのfeature内部Custom Eventは各Controllerの`start()/stop()`へ移管した。注入された`document`を使うため、別DOMへの誤登録も防止している。
@@ -218,6 +225,6 @@ Task 7で得た検証結果は原因調査のbaselineとして利用し、Task 8
 | Task 9 | 完了 | browser event registrationをowner別に整理し、root binderをcompose/cleanupへ縮小 |
 | Task 10 | 完了 | 既知候補と新規露出snapshotを根拠付きで解消。Flow1 gallery fixture不整合を修正 |
 | Task 11 | 完了 | `9098ebe`でPhase全体検証、CI相当E2E、public tree auditを実行。Task 12後に最終検証を再取得する |
-| Task 12 | 未着手 | Task 11後の独立レビューで確認した残存application責務、Event Day startup、feature request ownership、Route Guidance snapshot/asset boundary、test discovery漏れを解消 |
+| Task 12 | 完了 | Stage 12A〜12F完了。責務境界、startup診断、feature request ownership、Route Guidance契約、test discoveryを確定し、最終E2Eを再検証 |
 
 タスク完了時はこの表と「次に着手するタスク」を実態に合わせて更新する。個別タスク文書へ進捗状態を重複して記録しない。
