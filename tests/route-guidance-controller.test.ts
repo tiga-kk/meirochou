@@ -152,8 +152,6 @@ describe("RouteGuidanceController", () => {
       bundleVersion: "bundle-v1",
       currentLocation: { areaId: "east", label: "A", number: "1" },
       pendingCircles: [{ space: "東A01a" }],
-      matrixRef: null,
-      optimizationTimeLimitMs: 5000,
     });
     expect(startGuidance.execute).toHaveBeenCalledWith({
       eventDay: { eventId: "c108", dayId: "day1" },

@@ -186,8 +186,11 @@ describe("apps public behavior characterization", () => {
           "generation-1",
           NOW,
         ),
-        circles: [{ space: "E1-01", removedFromSource: false }],
-        circleStates: { "E1-01": "pending" },
+        circles: [
+          { space: "E1-00", removedFromSource: true },
+          { space: "E1-01", removedFromSource: false },
+        ],
+        circleStates: { "E1-00": "pending", "E1-01": "pending" },
       })),
       save: vi.fn(),
       saveAndRememberLastOpened: vi.fn(),
@@ -249,7 +252,7 @@ describe("apps public behavior characterization", () => {
     expect(initializeResumeStartup).toHaveBeenCalledWith({
       eventDay: REF,
       bundleVersion: "bundle-v1",
-      circleStates: { "E1-01": "pending" },
+      circleStates: { "E1-00": "pending", "E1-01": "pending" },
       pendingCircleSpaces: ["E1-01"],
     });
     expect(dialog.targetSpace).toBe("E1-01");

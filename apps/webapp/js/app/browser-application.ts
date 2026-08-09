@@ -872,8 +872,8 @@ export class BrowserApplication {
         .filter(
           (c) =>
             !c.removedFromSource &&
-            activeState.circleStates[c.space] === undefined ||
-              String(activeState.circleStates[c.space]) === "pending",
+            (activeState.circleStates[c.space] === undefined ||
+              String(activeState.circleStates[c.space]) === "pending"),
         )
         .map((c) => c.space);
 
@@ -1353,9 +1353,6 @@ export class BrowserApplication {
                 number: numberInput.value,
               },
               pendingCircles: allCandidates,
-              matrixRef: this.navigationRuntimeController.getMatrixRef(),
-              optimizationTimeLimitMs:
-                this.routeGuidanceController.getOptimizationTimeLimit(),
             });
           } catch (error) {
             console.warn("Route guidance could not be started.", error);

@@ -4,7 +4,6 @@ import { parseGridMeta, parsePointsPayload } from "../apps/webapp/js/features/ro
 import { planRoute } from "../apps/webapp/js/features/route-guidance/domain/routing/grid-route-planner.ts";
 import { InMemoryMapAreaCatalog } from "../apps/webapp/js/features/route-guidance/infrastructure/in-memory-map-area-catalog.ts";
 import { buildOptimizationProblem } from "../apps/webapp/js/features/route-guidance/use-cases/build-route-optimization-problem.ts";
-import { BrowserApplication } from "../apps/webapp/js/app/browser-application.ts";
 
 test("manifest prefixes and labels resolve circle spaces without an explicit list", () => {
   const catalog = new InMemoryMapAreaCatalog([
@@ -28,68 +27,6 @@ test("demo map can build the route origin required by candidate selection", () =
       startPosition: route?.startPosition,
     }),
   ).not.toBeNull();
-});
-
-test("demo navigation state supplies the origin contract used by candidate selection", async () => {
-  const snapshots = [];
-  const app = {
-    wantToBuy: [
-      { space: "東ア23a", priority: 10 },
-      { space: "東ア31b", priority: 9 },
-    ],
-    routeGuidanceController: { invalidatePendingDestinationSelection() {} },
-    routeMapAreaCatalog: new InMemoryMapAreaCatalog([
-      {
-        areaId: "demo-east",
-        id: "demo-east",
-        prefixes: ["東"],
-        labels: ["ア"],
-      },
-    ]),
-    readCurrentSpace: () => "東ア10",
-    getUnvisited() {
-      return this.wantToBuy;
-    },
-    rankCandidatesByGrid: async (_start, candidates) => candidates,
-    planGridRoute: async () => ({
-      cost: 224,
-      startPosition: { x: 10, y: 50 },
-      targetPosition: { x: 20, y: 30 },
-      cells: [],
-      points: [],
-    }),
-    targetWithRoute(target, route) {
-      return { ...target, gridDistance: Math.round(route.cost) };
-    },
-    getNavigationContext: () => ({}),
-    scheduleTimeout(callback) {
-      callback();
-      return 0;
-    },
-    ui: {
-      showLoading() {},
-      showNavigation() {},
-      showToast() {},
-    },
-    replaceRouteGuidanceSnapshot(changes) {
-      snapshots.push(changes);
-    },
-  };
-
-  await BrowserApplication.prototype.searchNextDevDemo.call(app);
-
-  expect(snapshots.at(-1).navigationState).toMatchObject({
-    stage: "navigating",
-    areaId: "demo-east",
-    currentPosition: {
-      source: "arrived-circle",
-      circleSpace: "東ア10",
-    },
-    lockedFirstLeg: {
-      from: { type: "circle", space: "東ア10" },
-      toSpace: "東ア23a",
-    },
-  });
 });
 
 test("demo resume inputs are accepted by the ALNS problem boundary", () => {

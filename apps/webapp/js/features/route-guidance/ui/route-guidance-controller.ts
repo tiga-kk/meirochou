@@ -42,6 +42,11 @@ export interface InitializeResumeStartupInput {
   readonly pendingCircleSpaces: readonly string[];
 }
 
+export type StartRouteGuidanceControllerInput = Omit<
+  Parameters<StartRouteGuidanceUseCase["execute"]>[0],
+  "matrixRef" | "optimizationTimeLimitMs"
+>;
+
 export type InitializeResumeStartupResult =
   | { readonly kind: "idle" }
   | {
@@ -71,7 +76,7 @@ export class RouteGuidanceController {
   }
 
   async startFromCurrentLocation(
-    input: Parameters<StartRouteGuidanceUseCase["execute"]>[0],
+    input: StartRouteGuidanceControllerInput,
   ): Promise<void> {
     return this.deps.startGuidance.execute({
       ...input,
@@ -152,10 +157,6 @@ export class RouteGuidanceController {
 
   setOptimizationTimeLimit(value: 5000 | 10000 | 15000): void {
     this.optimizationTimeLimitMs = value;
-  }
-
-  getOptimizationTimeLimit(): 5000 | 10000 | 15000 {
-    return this.optimizationTimeLimitMs;
   }
 
   saveSnapshot(
