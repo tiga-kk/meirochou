@@ -25,7 +25,9 @@ Phase 5Dで整理した責務境界を維持したまま、実際のデプロイ
 
 ### 通常状態で候補経路が重なる
 
-`FinishCurrentCircleUseCase`は次の目的地へ進んだ後、`currentRoute`と`selectedRoute`へ同じ経路を入れながら`selectionStatus`を`ready`にしている。地図Viewは`ready`でも候補経路を描画するため、赤い通常経路と青い候補経路が同一位置へ重なり得る。
+`FinishCurrentCircleUseCase`は次の目的地へ進んだ後、`currentRoute`と`selectedRoute`へ同じ経路を入れながら`selectionStatus`を`ready`にしている。さらに`StartRouteGuidanceUseCase`も通常案内の初回目的地を確定するとき同じ組み合わせを作る。地図Viewは`ready`でも候補経路を描画するため、案内開始直後や購入後進行直後に赤い通常経路と青い候補経路が同一位置へ重なり得る。
+
+通常案内ではcurrent/selectedが同じ値でも候補選択中とは扱わず`idle`とする。青線は`comparing`だけで描画する。
 
 ### 経路変更後の購入で進行できない
 
@@ -39,6 +41,12 @@ Phase 5Dで整理した責務境界を維持したまま、実際のデプロイ
 
 現行テストは「GAS失敗時にも購入状態とoutboxが残る」ことは証明しているが、「GAS失敗と無関係にRoute Guidanceが次へ進み、次のお品書きを描画する」結合契約までは固定していない。
 
+### 一覧購入が非同期保存とRoute Guidanceへ正しく接続されていない
+
+`DomCircleGalleryView.handleGalleryPurchase()`は本番では非同期の`BrowserApplication.addPurchased()`を呼ぶが、現行実装はPromiseを待たず、先に購入成功toast、カード除外、件数更新を行う。そのため端末保存が失敗しても一覧だけ成功表示になる余地がある。
+
+また、一覧から現在target以外のサークルを購入すると`FinishCurrentCircleUseCase`は`ignored`になり、ローカル購入状態だけが進んでも`NavigationState.bestOrder`/`provisionalOrder`へそのspaceが残り得る。その後に現在targetを購入した際、すでに購入済みのspaceを次targetとして選び`next-target-missing`へ到達しないよう、一覧購入時に将来順序から除外する必要がある。現在targetと`lockedFirstLeg`は非現在targetの購入では変更しない。
+
 ## UI方針
 
 ### メイン画面
@@ -51,6 +59,8 @@ Phase 5Dで整理した責務境界を維持したまま、実際のデプロイ
 - Twitter/Xアカウント、優先度、次の目的地等は小さな補助情報として横方向へまとめる。
 - 購入済み・保留は常に押しやすい44px以上のタッチ領域を維持する。
 - 候補サークル選択時だけ候補用の下部パネルを表示する。
+- ページ全体のユーザー拡大をviewport設定で禁止しない。地図操作との競合は地図操作領域だけの`touch-action`で扱う。
+- 地図上の旧overlayから表示要素を移す場合、`DomRouteGuidanceView`が参照するDOM idを参照切れにしない。
 
 ### 巡回予定
 
@@ -62,10 +72,13 @@ Phase 5Dで整理した責務境界を維持したまま、実際のデプロイ
 
 - `.gallery-grid`を2列へする。
 - 横長画像は既存の`wide`判定を使って2列占有にする。
+- 既存の優先度順/スペース順はDOM順として維持し、`dense`配置やJSでの見た目優先再配列を行わない。
 - 縦長カードのスワイプ可能方向は、ジェスチャー開始時の実配置から左列/右列を判定する。
 - 横長カードは従来どおり左右どちらにもスワイプ可能とする。
 - スワイプ中は指の水平移動量をそのまま1:1でカードへ適用せず、係数を掛けて抵抗感を出す。
 - 閾値未満では自然に元位置へ戻す。
+- 閾値を超えても端末保存成功前にカードを恒久的に除去しない。同じspaceの購入を処理中に二重開始しない。
+- 現在target以外を一覧購入した場合は現在経路を維持し、購入済みspaceだけを将来のRoute Guidance順序から除外する。全経路再計算は行わない。
 - 初回ヒントは実カードへ購入操作を発生させず、説明用のCSSアニメーションだけを表示する。
 - 初回ヒントは同じブラウザで最初の一覧表示時だけ表示し、表示済みをUI専用のLocalStorage keyで保持する。event/dayの保存schemaには追加しない。
 
@@ -83,6 +96,7 @@ CSSが担当するもの:
 TypeScript/JavaScriptが担当するもの:
 - Route Guidanceの状態遷移
 - スワイプ方向と閾値の判定
+- 一覧購入の非同期成功/失敗判定と二重開始防止
 - Pointer Eventsからのパン・ピンチ状態
 - requestAnimationFrameへまとめる描画更新
 - GAS outboxの配送
@@ -99,6 +113,7 @@ TypeScript/JavaScriptが担当するもの:
 - 操作開始時、画像ロード時、コンテナサイズ変更時等に必要な境界値を更新する。
 - ピンチ中も同じtransform stateを正本にする。
 - ホイールズームとマウス/タッチの入力を同じ内部状態へ収束させる。
+- `pointercancel`/`lostpointercapture`後にactive pointerを残さず、次の操作を開始できる状態へ戻す。
 - `touch-action: none`は地図操作領域だけへ限定する。
 
 ## GAS local-first方針
