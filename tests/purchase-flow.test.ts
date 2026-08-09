@@ -327,6 +327,8 @@ describe("circle-status production integration", () => {
       routeOptimizationGeneration: 1,
     });
 
+    fixture.app.startSyncCoordinator();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     await fixture.app.handleAction("purchase");
     await new Promise((resolve) => setTimeout(resolve, 0));
 

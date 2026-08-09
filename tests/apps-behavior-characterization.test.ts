@@ -92,9 +92,18 @@ describe("apps public behavior characterization", () => {
       navigationState: {
         stage: "navigating",
         areaId: "east",
-        currentPosition: null,
+        currentPosition: {
+          areaId: "east",
+          gridIndex: 0,
+          svgX: 0,
+          svgY: 0,
+          source: "manual-start",
+        },
         targetSpace: "E1-01",
-        lockedFirstLeg: null,
+        lockedFirstLeg: {
+          from: { type: "start", areaId: "east", gridIndex: 0 },
+          toSpace: "E1-01",
+        },
         provisionalOrder: ["E1-01", "E1-02"],
         bestOrder: ["E1-01", "E1-02"],
       },
