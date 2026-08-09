@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+      content="width=device-width, initial-scale=1.0"
     />
     <title>Meirochou</title>
 
@@ -53,30 +53,25 @@
       <!-- 現在地入力 -->
       <div class="card location-card">
         <div class="current-location-header">
-            <h2>現在地</h2>
-            <div class="location-controls">
-              <select id="loc-ewsn"></select>
-              <select id="loc-label"></select>
-              <input
-                id="loc-number"
-                type="number"
-                min="1"
-                max="99"
-                step="1"
-                inputmode="numeric"
-                value="10"
-                aria-label="現在地の番号"
-              />
-            </div>
+          <h2>現在地</h2>
+          <div class="location-controls">
+            <select id="loc-ewsn"></select>
+            <select id="loc-label"></select>
+            <input
+              id="loc-number"
+              type="number"
+              min="1"
+              max="99"
+              step="1"
+              inputmode="numeric"
+              value="10"
+              aria-label="現在地の番号"
+            />
+          </div>
+          <button type="button" id="btn-search" class="btn btn-primary">
+            <i class="fa-solid fa-magnifying-glass"></i> 次の目的地を検索
+          </button>
         </div>
-        <button
-          type="button"
-          id="btn-search"
-          class="btn btn-primary"
-          style="margin-top: 0.5rem"
-        >
-          <i class="fa-solid fa-magnifying-glass"></i> 次の目的地を検索
-        </button>
       </div>
 
       <!-- 次の目的地 -->
@@ -86,6 +81,18 @@
         </div>
 
         <div id="target-content" class="hidden">
+          <div class="navigation-summary" aria-live="polite">
+            <div class="route-card">
+              <span>NEXT</span>
+              <strong id="target-space-heading">---</strong>
+            </div>
+
+            <div class="map-log">
+              <div><span>FROM</span><strong id="target-start-space">---</strong></div>
+              <div><span>ROUTE</span><strong id="target-route-log">---</strong></div>
+            </div>
+          </div>
+
           <div class="navigation-map" id="navigation-map">
             <div class="map-transform-layer" id="navigation-map-layer">
               <img
@@ -96,15 +103,6 @@
               <div class="pin-layer" id="navigation-pin-layer"></div>
             </div>
 
-            <div class="route-card">
-              <span>NEXT</span>
-              <strong id="target-space-heading">---</strong>
-            </div>
-
-            <div class="map-log">
-              <div><span>FROM</span><strong id="target-start-space">---</strong></div>
-              <div><span>ROUTE</span><strong id="target-route-log">---</strong></div>
-            </div>
           </div>
 
           <div class="target-bottom-sheet">
