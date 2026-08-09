@@ -30,14 +30,18 @@ test("shows the in-app data and operation guide", async () => {
   expect(guide.textContent).toContain("経路を比較");
   expect(guide.textContent).toContain("左列の縦長カードは左方向");
   expect(guide.textContent).toContain("未送信データは設定画面から再送");
-  expect(guide.querySelector(".user-guide-body")?.getAttribute("style")).toBeNull();
+  expect(
+    guide.querySelector(".user-guide-body")?.getAttribute("style"),
+  ).toBeNull();
 });
 
 test("closes with Escape and restores focus to the opener", async () => {
   const opener = document.createElement("button");
   const guide = await renderGuide(opener);
 
-  expect(guide.querySelector("#btn-close-user-guide")).toBe(document.activeElement);
+  expect(guide.querySelector("#btn-close-user-guide")).toBe(
+    document.activeElement,
+  );
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
   await guide.updateComplete;
 

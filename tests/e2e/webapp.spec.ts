@@ -1,7 +1,7 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { routeDemoEventRegistry } from "./fixture-registry";
 
-const pinFor = (page: any, space: string) =>
+const pinFor = (page: Page, space: string) =>
   page.locator(`#navigation-pin-layer .map-pin[data-space="${space}"]`);
 
 test.beforeEach(async ({ context, page }) => {
@@ -30,7 +30,9 @@ test("予定を開くと巡回順と地図pinの番号が一致し案内状態�
   await page.goto("/?demo_ui=1");
 
   await expect(page.locator("#target-space-heading")).not.toHaveText("---");
-  const beforeTarget = await page.locator("#target-space-heading").textContent();
+  const beforeTarget = await page
+    .locator("#target-space-heading")
+    .textContent();
   await page.locator("#btn-open-itinerary").click();
 
   const dialog = page.locator("#route-itinerary-dialog");
@@ -48,7 +50,9 @@ test("予定を開くと巡回順と地図pinの番号が一致し案内状態�
         .sort((left, right) => Number(left) - Number(right)),
     );
   expect(pinIndexes).toEqual(
-    entryIndexes.filter((index) => index !== null).sort((left, right) => Number(left) - Number(right)),
+    entryIndexes
+      .filter((index) => index !== null)
+      .sort((left, right) => Number(left) - Number(right)),
   );
   await expect(page.locator("#target-space-heading")).toHaveText(
     beforeTarget || "",
@@ -56,7 +60,9 @@ test("予定を開くと巡回順と地図pinの番号が一致し案内状態�
 
   await dialog.getByRole("button", { name: "予定を閉じる" }).click();
   await expect(dialog.getByRole("dialog")).toHaveCount(0);
-  await expect(page.locator("#navigation-pin-layer .itinerary-pin")).toHaveCount(0);
+  await expect(
+    page.locator("#navigation-pin-layer .itinerary-pin"),
+  ).toHaveCount(0);
   await expect(page.locator("#target-space-heading")).toHaveText(
     beforeTarget || "",
   );
@@ -73,25 +79,37 @@ test("使い方をheaderから開き、本文を拡大表示して閉じられ�
   const dialog = guide.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await expect(guide.getByRole("heading", { name: "CSVを使う" })).toBeVisible();
-  await expect(guide.getByRole("heading", { name: "Google Spreadsheet / GASを使う" })).toBeVisible();
-  await expect(guide.getByRole("heading", { name: "地図と経路変更" })).toBeVisible();
-  await expect(guide.getByRole("heading", { name: "一覧とスワイプ" })).toBeVisible();
-  await expect(guide.getByRole("heading", { name: "未送信GASデータ" })).toBeVisible();
+  await expect(
+    guide.getByRole("heading", { name: "Google Spreadsheet / GASを使う" }),
+  ).toBeVisible();
+  await expect(
+    guide.getByRole("heading", { name: "地図と経路変更" }),
+  ).toBeVisible();
+  await expect(
+    guide.getByRole("heading", { name: "一覧とスワイプ" }),
+  ).toBeVisible();
+  await expect(
+    guide.getByRole("heading", { name: "未送信GASデータ" }),
+  ).toBeVisible();
 
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "200%";
   });
-  const scrollMetrics = await guide.locator(".user-guide-body").evaluate((body) => {
-    const dialogElement = body.closest<HTMLElement>(".user-guide-dialog");
-    const dialogStyle = dialogElement ? getComputedStyle(dialogElement) : null;
-    const bodyStyle = getComputedStyle(body);
-    return {
-      dialogMaxHeight: dialogStyle?.maxHeight,
-      dialogOverflow: dialogStyle?.overflow,
-      bodyOverflowY: bodyStyle.overflowY,
-      bodyCanScroll: body.scrollHeight > body.clientHeight,
-    };
-  });
+  const scrollMetrics = await guide
+    .locator(".user-guide-body")
+    .evaluate((body) => {
+      const dialogElement = body.closest<HTMLElement>(".user-guide-dialog");
+      const dialogStyle = dialogElement
+        ? getComputedStyle(dialogElement)
+        : null;
+      const bodyStyle = getComputedStyle(body);
+      return {
+        dialogMaxHeight: dialogStyle?.maxHeight,
+        dialogOverflow: dialogStyle?.overflow,
+        bodyOverflowY: bodyStyle.overflowY,
+        bodyCanScroll: body.scrollHeight > body.clientHeight,
+      };
+    });
   expect(scrollMetrics.dialogMaxHeight).not.toBe("none");
   expect(scrollMetrics.dialogOverflow).toBe("hidden");
   expect(["auto", "scroll"]).toContain(scrollMetrics.bodyOverflowY);
