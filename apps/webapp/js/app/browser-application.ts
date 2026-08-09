@@ -1150,6 +1150,7 @@ export class BrowserApplication {
     this.selectionMessage = "";
     this.ui.showNavigation(this.getNavigationContext("current"));
     this.ui.showToast(`目的地を ${destination.space} に変更しました`);
+    this.saveNavigationSnapshot();
   }
 
   /** Leave comparison while retaining the selected target details. */

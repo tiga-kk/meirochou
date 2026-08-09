@@ -146,10 +146,18 @@ describe("apps public behavior characterization", () => {
     app.routeGuidanceSession.subscribe((snapshot) => transitions.push(snapshot));
     app.ui.showNavigation = vi.fn();
     app.ui.showToast = vi.fn();
+    const saveNavigationSnapshot = vi.spyOn(app, "saveNavigationSnapshot");
 
     app.handleConfirmRoute();
 
     expect(transitions).toHaveLength(1);
+    expect(saveNavigationSnapshot).toHaveBeenCalledOnce();
+    expect(app.ui.showNavigation).toHaveBeenCalledWith(
+      expect.objectContaining({ fitMode: "current" }),
+    );
+    expect(app.ui.showToast).toHaveBeenCalledWith(
+      "目的地を E1-01 に変更しました",
+    );
     expect(app.routeGuidanceSession.getSnapshot()).toMatchObject({
       currentDestination: activeState.circles[0],
       currentRoute: route,
