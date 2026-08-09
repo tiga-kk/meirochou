@@ -1448,8 +1448,11 @@ test("webapp injects route guidance and delegates the start flow to its controll
   );
   assert.match(
     startFlow,
-    /await this\.routeGuidanceController\.startFromCurrentLocation\(\{[\s\S]*eventDay:[\s\S]*startPosition,[\s\S]*pendingCircles: candidates,/,
+    /await this\.routeGuidanceController\.startFromCurrentLocation\(\{[\s\S]*eventDay:[\s\S]*currentLocation:[\s\S]*pendingCircles: allCandidates,/,
   );
+  assert.doesNotMatch(startFlow, /planRoute(?:FromGridIndex)?\(/);
+  assert.doesNotMatch(startFlow, /loadGridRouteAssets\(/);
+  assert.doesNotMatch(startFlow, /replaceRouteGuidanceSnapshot\(/);
   assert.doesNotMatch(startFlow, /startRouteGuidanceUseCase/);
 });
 

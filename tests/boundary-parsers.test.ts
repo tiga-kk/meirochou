@@ -5,10 +5,12 @@ import {
   parseEventMapBundleManifest,
   parseGasCircleResponse,
   parseGasSheetListResponse,
-  parseGridMeta,
   parseMapBundleManifest,
-  parsePointsPayload,
 } from "../apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers";
+import {
+  parseGridMeta,
+  parsePointsPayload,
+} from "../apps/webapp/js/features/route-guidance/infrastructure/route-asset-parsers";
 import { runtimeMapAreaCatalog } from "../apps/webapp/js/features/route-guidance/infrastructure/runtime-map-area-catalog";
 
 const validMapManifest = {

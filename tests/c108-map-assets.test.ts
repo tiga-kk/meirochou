@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "vitest";
+import { parseEventMapBundleManifest } from "../apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers";
 import {
-  parseEventMapBundleManifest,
   parseGridMeta,
   parsePointsPayload,
-} from "../apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers";
+} from "../apps/webapp/js/features/route-guidance/infrastructure/route-asset-parsers";
 
 const BUNDLE_ROOT = resolve("apps/webapp/map-bundles/C108");
 const AREA_IDS = ["e456", "e7", "s12", "w12"];

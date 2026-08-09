@@ -120,4 +120,89 @@ describe("StartRouteGuidanceUseCase", () => {
     ).resolves.toBeUndefined();
     expect(session.replaceSnapshot).toHaveBeenCalled();
   });
+
+  it("resolves raw current location and commits the display target once", async () => {
+    const session = {
+      replaceSnapshot: vi.fn(),
+      getSnapshot: () => ({ navigationState: null }),
+    };
+    const mapArea = {
+      areaId: "e456",
+      prefixes: ["東"],
+      labels: ["A"],
+    };
+    const snapshotRepo = { saveSnapshot: vi.fn() };
+    const useCase = new StartRouteGuidanceUseCase(
+      session as any,
+      {
+        getAllMapAreas: () => [mapArea],
+        getMapArea: () => mapArea,
+        findMapAreaForCircleSpace: () => mapArea,
+      } as any,
+      { loadMapAssets: vi.fn(async () => assets) } as any,
+      snapshotRepo as any,
+    );
+
+    await useCase.execute({
+      eventDay: { eventId: "c108", dayId: "day1" },
+      bundleVersion: "bundle-v1",
+      currentLocation: { areaId: "e456", label: "A", number: "1" },
+      pendingCircles: [{ space: "東A01" }],
+      matrixRef: null,
+      optimizationTimeLimitMs: 10000,
+    });
+
+    expect(session.replaceSnapshot).toHaveBeenCalledOnce();
+    const snapshot = session.replaceSnapshot.mock.calls[0][0];
+    expect(snapshot.navigationState.currentPosition).toMatchObject({
+      areaId: "e456",
+      gridIndex: 1,
+      svgX: 15,
+      svgY: 5,
+    });
+    expect(snapshot.currentDestination).toMatchObject({
+      space: "東A01",
+      gridDistance: 0,
+      mapPosition: { x: 75, y: 50 },
+    });
+    expect(snapshot.selectedDestination).toBe(snapshot.currentDestination);
+    expect(snapshotRepo.saveSnapshot).toHaveBeenCalledOnce();
+  });
+
+  it("does not commit when route assets fail to load", async () => {
+    const session = { replaceSnapshot: vi.fn() };
+    const snapshotRepo = { saveSnapshot: vi.fn() };
+
+    await expect(
+      new StartRouteGuidanceUseCase(
+        session as any,
+        {
+          getMapArea: () => ({ areaId: "e456" }),
+          findMapAreaForCircleSpace: () => ({ areaId: "e456" }),
+        } as any,
+        {
+          loadMapAssets: vi.fn(async () => {
+            throw new Error("asset failure");
+          }),
+        } as any,
+        snapshotRepo as any,
+      ).execute({
+        eventDay: { eventId: "c108", dayId: "day1" },
+        bundleVersion: "bundle-v1",
+        startPosition: {
+          areaId: "e456",
+          gridIndex: 0,
+          svgX: 1,
+          svgY: 2,
+          source: "manual-start",
+        },
+        pendingCircles: [{ space: "東A01" }],
+        matrixRef: null,
+        optimizationTimeLimitMs: 10000,
+      }),
+    ).rejects.toThrow("asset failure");
+
+    expect(session.replaceSnapshot).not.toHaveBeenCalled();
+    expect(snapshotRepo.saveSnapshot).not.toHaveBeenCalled();
+  });
 });

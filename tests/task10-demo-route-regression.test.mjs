@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { test, expect } from "vitest";
-import { parseGridMeta, parsePointsPayload } from "../apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers.ts";
+import { parseGridMeta, parsePointsPayload } from "../apps/webapp/js/features/route-guidance/infrastructure/route-asset-parsers.ts";
 import { planRoute } from "../apps/webapp/js/features/route-guidance/domain/routing/grid-route-planner.ts";
 import { InMemoryMapAreaCatalog } from "../apps/webapp/js/features/route-guidance/infrastructure/in-memory-map-area-catalog.ts";
 import { buildOptimizationProblem } from "../apps/webapp/js/features/route-guidance/use-cases/build-route-optimization-problem.ts";

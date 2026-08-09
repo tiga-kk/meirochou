@@ -1,10 +1,4 @@
 import type {
-  GridMeta,
-  OcrPoint,
-  OcrPortal,
-  PointsPayload,
-} from "../../route-guidance/public-api";
-import type {
   Circle,
   EventDay,
   EventMapAreaManifest,
@@ -405,94 +399,6 @@ export function parseGasCircleResponse(input: unknown): GasCircleResponse {
 /** Validate the success envelope returned by a GAS sale update. */
 export function parseGasSaleResponse(input: unknown): void {
   gasSuccessEnvelope(input, "GAS sale response");
-}
-
-function parsePortal(input: unknown, path: string): OcrPortal {
-  const value = record(input, path);
-  return {
-    col: nonNegativeInteger(value.col, `${path}.col`),
-    row: nonNegativeInteger(value.row, `${path}.row`),
-    x: nonNegativeNumber(value.x, `${path}.x`),
-    y: nonNegativeNumber(value.y, `${path}.y`),
-  };
-}
-
-function parsePoint(input: unknown, path: string): OcrPoint {
-  const value = record(input, path);
-  if (!Array.isArray(value.portals)) {
-    throw new BoundaryValidationError(`${path}.portals`, "an array");
-  }
-  const number = value.number;
-  if (typeof number !== "string" && typeof number !== "number") {
-    throw new BoundaryValidationError(`${path}.number`, "a string or number");
-  }
-  return {
-    identifier: text(value.identifier, `${path}.identifier`),
-    number,
-    center_x: nonNegativeNumber(value.center_x, `${path}.center_x`),
-    center_y: nonNegativeNumber(value.center_y, `${path}.center_y`),
-    portals: value.portals.map((portal, index) =>
-      parsePortal(portal, `${path}.portals[${index}]`),
-    ),
-    ...(typeof value.id === "string" ? { id: value.id } : {}),
-    ...(typeof value.point_id === "number" ? { point_id: value.point_id } : {}),
-    ...(typeof value.group_id === "string" ? { group_id: value.group_id } : {}),
-  };
-}
-
-export function parsePointsPayload(input: unknown): PointsPayload {
-  const value = record(input, "points payload");
-  const image = record(value.image, "points payload.image");
-  if (!Array.isArray(value.points)) {
-    throw new BoundaryValidationError("points payload.points", "an array");
-  }
-  const parsed: PointsPayload = {
-    image: {
-      width: positiveNumber(image.width, "points payload.image.width"),
-      height: positiveNumber(image.height, "points payload.image.height"),
-      ...(typeof image.path === "string" ? { path: image.path } : {}),
-    },
-    points: value.points.flatMap((point, index) => {
-      const path = `points payload.points[${index}]`;
-      const candidate = record(point, path);
-      if (candidate.identifier === null || candidate.identifier === undefined)
-        return [];
-      return [parsePoint(candidate, path)];
-    }),
-  };
-  if (value.grid !== undefined) {
-    const grid = record(value.grid, "points payload.grid");
-    parsed.grid = {
-      cell_size: positiveNumber(
-        grid.cell_size,
-        "points payload.grid.cell_size",
-      ),
-      cols: positiveNumber(grid.cols, "points payload.grid.cols"),
-      rows: positiveNumber(grid.rows, "points payload.grid.rows"),
-      ...(typeof grid.grid_file === "string"
-        ? { grid_file: grid.grid_file }
-        : {}),
-      ...(typeof grid.meta_file === "string"
-        ? { meta_file: grid.meta_file }
-        : {}),
-    };
-  }
-  return parsed;
-}
-
-export function parseGridMeta(input: unknown): GridMeta {
-  const value = record(input, "grid metadata");
-  return {
-    width: positiveNumber(value.width, "grid metadata.width"),
-    height: positiveNumber(value.height, "grid metadata.height"),
-    cell_size: positiveNumber(value.cell_size, "grid metadata.cell_size"),
-    cols: positiveNumber(value.cols, "grid metadata.cols"),
-    rows: positiveNumber(value.rows, "grid metadata.rows"),
-    ...(typeof value.map_id === "string" ? { map_id: value.map_id } : {}),
-    ...(typeof value.grid_file === "string"
-      ? { grid_file: value.grid_file }
-      : {}),
-  };
 }
 
 function validateMapBundlePath(value: unknown, path: string): string {

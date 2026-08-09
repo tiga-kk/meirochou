@@ -1025,8 +1025,8 @@ export class BrowserApplication {
         },
       });
       return {
-        pointsPayload: parsePointsPayload(assets.points),
-        gridMeta: parseGridMeta(assets.gridMetadata),
+        pointsPayload: assets.points,
+        gridMeta: assets.gridMetadata,
         gridBytes: assets.gridBytes,
       };
     } catch (error) {
@@ -1124,81 +1124,6 @@ export class BrowserApplication {
             return;
           }
 
-          // Initial navigation start via NavigationOrchestrationService
-          const area = findAreaForSpace(
-            currentSpace,
-            this.routeMapAreaCatalog,
-          );
-          if (!area) {
-            this.ui.showToast("現在地のエリアを特定できませんでした", "error");
-            resolve();
-            return;
-          }
-
-          // Each C108 area has an independent grid/session. Do not ask the
-          // active area's points/grid assets to resolve circles from another
-          // area; those remain pending until the user switches maps and sets a
-          // start position there.
-          const candidates = allCandidates.filter(
-            (candidate) =>
-              findAreaForSpace(candidate.space, this.routeMapAreaCatalog)?.id ===
-              area.id,
-          );
-          if (candidates.length === 0) {
-            this.ui.showToast(
-              "現在のエリアに未訪問の候補がありません。地図を切り替えて始点を設定してください",
-              "warning",
-            );
-            resolve();
-            return;
-          }
-
-          const assets = await this.loadGridRouteAssets(area);
-          if (!assets) {
-            this.ui.showToast(
-              "グリッド経路アセットの読み込みに失敗しました",
-              "error",
-            );
-            resolve();
-            return;
-          }
-
-          const startPortalIndex = this.findPointPortalIndex(
-            assets.pointsPayload,
-            assets.gridMeta,
-            currentSpace,
-          );
-
-          if (startPortalIndex === null) {
-            this.ui.showToast(
-              "現在地のグリッド位置を特定できませんでした",
-              "error",
-            );
-            resolve();
-            return;
-          }
-
-          const startPointPosition = this.findPointPortalPosition(
-            assets.pointsPayload,
-            assets.gridMeta,
-            currentSpace,
-          );
-          if (!startPointPosition) {
-            this.ui.showToast(
-              "現在地の表示位置を特定できませんでした",
-              "error",
-            );
-            resolve();
-            return;
-          }
-
-          const startPosition = {
-            areaId: area.id,
-            gridIndex: startPortalIndex,
-            ...startPointPosition,
-            source: "manual-start",
-          };
-
           try {
             await this.routeGuidanceController.startFromCurrentLocation({
               eventDay: this.activeRef || {
@@ -1206,11 +1131,27 @@ export class BrowserApplication {
                 dayId: "active",
               },
               bundleVersion: this.currentManifest?.bundleVersion || "unknown",
-              startPosition,
-              pendingCircles: candidates,
+              currentLocation: {
+                areaId: this.document.getElementById("loc-ewsn").value,
+                label: this.document.getElementById("loc-label").value,
+                number: this.document.getElementById("loc-number").value,
+              },
+              pendingCircles: allCandidates,
             });
           } catch (error) {
             console.warn("Route guidance could not be started.", error);
+            if (
+              error?.message?.includes(
+                "No pending route guidance target is available",
+              )
+            ) {
+              this.ui.showToast(
+                "現在のエリアに未訪問の候補がありません。地図を切り替えて始点を設定してください",
+                "warning",
+              );
+              resolve();
+              return;
+            }
             this.ui.showToast(
               "経路の再構築に失敗したため、案内を開始できませんでした",
               "error",
@@ -1219,17 +1160,7 @@ export class BrowserApplication {
             return;
           }
 
-          const guidanceSnapshot = this.routeGuidanceSession.getSnapshot();
-          const displayTarget = this.targetWithRoute(
-            guidanceSnapshot.currentDestination,
-            guidanceSnapshot.currentRoute,
-          );
           this.currentStartSpace = currentSpace;
-          this.replaceRouteGuidanceSnapshot({
-            currentDestination: displayTarget,
-            selectedDestination: displayTarget,
-            selectionStatus: "idle",
-          });
           this.selectionMessage = "";
           this.ui.showNavigation(this.getNavigationContext("current"));
 

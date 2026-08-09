@@ -3,6 +3,7 @@ import type {
   RouteMapAssets,
   RouteMapAssetsLoader,
 } from "../use-cases/route-map-assets-loader";
+import { parseGridMeta, parsePointsPayload } from "./route-asset-parsers";
 
 export class HttpRouteMapAssetsLoader implements RouteMapAssetsLoader {
   private cache = new Map<string, RouteMapAssets>();
@@ -37,10 +38,9 @@ export class HttpRouteMapAssetsLoader implements RouteMapAssetsLoader {
     };
 
     const pointsRes = await load(mapArea.assets.points);
-    const points = (await pointsRes.json()) as RouteMapAssets["points"];
+    const points = parsePointsPayload(await pointsRes.json());
     const metaRes = await load(mapArea.assets.gridMeta);
-    const gridMetadata =
-      (await metaRes.json()) as RouteMapAssets["gridMetadata"];
+    const gridMetadata = parseGridMeta(await metaRes.json());
     const bytesRes = await load(mapArea.assets.grid);
     const gridBytes = new Uint8Array(await bytesRes.arrayBuffer());
 
