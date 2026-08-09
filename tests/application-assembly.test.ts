@@ -39,6 +39,18 @@ const mockState = vi.hoisted(() => ({
   bindings: [] as Array<Record<string, never>>,
 }));
 
+const testRegistry = {
+  schemaVersion: 1 as const,
+  events: [
+    {
+      eventId: "test-event",
+      displayName: "Test Event",
+      mapBundle: "test-map",
+      days: [{ dayId: "day1", displayName: "Day 1" }],
+    },
+  ],
+};
+
 vi.mock("../apps/webapp/js/app/browser-application", () => ({
   BrowserApplication: class {
     constructor(options: BindingOptions) {
@@ -52,6 +64,7 @@ vi.mock("../apps/webapp/js/app/browser-application", () => ({
       mockState.options[0].eventDayDependencies.backgroundProcess.start();
       mockState.workerFactories[0]?.();
     }
+    showStartupError() {}
     dispose() {
       mockState.options[0].eventDayDependencies.backgroundProcess.stop();
     }
@@ -73,6 +86,7 @@ describe("application assembly", () => {
     const app = assembleComiPathApplication({
       document: {} as Document,
       window: {} as Window,
+      registry: testRegistry,
       createAlnsWorker,
     });
     expect(app).toMatchObject({
@@ -89,6 +103,7 @@ describe("application assembly", () => {
     assembleComiPathApplication({
       document: {} as Document,
       window: {} as Window,
+      registry: testRegistry,
     });
 
     expect(mockState.options[0].routeGuidanceDependencies).toMatchObject({
@@ -121,6 +136,7 @@ describe("application assembly", () => {
     const app = assembleComiPathApplication({
       document: {} as Document,
       window: {} as Window,
+      registry: testRegistry,
     });
     const backgroundProcess =
       mockState.options[0].eventDayDependencies.backgroundProcess;
@@ -166,6 +182,7 @@ describe("application assembly", () => {
     assembleComiPathApplication({
       document: {} as Document,
       window: {} as Window,
+      registry: testRegistry,
       repository,
     });
 
@@ -202,6 +219,7 @@ describe("application assembly", () => {
     assembleComiPathApplication({
       document: {} as Document,
       window: {} as Window,
+      registry: testRegistry,
     });
     const routeDependencies = mockState.options[0]
       .routeGuidanceDependencies as any;

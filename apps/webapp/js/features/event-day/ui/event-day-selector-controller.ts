@@ -76,14 +76,14 @@ export class EventDaySelectorController {
    * Starts the controller: loads registry/repository, renders view,
    * binds DOM event listeners, and opens initial event/day.
    */
-  async start(): Promise<void> {
-    if (this.started) return;
+  async start(): Promise<Error | null> {
+    if (this.started) return null;
     this.started = true;
     this.stopped = false;
 
     const { openInitialEventDay, registry, view, repository, targetElement } =
       this.dependencies;
-    if (!registry || !view || !openInitialEventDay) return;
+    if (!registry || !view || !openInitialEventDay) return null;
 
     const lastOpenedRef = repository?.getLastOpenedEventDay() ?? null;
     const initial = openInitialEventDay.execute(
@@ -117,13 +117,15 @@ export class EventDaySelectorController {
       if (!this.stopped) view.showSuccess?.();
     } catch (error: unknown) {
       if (!this.stopped) {
-        view.showError(
-          error instanceof Error ? error.message : "Failed to open event day",
-        );
+        const startupError =
+          error instanceof Error ? error : new Error("Failed to open event day");
+        view.showError(startupError.message);
+        return startupError;
       }
     } finally {
       if (!this.stopped) view.showBusy?.(false);
     }
+    return null;
   }
 
   async selectEventDay(detail: unknown): Promise<void> {

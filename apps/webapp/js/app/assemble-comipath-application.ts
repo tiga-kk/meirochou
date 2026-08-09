@@ -376,12 +376,15 @@ export function assembleComiPathApplication(
                     {
                       eventId: "demo-v1",
                       displayName: "Demo Event",
-                      mapBundle: "demo",
+                      mapBundle: "../maps/demo-v1/manifest.json",
                       days: [{ dayId: "day1", displayName: "Day 1" }],
                     },
                   ],
                 },
-                registryUrl: "",
+                registryUrl: new URL(
+                  "/assets/events/manifest.json",
+                  options.window.location?.href ?? "http://localhost/",
+                ).href,
               }
             : browserFetcher
               ? await loadEventRegistryWithUrl(undefined, browserFetcher)
@@ -392,12 +395,15 @@ export function assembleComiPathApplication(
                       {
                         eventId: "demo-v1",
                         displayName: "Demo Event",
-                        mapBundle: "demo",
+                        mapBundle: "../maps/demo-v1/manifest.json",
                         days: [{ dayId: "day1", displayName: "Day 1" }],
                       },
                     ],
                   },
-                  registryUrl: "",
+                  registryUrl: new URL(
+                    "/assets/events/manifest.json",
+                    options.window.location?.href ?? "http://localhost/",
+                  ).href,
                 };
         browserRuntime.eventRegistry = loaded.registry;
         browserRuntime.eventRegistryUrl = loaded.registryUrl;
@@ -474,7 +480,11 @@ export function assembleComiPathApplication(
           activeEventDaySession,
           targetElement: options.targetElement ?? options.document,
         });
-        await eventDaySelectorController.start();
+        const startupError = await eventDaySelectorController.start();
+        if (startupError) {
+          browserRuntime.showStartupError(startupError);
+          return undefined;
+        }
         await browserRuntime.start();
         circleDataSourceController.start();
         return undefined;

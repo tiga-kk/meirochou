@@ -23,7 +23,10 @@ import type {
   EventRegistry,
   LocalEventDayState,
 } from "../features/event-day/public-api";
-import type { PendingGasUpdateBackgroundProcess } from "../features/circle-status/public-api";
+import type {
+  PendingGasUpdateBackgroundProcess,
+  PendingGasUpdateRetryOptions,
+} from "../features/circle-status/public-api";
 import type { CircleStatusControllerPort as CircleStatusController } from "../features/circle-status/public-api";
 import type { CircleDataSourceSession, CircleDataSourceController } from "../features/circle-data-source/public-api";
 import type { LocalDataDeletionController } from "../features/local-data-deletion/public-api";
@@ -227,7 +230,10 @@ interface PendingGasUpdatesControllerPort {
   invalidateRequests(): void;
   start(): void;
   stop(): void;
-  retryAll(eventDay?: EventDayRef): Promise<number | null>;
+  retryAll(
+    eventDay?: EventDayRef,
+    options?: PendingGasUpdateRetryOptions,
+  ): Promise<number | null>;
   discardOne(eventDay: EventDayRef, updateId: string): void;
 }
 
@@ -513,7 +519,10 @@ export class BrowserApplication {
 
   async flushActiveOutbox() {
     if (!this.activeRef) return { sent: 0, pending: 0, error: null };
-    const sent = (await this.pendingGasUpdatesController.retryAll(this.activeRef)) ?? 0;
+    const sent =
+      (await this.pendingGasUpdatesController.retryAll(this.activeRef, {
+        updateViewState: false,
+      })) ?? 0;
     const pending = this.activeState?.gasOutbox.length ?? 0;
     return { sent, pending, error: pending ? new Error("Pending GAS updates remain") : null };
   }
@@ -897,6 +906,10 @@ export class BrowserApplication {
     } else {
       this.ui.showToast("CSVデータ未設定。空のイベント・日程で起動しました");
     }
+  }
+
+  showStartupError(error: unknown): void {
+    renderMapBootstrapError(this.document, error);
   }
 
   /** Cleanup event listeners and coordinator timers. */

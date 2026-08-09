@@ -316,6 +316,7 @@ export class DomRouteMapView {
     const startSpaceForMap = getRouteStartSpaceForMap(
       startSpace,
       currentTarget?.space || "",
+      this.mapAreaCatalog,
     );
     const positionOverrides = new Map();
     if (currentRoute?.startPosition) {

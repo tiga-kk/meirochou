@@ -30,6 +30,11 @@ interface PendingGasUpdatesControllerOptions {
   readonly onStateChange?: () => void;
 }
 
+export interface PendingGasUpdateRetryOptions {
+  /** Whether to expose this request as the manual retry panel's busy state. */
+  readonly updateViewState?: boolean;
+}
+
 export class PendingGasUpdatesController {
   private eventCleanup: (() => void) | null = null;
   private requestVersion = 0;
@@ -82,28 +87,38 @@ export class PendingGasUpdatesController {
     this.invalidateRequests();
   }
 
-  async retryAll(eventDay?: EventDayRef): Promise<number | null> {
+  async retryAll(
+    eventDay?: EventDayRef,
+    options: PendingGasUpdateRetryOptions = {},
+  ): Promise<number | null> {
+    const updateViewState = options.updateViewState ?? true;
     const requestVersion = ++this.requestVersion;
-    this.state = { busy: true, resultMessage: "", errorMessage: "" };
-    this.options?.onStateChange?.();
+    if (updateViewState) {
+      this.state = { busy: true, resultMessage: "", errorMessage: "" };
+      this.options?.onStateChange?.();
+    }
     try {
       const result = await this.sendUseCase.execute({ eventDay });
       if (requestVersion !== this.requestVersion) return null;
-      this.state = {
-        busy: false,
-        resultMessage: `送信完了 (${result.processedCount}件)`,
-        errorMessage: "",
-      };
-      this.options?.onStateChange?.();
+      if (updateViewState) {
+        this.state = {
+          busy: false,
+          resultMessage: `送信完了 (${result.processedCount}件)`,
+          errorMessage: "",
+        };
+        this.options?.onStateChange?.();
+      }
       return result.processedCount;
     } catch (error) {
       if (requestVersion === this.requestVersion) {
-        this.state = {
-          busy: false,
-          resultMessage: "",
-          errorMessage: "再送処理中にエラーが発生しました。",
-        };
-        this.options?.onStateChange?.();
+        if (updateViewState) {
+          this.state = {
+            busy: false,
+            resultMessage: "",
+            errorMessage: "再送処理中にエラーが発生しました。",
+          };
+          this.options?.onStateChange?.();
+        }
         throw error;
       }
       return null;
