@@ -59,6 +59,7 @@ const snapshot = {
 async function seedNavigation(page: Page): Promise<void> {
   await page.addInitScript(
     ({ state, navSnapshot, stateKey, snapshotKey, matrixKey }) => {
+      if (localStorage.getItem(stateKey)) return;
       localStorage.setItem(
         "comipath:v1:index:event-days",
         JSON.stringify([{ eventId: "demo-v1", dayId: "day1" }]),
@@ -156,6 +157,47 @@ test("valid snapshot resumes in the dialog, preserves target, and reappears afte
     "open",
     "",
   );
+});
+
+test("confirmed route change is saved and resumes with the changed destination", async ({
+  page,
+}) => {
+  await seedNavigation(page);
+  await page.goto("/");
+
+  const resumeDialog = page.locator("#navigation-resume-dialog");
+  await resumeDialog.locator("button.btn-primary").click();
+  await expect(resumeDialog).not.toHaveAttribute("open", "");
+  await expect(page.locator("#target-space-heading")).toContainText("東ア23a");
+
+  const candidatePin = page.locator(
+    '#navigation-pin-layer .map-pin[data-space="東ア31b"]',
+  );
+  await expect(candidatePin).toBeVisible();
+  await candidatePin.evaluate((button) =>
+    (button as HTMLButtonElement).click(),
+  );
+  await expect(page.locator("#selected-target-space")).toHaveText("東ア31b");
+  await expect(page.locator("#btn-preview-route")).toBeEnabled();
+  await page.locator("#btn-preview-route").click();
+  await expect(page.locator("#route-change-confirmation")).toBeVisible();
+  await page.locator("#btn-confirm-route-change").click();
+
+  await expect(page.locator("#target-space-heading")).toContainText("東ア31b");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (key) => JSON.parse(localStorage.getItem(key) || "null"),
+        SNAPSHOT_KEY,
+      ),
+    )
+    .toMatchObject({ navState: { targetSpace: "東ア31b" } });
+
+  await page.reload();
+  const changedResumeDialog = page.locator("#navigation-resume-dialog");
+  await expect(changedResumeDialog).toHaveAttribute("open", "");
+  await expect(changedResumeDialog).toContainText("東ア31b");
+  await expect(changedResumeDialog).not.toContainText("東ア23a");
 });
 
 test("resetting the start clears snapshot but retains the matrix storage sentinel", async ({
