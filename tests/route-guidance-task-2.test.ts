@@ -123,6 +123,9 @@ describe("Task 2 route guidance ownership", () => {
       { saveSnapshot } as any,
     ).execute({
       eventDay: { eventId: "demo", dayId: "day1" },
+      bundleVersion: "bundle-v1",
+      matrixRef: null,
+      optimizationTimeLimitMs: 10000,
       startPosition: {
         areaId: "demo-east",
         gridIndex: 0,
@@ -160,6 +163,9 @@ describe("Task 2 route guidance ownership", () => {
         { saveSnapshot } as any,
       ).execute({
         eventDay: { eventId: "demo", dayId: "day1" },
+        bundleVersion: "bundle-v1",
+        matrixRef: null,
+        optimizationTimeLimitMs: 10000,
         startPosition: {
           areaId: "demo-east",
           gridIndex: 0,

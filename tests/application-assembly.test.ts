@@ -20,8 +20,6 @@ interface BindingOptions {
     readonly routeGuidanceSession: unknown;
     readonly routeMapAreaCatalog: unknown;
     readonly routeMapAssetsLoader: unknown;
-    readonly snapshotRepository: unknown;
-    readonly matrixRepository: unknown;
     readonly navigationRuntimeController: unknown;
     readonly routeGuidanceController: unknown;
   };
@@ -38,18 +36,11 @@ const mockState = vi.hoisted(() => ({
   constructors: 0,
   workerFactories: [] as Array<(() => Worker) | undefined>,
   options: [] as BindingOptions[],
-  bindings: [] as Array<{
-    clearNavigationSnapshot: ReturnType<typeof vi.fn>;
-    matrixRepository: { deleteByEventDay: ReturnType<typeof vi.fn> };
-    currentManifest?: { bundleVersion?: string };
-  }>,
+  bindings: [] as Array<Record<string, never>>,
 }));
 
 vi.mock("../apps/webapp/js/app/browser-application", () => ({
   BrowserApplication: class {
-    clearNavigationSnapshot = vi.fn();
-    matrixRepository = { deleteByEventDay: vi.fn() };
-
     constructor(options: BindingOptions) {
       mockState.constructors += 1;
       mockState.workerFactories.push(options.alnsWorkerFactory);
@@ -104,8 +95,6 @@ describe("application assembly", () => {
       routeGuidanceSession: expect.any(Object),
       routeMapAreaCatalog: expect.any(Object),
       routeMapAssetsLoader: expect.any(Object),
-      snapshotRepository: expect.any(Object),
-      matrixRepository: expect.any(Object),
       navigationRuntimeController: expect.any(Object),
       routeGuidanceController: expect.any(Object),
     });
@@ -180,25 +169,22 @@ describe("application assembly", () => {
       repository,
     });
 
-    const binding = mockState.bindings[0];
     const routeDependencies = mockState.options[0]
       .routeGuidanceDependencies as any;
-    const clearSavedSnapshot = vi.spyOn(
+    const invalidatePersistence = vi.spyOn(
       routeDependencies.routeGuidanceController,
-      "clearSavedSnapshot",
+      "invalidatePersistence",
     );
     const deleteByEventDay = vi.spyOn(
-      routeDependencies.matrixRepository,
-      "deleteByEventDay",
+      routeDependencies.navigationRuntimeController,
+      "deleteMatrix",
     );
     const deletion = mockState.options[0].localDataDeletionController;
     deletion.selectDeletionScope({ kind: "activity", eventDay: ref });
     await deletion.confirmDeletion({ kind: "activity", eventDay: ref });
-    expect(clearSavedSnapshot).toHaveBeenCalledWith(ref);
-    expect(clearSavedSnapshot).toHaveBeenCalledOnce();
+    expect(invalidatePersistence).toHaveBeenCalledWith(ref);
+    expect(invalidatePersistence).toHaveBeenCalledOnce();
     expect(deleteByEventDay).not.toHaveBeenCalled();
-    expect(binding.clearNavigationSnapshot).not.toHaveBeenCalled();
-    expect(binding.matrixRepository.deleteByEventDay).not.toHaveBeenCalled();
 
     deletion.selectDeletionScope({ kind: "circle-source", eventDay: ref });
     await deletion.confirmDeletion({ kind: "circle-source", eventDay: ref });
@@ -207,53 +193,21 @@ describe("application assembly", () => {
       ref.eventId,
       ref.dayId,
     );
-    expect(clearSavedSnapshot).toHaveBeenCalledTimes(2);
-    expect(binding.clearNavigationSnapshot).not.toHaveBeenCalled();
-    expect(binding.matrixRepository.deleteByEventDay).not.toHaveBeenCalled();
+    expect(invalidatePersistence).toHaveBeenCalledWith(ref, true);
+    expect(invalidatePersistence).toHaveBeenCalledTimes(2);
     expect(state.gasOutbox).toEqual([]);
   });
 
-  it("wires start snapshot persistence through the route guidance controller after startup", async () => {
-    const app = assembleComiPathApplication({
+  it("does not install a snapshot adapter in the browser binding", () => {
+    assembleComiPathApplication({
       document: {} as Document,
       window: {} as Window,
     });
     const routeDependencies = mockState.options[0]
       .routeGuidanceDependencies as any;
-    const saveSnapshot = vi.spyOn(
-      routeDependencies.routeGuidanceController,
-      "saveSnapshot",
-    );
-    const clearSavedSnapshot = vi.spyOn(
-      routeDependencies.routeGuidanceController,
-      "clearSavedSnapshot",
-    );
-    const binding = mockState.bindings[0];
-    const startGuidance = routeDependencies.routeGuidanceController.deps
-      .startGuidance;
-    const snapshotRepository = startGuidance.snapshotRepo;
-    const ref: EventDayRef = { eventId: "demo-v1", dayId: "day1" };
-
-    await app.start();
-
-    snapshotRepository.saveSnapshot(ref, {
-      eventId: ref.eventId,
-      dayId: ref.dayId,
-      mapAreaId: "east",
-      startPosition: {
-        areaId: "east",
-        gridIndex: 0,
-        svgX: 10,
-        svgY: 20,
-        source: "manual-start",
-      },
-      targetSpace: "東A01a",
-      visitedSpaces: [],
-    });
-    snapshotRepository.deleteSnapshot(ref);
-
-    expect(saveSnapshot).toHaveBeenCalledWith(ref, "bundle-v1");
-    expect(clearSavedSnapshot).toHaveBeenCalledWith(ref);
-    expect(binding.clearNavigationSnapshot).not.toHaveBeenCalled();
+    expect(routeDependencies).not.toHaveProperty("snapshotRepository");
+    expect(routeDependencies).not.toHaveProperty("matrixRepository");
+    expect(routeDependencies.routeGuidanceController.invalidatePersistence)
+      .toEqual(expect.any(Function));
   });
 });

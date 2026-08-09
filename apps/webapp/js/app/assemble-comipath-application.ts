@@ -86,13 +86,7 @@ export interface AssembleComiPathApplicationOptions {
 export function assembleComiPathApplication(
   options: AssembleComiPathApplicationOptions,
 ): StartableApplication & Record<string, unknown> {
-  let browserRuntime: any;
-  let currentRouteGuidanceBundleVersion: string | null = null;
-  let saveRouteGuidanceControllerSnapshot = (
-    _eventDay: EventDayRef,
-    _bundleVersion: string,
-  ) => {};
-  let clearRouteGuidanceControllerSnapshot = (_eventDay: EventDayRef) => {};
+  let browserRuntime: BrowserApplication | null = null;
   const storage = new StorageService();
   const repository =
     options.repository ?? new LocalStorageEventDayRepository(storage);
@@ -220,35 +214,12 @@ export function assembleComiPathApplication(
       ? { workerFactory: options.createAlnsWorker }
       : {}),
   });
-  const saveRouteGuidanceSnapshot = (eventDay: EventDayRef) => {
-    const bundleVersion = currentRouteGuidanceBundleVersion;
-    if (!bundleVersion) return;
-    try {
-      saveRouteGuidanceControllerSnapshot(eventDay, bundleVersion);
-    } catch (error) {
-      console.warn("Navigation snapshot could not be saved.", error);
-    }
-  };
-  const clearRouteGuidanceSnapshot = (eventDay: EventDayRef) => {
-    try {
-      clearRouteGuidanceControllerSnapshot(eventDay);
-    } catch (error) {
-      console.warn("Navigation snapshot could not be cleared.", error);
-    }
-  };
-  const routeGuidanceSnapshotRepository = {
-    loadSnapshot: () => null,
-    saveSnapshot: (eventDay: EventDayRef) =>
-      saveRouteGuidanceSnapshot(eventDay),
-    deleteSnapshot: (eventDay: EventDayRef) =>
-      clearRouteGuidanceSnapshot(eventDay),
-  };
   const routeGuidanceController = new RouteGuidanceController({
     startGuidance: new StartRouteGuidanceUseCase(
       routeGuidanceSession,
       routeMapAreaCatalog,
       routeMapAssetsLoader,
-      routeGuidanceSnapshotRepository,
+      snapshotRepository,
     ),
     resumeGuidance: new ResumeRouteGuidanceUseCase(
       routeGuidanceSession,
@@ -274,19 +245,14 @@ export function assembleComiPathApplication(
     ),
     navigationRuntimeController,
   });
-  saveRouteGuidanceControllerSnapshot = (eventDay, bundleVersion) =>
-    routeGuidanceController.saveSnapshot(eventDay, bundleVersion);
-  clearRouteGuidanceControllerSnapshot = (eventDay) =>
-    routeGuidanceController.clearSavedSnapshot(eventDay);
 
   const deleteLocalData = new DeleteLocalDataUseCase(
     repository,
     {
-      deleteActivitySnapshot: (ref) => clearRouteGuidanceSnapshot(ref),
-      deleteAllRouteData: (ref) => {
-        matrixRepository.deleteByEventDay(ref.eventId, ref.dayId);
-        clearRouteGuidanceSnapshot(ref);
-      },
+      deleteActivitySnapshot: (ref) =>
+        routeGuidanceController.invalidatePersistence(ref),
+      deleteAllRouteData: (ref) =>
+        routeGuidanceController.invalidatePersistence(ref, true),
     },
     {
       now: () => new Date().toISOString(),
@@ -329,8 +295,6 @@ export function assembleComiPathApplication(
       routeGuidanceSession,
       routeMapAreaCatalog,
       routeMapAssetsLoader,
-      snapshotRepository,
-      matrixRepository,
       navigationRuntimeController,
       routeGuidanceController,
     },
@@ -438,7 +402,6 @@ export function assembleComiPathApplication(
             afterSwitch: async (newRef, manifest, state) => {
               runtimeMapAreaCatalog.replaceMapAreas(manifest.areas);
               browserRuntime.currentManifest = manifest;
-              currentRouteGuidanceBundleVersion = manifest.bundleVersion ?? null;
               activeEventDaySession.setActiveEventDay(newRef, state);
             },
           },
@@ -460,8 +423,6 @@ export function assembleComiPathApplication(
         });
         await eventDaySelectorController.start();
         await browserRuntime.start();
-        currentRouteGuidanceBundleVersion =
-          browserRuntime.currentManifest?.bundleVersion ?? null;
         circleDataSourceController.start();
         return undefined;
       },

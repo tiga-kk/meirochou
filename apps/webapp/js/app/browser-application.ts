@@ -16,6 +16,8 @@ import {
   rankCandidatesByGridDistance,
 } from "../features/route-guidance/domain/routing/grid-route-planner";
 import { buildSpaceFromLocation } from "../features/route-guidance/ui/parse-current-location-form";
+import type { MapBundleManifest } from "../features/event-day/domain/event-day-contracts";
+import type { EventRegistry } from "../features/event-day/public-api";
 import {
   buildDeleteOptions,
   buildEventDayOptions,
@@ -100,6 +102,10 @@ function areSpacesInSameArea(spaceA, spaceB, mapAreaCatalog) {
  * アプリケーションのメインコントローラー
  */
 export class BrowserApplication {
+  eventRegistry: EventRegistry | null = null;
+  eventRegistryUrl: string | null = null;
+  currentManifest: MapBundleManifest | null = null;
+
   constructor(options = {}) {
     this.started = false;
     this.stopped = false;
@@ -124,8 +130,6 @@ export class BrowserApplication {
       !routeGuidanceDependencies.routeGuidanceSession ||
       !routeGuidanceDependencies.routeMapAreaCatalog ||
       !routeGuidanceDependencies.routeMapAssetsLoader ||
-      !routeGuidanceDependencies.snapshotRepository ||
-      !routeGuidanceDependencies.matrixRepository ||
       !routeGuidanceDependencies.navigationRuntimeController ||
       !routeGuidanceDependencies.routeGuidanceController
     ) {
@@ -147,8 +151,6 @@ export class BrowserApplication {
     this.routeGuidanceSession = routeGuidanceDependencies.routeGuidanceSession;
     this.routeMapAreaCatalog = routeGuidanceDependencies.routeMapAreaCatalog;
     this.routeMapAssetsLoader = routeGuidanceDependencies.routeMapAssetsLoader;
-    this.snapshotRepository = routeGuidanceDependencies.snapshotRepository;
-    this.matrixRepository = routeGuidanceDependencies.matrixRepository;
     this.navigationRuntimeController =
       routeGuidanceDependencies.navigationRuntimeController;
     this.routeGuidanceController = routeGuidanceDependencies.routeGuidanceController;
@@ -774,12 +776,11 @@ export class BrowserApplication {
 
   /** Invalidate runtime navigation and caches after circle identity changes. */
   invalidateNavigationForSourceChange(ref) {
-    this.clearNavigationSnapshot(ref);
     try {
-      this.matrixRepository.deleteByEventDay(ref.eventId, ref.dayId);
+      this.routeGuidanceController.invalidatePersistence(ref, true);
     } catch (error) {
       console.warn(
-        "Distance matrix could not be cleared after source update.",
+        "Navigation state could not be cleared after source update.",
         error,
       );
     }
@@ -1204,6 +1205,7 @@ export class BrowserApplication {
                 eventId: this.currentManifest?.eventId || "runtime",
                 dayId: "active",
               },
+              bundleVersion: this.currentManifest?.bundleVersion || "unknown",
               startPosition,
               pendingCircles: candidates,
             });

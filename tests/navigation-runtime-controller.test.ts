@@ -34,15 +34,14 @@ describe("Phase 5C Task 11: NavigationRuntimeController", () => {
     const dependencies = createBrowserApplicationOptions();
     const app = new BrowserApplication(dependencies);
     expect(app.navigationRuntimeController).toBeDefined();
-    expect(app.snapshotRepository).toBeDefined();
-    expect(app.matrixRepository).toBeDefined();
-
     expect(app.navigationRuntimeController.getSnapshotRepo()).toBe(
-      app.snapshotRepository,
+      dependencies.routeGuidanceDependencies.navigationRuntimeController.getSnapshotRepo(),
     );
     expect(app.navigationRuntimeController.getMatrixRepo()).toBe(
-      app.matrixRepository,
+      dependencies.routeGuidanceDependencies.navigationRuntimeController.getMatrixRepo(),
     );
+    expect(app).not.toHaveProperty("snapshotRepository");
+    expect(app).not.toHaveProperty("matrixRepository");
     expect(app.navigationRuntimeController.getOrchestration()).toBeDefined();
 
     expect(app.localDataDeletionController).toBe(

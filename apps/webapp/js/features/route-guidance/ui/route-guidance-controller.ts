@@ -3,8 +3,7 @@ import type {
   CircleVisitState,
   EventDayRef,
 } from "../../event-day/public-api";
-import type { NavigationSnapshot } from "../infrastructure/local-storage-route-guidance-snapshot-repository";
-import type { RouteGuidanceRuntimeController } from "../infrastructure/route-guidance-runtime-controller";
+import type { NavigationSnapshot } from "../use-cases/route-guidance-snapshot-repository";
 import type { RouteGuidanceSession } from "../domain/route-guidance-types";
 import type { ApplyOptimizedRouteOrderUseCase } from "../use-cases/apply-optimized-route-order";
 import type {
@@ -20,6 +19,7 @@ import type {
 import type { InvalidateRouteGuidanceUseCase } from "../use-cases/invalidate-route-guidance";
 import type {
   ResumeRouteGuidanceResult,
+  RouteGuidanceRuntimePort,
   ResumeRouteGuidanceUseCase,
 } from "../use-cases/resume-route-guidance";
 import type { StartRouteGuidanceUseCase } from "../use-cases/start-route-guidance";
@@ -32,7 +32,7 @@ export interface RouteGuidanceControllerDependencies {
   session?: RouteGuidanceSession;
   invalidateGuidance?: InvalidateRouteGuidanceUseCase;
   applyOptimizedOrder?: ApplyOptimizedRouteOrderUseCase;
-  navigationRuntimeController: RouteGuidanceRuntimeController;
+  navigationRuntimeController: RouteGuidanceRuntimePort;
 }
 
 export interface InitializeResumeStartupInput {
@@ -73,7 +73,11 @@ export class RouteGuidanceController {
   async startFromCurrentLocation(
     input: Parameters<StartRouteGuidanceUseCase["execute"]>[0],
   ): Promise<void> {
-    return this.deps.startGuidance.execute(input);
+    return this.deps.startGuidance.execute({
+      ...input,
+      matrixRef: this.deps.navigationRuntimeController.getMatrixRef(),
+      optimizationTimeLimitMs: this.optimizationTimeLimitMs,
+    });
   }
 
   initializeResumeStartup(
@@ -184,6 +188,16 @@ export class RouteGuidanceController {
       eventDay.eventId,
       eventDay.dayId,
     );
+  }
+
+  invalidatePersistence(eventDay: EventDayRef, clearMatrix = false): void {
+    this.clearSavedSnapshot(eventDay);
+    if (clearMatrix) {
+      this.deps.navigationRuntimeController.deleteMatrix(
+        eventDay.eventId,
+        eventDay.dayId,
+      );
+    }
   }
 
   async applyOptimizedOrder(

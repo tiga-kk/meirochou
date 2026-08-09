@@ -1,13 +1,16 @@
 import type { EventDayRef } from "../../event-day/public-api";
-import type { ConfirmedPosition } from "../domain/navigation-state";
+import type { NavigationState } from "../domain/route-guidance-types";
 
 export interface NavigationSnapshot {
+  readonly schemaVersion: 1;
   readonly eventId: string;
   readonly dayId: string;
-  readonly mapAreaId: string;
-  readonly startPosition: ConfirmedPosition;
-  readonly targetSpace: string | null;
-  readonly visitedSpaces: readonly string[];
+  readonly areaId: string;
+  readonly bundleVersion: string;
+  readonly matrixRef: string | null;
+  readonly navState: NavigationState;
+  readonly optimizationTimeLimitMs: 5000 | 10000 | 15000;
+  readonly savedAt: string;
 }
 
 export interface RouteGuidanceSnapshotRepository {

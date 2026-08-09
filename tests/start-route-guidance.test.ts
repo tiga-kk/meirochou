@@ -58,6 +58,9 @@ describe("StartRouteGuidanceUseCase", () => {
 
     await useCase.execute({
       eventDay: { eventId: "c108", dayId: "day1" },
+      bundleVersion: "bundle-v1",
+      matrixRef: null,
+      optimizationTimeLimitMs: 10000,
       startPosition: {
         areaId: "e456",
         gridIndex: 0,
@@ -69,7 +72,21 @@ describe("StartRouteGuidanceUseCase", () => {
     });
 
     expect(session.replaceSnapshot).toHaveBeenCalled();
-    expect(snapshotRepo.saveSnapshot).toHaveBeenCalled();
+    expect(snapshotRepo.saveSnapshot).toHaveBeenCalledOnce();
+    expect(snapshotRepo.saveSnapshot).toHaveBeenCalledWith(
+      { eventId: "c108", dayId: "day1" },
+      expect.objectContaining({
+        schemaVersion: 1,
+        eventId: "c108",
+        dayId: "day1",
+        areaId: "e456",
+        bundleVersion: "bundle-v1",
+        matrixRef: null,
+        navState: expect.any(Object),
+        optimizationTimeLimitMs: 10000,
+        savedAt: expect.any(String),
+      }),
+    );
   });
 
   it("uses the catalog area when the start position has no area id", async () => {
@@ -88,6 +105,9 @@ describe("StartRouteGuidanceUseCase", () => {
         snapshotRepo as unknown as RouteGuidanceSnapshotRepository,
       ).execute({
         eventDay: { eventId: "c108", dayId: "day1" },
+        bundleVersion: "bundle-v1",
+        matrixRef: null,
+        optimizationTimeLimitMs: 10000,
         startPosition: {
           areaId: "",
           gridIndex: 0,

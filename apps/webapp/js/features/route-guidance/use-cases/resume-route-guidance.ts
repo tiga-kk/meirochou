@@ -17,6 +17,7 @@ import type {
   NavigationState,
   RouteGuidanceSession,
 } from "../domain/route-guidance-types";
+import type { NavigationSnapshot } from "./route-guidance-snapshot-repository";
 import type { RouteMapAssetsLoader } from "./route-map-assets-loader";
 import { parseSpace } from "../../../shared/domain/space-parser";
 
@@ -26,27 +27,28 @@ export interface ResumeRouteGuidanceInput {
   readonly circleStates: Record<string, CircleVisitState>;
 }
 
-export interface ResumeNavigationSnapshot {
-  readonly schemaVersion: 1;
+export interface StartupInitInput {
   readonly eventId: string;
   readonly dayId: string;
-  readonly areaId: string;
   readonly bundleVersion: string;
-  readonly matrixRef: string | null;
-  readonly navState: NavigationState;
-  readonly optimizationTimeLimitMs: 5000 | 10000 | 15000;
-  readonly savedAt: string;
+  readonly circleStates: Record<string, CircleVisitState>;
+  readonly pendingCircleSpaces: readonly string[];
 }
 
-export interface ResumeRuntimeController {
-  getPendingResumeSnapshot(): ResumeNavigationSnapshot | null;
-  setPendingResumeSnapshot(snapshot: ResumeNavigationSnapshot | null): void;
+export interface StartupInitResult {
+  readonly shouldShowResumeDialog: boolean;
+  readonly snapshot: NavigationSnapshot | null;
+}
+
+export interface RouteGuidanceRuntimePort {
+  getPendingResumeSnapshot(): NavigationSnapshot | null;
+  setPendingResumeSnapshot(snapshot: NavigationSnapshot | null): void;
   getMatrixRef(): string | null;
   setMatrixRef(matrixRef: string | null): void;
   getMatrixRepo(): {
     load(cacheKey: string): StoredDistanceMatrix | null;
   };
-  resumeFromSnapshot(snapshot: ResumeNavigationSnapshot): {
+  resumeFromSnapshot(snapshot: NavigationSnapshot): {
     navState: NavigationState;
     optimizationTimeLimitMs: 5000 | 10000 | 15000;
     matrixRef: string | null;
@@ -70,8 +72,13 @@ export interface ResumeRuntimeController {
   saveSnapshot(
     eventId: string,
     dayId: string,
-    snapshot: ResumeNavigationSnapshot,
+    snapshot: NavigationSnapshot,
   ): void;
+  initStartup(input: StartupInitInput): StartupInitResult;
+  invalidateActiveOptimization(): void;
+  clearSnapshot(eventId: string, dayId: string): void;
+  deleteMatrix(eventId: string, dayId: string): void;
+  dispose(): void;
 }
 
 export type ResumeRouteGuidanceResult =
@@ -157,7 +164,7 @@ function findPointPortalIndex(
 export class ResumeRouteGuidanceUseCase {
   constructor(
     private session: RouteGuidanceSession,
-    private runtimeController: ResumeRuntimeController,
+    private runtimeController: RouteGuidanceRuntimePort,
     private assetsLoader: RouteMapAssetsLoader,
     private mapAreaCatalog?: MapAreaCatalog,
   ) {}
@@ -269,8 +276,8 @@ export class ResumeRouteGuidanceUseCase {
   }
 
   private persistSnapshot(
-    snapshot: ResumeNavigationSnapshot,
-    navState: ResumeNavigationSnapshot["navState"],
+    snapshot: NavigationSnapshot,
+    navState: NavigationSnapshot["navState"],
     optimizationTimeLimitMs: 5000 | 10000 | 15000,
   ) {
     this.runtimeController.saveSnapshot(snapshot.eventId, snapshot.dayId, {
@@ -283,7 +290,7 @@ export class ResumeRouteGuidanceUseCase {
   }
 
   private async rebuildLockedRoute(
-    lockedLeg: NonNullable<ResumeNavigationSnapshot["navState"]["lockedFirstLeg"]>,
+    lockedLeg: NonNullable<NavigationSnapshot["navState"]["lockedFirstLeg"]>,
     targetCircle: Circle,
   ) {
     if (!lockedLeg?.from || !this.mapAreaCatalog) return null;
@@ -317,8 +324,8 @@ export class ResumeRouteGuidanceUseCase {
   }
 
   private async buildOptimizationInput(input: {
-    snapshot: ResumeNavigationSnapshot;
-    navState: ResumeNavigationSnapshot["navState"];
+    snapshot: NavigationSnapshot;
+    navState: NavigationSnapshot["navState"];
     circles: readonly Circle[];
     circleStates: Record<string, CircleVisitState>;
     targetSpace: string;
@@ -463,7 +470,7 @@ export class ResumeRouteGuidanceUseCase {
 
   private isValidStoredMatrix(
     matrix: StoredDistanceMatrix,
-    navState: ResumeNavigationSnapshot["navState"],
+    navState: NavigationSnapshot["navState"],
     targetSpace: string,
   ) {
     return (

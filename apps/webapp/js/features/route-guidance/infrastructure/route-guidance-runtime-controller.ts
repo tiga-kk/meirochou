@@ -1,4 +1,3 @@
-import type { CircleVisitState } from "../../event-day/public-api";
 import type { NavigationState } from "../domain/route-guidance-types";
 import {
   buildOptimizationProblem,
@@ -8,9 +7,13 @@ import type { RouteGuidanceNavigationOperations } from "../use-cases/route-guida
 import type { LocalStorageDistanceMatrixRepository } from "./local-storage-distance-matrix-repository";
 import {
   type LocalStorageRouteGuidanceSnapshotRepository,
-  type NavigationSnapshot,
   validateSnapshotForResume,
 } from "./local-storage-route-guidance-snapshot-repository";
+import type { NavigationSnapshot } from "../use-cases/route-guidance-snapshot-repository";
+import type {
+  StartupInitInput,
+  StartupInitResult,
+} from "../use-cases/resume-route-guidance";
 import { parseTimeDecayedAlnsWorkerResponse } from "./worker/alns-worker-protocol";
 
 export interface AlnsWorkerPort {
@@ -24,19 +27,6 @@ export interface ControllerDependencies {
   readonly matrixRepo: LocalStorageDistanceMatrixRepository;
   readonly orchestration: RouteGuidanceNavigationOperations;
   readonly workerFactory?: () => AlnsWorkerPort;
-}
-
-export interface StartupInitInput {
-  readonly eventId: string;
-  readonly dayId: string;
-  readonly bundleVersion: string;
-  readonly circleStates: Record<string, CircleVisitState>;
-  readonly pendingCircleSpaces: readonly string[];
-}
-
-export interface StartupInitResult {
-  readonly shouldShowResumeDialog: boolean;
-  readonly snapshot: NavigationSnapshot | null;
 }
 
 export interface ResumeResult {
@@ -294,5 +284,9 @@ export class RouteGuidanceRuntimeController {
    */
   clearSnapshot(eventId: string, dayId: string): void {
     this.snapshotRepo.clearByIds(eventId, dayId);
+  }
+
+  deleteMatrix(eventId: string, dayId: string): void {
+    this.matrixRepo.deleteByEventDay(eventId, dayId);
   }
 }

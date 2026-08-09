@@ -35,10 +35,6 @@ import { InvalidateRouteGuidanceUseCase } from "../../apps/webapp/js/features/ro
 import { ResumeRouteGuidanceUseCase } from "../../apps/webapp/js/features/route-guidance/use-cases/resume-route-guidance";
 import { RouteGuidanceNavigationOperations } from "../../apps/webapp/js/features/route-guidance/use-cases/route-guidance-navigation-operations";
 import { createRouteGuidanceSession } from "../../apps/webapp/js/features/route-guidance/use-cases/route-guidance-session";
-import type {
-  NavigationSnapshot,
-  RouteGuidanceSnapshotRepository,
-} from "../../apps/webapp/js/features/route-guidance/use-cases/route-guidance-snapshot-repository";
 import { StartRouteGuidanceUseCase } from "../../apps/webapp/js/features/route-guidance/use-cases/start-route-guidance";
 import { StorageService } from "../../apps/webapp/js/state/storage-service";
 import {
@@ -112,23 +108,12 @@ export function createBrowserApplicationOptions(
     matrixRepo: matrixRepository,
     orchestration: orchestrationService,
   });
-  const routeGuidanceSnapshots = new Map<string, NavigationSnapshot>();
-  const routeGuidanceSnapshotRepository: RouteGuidanceSnapshotRepository = {
-    loadSnapshot: ({ eventId, dayId }) =>
-      routeGuidanceSnapshots.get(JSON.stringify([eventId, dayId])) ?? null,
-    saveSnapshot: ({ eventId, dayId }, snapshot) => {
-      routeGuidanceSnapshots.set(JSON.stringify([eventId, dayId]), snapshot);
-    },
-    deleteSnapshot: ({ eventId, dayId }) => {
-      routeGuidanceSnapshots.delete(JSON.stringify([eventId, dayId]));
-    },
-  };
   const routeGuidanceController = new RouteGuidanceController({
     startGuidance: new StartRouteGuidanceUseCase(
       routeGuidanceSession,
       runtimeMapAreaCatalog,
       routeMapAssetsLoader,
-      routeGuidanceSnapshotRepository,
+      snapshotRepository,
     ),
     resumeGuidance: new ResumeRouteGuidanceUseCase(
       routeGuidanceSession,
@@ -215,8 +200,6 @@ export function createBrowserApplicationOptions(
       routeGuidanceSession,
       routeMapAreaCatalog,
       routeMapAssetsLoader,
-      snapshotRepository,
-      matrixRepository,
       navigationRuntimeController,
       routeGuidanceController,
     },

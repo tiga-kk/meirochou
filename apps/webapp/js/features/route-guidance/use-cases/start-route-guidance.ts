@@ -8,8 +8,11 @@ import type { RouteMapAssetsLoader } from "./route-map-assets-loader";
 
 export interface StartRouteGuidanceInput {
   readonly eventDay: EventDayRef;
+  readonly bundleVersion: string;
   readonly startPosition: ConfirmedPosition;
   readonly pendingCircles: readonly Circle[];
+  readonly matrixRef: string | null;
+  readonly optimizationTimeLimitMs: 5000 | 10000 | 15000;
 }
 
 export class StartRouteGuidanceUseCase {
@@ -53,12 +56,15 @@ export class StartRouteGuidanceUseCase {
         routeOptimizationGeneration: 1,
       });
       this.snapshotRepo.saveSnapshot(input.eventDay, {
+        schemaVersion: 1,
         eventId: input.eventDay.eventId,
         dayId: input.eventDay.dayId,
-        mapAreaId: areaId,
-        startPosition: input.startPosition,
-        targetSpace: null,
-        visitedSpaces: [],
+        areaId,
+        bundleVersion: input.bundleVersion,
+        matrixRef: input.matrixRef,
+        navState: this.session.getSnapshot().navigationState!,
+        optimizationTimeLimitMs: input.optimizationTimeLimitMs,
+        savedAt: new Date().toISOString(),
       });
       return;
     }
@@ -131,12 +137,15 @@ export class StartRouteGuidanceUseCase {
 
     this.session.replaceSnapshot(newSnapshot);
     this.snapshotRepo.saveSnapshot(input.eventDay, {
+      schemaVersion: 1,
       eventId: input.eventDay.eventId,
       dayId: input.eventDay.dayId,
-      mapAreaId: areaId,
-      startPosition: navState.currentPosition,
-      targetSpace: navState.targetSpace,
-      visitedSpaces: [],
+      areaId,
+      bundleVersion: input.bundleVersion,
+      matrixRef: input.matrixRef,
+      navState,
+      optimizationTimeLimitMs: input.optimizationTimeLimitMs,
+      savedAt: new Date().toISOString(),
     });
   }
 }
