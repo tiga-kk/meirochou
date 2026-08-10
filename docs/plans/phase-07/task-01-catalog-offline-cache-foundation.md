@@ -13,6 +13,8 @@
 - offline cache失敗をcircle data/purchase stateのfailureへ昇格させない。
 - UI componentから`caches` APIを直接操作しない。
 - `publicDir`を有効化して`apps/webapp`配下を無差別に公開しない。
+- 同じURLのresponse bodyが裏で変わったことを、opaque responseを読んで自動検出しようとしない。
+- catalog以外のGETや非画像requestを「cacheに偶然matchした」だけで横取りしない。
 
 ## Files
 
@@ -72,6 +74,17 @@ export class CacheEventDayCatalogsUseCase {
 }
 ```
 
+## Cache identity契約
+
+Phase 7ではcatalog imageの**URL文字列をcontent identity兼Cache Storage key**として扱う。
+
+- 同じURLはevent/dayを跨いでも1つのcache entryを共有する。
+- `cacheAll()`は既に同じURLがcache済みなら再downloadしない。
+- source refreshで同じURLのresponse bodyだけが外部側で差し替わっても、Phase 7では自動検出・自動更新しない。
+- 新しい画像内容を確実に取得したいsourceは、新しいURLを返すことを前提とする。
+
+これはopaque cross-origin responseの内容比較やETag管理を追加しないための明示的な制約であり、実装担当が独自のrefresh metadata DBを追加してはいけない。
+
 ## Steps
 
 - [ ] **Step 1: cache portのRED unit testを書く**
@@ -85,6 +98,8 @@ expect(result.failed).toEqual([{ url: urlC, reason: expect.any(String) }]);
 ```
 
 opaque responseもcache成功として扱うtestを追加する。
+
+同じURLを2回`cacheAll()`へ渡しても2回目はnetwork fetchされず、status/countは1件として扱われることも固定する。
 
 - [ ] **Step 2: partial success Use CaseのRED testを書く**
 
@@ -112,11 +127,13 @@ npm run verify:webapp:build
 
 - [ ] **Step 5: Service Workerを実装する**
 
-controlled pageから発生したimage requestについて、catalog cacheにmatchがあればcacheを返し、なければnetworkへ流す。HTML/JS/CSS/map assetまでcache-firstへ変更しない。
+controlled pageから発生した`GET` image requestだけを対象にする。requestがcatalog cacheにmatchすればcacheを返し、matchしなければnetworkへ流す。HTML/JS/CSS/map assetまでcache-firstへ変更しない。
 
 workerは固定cache name`comipath-catalog-v1`を使用する。activate時に古いversionを消す場合は、cache名が`comipath-catalog-`prefixかつcurrent nameと異なるものだけを対象にし、無関係なCache Storageを消さない。
 
-Service Worker側は通常navigation/app shellのfetchへ介入しない。catalog cacheへ登録されたRequestだけをcache fallback対象にするため、messageでURL allowlistをworkerへ送るか、Cache StorageにmatchするRequestだけを先に確認してmatchなしなら即networkへ委譲する。後者を推奨し、別のpersistent allowlist DBは作らない。
+Service Worker側は通常navigation/app shellのfetchへ介入しない。別persistent allowlist DBは作らず、`request.method === "GET"`かつ`request.destination === "image"`を満たすrequestについてcatalog cacheを`match`し、matchなしなら即networkへ委譲する。
+
+cache entryの有無を「catalogとして事前保存済み」の判定に使う。map画像など別用途の画像がcatalog cacheへ明示登録されていない限り横取りしない。
 
 - [ ] **Step 6: registrationをbrowser entrypointから行う**
 
@@ -127,6 +144,8 @@ if ("serviceWorker" in navigator) {
 ```
 
 registration failureはconsole diagnosticに留め、app startupを失敗させない。test環境で`navigator.serviceWorker`がない場合も通常起動できる。
+
+`vite.config.ts`の`base:"./"`を維持する前提で、worker URLは現在pageと同じdirectory scopeへ解決される。scopeを`/`へhard-codeしない。
 
 - [ ] **Step 7: browser infrastructure portを実装する**
 
@@ -160,6 +179,7 @@ worker以外のsource treeをcopyしない。`scripts/verify-webapp-build.mjs`�
 5. Galleryとcurrent catalog双方でcache済みimageが表示される。
 6. 未保存URLは`No Image / オフライン未保存`fallbackになる。
 7. app shell/map assetは通常の既存挙動を維持する。
+8. catalog cacheへ入っていない通常画像requestはnetworkへ委譲される。
 
 - [ ] **Step 11: public tree/security auditを実行する**
 
@@ -190,6 +210,8 @@ Installable PWA: 非対応
 Background Sync: 非対応
 ```
 
+同じURLの外部画像内容が後から差し替わっても自動refreshしないURL identity制約は、ユーザー向け詳細へ書く必要はないが、開発者向け説明に誤って「常に最新版へ更新」と記載しない。
+
 - [ ] **Step 14: commit**
 
 ```bash
@@ -207,9 +229,11 @@ git commit -m "feat(offline): cache catalog images for event use"
 
 - user actionから任意URL集合をCache Storageへ保存できるportがある。
 - already cached URLを再downloadしない。
+- URL文字列がPhase 7のcache identityであることが明示され、同一URLのbody差し替えを自動検出しない。
 - partial failureで成功済みcacheが残る。
 - opaque cross-origin image responseをcacheできる。
 - cached external imageをnetwork failure時に表示できる。
+- Service WorkerはGET imageかつcatalog cache hitだけをcache fallbackし、app shell等を横取りしない。
 - `dist/webapp/catalog-service-worker.js`がproduction buildへ必ず含まれる。
 - service worker registration/cache failureでapp startupが止まらない。
 - app shell全体をcache-firstへしない。
