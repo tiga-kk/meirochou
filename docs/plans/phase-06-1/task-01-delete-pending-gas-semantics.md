@@ -13,9 +13,9 @@
 - unrelatedなLocalStorage schema変更を行わない。
 - 本番で参照されていない表示modelへwarningだけを追加して完了扱いしない。
 
-## Files
+## 対象ファイル
 
-**Modify:**
+**変更:**
 - `apps/webapp/js/shared/ui/management-view-model.ts`
 - `apps/webapp/js/features/local-data-deletion/use-cases/delete-local-data.ts`
 - `apps/webapp/js/components/storage-delete-dialog.ts`
@@ -26,7 +26,7 @@
 
 `apps/webapp/js/features/local-data-deletion/ui/local-data-deletion-dialog-model.ts`は現行の`storage-delete-dialog`本番wiringでは使われていないため、このTaskの必須変更対象にしない。
 
-## Interfaces
+## インターフェース
 
 `DeleteOptionViewModel`はpending outboxをbutton lockとしてではなくwarning metadataとして表現する。Phase 6.1では既存consumerへの変更を最小化するため`blocked`/`blockedReason` field自体は維持するが、pending countだけを理由にblockしない。
 
@@ -71,7 +71,7 @@ buildDeleteOptions()
 
 `buildStorageDeleteDialogModel()`は選択された`DeleteOptionViewModel`を`option`としてそのまま渡しているため、別のconfirmation modelを新設しない。`storage-delete-dialog.ts`は`model.option.pendingDiscardCount`を参照してwarningを表示する。
 
-## Steps
+## 手順
 
 - [ ] **Step 1: pending outbox付きUse Case削除のRED testを書く**
 
