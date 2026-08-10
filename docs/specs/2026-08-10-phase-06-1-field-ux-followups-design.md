@@ -17,7 +17,7 @@ Phase 6を`main`へmergeし、実際の`meirochou.tiga.moe`で操作して判明
 7. Galleryの外向きスワイプは開始直後を重くし、購入閾値へ近づくにつれて追従率を上げる非線形抵抗へ変更する。現在の一定係数0.6は廃止する。
 8. Route Guidanceの表示距離は内部のrouting costをそのまま表示せず、物理距離[m]を表示する。混雑重みは経路探索用costとして保持し、表示距離へ混ぜない。
 9. 物理距離換算はmap bundleごとの明示的なscale値を正本にする。既存資料・地図生成時の実寸基準からscaleを確定し、コード中で推測値を埋め込まない。
-10. 現在経路はStart/Goalを文字でも識別できるようにし、経路方向を視覚的に示す。
+10. 現在経路はStart/Goalを文字でも識別できるようにし、経路方向を視覚的に示す。manual grid startでも必ずStart markerを表示する。
 11. 現在経路には、StartからGoalへ流れるように見える軽量なSVG stroke animationを追加する。経路再計算やJavaScriptの毎フレーム処理は行わない。
 12. `prefers-reduced-motion: reduce`では経路の流れanimationを停止し、Start/Goal表示だけで方向が分かる状態を維持する。
 
@@ -136,7 +136,7 @@ export function calculateSwipeTranslation(
 
 現在の`RouteResult.cost`はgridの画像座標距離へcrowded multiplierを掛けたrouting costである。これは物理距離ではないためUIへ直接表示しない。
 
-`RouteResult`へ物理距離の元になるunweighted path lengthを追加するか、route cells/pointsから表示用distanceを純粋関数で算出する。routing cost自体の意味は変えない。
+`RouteResult`へ物理距離の元になるunweighted path lengthを追加する。`planRoute()`と`planRouteFromGridIndex()`の双方で同じcontractを返し、routing cost自体の意味は変えない。
 
 map bundle manifestのarea metadataへ物理scaleを追加する。
 
@@ -147,26 +147,33 @@ interface MapAreaManifestV1 {
 }
 ```
 
-`metersPerPixel`はC108各areaについて地図生成時に使用した既知実寸基準を調べて確定する。同じeventでもareaごとに異なる可能性を許容する。根拠が見つからない場合は推測値をcommitせず、そのareaの距離を`距離 -`のままにする。計画実装担当は数値を独断で作らない。
+`metersPerPixel`はC108各areaについて地図生成時に使用した既知実寸基準を調べて確定する。同じeventでもareaごとに異なる可能性を許容する。根拠が見つからない場合は推測値をcommitせず、そのTaskを`BLOCKED: physical scale evidence missing`とする。計画実装担当は数値を独断で作らない。
 
 UIは整数mを基本とし、短距離でもcm表示へ切り替えない。
 
 ## Start/Goalと経路animation
 
-Start/Goalは色だけに依存しない。
+Start/Goalは色や既存circle pinだけに依存しない。manual startは任意grid indexから始まるため、既存`.map-pin.start`が存在しない場合がある。
 
-- start pin: `S`
-- goal/current target pin: `G`
-- aria-labelにも`スタート`/`ゴール`を含める。
+current route SVGのsource-image viewBox内へ、route geometryから専用endpoint markerを描く。
+
+- `route.points[0]`に`S`
+- `route.points[route.points.length - 1]`に`G`
+- markerは`pointer-events:none`
+- markerは既存pin state/colorsを置き換えず、その上に方向理解用として描く
+
+`route.startPosition`/`targetPosition`はmap pin用percent座標であり、SVG viewBoxへ直接使わない。S/Gの座標はsource-image座標である`route.points`を使う。
 
 現在経路SVGはsolid base lineを維持し、その上にdirection flow用polylineを1本だけ重ねる。
 
 ```svg
 <polyline class="route-overlay-line" ... />
 <polyline class="route-flow-line" ... />
+<g class="route-endpoint route-start-marker">...<text>S</text></g>
+<g class="route-endpoint route-goal-marker">...<text>G</text></g>
 ```
 
-`route-flow-line`は同じ`points`を使い、CSSの`stroke-dasharray`と`stroke-dashoffset`だけをanimationする。JSの`requestAnimationFrame`、timer、経路points再生成をanimationのために追加しない。
+`route-flow-line`は同じordered `points`を使い、CSSの`stroke-dasharray`と`stroke-dashoffset`だけをanimationする。JSの`requestAnimationFrame`、timer、経路points再生成をanimationのために追加しない。
 
 ```css
 .route-flow-line {
@@ -182,9 +189,9 @@ Start/Goalは色だけに依存しない。
 }
 ```
 
-実装時は実際のpath方向でStart→Goalへ流れて見える符号をvisual/E2E snapshotで確認する。candidate routeには常時animationを追加しない。
+実装時は実際のpath方向でStart→Goalへ流れて見える符号をvisual/E2Eで確認する。candidate routeには常時animationを追加しない。
 
-この方式はroute geometryを一度生成した後にCSSが既存strokeのoffsetだけを変えるため、ALNS、Dijkstra、pin計算、DOM再構築を毎frame行わない。一本のSVG線だけを動かすため、Canvas/WebGLやanimation libraryを導入する必要はない。
+SVG stroke animationはroute geometryを一度生成した後にCSSが既存strokeのoffsetを変えるだけであり、ALNS、Dijkstra、pin計算、DOM再構築を毎frame行わない。一方でSVG paint自体が完全にfreeとは仮定しないため、Task 5で実機profileを取り、長いframeが増えていないことを確認する。
 
 ## 非対象
 
@@ -204,7 +211,7 @@ Start/Goalは色だけに依存しない。
 - map pointermove中にlayout readを繰り返さない。
 - Galleryは開始時に重く、閾値付近で軽くなる。
 - routing costの意味を変えずに、UI距離はm表示になる。
-- Start/Goalが文字で判別できる。
+- circle start/manual grid startの双方でStart/GoalがS/Gで判別できる。
 - current routeのflowがStart→Goal方向に見え、reduced-motionでは停止する。
 - route animationのためのJS frame loopを追加しない。
 - `npm run verify`とCI相当E2Eが成功する。
