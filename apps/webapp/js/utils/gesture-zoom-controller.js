@@ -439,6 +439,20 @@ export function applyRubberBand(value, min, max, overscrollLimit = 32) {
   );
 }
 
+export function calculateSwipeTranslation(rawDelta, triggerDistance) {
+  if (
+    !Number.isFinite(rawDelta) ||
+    !Number.isFinite(triggerDistance) ||
+    triggerDistance <= 0
+  ) {
+    return rawDelta;
+  }
+  const progress = Math.min(Math.abs(rawDelta) / triggerDistance, 1);
+  const eased = progress * progress * (3 - 2 * progress);
+  const ratio = 0.28 + (0.9 - 0.28) * eased;
+  return Math.sign(rawDelta) * Math.abs(rawDelta) * ratio;
+}
+
 /**
  * ギャラリー地図のリサイズ機能を設定
  */
@@ -517,7 +531,8 @@ export function setupSwipeAction(element, callback, options = {}) {
   let gestureAxis = null;
   let allowedDirection = "both";
   let callbackStarted = false;
-  const resistance = Math.max(0, Math.min(options.resistance ?? 0.6, 1));
+  let purchaseTriggerDistance = 0;
+  let rawDelta = 0;
   const getAllowedDirection = options.getAllowedDirection || (() => "both");
 
   const reset = () => {
@@ -533,10 +548,16 @@ export function setupSwipeAction(element, callback, options = {}) {
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       currentX = 0;
+      rawDelta = 0;
       isSwiping = false;
       gestureAxis = null;
       callbackStarted = false;
       allowedDirection = getAllowedDirection(element) || "both";
+      const visualThreshold = Math.max(
+        options.minimumThreshold ?? 100,
+        Math.min((element.getBoundingClientRect().width || 0) * 0.4, 180),
+      );
+      purchaseTriggerDistance = visualThreshold / 0.6;
       element.style.transition = "none";
     },
     { passive: true },
@@ -551,7 +572,8 @@ export function setupSwipeAction(element, callback, options = {}) {
       const deltaY = y - startY;
 
       if (!gestureAxis && Math.max(Math.abs(deltaX), Math.abs(deltaY)) > 8) {
-        gestureAxis = Math.abs(deltaY) > Math.abs(deltaX) ? "vertical" : "horizontal";
+        gestureAxis =
+          Math.abs(deltaY) > Math.abs(deltaX) ? "vertical" : "horizontal";
       }
       if (gestureAxis === "vertical") {
         return;
@@ -563,14 +585,11 @@ export function setupSwipeAction(element, callback, options = {}) {
 
       if (isSwiping) {
         if (e.cancelable) e.preventDefault();
-        currentX = deltaX * resistance;
+        rawDelta = deltaX;
+        currentX = calculateSwipeTranslation(rawDelta, purchaseTriggerDistance);
         element.style.transform = `translateX(${currentX}px)`;
 
-        const threshold = Math.max(
-          options.minimumThreshold ?? 100,
-          Math.min((element.getBoundingClientRect().width || 0) * 0.4, 180),
-        );
-        if (Math.abs(currentX) > threshold) {
+        if (Math.abs(rawDelta) > purchaseTriggerDistance) {
           element.style.opacity = "0.6";
         } else {
           element.style.opacity = "1";
@@ -582,13 +601,14 @@ export function setupSwipeAction(element, callback, options = {}) {
 
   element.addEventListener("touchend", () => {
     if (isSwiping) {
-      const threshold = Math.max(
-        options.minimumThreshold ?? 100,
-        Math.min((element.getBoundingClientRect().width || 0) * 0.4, 180),
-      );
-      const direction = currentX > 0 ? "right" : "left";
-      const permitted = allowedDirection === "both" || allowedDirection === direction;
-      if (!callbackStarted && permitted && Math.abs(currentX) > threshold) {
+      const direction = rawDelta > 0 ? "right" : "left";
+      const permitted =
+        allowedDirection === "both" || allowedDirection === direction;
+      if (
+        !callbackStarted &&
+        permitted &&
+        Math.abs(rawDelta) > purchaseTriggerDistance
+      ) {
         callbackStarted = true;
         const directionSign = currentX > 0 ? 1 : -1;
         element.style.transform = `translateX(${directionSign * 100}%)`;

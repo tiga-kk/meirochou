@@ -636,6 +636,19 @@ test("一覧の左右スワイプが外側方向の購入と端末保存へ到�
     (gridBox?.x ?? 0) + (gridBox?.width ?? 0) / 2,
   );
 
+  await dispatchTouchSwipe(rightCard, 20, 170);
+  await expect(rightCard).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const state = JSON.parse(
+          localStorage.getItem("comipath:v1:demo-v1:day1:state") || "null",
+        );
+        return state?.circleStates?.東イ08b;
+      }),
+    )
+    .not.toBe("purchased");
+
   await dispatchTouchSwipe(rightCard, 20, 200);
   await expect(rightCard).toHaveCount(0);
   await expect
@@ -644,7 +657,7 @@ test("一覧の左右スワイプが外側方向の購入と端末保存へ到�
         const state = JSON.parse(
           localStorage.getItem("comipath:v1:demo-v1:day1:state") || "null",
         );
-        return state?.circleStates?.["東イ08b"];
+        return state?.circleStates?.東イ08b;
       }),
     )
     .toBe("purchased");
@@ -659,7 +672,7 @@ test("一覧の左右スワイプが外側方向の購入と端末保存へ到�
         const state = JSON.parse(
           localStorage.getItem("comipath:v1:demo-v1:day1:state") || "null",
         );
-        return state?.circleStates?.["東ア31b"];
+        return state?.circleStates?.東ア31b;
       }),
     )
     .toBe("purchased");
