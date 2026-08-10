@@ -15,7 +15,7 @@ Task 1/2の既存変更は保持し、Task 4/5の機能は追加していない�
 
 ## コミット
 
-- 実装コミット: `e7bf407cdd647be43415637cd5fe38eadb5dd83f` (`fix(map): align viewport and gestures with map geometry`)
+- 実装コミット: `e7bf40791749f62cc4892c7e8c1cdaae44fe03cc` (`fix(map): align viewport and gestures with map geometry`)
 
 ## 実行コマンドと結果
 
