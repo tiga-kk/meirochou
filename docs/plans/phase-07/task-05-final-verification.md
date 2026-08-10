@@ -18,9 +18,13 @@ Service Worker/Cache Storage、event/day management、source action、visual red
 - `tests/e2e/catalog-offline.spec.ts`
 - `tests/e2e/management.spec.ts`
 - `tests/e2e/webapp.spec.ts`
-- 必要なvisual snapshots
+- `tests/e2e/management.spec.ts-snapshots/settings-shell-source-manager-mobile-chromium-linux.png`（旧settings shellからmanagement overviewへの意図した差分がある場合）
+- `tests/e2e/webapp.spec.ts-snapshots/navigation-map-catalog-mobile-chromium-linux.png`（main visual hierarchyの意図した差分がある場合）
+- `tests/e2e/webapp.spec.ts-snapshots/catalog-gallery-mobile-chromium-linux.png`（Gallery visual hierarchyの意図した差分がある場合）
 - `docs/status/progress.md`（全GREEN後のみ）
-- `README.md`/guidesのoffline/management説明（実装と一致する範囲）
+- `README.md`
+- `guides/user-data-management.md`
+- `guides/gas-sync.md`
 
 ## Required Flows
 
@@ -67,6 +71,8 @@ Service Worker/Cache Storage、event/day management、source action、visual red
 - source編集。
 - pending queueがあるsource変更の明示処理。
 - 削除。
+- `circle-source`/`event-day`/`all-event-days`削除後のcatalog cache cleanup。
+- cache cleanup failure時もlocal deletion結果を維持。
 
 ### Flow F: visual/a11y
 
@@ -125,21 +131,27 @@ cache put rejectionをinjectし、circle state/source data/navigationが変化�
 
 - [ ] **Step 7: visual snapshotを確認する**
 
-animation/reduced-motionを固定した状態でmain/management/Galleryを比較する。変更理由を説明できないsnapshot差分は更新しない。
+`prefers-reduced-motion: reduce`を固定した状態でmain/management/Galleryを比較する。変更理由を説明できないsnapshot差分は更新しない。Filesに列挙した3 snapshotを基本候補とし、別snapshotが失敗した場合は原因確認後に個別対応する。
 
 - [ ] **Step 8: repo hygiene**
+
+Phase 7実装branchはPhase 7開始時の`origin/main`から切る前提で、変更TS/JS/CSSだけを次で検査する。
 
 ```bash
 git diff --check
 git status --short
-npx biome check <Phase-7 changed files>
+git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.ts' '*.js' '*.css' \
+  | xargs -r npx biome check
+npx biome check .
 ```
 
-repo-wide Biomeはmain baselineとの差分で評価し、既存debtを一括修正しない。
+repo-wide BiomeはPhase 7開始時main baselineとの差分で評価し、新規error/warningだけを回帰とする。既存debtを一括修正しない。
 
 - [ ] **Step 9: docsを実装状態へ合わせる**
 
-READMEの`Service Worker/PWA`行は、`Service Worker: catalog offline cacheのみ対応 / installable PWAは非対応`と誤解なく書く。user guide/management guideも実UI名へ合わせる。
+`README.md`の`Service Worker/PWA`行は、`Service Worker: catalog offline cacheのみ対応 / installable PWAは非対応`と誤解なく書く。
+
+`guides/user-data-management.md`へ管理画面のevent/day一覧、offline準備、削除時のcache/outbox扱いを反映する。`guides/gas-sync.md`へ新しい管理画面からの再読込/queue表示導線を反映する。実装に存在しない操作名を書かない。
 
 - [ ] **Step 10: progressを完了へ更新する**
 
@@ -148,15 +160,24 @@ Required Flow A〜GがGREENの場合だけ`docs/status/progress.md`へPhase 7完
 - [ ] **Step 11: commit**
 
 ```bash
-git add tests README.md guides docs/status/progress.md
+git add tests/e2e/catalog-offline.spec.ts \
+  tests/e2e/management.spec.ts tests/e2e/webapp.spec.ts \
+  tests/e2e/management.spec.ts-snapshots/settings-shell-source-manager-mobile-chromium-linux.png \
+  tests/e2e/webapp.spec.ts-snapshots/navigation-map-catalog-mobile-chromium-linux.png \
+  tests/e2e/webapp.spec.ts-snapshots/catalog-gallery-mobile-chromium-linux.png \
+  README.md guides/user-data-management.md guides/gas-sync.md \
+  docs/status/progress.md
 git commit -m "test(phase-07): verify offline and management experience"
 ```
+
+snapshotに意図した差分がなく未変更なら、そのsnapshot pathは`git add`から外す。
 
 ## 受入条件
 
 - offline browser contextで保存済みcatalogが表示できる。
 - partial cache failureが成功cacheを消さない。
 - management overview/actionがproduction DOM wiringで動く。
+- deletion後の不要catalog cache cleanupがbest-effortで動く。
 - mainから旧inline settingsが消えている。
 - Phase 6.1/6の主要回帰がない。
 - `npm run verify`、`npm run test:e2e:ci`、build/public auditがGREEN。
