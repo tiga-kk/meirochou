@@ -1,4 +1,7 @@
-import type { CatalogOfflineCachePort } from "../features/catalog-offline/public-api";
+import {
+  catalogUrlsFromCircles,
+  type CatalogOfflineCachePort,
+} from "../features/catalog-offline/public-api";
 import type {
   EventDayRef,
   EventDayRepository,
@@ -6,25 +9,6 @@ import type {
 } from "../features/event-day/public-api";
 import type { LocalDataDeletionScope } from "../features/local-data-deletion/public-api";
 import type { DeleteLocalDataOperation } from "../features/local-data-deletion/public-api";
-
-function catalogUrls(state: LocalEventDayState): readonly string[] {
-  return [
-    ...new Set(
-      state.circles
-        .filter((circle) => circle.removedFromSource !== true)
-        .map((circle) => circle.tweet)
-        .filter((url): url is string => {
-          if (typeof url !== "string" || url.trim() === "") return false;
-          try {
-            const protocol = new URL(url).protocol;
-            return protocol === "http:" || protocol === "https:";
-          } catch {
-            return false;
-          }
-        }),
-    ),
-  ];
-}
 
 export class DeleteLocalDataWithCatalogCleanup implements DeleteLocalDataOperation {
   constructor(
@@ -60,15 +44,13 @@ export class DeleteLocalDataWithCatalogCleanup implements DeleteLocalDataOperati
       scope.kind === "all-event-days"
         ? this.repository.listEventDaysForDeletion().map((item) => item.state)
         : [this.requireState(scope.eventDay)];
-    return [...new Set(states.flatMap(catalogUrls))];
+    return [...new Set(states.flatMap((item) => catalogUrlsFromCircles(item.circles)))];
   }
 
   private remainingUrls(): Set<string> {
-    const urls = this.repository.listEventDays().flatMap((ref) => {
-      const state = this.repository.load(ref);
-      if (!state) throw new Error(`Missing state for ${ref.eventId}/${ref.dayId}`);
-      return catalogUrls(state);
-    });
+    const urls = this.repository
+      .listEventDaysForDeletion()
+      .flatMap(({ state }) => catalogUrlsFromCircles(state.circles));
     return new Set(urls);
   }
 

@@ -29,24 +29,29 @@ export class DialogFocusController {
   }
 
   private refreshBackgroundTargets(): void {
-    if (this.backgroundSelector) {
-      this.backgroundTargets = Array.from(
-        document.querySelectorAll<HTMLElement>(this.backgroundSelector),
-      );
-      if (this.backgroundTargets.length > 0) return;
-    }
-
-    if (this.backgroundTargets.length === 0) {
-      const container = document.getElementById("main-container");
-      if (container) {
-        this.backgroundTargets = [container];
-      } else {
-        const bodyChildren = Array.from(document.body.children).filter(
-          (el) => el !== this.targetDialog && el instanceof HTMLElement,
-        ) as HTMLElement[];
-        this.backgroundTargets = bodyChildren;
+    const targets: HTMLElement[] = this.backgroundSelector
+      ? Array.from(
+          document.querySelectorAll<HTMLElement>(this.backgroundSelector),
+        )
+      : [];
+    let child: HTMLElement = this.targetDialog;
+    let parent = child.parentElement;
+    while (parent) {
+      for (const sibling of Array.from(parent.children)) {
+        if (sibling !== child && sibling instanceof HTMLElement) {
+          targets.push(sibling);
+        }
       }
+      if (parent === document.body) break;
+      child = parent;
+      parent = parent.parentElement;
     }
+    this.backgroundTargets = Array.from(new Set(targets)).filter(
+      (target) =>
+        target !== this.targetDialog &&
+        !this.targetDialog.contains(target) &&
+        !target.contains(this.targetDialog),
+    );
   }
 
   private handleKeyDown = (e: KeyboardEvent): void => {

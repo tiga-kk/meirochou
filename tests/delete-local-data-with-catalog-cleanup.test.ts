@@ -150,13 +150,13 @@ describe("DeleteLocalDataWithCatalogCleanup", () => {
     const states = new Map([["event:day1", state([onlyA])]]);
     const repo = repository(states);
     const order: string[] = [];
+    let strictCalls = 0;
     vi.mocked(repo.listEventDaysForDeletion).mockImplementation(() => {
-      order.push("candidate");
-      return [{ ref: dayA, state: state([onlyA]) }];
-    });
-    vi.mocked(repo.listEventDays).mockImplementation(() => {
-      order.push("remaining");
-      return [];
+      strictCalls += 1;
+      order.push(strictCalls === 1 ? "candidate" : "remaining");
+      return strictCalls === 1
+        ? [{ ref: dayA, state: state([onlyA]) }]
+        : [];
     });
     const inner = {
       execute: vi.fn(async () => {
@@ -180,8 +180,11 @@ describe("DeleteLocalDataWithCatalogCleanup", () => {
   it("fails closed when remaining references cannot be collected", async () => {
     const states = new Map([["event:day1", state([onlyA])]]);
     const repo = repository(states);
-    vi.mocked(repo.listEventDays).mockImplementation(() => {
-      throw new Error("storage read failure");
+    let strictCalls = 0;
+    vi.mocked(repo.listEventDaysForDeletion).mockImplementation(() => {
+      strictCalls += 1;
+      if (strictCalls > 1) throw new Error("duplicate or missing state");
+      return [{ ref: dayA, state: state([onlyA]) }];
     });
     const offlineCache = cache();
     const inner = { execute: vi.fn(async () => {}) };

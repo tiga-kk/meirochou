@@ -36,8 +36,6 @@ export class StorageDeleteDialog extends LitElement {
 
   private readonly focusController = new DialogFocusController(this, {
     onEscape: () => this.handleClose(),
-    backgroundSelector:
-      ".container > *:not(#settings-area), #settings-area > *:not(storage-delete-dialog)",
   });
 
   constructor() {

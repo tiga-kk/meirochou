@@ -130,6 +130,15 @@ Phase計画:
 - `tests/e2e/webapp.spec.ts`の地図・候補表示snapshotはCIで一度失敗後retryで成功する既存flaky。今回のTask 5追加変更との因果関係は確認できない。
 - `npx biome check .`はリポジトリ既存のlint/format/a11y指摘を含むため、Phase 7の完了判定には使用しない。Task 5では広範な自動整形を行っていない。
 
+### Phase 7レビュー指摘対応
+
+- Service Workerのactivateで`clients.claim()`を実行し、初回registration後の同一pageをreloadなしでcontrolできることをcatalog offline E2Eで確認。
+- 管理overviewの「開く」は日程切替後にmanagement surfaceを閉じ、main navigationへ戻るよう修正。
+- managementの第一層をevent/day rowsへ限定し、旧selector/source/outbox/optimization/delete操作を閉じたsecondary detail surfaceへ移動。編集・再読込・削除からは必要時にdetailを開く。
+- 使用中rowへ`[使用中]`と`aria-current="true"`を追加。
+- offline statusとcache cleanupのcatalog URL抽出を`catalogUrlsFromCircles()`へ統一し、残存参照確認をstrict index listingへ変更。確認不能時はcleanupをskipする。
+- nested dialogのancestor/siblingを含むfocus containmentを共通化し、dialog中の外部操作をinert化するunit testを追加。
+
 ## 実装開始時の確認
 
 Phase 6.1のproduction実装は、この計画文書がレビューされ`main`へ反映された後の最新remote `main`から開始する。`docs/phase-06-1-phase-07-followup-plan`へproduction code/test/package/CI変更を追加しない。

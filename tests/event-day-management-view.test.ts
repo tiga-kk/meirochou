@@ -34,7 +34,12 @@ describe("EventDayManagementView", () => {
         pendingGasCount: 0,
         offlineCatalog: { cached: 0, total: 0 },
       },
-      { ...row, ref: { eventId: "C108", dayId: "day3" }, offlineCatalog: { cached: null, total: 3 } },
+      {
+        ...row,
+        ref: { eventId: "C108", dayId: "day3" },
+        selected: false,
+        offlineCatalog: { cached: null, total: 3 },
+      },
     ];
     document.body.appendChild(view);
     await view.updateComplete;
@@ -44,6 +49,10 @@ describe("EventDayManagementView", () => {
     expect(view.textContent).toContain("お品書き 4 / 8 保存済み");
     expect(view.textContent).toContain("設定する");
     expect(view.textContent).toContain("お品書き 保存状況を確認できません");
+    expect(view.querySelector('[aria-current="true"]')?.textContent).toContain(
+      "[使用中]",
+    );
+    expect(view.querySelectorAll('[aria-current="true"]')).toHaveLength(1);
 
     const events: string[] = [];
     for (const type of [

@@ -171,6 +171,25 @@ input[type="text"] {
   flex-shrink: 0;
 }
 
+.management-detail-surface {
+  width: min(760px, 100%);
+  margin: 0 auto 1rem;
+}
+
+.management-detail-surface > summary {
+  min-height: 44px;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--ink);
+  background: var(--bg-card);
+  cursor: pointer;
+  font-family: var(--font-ui-sans);
+  font-weight: 800;
+}
+
+.management-detail-surface[open] > summary {
+  margin-bottom: 0.75rem;
+}
+
 .event-day-management {
   margin-bottom: 1rem;
   padding-bottom: 1rem;

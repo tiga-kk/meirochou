@@ -14,7 +14,8 @@ self.addEventListener("activate", (event) => {
             )
             .map((name) => caches.delete(name)),
         ),
-      ),
+      )
+      .then(() => self.clients.claim()),
   );
 });
 

@@ -491,6 +491,13 @@ export class BrowserApplication {
     } | null;
   }
 
+  private openManagementDetail(): void {
+    const settings = this.document.getElementById("settings-area") as
+      | (BrowserElement & { openDetail?: () => void })
+      | null;
+    settings?.openDetail?.();
+  }
+
   private async openEventDayForManagement(ref: EventDayRef): Promise<void> {
     await this.eventDayTransition.execute(ref);
   }
@@ -499,6 +506,9 @@ export class BrowserApplication {
     if (!isEventDayRef((detail as { ref?: unknown })?.ref)) return;
     try {
       await this.openEventDayForManagement((detail as { ref: EventDayRef }).ref);
+      if (this.ui.els.settingsArea?.open) {
+        this.toggleSettings(this.document.getElementById("toggle-settings"));
+      }
       this.ui.showToast("日程を開きました");
     } catch {
       this.ui.showToast("日程を開けませんでした", "error");
@@ -513,12 +523,11 @@ export class BrowserApplication {
       const state = this.eventDayRepository.load(ref);
       if (!state) return;
       if (state.source.type === "gas") {
-        if (this.ui.els.settingsArea?.open) {
-          this.toggleSettings(this.document.getElementById("toggle-settings"));
-        }
+        this.openManagementDetail();
         await this.circleDataSourceController.refreshSavedGasSource(ref, state.source);
       } else {
         this.ui.showSettings();
+        this.openManagementDetail();
         this.getSourceManager()?.requestCsvFileSelection?.();
       }
     } catch {
@@ -576,6 +585,7 @@ export class BrowserApplication {
     try {
       await this.openEventDayForManagement(ref);
       this.ui.showSettings();
+      this.openManagementDetail();
       this.getSourceManager()?.focusSourceEditor?.();
     } catch {
       this.ui.showToast("編集画面を開けませんでした", "error");
@@ -587,6 +597,8 @@ export class BrowserApplication {
     if (!isEventDayRef(ref)) return;
     try {
       await this.openEventDayForManagement(ref);
+      this.ui.showSettings();
+      this.openManagementDetail();
       this.handleDeleteOptionSelect({ type: "event-day", ref });
     } catch {
       this.ui.showToast("削除確認を開けませんでした", "error");

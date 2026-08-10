@@ -45,9 +45,13 @@ export class EventDayManagementView extends LitElement {
             ? html`<p class="event-day-management-empty">イベント・日程がありません</p>`
             : this.rows.map(
                 (row) => html`
-                  <article class="event-day-management-row" data-selected=${row.selected ? "true" : "false"}>
+                  <article
+                    class="event-day-management-row"
+                    data-selected=${row.selected ? "true" : "false"}
+                    aria-current=${row.selected ? "true" : nothing}
+                  >
                     <div class="event-day-management-heading">
-                      <h3>${row.eventLabel} / ${row.dayLabel}</h3>
+                      <h3>${row.eventLabel} / ${row.dayLabel}${row.selected ? " [使用中]" : ""}</h3>
                       <span class="event-day-management-source-type">${row.sourceType === "gas" ? "GAS" : row.sourceType === "csv" ? "CSV" : "未設定"}</span>
                     </div>
                     <p class="event-day-management-source">

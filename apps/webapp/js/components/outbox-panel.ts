@@ -53,8 +53,6 @@ export class OutboxPanel extends LitElement {
       onEscape: () => {
         if (!this.discarding) this.handleCloseDiscard();
       },
-      backgroundSelector:
-        ".container > *:not(#settings-area), #settings-area > *:not(outbox-panel)",
     });
   }
 

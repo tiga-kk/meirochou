@@ -1,4 +1,5 @@
 import type { CatalogOfflineCachePort } from "../../features/catalog-offline/public-api";
+import { catalogUrlsFromCircles } from "../../features/catalog-offline/public-api";
 import type {
   EventDayRef,
   EventRegistry,
@@ -30,16 +31,6 @@ export interface BuildEventDayManagementRowsInput {
   readonly offlineCache: CatalogOfflineCachePort;
 }
 
-function isCatalogUrl(value: unknown): value is string {
-  if (typeof value !== "string" || value.trim() === "") return false;
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
 function stateKey(ref: EventDayRef): string {
   return `${ref.eventId}:${ref.dayId}`;
 }
@@ -69,17 +60,6 @@ function sourceSummary(state: LocalEventDayState): Pick<
   };
 }
 
-function catalogUrls(state: LocalEventDayState): readonly string[] {
-  return [
-    ...new Set(
-      state.circles
-        .filter((circle) => circle.removedFromSource !== true)
-        .map((circle) => circle.tweet)
-        .filter(isCatalogUrl),
-    ),
-  ];
-}
-
 export async function buildEventDayManagementRows(
   input: BuildEventDayManagementRowsInput,
 ): Promise<readonly EventDayManagementRow[]> {
@@ -106,7 +86,7 @@ export async function buildEventDayManagementRows(
         });
       }
 
-      const urls = catalogUrls(state);
+      const urls = catalogUrlsFromCircles(state.circles);
       let offlineCatalog: EventDayManagementRow["offlineCatalog"];
       try {
         offlineCatalog = await input.offlineCache.getStatus(urls);

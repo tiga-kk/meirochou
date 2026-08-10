@@ -616,6 +616,7 @@ test("設定画面の開閉やソース閲覧時に明示的な取得なしにGA
   await page.goto("/");
 
   await page.locator("#toggle-settings").click();
+  await page.locator("#settings-area .management-detail-surface > summary").click();
   await expect(page.locator("source-manager")).toBeVisible();
   expect(requestCount).toBe(0);
 });

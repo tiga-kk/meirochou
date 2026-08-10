@@ -146,9 +146,8 @@ test("catalog cache hit works offline while uncached images use the network", as
   page,
 }) => {
   await page.goto("/");
-  await page.evaluate(() => navigator.serviceWorker.ready);
-  await page.reload();
   await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
     if (!navigator.serviceWorker.controller) throw new Error("worker is not controlling page");
     const cache = await caches.open("comipath-catalog-v1");
     const pixel = Uint8Array.from([

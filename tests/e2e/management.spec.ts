@@ -111,6 +111,10 @@ async function openSettings(page: Page): Promise<void> {
   await page.locator("#toggle-settings").click();
   const settings = page.locator("#settings-area");
   await expect(settings).toHaveClass(/show/);
+  const detail = settings.locator(".management-detail-surface");
+  if (!(await detail.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await detail.locator("summary").click();
+  }
   await expect(settings.locator(".source-manager-panel")).toBeVisible();
 }
 
@@ -177,7 +181,10 @@ test.describe("Mobile Management Flows", () => {
     ]);
 
     await page.goto("/");
-    await openSettings(page);
+    await page.locator("#toggle-settings").click();
+    await expect(page.locator("#settings-area")).toHaveClass(/show/);
+    await expect(page.locator("event-day-management-view")).toBeVisible();
+    await expect(page.locator("source-manager")).toBeHidden();
     const rows = page.locator("event-day-management-view .event-day-management-row");
     await expect(rows).toHaveCount(2);
     await expect(rows.nth(0)).toContainText("CSV");
@@ -254,6 +261,9 @@ test.describe("Mobile Management Flows", () => {
     await openSettings(page);
     const rows = page.locator("event-day-management-view .event-day-management-row");
     await rows.nth(1).locator('button[data-action="open"]').click();
+    await expect(page.locator("#settings-area")).toBeHidden();
+
+    await openSettings(page);
     await expect(page.locator("source-manager h3")).toContainText("day2");
 
     await rows.nth(0).locator('button[data-action="refresh"]').click();
@@ -297,7 +307,7 @@ test.describe("Mobile Management Flows", () => {
     await diffDialog.locator('button[data-action="apply"]').click();
     await expect(diffOverlay).not.toBeVisible();
 
-    await page.locator("#toggle-settings").click();
+    await page.locator("#settings-area .management-surface-close").click();
     await page.locator("#btn-open-gallery").click();
     await expect(page.locator("#gallery-grid .gallery-item")).toHaveCount(2);
   });
