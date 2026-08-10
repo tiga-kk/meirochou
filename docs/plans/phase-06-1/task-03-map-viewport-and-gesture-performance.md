@@ -13,6 +13,7 @@
 - overscrollを完全hard clampして指の動きを不自然に止めない。
 - `object-fit: contain`のletterboxを別の固定viewportへ残さない。
 - route計算やALNSへviewer geometryを混ぜない。
+- responsive layoutで求めた初期中央位置を`reset()`時に`x=0,y=0`へ失わない。
 
 ## Files
 
@@ -90,7 +91,9 @@ Gesture helper:
 export function applyRubberBand(value, min, max, overscrollLimit = 32) {}
 ```
 
-`GestureZoomController`は外部からstage layout/initial transform更新を受けられるようにする。既存`setTransform()`と`refreshLayout()`を無秩序に増やさず、1つの明示メソッドへまとめてよい。
+`GestureZoomController`は外部からstage layoutとbase transformを1回で更新できるようにする。既存`setTransform()`と`refreshLayout()`を無秩序に増やさず、layout更新用の1つの明示メソッドへまとめてよい。
+
+このとき`initialX`/`initialY`は単なる初回描画値ではなく、scale 1のbase transformとして保持する。`reset()`/`resetZoom()`は常に`{ scale: 1, x: baseX, y: baseY }`へ戻る。横長・縦長mapで`{1,0,0}`へ戻して中央寄せを壊さない。
 
 ## Steps
 
@@ -141,7 +144,7 @@ it("clips and vertically centers an extremely tall map instead of letterboxing",
 });
 ```
 
-- [ ] **Step 2: rubber-bandのRED unit testを書く**
+- [ ] **Step 2: rubber-bandとbase resetのRED unit testを書く**
 
 ```ts
 it("limits overscroll and increases resistance outside bounds", () => {
@@ -152,6 +155,8 @@ it("limits overscroll and increases resistance outside bounds", () => {
   expect(farOutside - slightlyOutside).toBeLessThan(190);
 });
 ```
+
+`GestureZoomController` testでは横長layoutの`baseX < 0`、縦長layoutの`baseY < 0`を設定した後にpan/zoomして`reset()`し、scale 1かつ元のbaseX/baseYへ戻ることを固定する。
 
 - [ ] **Step 3: REDを確認する**
 
@@ -167,19 +172,25 @@ npx vitest run --root . tests/gesture-zoom-controller.test.ts tests/route-map-vi
 
 - [ ] **Step 5: image load/resizeでlayoutを一度計算して適用する**
 
-`naturalWidth`/`naturalHeight`とviewport幅から`calculateMapViewportLayout()`を呼び、viewport height、stage size、initial transformを更新する。ResizeObserverでも再計算する。
+`naturalWidth`/`naturalHeight`とviewport幅から`calculateMapViewportLayout()`を呼び、viewport height、stage size、base transformを更新する。ResizeObserverでも再計算する。
 
 横長cover時はinitialX、縦長clip時はinitialYを中央へ寄せる。area変更時は旧areaのpan/zoomをそのまま持ち越さず、新しいlayoutのbase transformから開始する。
+
+layout更新APIはcontroller内部のlayout cacheとbase transformを同時に更新し、古いstage寸法と新しいtransformが一瞬混在する経路を作らない。既存`resetZoom`はこのbase transformへ戻す。
 
 - [ ] **Step 6: gesture hot pathのlayout readを排除する**
 
 pointerdownで必要ならviewport originを1回取得し、そのgesture中はcached geometryを使う。pointermove/pinch move内の`getBoundingClientRect()`を残さない。
+
+wheel zoomも1イベントにつき必要なorigin読取だけにし、RAF/inertiaの各frameではlayout readしない。
 
 - [ ] **Step 7: panへrubber-bandを適用する**
 
 proposed x/yを直接stateへ加算せず、現在scaleに対するmin/max boundsを求め、範囲外だけ`applyRubberBand()`へ通す。release/cancel/lostcaptureは既存settleへ接続する。
 
 stageがviewportより小さくなるscaleは作らない。base scale 1ですでにcoverされるため、MIN_SCALEは1を維持できる設計を優先する。
+
+base transformは「許容boundsの中央位置」であり、pan bounds自体をbaseX/baseY中心に固定しない。wide/tall stageは従来どおりviewportを覆う全範囲をpanできる。
 
 - [ ] **Step 8: transform pathをcompositor-friendlyに保つ**
 
@@ -194,6 +205,8 @@ stageに`will-change: transform`を付け、transform更新は既存RAF coalesci
 - dragでoverscrollが約32pxを大きく超えない。
 - release後にbound内へ戻る。
 - pointercancel後に次のpanが可能。
+- 横長/縦長caseで一度pan/zoomした後にresetし、初期中央位置へ戻る。
+- area変更後は旧areaのtransformではなく新areaのbase transformになる。
 
 - [ ] **Step 10: focused/full verification**
 
@@ -223,3 +236,4 @@ git commit -m "fix(map): align viewport and gestures with map geometry"
 - pointermove hot pathにlayout readがない。
 - transform反映は1 frame最大1回。
 - pin/route/imageの座標がずれない。
+- reset/area変更後もwide/tall mapのbase中央位置を失わない。
