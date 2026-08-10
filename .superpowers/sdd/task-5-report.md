@@ -58,3 +58,14 @@
 `BLOCKED: physical scale evidence missing (e456, e7, s12, w12)`
 
 scale根拠が揃うまで、推測`metersPerPixel`、manifest/parser/runtime contract、整数m表示は追加しない。
+
+## レビュー指摘対応
+
+Task 5のS/G markerとcurrent route flowによる意図したvisual差分を、次の2 snapshotだけ更新した。
+
+- `tests/e2e/webapp.spec.ts-snapshots/navigation-map-catalog-mobile-chromium-linux.png`: current routeのS/G markerとflowを地図・カタログ表示へ反映。
+- `tests/e2e/webapp.spec.ts-snapshots/route-comparison-mobile-chromium-linux.png`: route comparison表示のcurrent route S/G markerとflowを反映。candidate routeにflowを追加していないことも維持。
+
+更新対象を限定したsnapshot更新E2Eは2 passed。更新後のroute/Start/Goal/flow grep E2Eは3 passed。
+
+scale blockerは維持する。e456、e7、s12、w12の物理scale根拠は未確認であり、推測`metersPerPixel`およびscale依存実装は追加していない。
