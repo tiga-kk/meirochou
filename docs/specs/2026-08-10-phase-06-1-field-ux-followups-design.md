@@ -60,7 +60,7 @@ successは約1.5秒で消してよい。loadingは処理終了まで消さない
 
 ## 地図viewportとstage
 
-現在の`.navigation-map`は固定heightで、画像はその全面要素へ`object-fit: contain`されている。この構造をやめ、viewportの中に実画像比率を持つstageを配置する。
+現在の`.navigation-map`は固定heightで、画像はその全面要素へ`object-fit: contain`されている。この構造をやめ、viewportの中に実画像比率を持つstageを配置する。base scale 1の初期表示では、画像stageがviewportを少なくとも一方向で満たし、letterboxを作らない。
 
 geometry計算の正本は純粋関数にする。
 
@@ -90,10 +90,11 @@ export function calculateMapViewportLayout(
 ルール:
 
 - `naturalHeightAtViewportWidth = viewportWidth * imageHeight / imageWidth`
-- 220px以上かつmaxHeight以下なら、stageをviewport幅へfitさせ、viewportHeightをその自然heightへ合わせる。
-- 220px未満ならviewportHeight=220、stageHeight=220として画像比率からstageWidthを求め、`initialX=(viewportWidth-stageWidth)/2`とする。
-- maxHeightを超える縦長画像ではviewportHeight=maxHeightとし、stageWidth/Heightは画像比率を保ったままviewport内に収める。
+- `naturalHeightAtViewportWidth`が220px以上かつmaxHeight以下なら、stageをviewport幅へfitさせ、viewportHeightをその自然heightへ合わせる。
+- 220px未満の横長画像では`viewportHeight=220`、`stageHeight=220`として画像比率から`stageWidth`を求め、`initialX=(viewportWidth-stageWidth)/2`として横方向を中央にする。stageはviewportより横へはみ出し、横panできる。
+- maxHeightを超える縦長画像では`viewportHeight=maxHeight`、`stageWidth=viewportWidth`、`stageHeight=naturalHeightAtViewportWidth`とし、`initialY=(viewportHeight-stageHeight)/2`として縦方向を中央にする。stageはviewportより縦へはみ出し、縦panできる。
 - pin layerとroute overlayはstageと同一boxを使う。画像だけ別boxへ`object-fit`しない。
+- area変更時は旧areaのpan/zoomを持ち越さず、新areaのbase layoutから開始する。
 
 ### Rubber-band
 
@@ -207,6 +208,7 @@ SVG stroke animationはroute geometryを一度生成した後にCSSが既存stro
 - outboxが残っていても全日程削除を選択でき、確認文に破棄件数が表示され、confirm後に全state/outboxが消える。
 - GAS読込中は右下indicatorが処理終了まで表示され、成功/失敗が識別できる。
 - E456等の横長地図で大きな上下余白が残らず、操作領域は220px以上ある。
+- maxHeightを超える縦長地図でも左右letterboxを作らず、縦panできる。
 - 地図を強く端へdragしても外側表示は約32px以内に抑えられ、releaseで戻る。
 - map pointermove中にlayout readを繰り返さない。
 - Galleryは開始時に重く、閾値付近で軽くなる。
