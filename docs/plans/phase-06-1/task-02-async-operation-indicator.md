@@ -14,13 +14,13 @@ GAS等の長時間処理が「いつ始まり、いつ終わったか」を常�
 - `busy=true`なのに`operation="idle"`、または`busy=false`なのに非idle operationが残るsnapshotを通知しない。
 - GASだけを接続して、enumに存在するCSV/apply operationを本番では到達不能のまま残さない。
 
-## Files
+## 対象ファイル
 
-**Create:**
+**作成:**
 - `apps/webapp/js/components/async-operation-indicator.ts`
 - `tests/async-operation-indicator.test.ts`
 
-**Modify:**
+**変更:**
 - `apps/webapp/index.html`
 - `apps/webapp/css/base.css`
 - `apps/webapp/js/features/circle-data-source/use-cases/circle-data-source-session.ts`
@@ -32,7 +32,7 @@ GAS等の長時間処理が「いつ始まり、いつ終わったか」を常�
 - `tests/management-session.test.ts`
 - `tests/e2e/management.spec.ts`
 
-## Interfaces
+## インターフェース
 
 ```ts
 export type AsyncOperationStatus =
@@ -67,7 +67,7 @@ interface CircleDataSourceSessionSnapshot {
 
 `BrowserApplication`は既存Circle Data Source Session subscriptionからsnapshotを受け取り、indicatorのrender-only statusへ写像する。`assemble-comipath-application.ts`はindicator DOM/componentとsession/controllerを既存compositionへ接続するだけにし、network stateを新しく所有しない。
 
-## Steps
+## 手順
 
 - [ ] **Step 1: componentのRED testを書く**
 
