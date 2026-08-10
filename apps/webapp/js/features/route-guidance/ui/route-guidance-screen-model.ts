@@ -1,4 +1,5 @@
 import type { Circle } from "../../event-day/public-api";
+import type { RouteResult } from "../domain/routing/grid-route-types";
 
 export interface RouteGuidanceScreenModelInput {
   readonly currentDestination: Circle | null;
@@ -35,6 +36,23 @@ function normalizeCatalogImageUrl(value: unknown): string {
   if (typeof value !== "string" || value.trim() === "") return "";
   if (value.startsWith("data:image/")) return value;
   return normalizeExternalUrl(value);
+}
+
+export function formatRouteDistance(
+  route: Pick<RouteResult, "cost" | "physicalPixelLength">,
+  metersPerPixel?: number,
+): string {
+  const hasScale =
+    typeof metersPerPixel === "number" &&
+    Number.isFinite(metersPerPixel) &&
+    metersPerPixel > 0;
+  if (hasScale && Number.isFinite(route.physicalPixelLength)) {
+    return `約 ${Math.round(route.physicalPixelLength * metersPerPixel)} m`;
+  }
+  if (hasScale) return "距離 -";
+  return Number.isFinite(route.cost)
+    ? `距離 ${Math.round(route.cost)}`
+    : "距離 -";
 }
 
 function formatDistance(circle: Circle, startSpace: string): string {

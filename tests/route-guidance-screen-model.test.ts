@@ -1,7 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { buildRouteGuidanceScreenModel } from "../apps/webapp/js/features/route-guidance/ui/route-guidance-screen-model";
+import {
+  buildRouteGuidanceScreenModel,
+  formatRouteDistance,
+} from "../apps/webapp/js/features/route-guidance/ui/route-guidance-screen-model";
 
 describe("RouteGuidanceScreenModel", () => {
+  it("formats physical route distance separately from weighted routing cost", () => {
+    expect(
+      formatRouteDistance({ cost: 900, physicalPixelLength: 100 }, 270 / 4096),
+    ).toBe("約 7 m");
+  });
+
+  it("keeps the legacy cost label when a fictional area has no scale", () => {
+    expect(formatRouteDistance({ cost: 900, physicalPixelLength: 100 })).toBe(
+      "距離 900",
+    );
+  });
+
+  it("does not use routing cost when scale exists without physical length", () => {
+    expect(
+      formatRouteDistance(
+        { cost: 900 } as Parameters<typeof formatRouteDistance>[0],
+        270 / 4096,
+      ),
+    ).toBe("距離 -");
+    expect(
+      formatRouteDistance({ cost: 900, physicalPixelLength: Number.NaN }, 0.1),
+    ).toBe("距離 -");
+  });
+
   it("formats an active destination and the next destination without exposing raw URLs", () => {
     const model = buildRouteGuidanceScreenModel({
       currentDestination: {

@@ -235,6 +235,30 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   await expect(
     page.locator('[data-route-kind="current"] .route-flow-line'),
   ).toHaveCSS("animation-name", "route-flow");
+  const routeFlowOffsets = await page
+    .locator('[data-route-kind="current"] .route-flow-line')
+    .evaluate((element) => {
+      const animation = element
+        .getAnimations()
+        .find(
+          (candidate): candidate is CSSAnimation =>
+            candidate instanceof CSSAnimation &&
+            candidate.animationName === "route-flow",
+        );
+      if (!animation) throw new Error("route-flow animation was not found");
+
+      animation.pause();
+      animation.currentTime = 0;
+      const initial = Number.parseFloat(
+        getComputedStyle(element).strokeDashoffset,
+      );
+      animation.currentTime = 550;
+      const middle = Number.parseFloat(
+        getComputedStyle(element).strokeDashoffset,
+      );
+      return { initial, middle };
+    });
+  expect(routeFlowOffsets.middle).toBeLessThan(routeFlowOffsets.initial);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(
     page.locator('[data-route-kind="current"] .route-flow-line'),

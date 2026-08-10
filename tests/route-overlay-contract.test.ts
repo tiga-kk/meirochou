@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import {
@@ -138,4 +140,44 @@ test("weighted cost stays separate from unweighted pixel length for both route o
     assert.equal(route.cost, 25);
     assert.ok(route.cost > route.physicalPixelLength);
   }
+});
+
+test("planRouteFromGridIndex keeps ordered points for current route endpoints and flow", () => {
+  const route = planRouteFromGridIndex(
+    fictionalPoints,
+    fictionalGridMeta,
+    fictionalGridBytes,
+    10 * fictionalGridMeta.cols + 10,
+    "東ア02",
+  );
+
+  assert.ok(route);
+  const overlay = buildRouteOverlaySvg(route);
+  assert.ok(overlay);
+
+  const orderedPoints = route.points
+    .map((point) => `${point.x},${point.y}`)
+    .join(" ");
+  assert.equal(
+    overlay.querySelector(".route-overlay-line")?.getAttribute("points"),
+    orderedPoints,
+  );
+  assert.equal(
+    overlay.querySelector(".route-flow-line")?.getAttribute("points"),
+    orderedPoints,
+  );
+  assert.equal(
+    overlay.querySelector(".route-start-marker")?.getAttribute("transform"),
+    `translate(${route.points[0].x} ${route.points[0].y})`,
+  );
+  assert.equal(
+    overlay.querySelector(".route-goal-marker")?.getAttribute("transform"),
+    `translate(${route.points.at(-1)?.x} ${route.points.at(-1)?.y})`,
+  );
+
+  const candidate = buildRouteOverlaySvg(route, undefined, "candidate");
+  assert.ok(candidate);
+  assert.equal(candidate.querySelector(".route-flow-line"), null);
+  assert.equal(candidate.querySelector(".route-start-marker"), null);
+  assert.equal(candidate.querySelector(".route-goal-marker"), null);
 });

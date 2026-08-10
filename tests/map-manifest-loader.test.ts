@@ -121,6 +121,7 @@ const validC108Payload = {
     {
       areaId: "e456",
       displayName: "東456ホール",
+      metersPerPixel: 270 / 4096,
       assets: {
         svg: "./e456/map.svg",
         points: "./e456/points.json",
@@ -131,6 +132,7 @@ const validC108Payload = {
     {
       areaId: "e7",
       displayName: "東7ホール",
+      metersPerPixel: 120 / 1848,
       assets: {
         svg: "./e7/map.svg",
         points: "./e7/points.json",
@@ -141,6 +143,7 @@ const validC108Payload = {
     {
       areaId: "s12",
       displayName: "南12ホール",
+      metersPerPixel: 144 / 1872,
       assets: {
         svg: "./s12/map.svg",
         points: "./s12/points.json",
@@ -151,6 +154,7 @@ const validC108Payload = {
     {
       areaId: "w12",
       displayName: "西12ホール",
+      metersPerPixel: 180 / 2904,
       assets: {
         svg: "./w12/map.svg",
         points: "./w12/points.json",
@@ -189,6 +193,31 @@ test("loadEventMapBundleManifestFromUrl fetches manifest and returns validated 4
   assert.equal(manifest.areas[1].areaId, "e7");
   assert.equal(manifest.areas[2].areaId, "s12");
   assert.equal(manifest.areas[3].areaId, "w12");
+  assert.deepEqual(
+    manifest.areas.map((area) => area.metersPerPixel),
+    [270 / 4096, 120 / 1848, 144 / 1872, 180 / 2904],
+  );
+});
+
+test("C108 manifest rejects a missing or invalid physical scale", async () => {
+  for (const metersPerPixel of [undefined, 0, -1, Number.NaN, Infinity]) {
+    const payload = structuredClone(validC108Payload);
+    if (metersPerPixel === undefined) {
+      delete payload.areas[0].metersPerPixel;
+    } else {
+      payload.areas[0].metersPerPixel = metersPerPixel;
+    }
+    await assert.rejects(
+      loadEventMapBundleManifestFromUrl(
+        "https://example.test/map-bundles/C108/manifest.json",
+        {
+          fetcher: async () =>
+            ({ ok: true, status: 200, json: async () => payload }) as Response,
+        },
+      ),
+      /map bundle manifest\.areas\[0\]\.metersPerPixel/,
+    );
+  }
 });
 
 test("loadEventMapBundleManifestFromUrl does not fetch sub-assets on manifest parse failure", async () => {

@@ -243,47 +243,55 @@ export class GestureZoomController {
     const winH = this.layout.containerHeight;
 
     let bounced = false;
+    let needsTransform = false;
+    const applyBounce = (axis, velocityKey, boundary) => {
+      needsTransform = true;
+      const next =
+        this.state[axis] + (boundary - this.state[axis]) * 0.2;
+      if (Math.abs(boundary - next) < 0.25) {
+        this.state[axis] = boundary;
+        this[velocityKey] = 0;
+        return false;
+      }
+      this.state[axis] = next;
+      this[velocityKey] *= this.BOUNCE_FRICTION;
+      return true;
+    };
 
     // X軸の境界
     if (winW >= curW) {
       if (this.state.x > 0) {
-        this.state.x += (0 - this.state.x) * 0.2;
-        this.vx *= this.BOUNCE_FRICTION;
-        bounced = true;
+        bounced = applyBounce("x", "vx", 0) || bounced;
       }
     } else {
       if (this.state.x > 0) {
-        this.state.x += (0 - this.state.x) * 0.2;
-        this.vx *= this.BOUNCE_FRICTION;
-        bounced = true;
+        bounced = applyBounce("x", "vx", 0) || bounced;
       } else if (this.state.x < winW - curW) {
-        this.state.x += (winW - curW - this.state.x) * 0.2;
-        this.vx *= this.BOUNCE_FRICTION;
-        bounced = true;
+        bounced =
+          applyBounce("x", "vx", winW - curW) || bounced;
       }
     }
 
     // Y軸の境界
     if (winH >= curH) {
       if (this.state.y > 0) {
-        this.state.y += (0 - this.state.y) * 0.2;
-        this.vy *= this.BOUNCE_FRICTION;
-        bounced = true;
+        bounced = applyBounce("y", "vy", 0) || bounced;
       }
     } else {
       if (this.state.y > 0) {
-        this.state.y += (0 - this.state.y) * 0.2;
-        this.vy *= this.BOUNCE_FRICTION;
-        bounced = true;
+        bounced = applyBounce("y", "vy", 0) || bounced;
       } else if (this.state.y < winH - curH) {
-        this.state.y += (winH - curH - this.state.y) * 0.2;
-        this.vy *= this.BOUNCE_FRICTION;
-        bounced = true;
+        bounced =
+          applyBounce("y", "vy", winH - curH) || bounced;
       }
     }
 
-    if (Math.abs(this.vx) > 0.1 || Math.abs(this.vy) > 0.1 || bounced) {
+    const shouldContinue =
+      Math.abs(this.vx) > 0.1 || Math.abs(this.vy) > 0.1 || bounced;
+    if (needsTransform || shouldContinue) {
       this.scheduleTransform();
+    }
+    if (shouldContinue) {
       this.rafId = requestAnimationFrame(() => this.animate());
     }
   }

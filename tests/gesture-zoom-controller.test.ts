@@ -289,16 +289,38 @@ describe("GestureZoomController", () => {
   });
 
   it("settles a bounds violation after a low-speed pointer release", () => {
-    const { container, controller } = createController();
+    const { container, image, controller } = createController();
 
     container.dispatchEvent(pointerEvent("pointerdown", 1, 10, 10));
-    controller.setTransform({ scale: 1, x: 20, y: 0 });
+    controller.setTransform({ scale: 1, x: 20, y: 20 });
     container.dispatchEvent(pointerEvent("pointerup", 1, 10, 10));
 
     expect(controller.rafId).not.toBeNull();
-    for (let frame = 0; frame < 20; frame += 1) flushRaf();
+    for (let frame = 0; frame < 100; frame += 1) flushRaf();
 
-    expect(controller.state.x).toBeLessThan(1);
-    expect(controller.state.x).toBeGreaterThanOrEqual(0);
+    expect(controller.state.x).toBe(0);
+    expect(controller.state.y).toBe(0);
+    expect(controller.rafId).toBeNull();
+    expect(callbacks).toHaveLength(0);
+    expect(image.style.transform).toContain("translate3d(0px, 0px, 0)");
+  });
+
+  it("settles a lower bounds violation and stops RAF", () => {
+    const { container, image, controller } = createController();
+
+    container.dispatchEvent(pointerEvent("pointerdown", 1, 10, 10));
+    controller.setTransform({ scale: 1, x: -220, y: -220 });
+    container.dispatchEvent(pointerEvent("pointerup", 1, 10, 10));
+
+    expect(controller.rafId).not.toBeNull();
+    for (let frame = 0; frame < 100; frame += 1) flushRaf();
+
+    expect(controller.state.x).toBe(-200);
+    expect(controller.state.y).toBe(-200);
+    expect(controller.rafId).toBeNull();
+    expect(callbacks).toHaveLength(0);
+    expect(image.style.transform).toContain(
+      "translate3d(-200px, -200px, 0)",
+    );
   });
 });

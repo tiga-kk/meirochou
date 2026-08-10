@@ -6,6 +6,7 @@
     {
       "areaId": "e456",
       "displayName": "東456ホール",
+      "metersPerPixel": 0.06591796875,
       "assets": {
         "svg": "./e456/map.svg",
         "points": "./e456/points.json",
@@ -16,6 +17,7 @@
     {
       "areaId": "e7",
       "displayName": "東7ホール",
+      "metersPerPixel": 0.06493506493506493,
       "assets": {
         "svg": "./e7/map.svg",
         "points": "./e7/points.json",
@@ -26,6 +28,7 @@
     {
       "areaId": "s12",
       "displayName": "南12ホール",
+      "metersPerPixel": 0.07692307692307693,
       "assets": {
         "svg": "./s12/map.svg",
         "points": "./s12/points.json",
@@ -36,6 +39,7 @@
     {
       "areaId": "w12",
       "displayName": "西12ホール",
+      "metersPerPixel": 0.06198347107438017,
       "assets": {
         "svg": "./w12/map.svg",
         "points": "./w12/points.json",

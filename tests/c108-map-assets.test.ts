@@ -52,6 +52,10 @@ test("C108 map bundle contains manifest and 4 area files", () => {
     AREA_IDS,
     "manifest area order must match the C108 inventory",
   );
+  assert.deepEqual(
+    manifest.areas.map((area) => area.metersPerPixel),
+    [270 / 4096, 120 / 1848, 144 / 1872, 180 / 2904],
+  );
 
   for (const areaId of AREA_IDS) {
     const areaDir = resolve(BUNDLE_ROOT, areaId);

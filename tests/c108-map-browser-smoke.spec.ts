@@ -164,6 +164,7 @@ test.describe("C108 Map Real Browser Smoke Test", () => {
       await expect(page.locator(".map-pin.start")).toBeVisible();
       await expect(page.locator(".map-pin.next")).toBeVisible();
       await expect(page.locator(".route-overlay")).toBeVisible();
+      await expect(page.locator("#target-route-log")).toHaveText(/^約 \d+ m/);
 
       const gridResponse = await page.request.get(
         `${baseURL}/assets/maps/C108/${areaId}/grid-meta.json`,
