@@ -14,9 +14,9 @@ Service Worker/Cache Storage、event/day management、source action、visual red
 - cache status取得失敗を`0/N 保存済み`と誤表示したまま完了扱いしない。
 - 共有catalog URLを片方のevent/day削除で失うcaseを見落とさない。
 
-## Files
+## 対象ファイル
 
-**Modify:**
+**変更:**
 - `tests/e2e/catalog-offline.spec.ts`
 - `tests/e2e/management.spec.ts`
 - `tests/e2e/webapp.spec.ts`
@@ -28,7 +28,7 @@ Service Worker/Cache Storage、event/day management、source action、visual red
 - `guides/user-data-management.md`
 - `guides/gas-sync.md`
 
-## Required Flows
+## 必須フロー
 
 ### Flow A: 家でoffline準備
 
@@ -98,7 +98,7 @@ Service Worker/Cache Storage、event/day management、source action、visual red
 - GAS local-first purchase。
 - itinerary/user guide。
 
-## Steps
+## 手順
 
 - [ ] **Step 1: missing E2EをREDで追加する**
 
@@ -144,7 +144,7 @@ cache put rejectionをinjectし、circle state/source data/navigationが変化�
 
 - [ ] **Step 8: visual snapshotを確認する**
 
-`prefers-reduced-motion: reduce`を固定した状態でmain/management/Galleryを比較する。変更理由を説明できないsnapshot差分は更新しない。Filesに列挙した3 snapshotを基本候補とし、別snapshotが失敗した場合は原因確認後に個別対応する。
+`prefers-reduced-motion: reduce`を固定した状態でmain/management/Galleryを比較する。変更理由を説明できないsnapshot差分は更新しない。対象ファイルに列挙した3 snapshotを基本候補とし、別snapshotが失敗した場合は原因確認後に個別対応する。
 
 - [ ] **Step 9: repo hygiene**
 
