@@ -825,7 +825,7 @@ test.describe("Mobile Management Flows", () => {
     ).toBeVisible();
     await expect(page.locator("outbox-panel h3")).toContainText("(1件)");
     await expect(
-      page.locator(".storage-delete-option button:disabled"),
+      page.locator(".storage-delete-option button:not(:disabled)"),
     ).toHaveCount(4);
     await expect(
       page.locator('source-manager button[data-action="csv-export"]'),
