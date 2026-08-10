@@ -12,7 +12,9 @@ Task 2のevent/day overviewを操作の起点にし、既存Use Caseを再利用
 - offline準備失敗でsource dataやpurchase stateをrollbackしない。
 - offline保存をpage load時に自動で全件開始しない。
 - catalog cache削除失敗をローカルデータ削除の失敗へ昇格させない。
-- ローカル削除後にrepositoryから消えたstateを読んでcatalog URLを復元しようとしない。cleanup対象URLは削除実行前に収集する。
+- ローカル削除後にrepositoryから消えたstateだけを読んで削除対象catalog URLを復元しようとしない。候補URLは削除実行前に収集する。
+- あるevent/dayを削除しただけで、別event/dayも参照している同一catalog URLをCache Storageから消さない。
+- cleanup対象の残存参照を確認できない場合に、推測で共有cacheを削除しない。
 
 ## Files
 
@@ -75,7 +77,17 @@ export class DeleteLocalDataWithCatalogCleanup
 }
 ```
 
-`execute()`は削除前にscope対象stateから有効catalog URL集合をsnapshotし、`inner.execute(scope)`成功後に`offlineCache.remove(urls)`をbest-effortで行う。cache remove失敗はconsole diagnosticへ残してよいが、成功済みlocal deletionを失敗へ変えない。
+`execute()`は次の順序を守る。
+
+1. 削除前に、scopeから消える可能性があるcatalog URLを`candidateUrls`としてsnapshotする。
+2. `inner.execute(scope)`を実行する。失敗した場合はcache cleanupを行わず、その失敗をそのまま返す。
+3. local deletion成功後、repositoryに残る全event/dayのcurrent catalog URL unionを`remainingReferencedUrls`として取得する。
+4. `candidateUrls - remainingReferencedUrls`だけを`offlineCache.remove()`へ渡す。
+5. cache remove失敗はdiagnosticへ残してよいが、成功済みlocal deletionを失敗へ変えない。
+
+同じcatalog URLはevent/dayを跨いで共有できるため、「削除scopeに含まれていたURL」だけでは削除条件にならない。local deletion後に他stateからも参照されなくなったURLだけをcleanup対象にする。
+
+local deletion後の残存参照確認自体が失敗した場合はfail-closedとし、その回のcache cleanupをskipする。共有cacheを誤削除するより、不要cacheが一時的に残る方を選ぶ。
 
 ## Steps
 
@@ -106,13 +118,22 @@ GAS rowでは完全URL/sheetをdetail editorへ読み込む。pending GAS queue 
 
 - [ ] **Step 6: deletion cache cleanupのRED testを書く**
 
-少なくともevent-dayとall-event-daysを固定する。
+少なくともevent-day、共有URL、all-event-daysを固定する。
 
 ```ts
-it("captures catalog URLs before event-day deletion and removes them after local deletion", async () => {
-  await operation.execute({ kind: "event-day", eventDay: ref });
-  expect(inner.execute).toHaveBeenCalledWith({ kind: "event-day", eventDay: ref });
-  expect(offlineCache.remove).toHaveBeenCalledWith([urlA, urlB]);
+it("removes only URLs no longer referenced after event-day deletion", async () => {
+  // dayA: [sharedUrl, onlyA]
+  // dayB: [sharedUrl]
+  await operation.execute({ kind: "event-day", eventDay: dayA });
+
+  expect(inner.execute).toHaveBeenCalledWith({
+    kind: "event-day",
+    eventDay: dayA,
+  });
+  expect(offlineCache.remove).toHaveBeenCalledWith([onlyA]);
+  expect(offlineCache.remove).not.toHaveBeenCalledWith(
+    expect.arrayContaining([sharedUrl]),
+  );
 });
 
 it("does not roll back successful local deletion when cache cleanup fails", async () => {
@@ -122,7 +143,9 @@ it("does not roll back successful local deletion when cache cleanup fails", asyn
 });
 ```
 
-`all-event-days`では削除前の全stateからcatalog URLのunionをdedupeして取得する。`activity`はcircle source自体を保持するためcatalog cacheを削除しない。`circle-source`と`event-day`は対象dayのcatalog URLを削除対象とする。
+`all-event-days`では削除前の全stateからcatalog URL unionをdedupeして取得し、local deletion後のremaining setが空なら全candidate URLをcleanupできる。`activity`はcircle source自体を保持するためcatalog cacheを削除しない。`circle-source`と`event-day`は対象dayのURLをcandidateにするが、別dayからの残存参照を差し引いてからremoveする。
+
+残存参照取得がthrowしたcaseでは`offlineCache.remove`を呼ばず、local deletion自体は成功として維持するtestも追加する。
 
 - [ ] **Step 7: `削除`をPhase 6.1 deletion flowへ接続する**
 
@@ -144,8 +167,9 @@ failed URLsはconsoleだけでなく件数としてUIへ残す。個別URLの一
 - network failureを混ぜても成功cache維持。
 - edit sourceのpending queue guard。
 - delete confirmation。
-- event-day/all-event-days削除後に対象catalog cacheが残らない。
-- cache cleanup failureをinjectしてもlocal deletion結果は維持される。
+- event-day/all-event-days削除後に、その時点で他dayから参照されていないcatalog cacheが残らない。
+- 共有URLを持つ2日程で片方だけ削除しても、残る日程の共有URLはofflineで読める。
+- cache cleanup failureまたは残存参照確認failureをinjectしてもlocal deletion結果は維持される。
 
 - [ ] **Step 11: verification**
 
@@ -182,5 +206,6 @@ git commit -m "feat(management): connect event day actions and offline preparati
 - offline準備はprogress/partial failureを表示する。
 - source変更時に旧pending queueが新sourceへ送られない。
 - 削除はPhase 6.1の共通deletion semanticsを再利用する。
-- `circle-source`/`event-day`/`all-event-days`削除後に対象catalog cacheをbest-effortで整理する。
+- `circle-source`/`event-day`/`all-event-days`削除後は、他event/dayから参照されていないcatalog cacheだけをbest-effortで整理する。
+- 共有catalog URLは参照するevent/dayが1つでも残る限り削除されない。
 - cache cleanup failureはlocal deletion成功を取り消さない。
