@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import type { CircleDataPreview } from "../apps/webapp/js/features/circle-data-source/domain/circle-data-source-types";
 import { CircleDataSourceController } from "../apps/webapp/js/features/circle-data-source/ui/circle-data-source-controller";
 import type { CancelableRequest } from "../apps/webapp/js/features/circle-data-source/use-cases/cancelable-request";
 import { createCircleDataSourceSession } from "../apps/webapp/js/features/circle-data-source/use-cases/circle-data-source-session";
 import type { GoogleSheetCircleClient } from "../apps/webapp/js/features/circle-data-source/use-cases/google-sheet-circle-client";
-import type { CircleDataPreview } from "../apps/webapp/js/features/circle-data-source/domain/circle-data-source-types";
 
 describe("CircleDataSourceController", () => {
   it("cancels an in-flight request on stop and ignores its result", async () => {
@@ -55,7 +55,7 @@ describe("CircleDataSourceController", () => {
       },
       session,
       previewCsvImport: { execute: vi.fn(() => preview) },
-      applyCircleDataPreview: { execute: vi.fn(async () => ({} as never)) },
+      applyCircleDataPreview: { execute: vi.fn(async () => ({}) as never) },
       onOperationComplete: (operation) => operations.push(operation),
     });
 
@@ -88,7 +88,12 @@ describe("CircleDataSourceController", () => {
       client: { startLoadingSheetNames: vi.fn(), startLoadingCircles: vi.fn() },
       session,
       applyCircleDataPreview: {
-        execute: vi.fn(() => new Promise((resolve) => { resolveApply = () => resolve({} as never); })),
+        execute: vi.fn(
+          () =>
+            new Promise((resolve) => {
+              resolveApply = () => resolve({} as never);
+            }),
+        ),
       },
       onOperationComplete: (operation) => operations.push(operation),
     });
@@ -99,6 +104,128 @@ describe("CircleDataSourceController", () => {
     await applying;
 
     expect(operations).toEqual([]);
-    expect(session.getSnapshot()).toMatchObject({ busy: false, operation: "idle" });
+    expect(session.getSnapshot()).toMatchObject({
+      busy: false,
+      operation: "idle",
+    });
+  });
+
+  it("does not report csv success after setPreview starts a newer request", async () => {
+    const preview = { previewId: "preview-1" } as CircleDataPreview;
+    const session = createCircleDataSourceSession();
+    const operations: string[] = [];
+    let controller!: CircleDataSourceController;
+    let reentered = false;
+    session.subscribe(({ operation, preview: currentPreview }) => {
+      if (
+        !reentered &&
+        operation === "idle" &&
+        currentPreview?.previewId === preview.previewId
+      ) {
+        reentered = true;
+        void controller.handleCsvFile(
+          { eventId: "c104", dayId: "day1" },
+          "new.csv",
+          "space,priority\n東A-01b,2",
+        );
+      }
+    });
+    controller = new CircleDataSourceController({
+      client: { startLoadingSheetNames: vi.fn(), startLoadingCircles: vi.fn() },
+      session,
+      previewCsvImport: { execute: vi.fn(() => preview) },
+      onOperationComplete: (operation) => operations.push(operation),
+    });
+
+    await controller.handleCsvFile(
+      { eventId: "c104", dayId: "day1" },
+      "old.csv",
+      "space,priority\n東A-01a,1",
+    );
+
+    expect(operations).toEqual(["csv-preview"]);
+  });
+
+  it("does not report gas success after setPreview starts a newer request", async () => {
+    let resolveRequest!: (value: CircleDataPreview) => void;
+    const preview = { previewId: "preview-1" } as CircleDataPreview;
+    const session = createCircleDataSourceSession();
+    const operations: string[] = [];
+    let controller!: CircleDataSourceController;
+    let reentered = false;
+    session.subscribe(({ operation, preview: currentPreview }) => {
+      if (
+        !reentered &&
+        operation === "idle" &&
+        currentPreview?.previewId === preview.previewId
+      ) {
+        reentered = true;
+        void controller.handleCsvFile(
+          { eventId: "c104", dayId: "day1" },
+          "new.csv",
+          "space,priority\n東A-01b,2",
+        );
+      }
+    });
+    controller = new CircleDataSourceController({
+      client: {
+        startLoadingSheetNames: vi.fn(),
+        startLoadingCircles: vi.fn(),
+      },
+      session,
+      previewGoogleSheetImport: {
+        start: vi.fn(() => ({
+          result: new Promise<CircleDataPreview>((resolve) => {
+            resolveRequest = resolve;
+          }),
+          cancel: vi.fn(),
+        })),
+      },
+      previewCsvImport: { execute: vi.fn(() => preview) },
+      onOperationComplete: (operation) => operations.push(operation),
+    });
+
+    const loading = controller.handleGasPreviewRequest(
+      { eventId: "c104", dayId: "day1" },
+      {
+        type: "gas",
+        gasUrl: "https://script.google.com/macros/s/test/exec",
+        sheetName: "day1",
+      },
+    );
+    resolveRequest(preview);
+    await loading;
+
+    expect(operations).toEqual(["csv-preview"]);
+  });
+
+  it("does not report apply success after setPreview starts a newer request", async () => {
+    const preview = { previewId: "preview-1" } as CircleDataPreview;
+    const session = createCircleDataSourceSession();
+    const operations: string[] = [];
+    let controller!: CircleDataSourceController;
+    let reentered = false;
+    session.setPreview(preview);
+    session.subscribe(({ operation, preview: currentPreview }) => {
+      if (!reentered && operation === "idle" && currentPreview === null) {
+        reentered = true;
+        void controller.handleCsvFile(
+          { eventId: "c104", dayId: "day1" },
+          "new.csv",
+          "space,priority\n東A-01b,2",
+        );
+      }
+    });
+    controller = new CircleDataSourceController({
+      client: { startLoadingSheetNames: vi.fn(), startLoadingCircles: vi.fn() },
+      session,
+      previewCsvImport: { execute: vi.fn(() => preview) },
+      applyCircleDataPreview: { execute: vi.fn(async () => ({}) as never) },
+      onOperationComplete: (operation) => operations.push(operation),
+    });
+
+    await controller.applyPreview("preview-1");
+
+    expect(operations).toEqual(["csv-preview"]);
   });
 });

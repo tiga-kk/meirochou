@@ -45,3 +45,17 @@
 
 - 既存の`browser-application.ts`、`assemble-comipath-application.ts`、既存testにBiomeの未修正診断があり、Task 2の変更だけでは全対象Biome checkをcleanにできない。機能テスト、architecture/typecheck、buildには影響なし。
 - Task 1と同じ共有ブランチ上で実装し、pushはしていない。
+
+## Task 2レビュー修正
+
+- `setPreview()`の同期subscriberが新しいrequestを開始する再入を、CSV preview/GAS preview/apply previewそれぞれでfocused regression testとして追加した。
+- 各成功通知のcallback直前に対象`sequence`と`requestGeneration`のcurrent性を再確認し、stale/cancel後の`onOperationComplete`を抑止した。
+- `npx biome format --write apps/webapp/js/features/circle-data-source/ui/circle-data-source-controller.ts tests/circle-data-source-cancellation.test.ts`を実行し、対象2ファイルのBiome format診断が消えたことを確認した。Task 2変更ファイル全体には、今回の変更と無関係な既存format/lint診断が残るため修正範囲を広げていない。
+
+## 修正後の検証
+
+- `npx vitest run --root . tests/circle-data-source-cancellation.test.ts` — 成功（6テスト）。修正前のREDでは再入3ケースが失敗し、修正後に全件成功。
+- `npx vitest run --root . tests/async-operation-indicator.test.ts tests/management-session.test.ts tests/source-manager-app.test.ts tests/circle-data-source-cancellation.test.ts` — 成功（25テスト）。
+- `npx biome check apps/webapp/js/features/circle-data-source/ui/circle-data-source-controller.ts tests/circle-data-source-cancellation.test.ts` — 成功（format診断なし）。
+- `npm run check:webapp` — 成功（architecture check、typecheck）。
+- `git diff --check` — 成功。
