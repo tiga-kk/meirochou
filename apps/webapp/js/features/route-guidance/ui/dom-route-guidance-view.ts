@@ -13,6 +13,14 @@ import {
   formatRouteDistance,
 } from "./route-guidance-screen-model";
 
+function hasUsableMapScale(area) {
+  return (
+    typeof area?.metersPerPixel === "number" &&
+    Number.isFinite(area.metersPerPixel) &&
+    area.metersPerPixel > 0
+  );
+}
+
 /**
  * Route guidance DOM view and its adjacent browser-owned controls.
  * DOM操作、表示更新を担当
@@ -289,26 +297,35 @@ export class DomRouteGuidanceView {
     const detailArea = this.mapAreaCatalog.findMapAreaForCircleSpace(
       detailTarget.space,
     );
+    const getDistanceLabel = (target, route, area) =>
+      route
+        ? formatRouteDistance(route, area?.metersPerPixel)
+        : hasUsableMapScale(area)
+          ? "距離 -"
+          : buildRouteGuidanceScreenModel({
+              currentDestination: target,
+              nextDestination: null,
+              startSpace,
+            }).distanceLabel;
     const distanceLabel =
       selectionState === "loading"
         ? "距離 計算中"
         : selectionState === "error"
           ? "距離 計算不可"
-          : detailRoute
-            ? formatRouteDistance(detailRoute, detailArea?.metersPerPixel)
-            : undefined;
+          : getDistanceLabel(detailTarget, detailRoute, detailArea);
 
     this.els.heading.textContent = currentViewModel.space;
     if (this.els.targetStartSpace)
       this.els.targetStartSpace.textContent = startSpace || "-";
     if (this.els.targetRouteLog) {
-      const currentDistance = currentRoute
-        ? formatRouteDistance(
-            currentRoute,
-            this.mapAreaCatalog.findMapAreaForCircleSpace(currentTarget.space)
-              ?.metersPerPixel,
-          )
-        : currentViewModel.distanceLabel;
+      const currentArea = this.mapAreaCatalog.findMapAreaForCircleSpace(
+        currentTarget.space,
+      );
+      const currentDistance = getDistanceLabel(
+        currentTarget,
+        currentRoute,
+        currentArea,
+      );
       this.els.targetRouteLog.textContent = `${currentDistance} / ${currentViewModel.nextLabel}`;
     }
     this.renderTargetDetails(
@@ -340,22 +357,24 @@ export class DomRouteGuidanceView {
     }
     this.els.routeChangeConfirmation?.classList.toggle("hidden", !comparing);
     if (comparing) {
+      const currentArea = this.mapAreaCatalog.findMapAreaForCircleSpace(
+        currentTarget.space,
+      );
+      const candidateArea = this.mapAreaCatalog.findMapAreaForCircleSpace(
+        detailTarget.space,
+      );
       this.els.routeChangeCurrent.textContent = currentTarget.space;
-      this.els.routeChangeCurrentDistance.textContent = currentRoute
-        ? formatRouteDistance(
-            currentRoute,
-            this.mapAreaCatalog.findMapAreaForCircleSpace(currentTarget.space)
-              ?.metersPerPixel,
-          )
-        : "距離 -";
+      this.els.routeChangeCurrentDistance.textContent = getDistanceLabel(
+        currentTarget,
+        currentRoute,
+        currentArea,
+      );
       this.els.routeChangeCandidate.textContent = detailTarget.space;
-      this.els.routeChangeCandidateDistance.textContent = state.selectedRoute
-        ? formatRouteDistance(
-            state.selectedRoute,
-            this.mapAreaCatalog.findMapAreaForCircleSpace(detailTarget.space)
-              ?.metersPerPixel,
-          )
-        : "距離 -";
+      this.els.routeChangeCandidateDistance.textContent = getDistanceLabel(
+        detailTarget,
+        state.selectedRoute,
+        candidateArea,
+      );
     }
     if (this.els.btnPurchased) this.els.btnPurchased.disabled = comparing;
     if (this.els.btnHold) this.els.btnHold.disabled = comparing;
