@@ -2,7 +2,7 @@
 
 ## 目標
 
-Route Guidanceの距離を物理mで表示し、地図だけを一目見てもStart/Goalと進行方向を理解できるようにする。current routeへCSS/SVGだけの軽量flow animationを追加する。
+Route Guidanceの距離を物理mで表示し、地図だけを一目見てもStart/Goalと進行方向を理解できるようにする。manual grid startでも必ず見えるroute endpoint markerと、current routeへのCSS/SVGだけの軽量flow animationを追加する。
 
 ## やってはいけないこと
 
@@ -11,6 +11,7 @@ Route Guidanceの距離を物理mで表示し、地図だけを一目見てもSt
 - 根拠のない`metersPerPixel`を作らない。
 - animationのためにJS RAF/timerを追加しない。
 - route geometryをanimationのために毎frame再生成しない。
+- 既存circle pinの存在をStart表示の前提にしない。manual grid startではcircle pinが存在しないためである。
 - 色だけでStart/Goalを区別しない。
 - reduced-motion利用者へ強制animationしない。
 
@@ -48,8 +49,8 @@ Routing resultは探索costとunweighted lengthを分離する。
 
 ```ts
 export interface RouteResult {
-  cost: number;              // existing weighted routing cost
-  physicalPixelLength: number; // unweighted path length in source-image pixels
+  cost: number;                 // existing weighted routing cost
+  physicalPixelLength: number;  // unweighted path length in source-image pixels
   // existing fields...
 }
 ```
@@ -62,6 +63,15 @@ export function formatRouteDistanceMeters(
   metersPerPixel: number | null,
 ): string;
 ```
+
+Current route SVGは、ordered `route.points`の先頭/末尾からendpoint markerを作る。
+
+```text
+route.points[0]                  => S marker
+route.points[route.points.length - 1] => G marker
+```
+
+これにより`planRouteFromGridIndex()`のmanual startでもSを描画できる。既存`.map-pin.start`の有無へ依存しない。
 
 ## Steps
 
@@ -90,6 +100,8 @@ expect(route.cost).toBeGreaterThan(route.physicalPixelLength);
 expect(route.physicalPixelLength).toBe(expectedUnweightedLength);
 ```
 
+`planRoute()`と`planRouteFromGridIndex()`の双方へ同じpropertyが入ることを固定する。
+
 - [ ] **Step 3: meter formattingのRED testを書く**
 
 ```ts
@@ -97,17 +109,17 @@ expect(formatRouteDistanceMeters(800, 0.125)).toBe("距離 100 m");
 expect(formatRouteDistanceMeters(800, null)).toBe("距離 -");
 ```
 
-- [ ] **Step 4: Start/Goalとflow overlayのRED testを書く**
+- [ ] **Step 4: endpoint markerとflow overlayのRED testを書く**
 
-`buildRouteOverlaySvg()`のcurrent routeにbase lineとflow lineの2本があり、candidate routeにはcurrent flow classを付けないことを固定する。
+`buildRouteOverlaySvg()`のcurrent routeにbase line、flow line、S marker、G markerがあることを固定する。manual startを表すrouteでもmarker座標は`route.points`から得るため同じcontractで動く。
 
 ```ts
 expect(current.querySelector(".route-overlay-line")).not.toBeNull();
 expect(current.querySelector(".route-flow-line")).not.toBeNull();
+expect(current.querySelector(".route-start-marker")?.textContent).toBe("S");
+expect(current.querySelector(".route-goal-marker")?.textContent).toBe("G");
 expect(candidate.querySelector(".route-flow-line")).toBeNull();
 ```
-
-Map pin testではstart/goal accessible nameへ文字情報を要求する。
 
 - [ ] **Step 5: REDを確認する**
 
@@ -128,9 +140,26 @@ Task Step 1で根拠を確認した実数だけをC108 manifestへ記載する�
 
 `route.cost`を文字列化している箇所を`physicalPixelLength * metersPerPixel`へ置き換える。比較画面のcurrent/candidate距離も同じ関数を使う。
 
-- [ ] **Step 9: Start/Goal pinへ文字を追加する**
+- [ ] **Step 9: current route SVGへ専用S/G endpoint markerを追加する**
 
-start pinは`S`、current target/goal pinは`G`を表示する。予定番号pinとの優先順位が衝突しないよう、current route表示時のgoalはGを優先し、予定dialog用indexはaccessible label等で失わないようtestを更新する。
+既存circle pinへ文字を載せるだけではなく、`route-overlay-svg.ts`でcurrent route geometryからmarkerを生成する。
+
+```svg
+<g class="route-endpoint route-start-marker" transform="translate(startX startY)">
+  <circle ... />
+  <text ...>S</text>
+</g>
+<g class="route-endpoint route-goal-marker" transform="translate(goalX goalY)">
+  <circle ... />
+  <text ...>G</text>
+</g>
+```
+
+markerの中心は`route.points[0]`と`route.points.at(-1)`を使う。`startPosition`/`targetPosition`はpin配置用percent座標なので、SVG source-image viewBoxへ直接混ぜない。
+
+既存map pinの色/stateは維持する。S/G overlayがpointer eventを奪わないよう`pointer-events:none`にする。
+
+SVG全体を`aria-hidden`のままにする場合、route summary側の既存`FROM`/target textがStart/Goalのtextual equivalentになることをE2E/a11y testで確認する。視覚markerだけのためにSVGをinteractive accessibility treeへ追加しない。
 
 - [ ] **Step 10: current routeへflow polylineを追加する**
 
@@ -162,14 +191,17 @@ base polylineと同じordered `points`を持つ`route-flow-line`を1本だけ作
 
 Chrome DevToolsまたはPlaywright trace/manual profileで、route表示中にJS側のanimation RAF callbackが新規に継続実行されていないことを確認する。animationによるDijkstra/ALNS再実行、DOM再生成がないことをコードレビューでも確認する。
 
+SVG stroke animationは毎frameのroute計算を発生させないが、ブラウザのpaint自体が完全に0になるとは仮定しない。実機profileで長いframeが増えていないことを確認する。
+
 - [ ] **Step 12: E2E/visual確認**
 
-- current routeにS/Gが見える。
+- circle start routeとmanual grid start routeの双方でS/Gが見える。
 - flow overlayが存在する。
 - computed styleでanimation-nameが`route-flow`。
 - `emulateMedia({ reducedMotion: "reduce" })`ではanimationが`none`。
 - 距離が`距離 <integer> m`形式。
 - candidate comparisonの青線は従来どおり識別できる。
+- S/G markerがmap pin clickを妨げない。
 
 - [ ] **Step 13: full verification**
 
@@ -195,7 +227,7 @@ git commit -m "feat(route-guidance): show physical distance and route direction"
 - 4 areaすべてのscaleに根拠がある。根拠なしの推測値は0件。
 - routing costとphysicalPixelLengthが別propertyとして存在する。
 - UI距離は整数m。
-- current routeのStart/GoalがS/Gで識別できる。
+- circle start/manual grid startの双方でcurrent routeのStart/GoalがS/Gで識別できる。
 - current routeだけにStart→Goal方向のflowがある。
 - reduced-motionではflow animationが停止する。
 - route animationのためのJS frame loopがない。
