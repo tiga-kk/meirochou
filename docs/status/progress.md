@@ -10,13 +10,13 @@
 - 計画文書branch: `docs/phase-06-1-phase-07-followup-plan`
 - Phase 5D: 完了
 - Phase 6: 完了・`main`へmerge済み
-- 現在のフェーズ: Phase 6.1 完了（Task 1〜5実装、Task 6検証完了）
+- 現在のフェーズ: Phase 6.1 実装完了・既知の検証残件あり（完了判定は完全GREEN扱いにしない）
 - scale values: 確定
 - Phase 7: 未開始
 
 ### Phase 6.1の既知残件
 
-- 同一地点pinのz-orderテストにflakyがあり、CI retryでは通るがfocused再実行では失敗する。今回のPhase 6.1新規回帰とは断定しない。
+- 同一地点pinのz-orderテストは、今回のfocused rerunでは単発・5回反復とも成功したが、過去のCI retry/再実行失敗履歴があるため、間欠残件として追跡中。今回のPhase 6.1新規回帰とは断定しない。
 - C108 private smoke 8件はfixture unavailableのためskip。以上により完全GREENではない。
 
 ### Phase 6.1で確定したscale values
