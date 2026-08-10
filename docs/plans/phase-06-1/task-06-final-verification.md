@@ -16,7 +16,9 @@ Task 1〜5の個別GREENだけで完了扱いせず、本番DOM wiring、実map 
 **Modify:**
 - `tests/e2e/webapp.spec.ts`
 - `tests/e2e/management.spec.ts`
-- 必要な既存snapshotのみ
+- `tests/e2e/webapp.spec.ts-snapshots/navigation-map-catalog-mobile-chromium-linux.png`（意図したmap viewport/S/G差分が出る場合）
+- `tests/e2e/webapp.spec.ts-snapshots/route-comparison-mobile-chromium-linux.png`（意図したcurrent route endpoint差分が出る場合）
+- `tests/e2e/management.spec.ts-snapshots/scoped-deletion-dialog-mobile-chromium-linux.png`（pending破棄warningの意図した差分が出る場合）
 - `docs/status/progress.md`（全検証GREEN後のみ）
 
 ## Required E2E Flows
@@ -39,9 +41,13 @@ Task 1〜5の個別GREENだけで完了扱いせず、本番DOM wiring、実map 
 4. response/apply後にsuccessへ変わる。
 5. success表示後にidleへ戻る。
 
-### Flow C: 横長map viewer
+### Flow C: responsive map viewer
 
-E456相当の横長assetを表示し、viewport height >= 220px、旧固定360pxではないことを確認する。stageのaspect ratioが画像と一致し、初期横positionが中央寄せであることを確認する。
+1. E456相当の横長assetを表示し、viewport height >= 220pxかつ旧固定360pxではないことを確認する。
+2. 横長stageのaspect ratioが画像と一致し、stageWidth > viewportWidth、初期Xが中央寄せであることを確認する。
+3. W12相当の自然比率caseでviewportが画像自然heightへ追従することを確認する。
+4. test用の縦長fixtureでstageHeight > viewportHeight、stageWidth == viewportWidth、初期Yが中央寄せであることを確認する。
+5. いずれの初期表示にも不要なletterboxがないことを確認する。
 
 ### Flow D: map rubber-band
 
@@ -58,10 +64,11 @@ E456相当の横長assetを表示し、viewport height >= 220px、旧固定360px
 ### Flow F: m距離と方向表示
 
 1. current routeの距離が`距離 N m`。
-2. start pinにS、goalにG。
-3. current routeにflow polyline。
-4. candidate route comparisonの青線契約を維持。
+2. circle start routeとmanual grid start routeの双方でSVG endpoint marker `S`/`G`が見える。
+3. current routeにflow polylineがある。
+4. candidate route comparisonの青線契約を維持する。
 5. reduced-motionではflow animationなし。
+6. endpoint markerがmap pin clickを妨げない。
 
 ### Flow G: Phase 6回帰
 
@@ -98,13 +105,22 @@ git diff --check
 git status --short
 ```
 
-- [ ] **Step 5: changed filesだけBiomeを確認する**
+- [ ] **Step 5: Phase 6.1変更コードだけBiomeを確認する**
+
+実装branchはPhase 6.1開始時の`origin/main`から切る前提なので、次のコマンドでPhase 6.1差分のTS/JS/CSSだけを検査する。
 
 ```bash
-npx biome check <Phase-6.1で変更したts/js/cssの対象>
+git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.ts' '*.js' '*.css' \
+  | xargs -r npx biome check
 ```
 
-repo-wide `npx biome check`も実行し、main baselineとの差分だけを回帰判定に使う。既存debtをPhase 6.1で一括修正しない。
+続いてrepo-wide baselineも確認する。
+
+```bash
+npx biome check .
+```
+
+repo-wide結果はPhase 6.1開始時`main`の結果と比較し、新規error/warningだけを回帰として扱う。既存debtをPhase 6.1で一括修正しない。
 
 - [ ] **Step 6: physical scale evidenceを再確認する**
 
@@ -112,7 +128,9 @@ C108 `e456/e7/s12/w12`の全areaに、Task 5で記録したscale根拠が存在�
 
 - [ ] **Step 7: visual snapshotを確認する**
 
-地図viewport、S/G、route flowの静止frame、右下indicator、削除確認の意図した差分だけ更新する。flow animationの瞬間差分でsnapshotを不安定にしないよう、snapshot時はanimationを一時停止するtest CSSまたはreduced-motionを使う。
+地図viewport、S/G、route flowの静止frame、右下indicator、削除確認の意図した差分だけ更新する。flow animationの瞬間差分でsnapshotを不安定にしないよう、snapshot時は`prefers-reduced-motion: reduce`を指定する。
+
+更新候補はFilesに列挙した3 snapshotだけを基本とし、別snapshotが失敗した場合は差分原因を確認してから個別に追加する。一括`--update-snapshots`で原因確認を飛ばさない。
 
 - [ ] **Step 8: progressを更新する**
 
@@ -121,9 +139,15 @@ C108 `e456/e7/s12/w12`の全areaに、Task 5で記録したscale根拠が存在�
 - [ ] **Step 9: commit**
 
 ```bash
-git add tests docs/status/progress.md
+git add tests/e2e/webapp.spec.ts tests/e2e/management.spec.ts \
+  tests/e2e/webapp.spec.ts-snapshots/navigation-map-catalog-mobile-chromium-linux.png \
+  tests/e2e/webapp.spec.ts-snapshots/route-comparison-mobile-chromium-linux.png \
+  tests/e2e/management.spec.ts-snapshots/scoped-deletion-dialog-mobile-chromium-linux.png \
+  docs/status/progress.md
 git commit -m "test(phase-06-1): verify field UX follow-ups"
 ```
+
+snapshotに意図した差分がなくファイルが未変更なら、そのsnapshot pathは`git add`から外す。
 
 ## 受入条件
 
@@ -131,6 +155,6 @@ git commit -m "test(phase-06-1): verify field UX follow-ups"
 - `npm run verify` GREEN。
 - `npm run test:e2e:ci` GREEN。
 - public tree audit/diff check GREEN。
-- main baseline比で新しいBiome errorを増やさない。
+- Phase 6.1開始時main baseline比で新しいBiome error/warningを増やさない。
 - physical scale evidenceが全area分ある。
 - progressは上記成立後だけPhase 6.1完了になる。
