@@ -517,6 +517,7 @@ test("マニフェストの2エリアから現在地候補を切り替える", a
   await expect(page.locator("#header-area-mark")).toHaveText("東");
   await expect(page.locator("#header-area-title")).toHaveText("デモ東");
   await page.locator("#toggle-settings").click();
+  await page.locator("#settings-area .management-surface-close").click();
   const areaSelect = page.locator("#loc-ewsn").locator("..");
   await areaSelect.locator(".custom-select-trigger").click();
   await areaSelect.locator('[data-value="demo-west"]').click();

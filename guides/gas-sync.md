@@ -4,6 +4,15 @@ ComiPath uses Google Apps Script as an optional circle source and a one-way
 destination for purchase state. `LocalStorage` remains authoritative for
 activity on the current device.
 
+## Management overview
+
+ヘッダーの「**管理**」を開くと、event/day一覧からGASを使っている日程のsource、シート名、データ件数、GAS同期の送信待ち件数を確認できます。
+
+- 「**再読込**」は保存済みのGAS URLとシートを使ってpreviewを取得します。URLやシートの再入力は不要です。
+- previewの差分を確認してから「**変更を適用**」します。既存のsource editorからのpreview/applyも同じ契約です。
+- 送信待ちがある場合は、管理画面内の「GAS同期 キュー管理」で件数を確認し、「**再送**」または明示的な破棄確認へ進みます。
+- 送信待ちの意味を変えるsource変更や日程データ削除を、確認なしに静かに切り替えることはありません。
+
 ## Network behavior
 
 - Opening cached state performs no implicit GAS GET.

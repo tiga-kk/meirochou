@@ -62,6 +62,85 @@ test("管理overviewのoffline準備が対象catalogの進捗を表示する", a
   );
 });
 
+test("offline準備のpartial failureは成功cacheを保持しretryで不足分だけ再取得する", async ({
+  page,
+}) => {
+  let failSecond = true;
+  let firstRequests = 0;
+  let secondRequests = 0;
+  await routeDemoEventRegistry(page);
+  await page.route("**/catalog-retry-a.png", async (route) => {
+    firstRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: Buffer.from(catalogPixel),
+    });
+  });
+  await page.route("**/catalog-retry-b.png", async (route) => {
+    secondRequests += 1;
+    if (failSecond) {
+      await route.fulfill({ status: 503, body: "temporary failure" });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: Buffer.from(catalogPixel),
+    });
+  });
+  await page.addInitScript(() => {
+    const timestamp = "2026-07-25T00:00:00.000Z";
+    const origin = location.origin;
+    localStorage.setItem(
+      "comipath:v1:index:event-days",
+      JSON.stringify([{ eventId: "demo-v1", dayId: "day1" }]),
+    );
+    localStorage.setItem(
+      "comipath:v1:last-opened",
+      JSON.stringify({ eventId: "demo-v1", dayId: "day1" }),
+    );
+    localStorage.setItem(
+      "comipath:v1:demo-v1:day1:state",
+      JSON.stringify({
+        schemaVersion: 2,
+        source: { type: "csv", fileName: "catalog-retry.csv" },
+        sourceGeneration: "gen-offline-retry-e2e",
+        circles: [
+          { space: "東ア23a", tweet: `${origin}/catalog-retry-a.png` },
+          { space: "東ア31b", tweet: `${origin}/catalog-retry-b.png` },
+        ],
+        circleStates: {},
+        gasOutbox: [],
+        timestamps: {
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          sourceUpdatedAt: timestamp,
+        },
+      }),
+    );
+  });
+
+  await page.goto("/");
+  firstRequests = 0;
+  secondRequests = 0;
+  await page.locator("#toggle-settings").click();
+  const row = page.locator("event-day-management-view .event-day-management-row").first();
+  await row.locator('button[data-action="offline"]').click();
+  await expect(page.locator("async-operation-indicator")).toContainText(
+    "お品書き 1 / 2 保存済み、1件失敗",
+  );
+  const firstAfterInitial = firstRequests;
+  const secondAfterInitial = secondRequests;
+  failSecond = false;
+  await row.locator('button[data-action="offline"]').click();
+  await expect(page.locator("async-operation-indicator")).toContainText(
+    "お品書き 2 / 2 保存済み",
+  );
+  expect(firstRequests).toBe(firstAfterInitial);
+  expect(secondRequests).toBe(secondAfterInitial + 1);
+});
+
 test("catalog cache hit works offline while uncached images use the network", async ({
   context,
   page,

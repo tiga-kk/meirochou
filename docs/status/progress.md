@@ -10,9 +10,9 @@
 - 計画文書branch: `docs/phase-06-1-phase-07-followup-plan`
 - Phase 5D: 完了
 - Phase 6: 完了・`main`へmerge済み
-- 現在のフェーズ: Phase 6.1 実装完了・既知の検証残件あり（完了判定は完全GREEN扱いにしない）
+- 現在のフェーズ: Phase 7 実装完了・既知の検証残件あり（完了判定は完全GREEN扱いにしない）
 - scale values: 確定
-- Phase 7: Task 1〜4完了・Task 5着手可能
+- Phase 7: 完了・既知のvisual snapshot残件あり
 
 ### Phase 6.1の既知残件
 
@@ -116,7 +116,19 @@ Phase計画:
   - source-diff dialogをmanagement surface上で操作できるnested modalとして整理し、既存source preview/applyフローの回帰を解消。
   - 意図したsettings surface snapshotだけを更新。地図/候補経路、source-diff、outbox、deleteの既存visual snapshot差分は基準時点からの残件として保持。
   - `npm run verify`、management/webappの代表E2E、CI相当E2E、architecture/typecheck、build、public tree auditを実行。
-- 次に着手可能: Task 5 — offline/management/visualを最終検証
+- Task 5: offline/management/visualの最終検証 — 完了
+  - catalog offlineのpartial failure/retryで成功済みcacheを保持し、不足URLだけを再取得するE2Eを追加・確認。
+  - management overviewのoffline status取得失敗を`0 / N`保存済みと混同しないE2Eを追加・確認。
+  - 管理、GAS同期、offline準備、cache cleanup、queue操作の利用者向けガイドとREADMEの対応状況を更新。
+  - Task 4の独立dialog化に伴い、背景UI操作前に管理dialogを閉じる既存E2Eの操作順を補正。production codeと既存snapshotは変更していない。
+  - `npm run verify`、catalog-offline E2E 3件、management E2E 15件、対象webapp E2E、`npm run test:e2e:ci`、public tree audit、`git diff --check`を実行。
+  - 全体CIは46件成功。managementの既存visual snapshot 3件は開始基準でも再現するため残件扱い。webappの地図snapshot 1件はretryで成功する既存flakyとして記録。
+
+### Phase 7の既知残件
+
+- `tests/e2e/management.spec.ts`のFlow 1（settings/source preview）、Flow 5（outbox）、Flow 7（scoped deletion）のvisual snapshot 3件は、機能assertionが通過する一方でサイズ差分が残っている。snapshotは根拠なく更新していない。
+- `tests/e2e/webapp.spec.ts`の地図・候補表示snapshotはCIで一度失敗後retryで成功する既存flaky。今回のTask 5追加変更との因果関係は確認できない。
+- `npx biome check .`はリポジトリ既存のlint/format/a11y指摘を含むため、Phase 7の完了判定には使用しない。Task 5では広範な自動整形を行っていない。
 
 ## 実装開始時の確認
 

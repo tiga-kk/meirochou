@@ -187,6 +187,32 @@ test.describe("Mobile Management Flows", () => {
     await expect(rows.nth(1)).toContainText("設定する");
   });
 
+  test("管理overviewはoffline status取得失敗を0件保存済みと混同しない", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const originalMatch = Cache.prototype.match;
+      Cache.prototype.match = function matchWithFailure() {
+        void originalMatch;
+        return Promise.reject(new Error("status unavailable"));
+      };
+    });
+    await seedStates(page, [
+      {
+        ref: { eventId: "demo-v1", dayId: "day1" },
+        state: createState({
+          circles: [{ space: "東ア23a", tweet: "https://example.test/status.png" }],
+        }),
+      },
+    ]);
+
+    await page.goto("/");
+    await openSettings(page);
+    const row = page.locator("event-day-management-view .event-day-management-row").first();
+    await expect(row).toContainText("お品書き 保存状況を確認できません");
+    await expect(row).not.toContainText("お品書き 0 / 1 保存済み");
+  });
+
   test("管理overviewの開くと保存済みGAS再読込を既存フローへ接続する", async ({
     page,
   }) => {
