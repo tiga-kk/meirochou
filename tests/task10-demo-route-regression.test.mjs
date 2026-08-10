@@ -21,6 +21,8 @@ test("demo map can build the route origin required by candidate selection", () =
 
   const route = planRoute(points, gridMeta, gridBytes, "東ア10", "東ア23a");
   expect(route).not.toBeNull();
+  expect(route.physicalPixelLength).toBeGreaterThan(0);
+  expect(route.cost).toBeGreaterThanOrEqual(route.physicalPixelLength);
   expect(route?.startPosition).toBeDefined();
   expect(
     planRoute(points, gridMeta, gridBytes, "東ア10", "東ア31b", {

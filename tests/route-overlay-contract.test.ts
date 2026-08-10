@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { planRoute } from "../apps/webapp/js/features/route-guidance/domain/routing/grid-route-planner";
+import {
+  planRoute,
+  planRouteFromGridIndex,
+} from "../apps/webapp/js/features/route-guidance/domain/routing/grid-route-planner";
 import type {
   GridMeta,
   PointsPayload,
@@ -51,6 +54,7 @@ test("planRoute and buildRouteOverlaySvg fulfill coordinate contracts with ficti
   );
 
   assert.ok(route);
+  assert.ok(route.physicalPixelLength > 0);
   assert.equal(route.image.width, 1000);
   assert.equal(route.image.height, 800);
   assert.ok(route.points.length >= 2);
@@ -83,5 +87,55 @@ test("planRoute and buildRouteOverlaySvg fulfill coordinate contracts with ficti
   for (const p of rawPoints) {
     assert.ok(p.x >= 0 && p.x <= 1000, `x=${p.x} out of bounds`);
     assert.ok(p.y >= 0 && p.y <= 800, `y=${p.y} out of bounds`);
+  }
+
+  assert.ok(svg.querySelector(".route-overlay-line"));
+  assert.ok(svg.querySelector(".route-flow-line"));
+  assert.equal(svg.querySelector(".route-start-marker")?.textContent, "S");
+  assert.equal(svg.querySelector(".route-goal-marker")?.textContent, "G");
+
+  const candidate = buildRouteOverlaySvg(route, undefined, "candidate");
+  assert.ok(candidate);
+  assert.equal(candidate.querySelector(".route-flow-line"), null);
+});
+
+test("weighted cost stays separate from unweighted pixel length for both route origins", () => {
+  const points: PointsPayload = {
+    image: { width: 30, height: 10 },
+    grid: { cell_size: 10, cols: 3, rows: 1 },
+    points: [
+      {
+        identifier: "ア",
+        number: 1,
+        center_x: 5,
+        center_y: 5,
+        portals: [{ col: 0, row: 0, x: 5, y: 5 }],
+      },
+      {
+        identifier: "ア",
+        number: 2,
+        center_x: 25,
+        center_y: 5,
+        portals: [{ col: 2, row: 0, x: 25, y: 5 }],
+      },
+    ],
+  };
+  const meta: GridMeta = {
+    cell_size: 10,
+    cols: 3,
+    rows: 1,
+    width: 30,
+    height: 10,
+  };
+  const grid = new Uint8Array([1, 2, 1]);
+
+  for (const route of [
+    planRoute(points, meta, grid, "東ア01", "東ア02"),
+    planRouteFromGridIndex(points, meta, grid, 0, "東ア02"),
+  ]) {
+    assert.ok(route);
+    assert.equal(route.physicalPixelLength, 20);
+    assert.equal(route.cost, 25);
+    assert.ok(route.cost > route.physicalPixelLength);
   }
 });

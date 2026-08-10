@@ -220,6 +220,26 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   await expect(
     page.locator("#navigation-pin-layer .route-overlay"),
   ).toBeVisible();
+  await expect(
+    page.locator('[data-route-kind="current"] .route-overlay-line'),
+  ).toHaveCount(1);
+  await expect(
+    page.locator('[data-route-kind="current"] .route-flow-line'),
+  ).toHaveCount(1);
+  await expect(
+    page.locator('[data-route-kind="current"] .route-start-marker'),
+  ).toHaveText("S");
+  await expect(
+    page.locator('[data-route-kind="current"] .route-goal-marker'),
+  ).toHaveText("G");
+  await expect(
+    page.locator('[data-route-kind="current"] .route-flow-line'),
+  ).toHaveCSS("animation-name", "route-flow");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(
+    page.locator('[data-route-kind="current"] .route-flow-line'),
+  ).toHaveCSS("animation-name", "none");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect(page.locator(".target-bottom-sheet")).toBeVisible();
   await pinFor(page, "東ア23a").evaluate((button: HTMLButtonElement) =>
     button.click(),
@@ -355,6 +375,9 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   await expect(
     page.locator('[data-route-kind="candidate"] .route-overlay-line'),
   ).toHaveCSS("stroke-dasharray", "22px, 14px");
+  await expect(
+    page.locator('[data-route-kind="candidate"] .route-flow-line'),
+  ).toHaveCount(0);
   await expect(page.locator("#btn-purchased")).toBeDisabled();
   await expect(page.locator("#btn-hold")).toBeDisabled();
   await expect(page.locator("#toast")).toBeHidden();

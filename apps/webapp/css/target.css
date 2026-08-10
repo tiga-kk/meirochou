@@ -97,6 +97,45 @@
   stroke-opacity: 0.78;
 }
 
+.route-flow-line {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.8);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 18 46;
+  animation: route-flow 1.1s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes route-flow {
+  to {
+    stroke-dashoffset: -64;
+  }
+}
+
+.route-endpoint {
+  pointer-events: none;
+}
+
+.route-endpoint circle {
+  fill: var(--ink);
+  stroke: var(--bg-card);
+  stroke-width: 3;
+}
+
+.route-endpoint text {
+  fill: var(--bg-card);
+  font: 900 18px var(--font-ui-sans);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-flow-line {
+    animation: none;
+  }
+}
+
 .route-overlay-candidate .route-overlay-line {
   stroke: var(--primary);
   stroke-dasharray: 22 14;

@@ -378,6 +378,13 @@ function buildRoutePoints(
   return { cells, points };
 }
 
+function calculatePhysicalPixelLength(points: readonly MapPoint[]): number {
+  return points.slice(1).reduce((length, point, index) => {
+    const previous = points[index];
+    return length + Math.hypot(point.x - previous.x, point.y - previous.y);
+  }, 0);
+}
+
 export function buildDistanceMap(
   pointsPayload: PointsPayload,
   gridMeta: Partial<GridMeta>,
@@ -606,6 +613,7 @@ export function planRoute(
 
   return {
     cost: distances[reachedIndex],
+    physicalPixelLength: calculatePhysicalPixelLength(points),
     cells,
     points,
     startPosition: {
@@ -729,6 +737,7 @@ export function planRouteFromGridIndex(
 
   return {
     cost: distances[reachedIndex],
+    physicalPixelLength: calculatePhysicalPixelLength(points),
     cells,
     points,
     startPosition: {
