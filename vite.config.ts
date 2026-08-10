@@ -255,6 +255,15 @@ function mapBundlePlugin(
     name: "comipath-map-bundle",
     configureServer(server) {
       server.middlewares.use(
+        "/catalog-service-worker.js",
+        (_request, response) => {
+          response.setHeader("Content-Type", "application/javascript");
+          response.end(
+            readFileSync(resolve(webappRoot, "catalog-service-worker.js")),
+          );
+        },
+      );
+      server.middlewares.use(
         "/assets/events/manifest.json",
         (request, response, next) => {
           const registryPath = resolve(webappRoot, "events/manifest.json");
@@ -346,6 +355,11 @@ function mapBundlePlugin(
       });
     },
     closeBundle() {
+      cpSync(
+        resolve(webappRoot, "catalog-service-worker.js"),
+        resolve(outputDirectory, "catalog-service-worker.js"),
+        { force: true, preserveTimestamps: true },
+      );
       for (const [eventId, bundleDirectory] of mapBundles.entries()) {
         // Satisfies contract test: cpSync(bundleDirectory, resolve(outputDirectory, "assets/maps"))
         cpSync(

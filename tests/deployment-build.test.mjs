@@ -121,7 +121,11 @@ function createFixture() {
   );
   writeFileSync(
     join(outputAssets, "comipath-browser-runtime.js"),
-    "console.log('fixture');\n",
+    "navigator.serviceWorker.register('./catalog-service-worker.js');\n",
+  );
+  writeFileSync(
+    join(outputRoot, "catalog-service-worker.js"),
+    "self.addEventListener('fetch', () => {});\n",
   );
 
   return root;

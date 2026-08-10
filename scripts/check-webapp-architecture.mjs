@@ -257,7 +257,7 @@ function isAllowedUseCaseDependency(importer, resolvedImport, importedFeature) {
   const feature = featureName(importer);
   if (!feature) return false;
   if (
-    new RegExp(`(?:^|/)features/${feature}/(?:domain|use-cases)/`).test(
+    new RegExp(`(?:^|/)features/${feature}/(?:domain|application|use-cases)/`).test(
       resolvedImport,
     )
   ) {

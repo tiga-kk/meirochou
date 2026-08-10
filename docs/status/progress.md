@@ -12,7 +12,7 @@
 - Phase 6: 完了・`main`へmerge済み
 - 現在のフェーズ: Phase 6.1 実装完了・既知の検証残件あり（完了判定は完全GREEN扱いにしない）
 - scale values: 確定
-- Phase 7: 未開始
+- Phase 7: Task 1完了・Task 2着手可能
 
 ### Phase 6.1の既知残件
 
@@ -94,6 +94,14 @@ Phase計画:
 - 同じcatalog URLは複数event/dayで共有できる。local deletion後のcache cleanupでは残存event/dayの参照を確認し、他dayが参照する共有URLを削除しない。残存参照確認に失敗した場合はcache cleanupをskipし、成功済みlocal deletionは維持する。
 - main navigationから旧inline設定panelの縦積みを外し、管理は独立surfaceへ移す。
 - visual redesignは装飾追加ではなく、map/catalog/actionを主役にした情報階層の整理として行う。既存tokenを優先し、同義tokenを不要に増やさない。
+
+### Phase 7の進捗
+
+- Task 1: Service Worker + Cache Storageのcatalog offline基盤 — 完了
+  - `comipath-catalog-v1`へのURL単位cache、opaque response、partial failure、best-effort persistenceを実装。
+  - production buildへ`catalog-service-worker.js`を単一ファイルとして含め、GET imageのcache hitだけをoffline fallbackする契約を検証。
+  - focused unit/E2E、`npm run verify`、public tree auditを実行済み。
+- 次に着手可能: Task 2 — registry全event/dayのmanagement overview modelと一覧UI
 
 ## 実装開始時の確認
 

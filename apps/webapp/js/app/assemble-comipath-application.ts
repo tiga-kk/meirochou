@@ -1,4 +1,10 @@
 import { BrowserApplication } from "./browser-application";
+import {
+  CacheEventDayCatalogsUseCase,
+  GetCatalogOfflineStatusUseCase,
+  type CatalogOfflineCachePort,
+} from "../features/catalog-offline/public-api";
+import { BrowserCatalogOfflineCache } from "../features/catalog-offline/infrastructure/browser-catalog-offline-cache";
 import { createDevDemoData, isDevDemoEnabled } from "../dev-demo-data.js";
 import {
   completeCircleVisit,
@@ -80,6 +86,7 @@ export interface AssembleComiPathApplicationOptions {
   readonly registry?: EventRegistry;
   readonly googleSheetClient?: GoogleSheetCircleClient;
   readonly csvDownloader?: CircleCsvDownloader;
+  readonly catalogOfflineCache?: CatalogOfflineCachePort;
   readonly targetElement?: HTMLElement | Window | Document;
 }
 
@@ -95,6 +102,10 @@ export interface AssembledComiPathApplication extends StartableApplication {
   readonly openInitialEventDay: OpenInitialEventDayUseCase;
   readonly routeGuidanceController: RouteGuidanceController;
   readonly routeGuidanceSession: ReturnType<typeof createRouteGuidanceSession>;
+  readonly catalogOfflineCache: CatalogOfflineCachePort;
+  readonly cacheEventDayCatalogs: CacheEventDayCatalogsUseCase;
+  readonly getCatalogOfflineStatus: GetCatalogOfflineStatusUseCase;
+  readonly getCurrentCatalogUrls: () => readonly string[];
 }
 
 function toDomainMapManifest(manifest: MapBundleManifestV1): MapBundleManifest {
@@ -115,6 +126,21 @@ export function assembleComiPathApplication(
 ): AssembledComiPathApplication {
   let browserRuntime: BrowserApplication | null = null;
   const storage = new StorageService();
+  const catalogOfflineCache =
+    options.catalogOfflineCache ??
+    new BrowserCatalogOfflineCache({
+      caches: options.window.caches,
+      fetcher: options.window.fetch?.bind(options.window),
+      persist: options.window.navigator?.storage?.persist?.bind(
+        options.window.navigator.storage,
+      ),
+    });
+  const cacheEventDayCatalogs = new CacheEventDayCatalogsUseCase(
+    catalogOfflineCache,
+  );
+  const getCatalogOfflineStatus = new GetCatalogOfflineStatusUseCase(
+    catalogOfflineCache,
+  );
   const repository =
     options.repository ?? new LocalStorageEventDayRepository(storage);
   const activeEventDaySession = createActiveEventDaySession();
@@ -518,5 +544,19 @@ export function assembleComiPathApplication(
     openInitialEventDay,
     routeGuidanceController,
     routeGuidanceSession,
+    catalogOfflineCache,
+    cacheEventDayCatalogs,
+    getCatalogOfflineStatus,
+    getCurrentCatalogUrls: () => [
+      ...new Set(
+        activeEventDayReader
+          .getAllCircles()
+          .map((circle) => circle.tweet)
+          .filter(
+            (url): url is string =>
+              typeof url === "string" && url.trim() !== "",
+          ),
+      ),
+    ],
   };
 }

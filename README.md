@@ -15,7 +15,9 @@
 | CSVエクスポート | o |
 | マルチデバイス同期 | x 非対応 |
 | JSON完全バックアップ | x 非対応 |
-| Service Worker/PWA | x 非対応 |
+| Service Worker | catalog image offline cacheのみ対応 |
+| Installable PWA | x 非対応 |
+| Background Sync | x 非対応 |
 
 ## 使用方法（人間向け）
 1. 宝の地図からサークル名をCSVまたはスプレッドシートに抽出する。

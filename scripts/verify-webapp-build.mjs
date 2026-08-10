@@ -162,10 +162,18 @@ export function verifyWebappBuild({
   const outputMapsDir = resolve(outputRoot, "assets/maps");
   const outputRegistryFile = resolve(outputRoot, "assets/events/manifest.json");
   const outputIndexFile = resolve(outputRoot, "index.html");
+  const outputServiceWorkerFile = resolve(
+    outputRoot,
+    "catalog-service-worker.js",
+  );
   const registrySourcePath = resolve(webappRoot, "events/manifest.json");
   const sourceBundlesRoot = resolve(webappRoot, "map-bundles");
 
   assert.ok(existsSync(outputIndexFile), "built index.html is missing");
+  assert.ok(
+    existsSync(outputServiceWorkerFile),
+    "built catalog-service-worker.js is missing",
+  );
   assert.ok(
     existsSync(registrySourcePath),
     "source event registry manifest.json is missing",
@@ -409,6 +417,19 @@ export function verifyWebappBuild({
   assertNoForbiddenBuiltPaths(outputRoot);
   assertNoForbiddenBuiltText(outputRoot);
   assertRelativeIndexAssets(readFileSync(outputIndexFile, "utf8"));
+  const builtText = listTreeEntries(outputRoot)
+    .filter(
+      (entry) =>
+        entry.stats.isFile() &&
+        textExtensions.has(extname(entry.path).toLowerCase()),
+    )
+    .map((entry) => readFileSync(entry.path, "utf8"))
+    .join("\n");
+  assert.match(
+    builtText,
+    /\.\/catalog-service-worker\.js/,
+    "catalog Service Worker registration must use a relative URL",
+  );
 
   return {
     eventIds: Object.freeze([...sourceBundleMap.keys()]),
