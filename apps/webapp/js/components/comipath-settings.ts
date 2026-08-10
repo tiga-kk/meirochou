@@ -5,6 +5,7 @@ import {
   DEFAULT_SEARCH_TIME_LIMIT_MS,
 } from "../features/route-guidance/domain/optimization/time-decayed-objective";
 import { dispatchManagementEvent } from "../shared/ui/management-events";
+import { DialogFocusController } from "../ui/dialog-focus";
 import type {
   DeleteOptionViewModel,
   EventDayOption,
@@ -52,6 +53,12 @@ export class ComipathSettings extends LitElement {
   declare busy: boolean;
   declare errorMessage: string;
 
+  private isOpen = false;
+
+  private readonly focusController = new DialogFocusController(this, {
+    onEscape: () => this.requestClose(),
+  });
+
   constructor() {
     super();
     this.open = false;
@@ -74,12 +81,38 @@ export class ComipathSettings extends LitElement {
   }
 
   protected updated(changed: PropertyValues<this>): void {
-    if (changed.has("open")) this.classList.toggle("show", this.open);
+    if (!changed.has("open")) return;
+    this.classList.toggle("show", this.open);
+    if (this.open && !this.isOpen) {
+      this.isOpen = true;
+      this.focusController.activate();
+    } else if (!this.open && this.isOpen) {
+      this.isOpen = false;
+      this.focusController.deactivate();
+    }
+  }
+
+  disconnectedCallback(): void {
+    if (this.isOpen) this.focusController.deactivate();
+    this.isOpen = false;
+    super.disconnectedCallback();
+  }
+
+  private requestClose(): void {
+    if (!this.open) return;
+    dispatchManagementEvent(this, "settings-close-request", {});
   }
 
   protected render() {
     return html`
-      <h2>設定</h2>
+      <div class="management-surface-header">
+        <h2 id="settings-heading">管理</h2>
+        <button
+          type="button"
+          class="btn btn-secondary management-surface-close"
+          @click=${this.requestClose}
+        >閉じる</button>
+      </div>
       <event-day-management-view
         .rows=${this.eventDayManagementRows}
       ></event-day-management-view>

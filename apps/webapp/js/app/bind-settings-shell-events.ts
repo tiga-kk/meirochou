@@ -31,14 +31,22 @@ export function bindSettingsShellEvents(
       application.toggleSettings(settingsToggle);
     });
 
+    listen(settings, "settings-close-request", () => {
+      application.toggleSettings(settingsToggle);
+    });
+
     const onEscape = (event: Event) => {
       const keyboardEvent = event as KeyboardEvent;
       if (
         keyboardEvent.key !== "Escape" ||
         !settings.open ||
-        !settingsToggle
-      )
+        !settingsToggle ||
+        (event.target instanceof Node &&
+          settings instanceof Node &&
+          settings.contains(event.target))
+      ) {
         return;
+      }
       keyboardEvent.preventDefault();
       settingsToggle.dispatchEvent(new Event("click"));
       (settingsToggle as HTMLElement).focus();

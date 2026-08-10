@@ -97,7 +97,7 @@ test("settings shell renders an h2 heading for the screen reader landmark", asyn
 
   const heading = element.querySelector("h2");
   expect(heading).not.toBeNull();
-  expect(heading?.textContent?.trim()).toContain("設定");
+  expect(heading?.textContent?.trim()).toContain("管理");
   document.body.removeChild(element);
 });
 

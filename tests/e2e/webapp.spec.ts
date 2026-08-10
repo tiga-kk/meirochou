@@ -43,11 +43,22 @@ test("初回訪問では空のローカルイベント・日程で起動する",
 
   const settings = page.locator("#settings-area");
   await expect(settings).toBeHidden();
-  await expect(page.locator("#toggle-settings")).toHaveAttribute(
+  const managementButton = page.getByRole("button", { name: "管理" });
+  await expect(managementButton).toHaveAttribute(
     "aria-expanded",
     "false",
   );
   await expect(page.locator("#toast")).toContainText("CSVデータ未設定");
+
+  await managementButton.click();
+  await expect(settings).toBeVisible();
+  await expect(page.locator("event-day-management-view")).toBeVisible();
+  await expect(page.locator(".container > comipath-settings.card")).toHaveCount(0);
+  await expect(settings.locator(".management-surface-close")).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(settings).toBeHidden();
+  await expect(managementButton).toBeFocused();
 });
 
 test("予定を開くと巡回順と地図pinの番号が一致し案内状態を変えない", async ({

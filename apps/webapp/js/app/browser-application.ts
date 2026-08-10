@@ -513,6 +513,9 @@ export class BrowserApplication {
       const state = this.eventDayRepository.load(ref);
       if (!state) return;
       if (state.source.type === "gas") {
+        if (this.ui.els.settingsArea?.open) {
+          this.toggleSettings(this.document.getElementById("toggle-settings"));
+        }
         await this.circleDataSourceController.refreshSavedGasSource(ref, state.source);
       } else {
         this.ui.showSettings();

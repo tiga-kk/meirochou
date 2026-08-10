@@ -50,6 +50,8 @@ export class SourceDiffDialog extends LitElement {
       const previousWasOpen = this.wasOpen;
       this.wasOpen = isOpen;
       if (isOpen) {
+        // The management surface may have inerted this nested modal host.
+        this.removeAttribute("inert");
         this.removeAttribute("hidden");
         this.classList.remove("hidden");
         this.focusController?.activate();

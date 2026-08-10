@@ -132,10 +132,43 @@ input[type="text"] {
 /* Settings Area */
 #settings-area {
   display: none;
-  scroll-margin-top: 70px;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow-y: auto;
+  padding: max(0.75rem, env(safe-area-inset-top))
+    max(0.75rem, env(safe-area-inset-right))
+    max(0.75rem, env(safe-area-inset-bottom))
+    max(0.75rem, env(safe-area-inset-left));
+  background: var(--bg-body);
 }
 #settings-area.show {
   display: block;
+}
+
+#settings-area > * {
+  width: min(760px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.management-surface-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--ink);
+}
+
+.management-surface-header h2 {
+  margin: 0;
+}
+
+.management-surface-close {
+  min-height: 44px;
+  flex-shrink: 0;
 }
 
 .event-day-management {

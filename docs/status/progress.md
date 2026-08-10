@@ -12,7 +12,7 @@
 - Phase 6: 完了・`main`へmerge済み
 - 現在のフェーズ: Phase 6.1 実装完了・既知の検証残件あり（完了判定は完全GREEN扱いにしない）
 - scale values: 確定
-- Phase 7: Task 1〜3完了・Task 4着手可能
+- Phase 7: Task 1〜4完了・Task 5着手可能
 
 ### Phase 6.1の既知残件
 
@@ -110,7 +110,13 @@ Phase計画:
   - Task 1のcache use caseでoffline準備の進捗と部分失敗を表示し、成功済みcacheをrollbackしない契約を実装。
   - local deletion後は未参照catalog URLだけをbest-effort cleanupし、共有URL、削除失敗、残存参照取得失敗を安全側へ扱うwrapperとテストを追加。
   - focused tests、webapp全体検証、management/catalog-offline E2Eを実行。既存のsource-diff/outbox/delete visual snapshot 3件は基準commitでも再現したため、今回の回帰とは分類しない。
-- 次に着手可能: Task 4 — mainとmanagementのvisual hierarchyを再構成
+- Task 4: mainとmanagementのvisual hierarchyを再構成 — 完了
+  - main内のinline settings cardを廃止し、headerの「管理」から独立したdialog相当surfaceを開く構造へ変更。
+  - event/day overviewを第一層に置き、safe-area、44px操作領域、keyboard focus、Escape/閉じる時のfocus復帰、dialog semanticsを維持。
+  - source-diff dialogをmanagement surface上で操作できるnested modalとして整理し、既存source preview/applyフローの回帰を解消。
+  - 意図したsettings surface snapshotだけを更新。地図/候補経路、source-diff、outbox、deleteの既存visual snapshot差分は基準時点からの残件として保持。
+  - `npm run verify`、management/webappの代表E2E、CI相当E2E、architecture/typecheck、build、public tree auditを実行。
+- 次に着手可能: Task 5 — offline/management/visualを最終検証
 
 ## 実装開始時の確認
 

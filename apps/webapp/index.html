@@ -54,20 +54,18 @@
         <button
           type="button"
           id="toggle-settings"
-          class="settings-btn"
-          aria-label="設定"
+          class="header-btn"
+          aria-label="管理"
           aria-controls="settings-area"
           aria-expanded="false"
+          aria-haspopup="dialog"
         >
-          <i class="fa-solid fa-gear"></i>
+          管理
         </button>
       </div>
     </header>
 
     <div class="container">
-      <!-- 設定エリア -->
-      <comipath-settings id="settings-area" class="card"></comipath-settings>
-
       <!-- 現在地入力 -->
       <div class="card location-card">
         <div class="current-location-header">
@@ -229,6 +227,14 @@
         </button>
       </div>
     </div>
+
+    <!-- 独立した管理surface。mainの地図・案内面積を占有しない。 -->
+    <comipath-settings
+      id="settings-area"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-heading"
+    ></comipath-settings>
 
     <div id="pdf-modal" class="pdf-modal hidden">
       <div class="pdf-modal-header">
