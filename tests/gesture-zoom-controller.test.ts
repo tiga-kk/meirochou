@@ -137,6 +137,25 @@ describe("GestureZoomController", () => {
     expect(controller.state.scale).toBe(1);
   });
 
+  it("limits pinch center movement to the rubber-band overscroll", () => {
+    const { container, controller } = createController();
+    controller.setLayout({
+      containerWidth: 100,
+      containerHeight: 100,
+      stageWidth: 300,
+      stageHeight: 300,
+    });
+
+    container.dispatchEvent(pointerEvent("pointerdown", 1, 20, 50));
+    container.dispatchEvent(pointerEvent("pointerdown", 2, 80, 50));
+    container.dispatchEvent(pointerEvent("pointermove", 1, 220, 50));
+    container.dispatchEvent(pointerEvent("pointermove", 2, 140, 50));
+    flushRaf();
+
+    expect(controller.state.x).toBeGreaterThan(0);
+    expect(controller.state.x).toBeLessThanOrEqual(32);
+  });
+
   it("recovers from cancel and capture loss without leaving active pointers", () => {
     const { container, controller } = createController();
 
@@ -209,6 +228,24 @@ describe("GestureZoomController", () => {
     expect(controller.baseX).toBe(-100);
     expect(controller.baseY).toBe(0);
     expect(container.getBoundingClientRect).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves the transform when the same layout is applied again", () => {
+    const { controller } = createController();
+    const layout = {
+      containerWidth: 100,
+      containerHeight: 100,
+      stageWidth: 300,
+      stageHeight: 100,
+      baseX: -100,
+      baseY: 0,
+    };
+
+    controller.setLayout(layout);
+    controller.setTransform({ scale: 2, x: -160, y: -20 });
+    controller.setLayout(layout);
+
+    expect(controller.state).toEqual({ scale: 2, x: -160, y: -20 });
   });
 
   it("applies bounded resistance outside pan limits", () => {

@@ -41,3 +41,18 @@ Task 1/2の既存変更は保持し、Task 4/5の機能は追加していない�
 
 - CIコンテナの`npm ci`で既存依存の監査結果としてmoderate 1件、high 1件が表示された。今回の変更では依存更新を行っていない。
 - `biome check`は今回未変更の既存箇所にも整形診断があるため、全体自動整形は行っていない。
+
+## Task 3レビュー修正追記
+
+- pinchの中心移動・scale補正後の座標を`getXBounds()`/`getYBounds()`と`applyPan()`へ通し、overscrollLimit 32を適用。
+- `setLayout()`はcontainer/stage/base transformの値が変化した時だけresetし、同じlayoutの再適用ではtransformを保持。
+- focused regression testを2件追加（pinch overscroll上限、同一layout再適用時のtransform保持）。
+
+## 修正後の検証
+
+- `npx vitest run --root . tests/gesture-zoom-controller.test.ts tests/route-map-viewport-layout.test.ts` — 成功、2 files / 14 tests
+- `npm run test:webapp` — 成功、95 files / 668 tests
+- `npm run test:e2e:ci -- --grep "地図|map"` — 1 failed / 3 passed / 8 skipped。`navigation-map-catalog.png`の既存snapshot差分。snapshotは変更していない。
+- `npm run check:webapp` — 成功、architecture check / typecheck
+- `git diff --check` — 成功
+- 修正コミット — 本追記を含むコミット

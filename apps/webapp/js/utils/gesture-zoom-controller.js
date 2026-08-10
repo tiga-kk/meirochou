@@ -109,6 +109,15 @@ export class GestureZoomController {
     )
       return;
     this.hasExplicitLayout = true;
+    const nextBaseX = Number.isFinite(baseX) ? baseX : 0;
+    const nextBaseY = Number.isFinite(baseY) ? baseY : 0;
+    const layoutChanged =
+      this.layout.containerWidth !== containerWidth ||
+      this.layout.containerHeight !== containerHeight ||
+      this.layout.stageWidth !== stageWidth ||
+      this.layout.stageHeight !== stageHeight ||
+      this.baseX !== nextBaseX ||
+      this.baseY !== nextBaseY;
     this.layout = {
       ...this.layout,
       containerWidth,
@@ -116,9 +125,9 @@ export class GestureZoomController {
       stageWidth,
       stageHeight,
     };
-    this.baseX = Number.isFinite(baseX) ? baseX : 0;
-    this.baseY = Number.isFinite(baseY) ? baseY : 0;
-    this.reset();
+    this.baseX = nextBaseX;
+    this.baseY = nextBaseY;
+    if (layoutChanged) this.reset();
   }
 
   updateTransform() {
@@ -361,6 +370,8 @@ export class GestureZoomController {
     this.state.x -= imgX * (scaleRatio - 1);
     this.state.y -= imgY * (scaleRatio - 1);
     this.state.scale = newScale;
+    this.state.x = this.applyPan(this.state.x, this.getXBounds());
+    this.state.y = this.applyPan(this.state.y, this.getYBounds());
     this.lastPinchCenter = currentCenter;
     this.scheduleTransform();
   }
