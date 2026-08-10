@@ -2,7 +2,7 @@
 
 ## 目標
 
-Task 2のevent/day overviewを操作の起点にし、既存Use Caseを再利用して`開く`、`再読込`、`オフライン準備`、`編集`、`削除`をevent/day単位で実行できるようにする。
+Task 2のevent/day overviewを操作の起点にし、既存Use Caseを再利用して`開く`、`再読込`、`オフライン準備`、`編集`、`削除`をevent/day単位で実行できるようにする。ローカル削除後には、そのscopeで不要になったcatalog cacheもbest-effortで整理する。
 
 ## やってはいけないこと
 
@@ -11,19 +11,27 @@ Task 2のevent/day overviewを操作の起点にし、既存Use Caseを再利用
 - source変更時にpending GAS queueを新sourceへ暗黙移行しない。
 - offline準備失敗でsource dataやpurchase stateをrollbackしない。
 - offline保存をpage load時に自動で全件開始しない。
+- catalog cache削除失敗をローカルデータ削除の失敗へ昇格させない。
+- ローカル削除後にrepositoryから消えたstateを読んでcatalog URLを復元しようとしない。cleanup対象URLは削除実行前に収集する。
 
 ## Files
+
+**Create:**
+- `apps/webapp/js/app/delete-local-data-with-catalog-cleanup.ts`
 
 **Modify:**
 - `apps/webapp/js/components/event-day-management-view.ts`
 - `apps/webapp/js/components/circle-data-source-panel.ts`
 - `apps/webapp/js/app/browser-application.ts`
+- `apps/webapp/js/app/assemble-comipath-application.ts`
 - `apps/webapp/js/features/circle-data-source/ui/circle-data-source-controller.ts`
-- `apps/webapp/js/features/local-data-deletion/...`の既存公開操作
-- `apps/webapp/js/features/catalog-offline/...`
+- `apps/webapp/js/features/catalog-offline/use-cases/cache-event-day-catalogs.ts`
+- `apps/webapp/js/features/catalog-offline/use-cases/get-catalog-offline-status.ts`
+- `apps/webapp/js/features/catalog-offline/public-api.ts`
 - `apps/webapp/js/shared/ui/management-events.ts`
 
 **Test:**
+- `tests/delete-local-data-with-catalog-cleanup.test.ts`
 - `tests/event-day-management-actions.test.ts`
 - `tests/e2e/management.spec.ts`
 - `tests/e2e/catalog-offline.spec.ts`
@@ -52,6 +60,23 @@ interface OfflinePreparationResult {
 }
 ```
 
+Deletion wrapperは既存`DeleteLocalDataOperation`と同じinterfaceを実装する。
+
+```ts
+export class DeleteLocalDataWithCatalogCleanup
+  implements DeleteLocalDataOperation {
+  constructor(
+    private readonly inner: DeleteLocalDataOperation,
+    private readonly repository: EventDayRepository,
+    private readonly offlineCache: CatalogOfflineCachePort,
+  ) {}
+
+  execute(scope: LocalDataDeletionScope): Promise<void>;
+}
+```
+
+`execute()`は削除前にscope対象stateから有効catalog URL集合をsnapshotし、`inner.execute(scope)`成功後に`offlineCache.remove(urls)`をbest-effortで行う。cache remove失敗はconsole diagnosticへ残してよいが、成功済みlocal deletionを失敗へ変えない。
+
 ## Steps
 
 - [ ] **Step 1: action dispatch/ownershipのRED testを書く**
@@ -79,19 +104,39 @@ current source circlesからcatalog URLを収集し、Cache Use Caseへ渡し、
 
 GAS rowでは完全URL/sheetをdetail editorへ読み込む。pending GAS queue > 0でsourceを変更しようとした場合、既存queueを処理/破棄する明示確認なしにapplyできないことを固定する。
 
-- [ ] **Step 6: `削除`をPhase 6.1 deletion flowへ接続する**
+- [ ] **Step 6: deletion cache cleanupのRED testを書く**
 
-row refをscopeへ渡し、pending discard warningを含む既存confirmationを再利用する。別の削除ロジックをmanagement UI内へ作らない。
+少なくともevent-dayとall-event-daysを固定する。
 
-- [ ] **Step 7: action実装をcontroller/applicationへ接続する**
+```ts
+it("captures catalog URLs before event-day deletion and removes them after local deletion", async () => {
+  await operation.execute({ kind: "event-day", eventDay: ref });
+  expect(inner.execute).toHaveBeenCalledWith({ kind: "event-day", eventDay: ref });
+  expect(offlineCache.remove).toHaveBeenCalledWith([urlA, urlB]);
+});
+
+it("does not roll back successful local deletion when cache cleanup fails", async () => {
+  offlineCache.remove.mockRejectedValue(new Error("quota/cache failure"));
+  await expect(operation.execute({ kind: "all-event-days" })).resolves.toBeUndefined();
+  expect(inner.execute).toHaveBeenCalledTimes(1);
+});
+```
+
+`all-event-days`では削除前の全stateからcatalog URLのunionをdedupeして取得する。`activity`はcircle source自体を保持するためcatalog cacheを削除しない。`circle-source`と`event-day`は対象dayのcatalog URLを削除対象とする。
+
+- [ ] **Step 7: `削除`をPhase 6.1 deletion flowへ接続する**
+
+composition rootで既存`DeleteLocalDataUseCase`を`DeleteLocalDataWithCatalogCleanup`でwrapし、`LocalDataDeletionController`へ同じ`DeleteLocalDataOperation`として注入する。management UI内へ別の削除ロジックを作らない。
+
+- [ ] **Step 8: action実装をcontroller/applicationへ接続する**
 
 BrowserApplicationが巨大化する場合はevent bindingだけを薄いcontrollerへ分離してよいが、新しいgeneric Manager/Facadeを作らない。
 
-- [ ] **Step 8: offline preparationのpartial failureを表示する**
+- [ ] **Step 9: offline preparationのpartial failureを表示する**
 
 failed URLsはconsoleだけでなく件数としてUIへ残す。個別URLの一覧表示はdetailで必要な場合だけにし、overview rowには`47 / 52`のようなsummaryを表示する。
 
-- [ ] **Step 9: E2Eを追加する**
+- [ ] **Step 10: E2Eを追加する**
 
 - day1→day2 `開く`。
 - GAS `再読込`で保存済みsourceを使用。
@@ -99,24 +144,33 @@ failed URLsはconsoleだけでなく件数としてUIへ残す。個別URLの一
 - network failureを混ぜても成功cache維持。
 - edit sourceのpending queue guard。
 - delete confirmation。
+- event-day/all-event-days削除後に対象catalog cacheが残らない。
+- cache cleanup failureをinjectしてもlocal deletion結果は維持される。
 
-- [ ] **Step 10: verification**
+- [ ] **Step 11: verification**
 
 ```bash
-npx vitest run --root . tests/event-day-management-actions.test.ts
+npx vitest run --root . tests/delete-local-data-with-catalog-cleanup.test.ts tests/event-day-management-actions.test.ts
 npm run test:webapp
-npm run test:e2e:ci -- --grep "管理|再読込|オフライン"
+npx playwright test tests/e2e/management.spec.ts tests/e2e/catalog-offline.spec.ts
 npm run check:webapp
 git diff --check
 ```
 
-- [ ] **Step 11: commit**
+- [ ] **Step 12: commit**
 
 ```bash
-git add apps/webapp/js/components apps/webapp/js/app \
-  apps/webapp/js/features/circle-data-source \
+git add apps/webapp/js/components/event-day-management-view.ts \
+  apps/webapp/js/components/circle-data-source-panel.ts \
+  apps/webapp/js/app/delete-local-data-with-catalog-cleanup.ts \
+  apps/webapp/js/app/browser-application.ts \
+  apps/webapp/js/app/assemble-comipath-application.ts \
+  apps/webapp/js/features/circle-data-source/ui/circle-data-source-controller.ts \
   apps/webapp/js/features/catalog-offline \
-  apps/webapp/js/shared/ui/management-events.ts tests
+  apps/webapp/js/shared/ui/management-events.ts \
+  tests/delete-local-data-with-catalog-cleanup.test.ts \
+  tests/event-day-management-actions.test.ts \
+  tests/e2e/management.spec.ts tests/e2e/catalog-offline.spec.ts
 git commit -m "feat(management): connect event day actions and offline preparation"
 ```
 
@@ -128,3 +182,5 @@ git commit -m "feat(management): connect event day actions and offline preparati
 - offline準備はprogress/partial failureを表示する。
 - source変更時に旧pending queueが新sourceへ送られない。
 - 削除はPhase 6.1の共通deletion semanticsを再利用する。
+- `circle-source`/`event-day`/`all-event-days`削除後に対象catalog cacheをbest-effortで整理する。
+- cache cleanup failureはlocal deletion成功を取り消さない。
