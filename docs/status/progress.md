@@ -2,88 +2,91 @@
 
 更新日: 2026-08-10
 
-## Phase 6 Task 9 の状態
-
-Phase 6 Task 9（ユーザー体験の最終検証）は完了した。経路変更確定後のsnapshot保存、resume中の古いALNS進捗によるsnapshot上書き、低速・範囲外パンのsettle、ギャラリー購入ボタンの44pxタッチターゲット、予定pinのaccessible nameを修正し、計画書が要求する統合検証を追加した。
-
-追加・更新した検証:
-
-- 経路変更→確定→購入→次のお品書き表示
-- 経路変更確定→LocalStorage snapshot→reload→変更後目的地で再開
-- GAS delivery失敗後の次目的地表示と候補経路非表示
-- ギャラリーの左右実スワイプによる購入と端末保存
-- CSV/GAS guideのvalidation差分
-- 予定一覧と地図pinの番号・accessible name整合
-- 44px購入ボタン、200%表示、地図操作、既存のlocal save failure回帰
-
-検証結果:
-
-- `npm run verify`: 成功（webapp 647 tests、Route Guidance 35 tests、Phase 5D回帰4 tests、architecture/typecheck/build/GASを含む）
-- `npm run test:e2e:ci`: 成功（43 passed / 8 skipped）
-- `npx biome check`: repo-wideでは89 errors / 116 warnings / 8 infos。mainでも同じ結果を再現し、Phase 6で追加したコードによる新規errorではない。変更箇所の機械的な既存format debtは修正せず、Phase 6の回帰とは分離して記録する。
-- `node scripts/audit-public-tree.mjs`と`git diff --check`: 成功
-
-次に着手するPhase 6タスクはない。外部公開や不可逆変更を伴う次フェーズは自動開始しない。
-
-## 現在の対象
+## 現在の状態
 
 - リポジトリ: `tiga-kk/meirochou`
-- ブランチ: `feature/phase-06-task-01`
-- production確認元: `main`
-- Phase 6計画作成時の`main` HEAD: `3322c31cf8c8413ecc6a5d5d2e7abaefea7aa318`
-- 計画文書ブランチ: `docs/phase-06-user-experience-plan`
-- 現在のフェーズ: Phase 6 Task 9 完了
-- 次に着手するタスク: なし（Phase 6完了。次Phaseは自動開始しない）
+- production branch: `main`
+- Phase 6 merge commit: `9718f976558e31596585f6e03416db8825c6e13f`（PR #9）
+- 計画文書branch: `docs/phase-06-1-phase-07-followup-plan`
+- Phase 5D: 完了
+- Phase 6: 完了・`main`へmerge済み
+- 現在のフェーズ: Phase 6.1 計画完了、実装未開始
+- 次に着手するTask: Phase 6.1 Task 1
+- Phase 7: 計画済み。Phase 6.1完了前には実装開始しない
 
-## Phase 5D
+## Phase 6.1
 
-Phase 5Dの責務整理は完了し、PR #7として`main`へmerge済みである。現在のproduction実装はPhase 5D完了後の`main`を基準とする。
-
-Phase 5Dの履歴、完了条件、各Taskの詳細は`docs/plans/phase-05d/`とGit履歴を参照する。Phase 6ではPhase 5Dの旧WIP状態や固定SHAを実装開始条件として再利用しない。
-
-## Phase 6
+本番`meirochou.tiga.moe`を実機操作して判明した具体的な問題を修正する。
 
 設計:
-`docs/specs/2026-08-09-phase-06-user-experience-improvements-design.md`
+`docs/specs/2026-08-10-phase-06-1-field-ux-followups-design.md`
 
 Phase計画:
-`docs/plans/phase-06/README.md`
+`docs/plans/phase-06-1/README.md`
 
 実装順:
-1. Task 1 Route Guidanceの候補・確定状態を修正
-2. Task 2 GAS配送を購入後進行から完全に分離
-3. Task 3 地図ジェスチャーの操作性能を改善
-4. Task 4 地図とお品書きを主役にメイン画面を再構成
-5. Task 5 地図上の候補サークル選択を明確化
-6. Task 6 今後の巡回予定を一覧と地図で表示
-7. Task 7 お品書き一覧を2列化しスワイプ操作を改善
-8. Task 8 常設の使い方画面と初見ユーザー向け導線を追加
-9. Task 9 Phase 6全体を最終検証
 
-## 現状調査で確認済みの重要事項
+1. Task 1: pending GASがあっても明示削除できるよう、削除scopeとoutboxの意味を修正する
+2. Task 2: GAS読込等の長時間処理を右下async operation indicatorで表示する
+3. Task 3: map viewport/stageを実画像比率へ合わせ、rubber-bandとgesture性能を修正する
+4. Task 4: Gallery swipeを「開始時は重く、閾値付近で軽い」非線形抵抗へ変更する
+5. Task 5: 距離をm表示し、Start/Goalと軽量なStart→Goal route flow animationを追加する
+6. Task 6: Phase 6.1全体をE2E/visual/performance観点で最終検証する
 
-- 通常購入後の`FinishCurrentCircleUseCase`だけでなく、初回案内を作る`StartRouteGuidanceUseCase`も`selectedRoute === currentRoute`かつ`selectionStatus: "ready"`を作る。地図Viewは`ready`でもcandidate overlayを描画するため、初回案内と購入後進行の両方で赤線と青線が重なり得る。
-- `ResumeRouteGuidanceUseCase`は通常再開時に`selectionStatus: "idle"`を作っている。Task 1では開始・再開・購入後進行の通常案内を`idle`へ統一し、青線を`comparing`だけへ限定する。
-- 経路変更confirmは表示中destination/routeを変更する一方、`NavigationState.targetSpace`と`lockedFirstLeg`を同時更新しておらず、その後の購入が`FinishCurrentCircleUseCase`で`ignored`になり得る。
-- Circle Statusはrepository saveとoutbox追加を先に行うlocal-first設計になっている。
-- ただしrepository save後の`backgroundProcess.requestSend()`はbest-effort副作用として隔離されておらず、同期例外が上位へ漏れる余地がある。
-- 購入直後はbackground send要求に加え`BrowserApplication`から診断用flushも呼び、automatic deliveryの所有が重複している。
-- 現行テストはGAS失敗時のlocal purchase/outbox保持を確認しているが、GAS失敗時もRoute Guidanceが次の目的地へ進み次のお品書きを描画するproduction integrationを固定していない。
-- 地図ジェスチャーはtouch/mouseの別実装で、慣性frame内にlayout readが残っている。Pointer Events化では`pointercancel`/capture喪失時の復帰も契約へ含める。
-- 現行`index.html`はviewportで`maximum-scale=1.0, user-scalable=no`を指定しており、Phase 6の200%拡大受入条件と矛盾する。
-- 地図上の`.route-card`/`.map-log`を単に削除すると、`DomRouteGuidanceView`が直接参照する`#target-space-heading`、`#target-start-space`、`#target-route-log`を失ってruntime errorになり得る。Task 4では表示先を移すかView参照も同時に整理する。
-- Task 5で必要な「候補を閉じる」公開操作は現行`ChangeDestinationUseCase`/`RouteGuidanceController`に存在しない。既存責務方向の中で最小の取消操作を追加する必要がある。
-- 一覧はCSS上1列で、横長だけ`wide`判定する既存構造である。既存`sortTargets()`の優先度順/スペース順は2列化後もDOM順として維持する。
-- `DomCircleGalleryView.handleGalleryPurchase()`は非同期の`BrowserApplication.addPurchased()`を待たずに成功toastとカード削除を行っており、端末保存失敗を一覧だけ成功扱いする余地がある。
-- 一覧で現在target以外を購入するとlocal stateは進む一方、購入済みspaceが`NavigationState.bestOrder`/`provisionalOrder`へ残り得る。その後の通常購入で`next-target-missing`へ進まないよう、現在経路を維持したまま将来順序から除外する必要がある。
-- CSV parserとGAS sheetはカラム名自体は同系統だがvalidationが完全には同一ではない。特にGASはrecognized header重複を拒否する一方、現行CSV parserには同じheader重複validationを持たないため、Task 8のガイドで共通規則として誤記しない。
+### Phase 6.1で固定した重要事項
+
+- pending GAS queueは明示削除を禁止するlockではなく、削除confirmationで破棄件数を警告する対象とする。
+- `activity`/`circle-source`削除では、そのscopeに属するpending GAS queueも一緒に破棄し、旧mutationを後からremoteへ送らない。
+- map viewportは実画像比率へ追従する。横長地図でも操作領域は最低220pxを確保する。
+- 横長地図は必要ならcover表示して横panさせる。地図外は最大約32pxだけrubber-bandし、releaseで戻す。
+- map pointermove hot pathでlayout readを繰り返さない。
+- Galleryの購入方向契約は維持し、表示translationだけ非線形抵抗へする。
+- routing costと物理距離を分離する。UIへweighted routing costをそのまま距離として表示しない。
+- `metersPerPixel`はC108各areaの既知実寸根拠を確認してから設定し、推測値をcommitしない。
+- current routeはS/Gを文字表示し、solid base line上にCSS `stroke-dashoffset`のflow lineを重ねる。
+- route animationのためにJavaScript RAF/timer、Dijkstra/ALNS再計算、毎frame DOM再生成を追加しない。
+- `prefers-reduced-motion: reduce`ではflow animationを停止する。
+
+## Phase 7
+
+Phase 6.1完了後、会場の不安定な通信へ備えたoffline準備と管理画面再設計を行う。
+
+設計:
+`docs/specs/2026-08-10-phase-07-offline-event-management-and-visual-system-design.md`
+
+Phase計画:
+`docs/plans/phase-07/README.md`
+
+実装順:
+
+1. Task 1: Service Worker + Cache Storageでcatalog offline cache基盤を追加
+2. Task 2: registry全event/dayのmanagement overviewを追加
+3. Task 3: 開く/再読込/offline準備/編集/削除actionを一覧へ接続
+4. Task 4: mainとmanagementのvisual hierarchyを再構成
+5. Task 5: offline/management/visualを最終検証
+
+### Phase 7で固定した重要事項
+
+- offline保存はユーザーが事前に明示実行する。page loadごとの自動全downloadは行わない。
+- Service Workerはcatalog image fallbackに限定し、full PWA、install prompt、background sync、pushを追加しない。
+- partial download failureでも成功済みcacheを保持する。
+- management一覧にはregistry定義済みevent/dayをすべて表示し、未設定dayも消さない。
+- registry外eventをブラウザだけで任意作成しない。
+- GAS sourceは現行どおりevent/dayあたり1 sheetとし、Phase 7でmulti-sheetへ広げない。
+- main navigationから旧inline設定panelの縦積みを外し、管理は独立surfaceへ移す。
+- visual redesignは装飾追加ではなく、map/catalog/actionを主役にした情報階層の整理として行う。
 
 ## 実装開始時の確認
 
-Phase 6のproduction実装は、計画文書ブランチのレビュー済み内容が`main`へ反映された後の最新remote `main`から開始する。`docs/phase-06-user-experience-plan`へproduction codeを追加しない。
+Phase 6.1のproduction実装は、この計画文書がレビューされ`main`へ反映された後の最新remote `main`から開始する。`docs/phase-06-1-phase-07-followup-plan`へproduction code/test/package/CI変更を追加しない。
 
-Task 1開始直前に最新remote `main`を取得し、その時点のHEADをTaskの基準コミットとして扱う。計画作成時HEADやこの文書の履歴上のSHAを実装開始SHAとして固定しない。
+各Task開始直前に最新remote `main`を取得し、Task文書で列挙したファイル名・公開contract・test commandが現在コードと一致するか確認する。private implementationの安全な移動には追従してよいが、ユーザー向け契約が変わっている場合はTaskを勝手に読み替えず計画を再評価する。
 
-計画作成以降にproduction/test差分が進んでいる場合は、Task文書のファイル名、公開契約、検証コマンドを現在コードへ照合してから着手する。安全に一意に追従できるprivate実装差分はその場で調整し、外部挙動が変わる場合だけ判断を分離する。
+Phase 6.1 Task 6がGREENになり、`docs/status/progress.md`へ完了が記録されるまでPhase 7実装を開始しない。
 
-ユーザー向け外部挙動を変える未決事項は現在ない。内部実装はPhase 6設計と既存feature境界の範囲で必要最小限に決める。
+## 完了済みPhaseの参照
+
+- Phase 6: `docs/specs/2026-08-09-phase-06-user-experience-improvements-design.md`, `docs/plans/phase-06/`
+- Phase 5D: `docs/plans/phase-05d/`
+
+過去の詳細なWIP/診断記録は各Phase文書とGit履歴を正本とし、このprogress文書には現在の実装判断に必要な状態だけを保持する。
