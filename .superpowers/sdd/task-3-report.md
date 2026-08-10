@@ -56,3 +56,14 @@ Task 1/2の既存変更は保持し、Task 4/5の機能は追加していない�
 - `npm run check:webapp` — 成功、architecture check / typecheck
 - `git diff --check` — 成功
 - 修正コミット — 本追記を含むコミット
+
+## Task 3レビュー修正（pinch overscroll回帰テスト）
+
+- `tests/gesture-zoom-controller.test.ts`の既存pinch overscroll testを補強し、正側のx/yと負側境界のx/yがいずれも32px以内であることを固定した。
+- production codeとテスト基盤は変更していない。
+
+## レビュー修正の検証
+
+- `npx vitest run --root . tests/gesture-zoom-controller.test.ts tests/route-map-viewport-layout.test.ts` — 成功、2 files / 14 tests
+- `npm run check:webapp` — 成功、architecture check / typecheck
+- `git diff --check` — 成功

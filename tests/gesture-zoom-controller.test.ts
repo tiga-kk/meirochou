@@ -146,14 +146,28 @@ describe("GestureZoomController", () => {
       stageHeight: 300,
     });
 
-    container.dispatchEvent(pointerEvent("pointerdown", 1, 20, 50));
-    container.dispatchEvent(pointerEvent("pointerdown", 2, 80, 50));
-    container.dispatchEvent(pointerEvent("pointermove", 1, 220, 50));
-    container.dispatchEvent(pointerEvent("pointermove", 2, 140, 50));
+    container.dispatchEvent(pointerEvent("pointerdown", 1, 20, 20));
+    container.dispatchEvent(pointerEvent("pointerdown", 2, 80, 80));
+    container.dispatchEvent(pointerEvent("pointermove", 1, 220, 220));
+    container.dispatchEvent(pointerEvent("pointermove", 2, 140, 140));
     flushRaf();
 
     expect(controller.state.x).toBeGreaterThan(0);
     expect(controller.state.x).toBeLessThanOrEqual(32);
+    expect(controller.state.y).toBeGreaterThan(0);
+    expect(controller.state.y).toBeLessThanOrEqual(32);
+
+    controller.reset();
+    container.dispatchEvent(pointerEvent("pointerdown", 1, 80, 80));
+    container.dispatchEvent(pointerEvent("pointerdown", 2, 20, 20));
+    container.dispatchEvent(pointerEvent("pointermove", 1, -270, -270));
+    container.dispatchEvent(pointerEvent("pointermove", 2, -330, -330));
+    flushRaf();
+
+    expect(controller.state.x).toBeGreaterThanOrEqual(-232);
+    expect(controller.state.x).toBeLessThan(-200);
+    expect(controller.state.y).toBeGreaterThanOrEqual(-232);
+    expect(controller.state.y).toBeLessThan(-200);
   });
 
   it("recovers from cancel and capture loss without leaving active pointers", () => {
