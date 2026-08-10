@@ -11,6 +11,8 @@ registry定義済みの全event/dayを一つの管理一覧へ投影し、source
 - 一覧rowからrepositoryやCache Storageを直接読むcomponentを作らない。
 - GAS完全URLを一覧へ常時そのまま表示しない。
 - source editor/delete/outboxの全入力UIを一覧rowへ詰め込まない。
+- async builderが完了してからしか返らないのに、到達不能な`checking` stateをrow contractへ置かない。
+- offline status取得失敗を`0件保存済み`として偽装しない。
 
 ## Files
 
@@ -45,9 +47,8 @@ export interface EventDayManagementRow {
   readonly circleCount: number;
   readonly pendingGasCount: number;
   readonly offlineCatalog: {
-    readonly cached: number;
+    readonly cached: number | null; // null = status取得失敗/確認不能
     readonly total: number;
-    readonly checking: boolean;
   };
 }
 ```
@@ -63,7 +64,9 @@ export async function buildEventDayManagementRows(input: {
 }): Promise<readonly EventDayManagementRow[]>;
 ```
 
-Catalog URL集合は`removedFromSource === false`かつ有効catalog URLを持つcurrent circlesから作る。
+Catalog URL集合は`removedFromSource !== true`かつ有効catalog URLを持つcurrent circlesから作る。同一day内の同一URLは1件として数える。
+
+このbuilderはCache Storage実装を直接知らず`CatalogOfflineCachePort`だけを使うが、status I/Oを行うため「pure function」とは扱わない。複数rowのstatus取得は独立しているため`Promise.all`等で並行化してよい。1 rowのstatus取得失敗はそのrowの`cached=null`へ落とし、他rowとmanagement全体の描画は継続する。
 
 ## Steps
 
@@ -82,7 +85,19 @@ expect(rows[1].sourceType).toBe("none");
 
 - [ ] **Step 2: offline statusを含むRED testを書く**
 
-cache portをfakeし、`cached/total/checking`がrowへ投影されることを確認する。status取得失敗はmanagement全体failureへせず、offline statusだけunknown相当へ落とす設計にしてよい。
+cache portをfakeし、成功時に`cached/total`がrowへ投影されることを確認する。
+
+status取得失敗では次を固定する。
+
+```ts
+expect(failedRow.offlineCatalog).toEqual({
+  cached: null,
+  total: expectedCurrentCatalogUrlCount,
+});
+expect(otherRow.offlineCatalog.cached).toBe(expectedCachedCount);
+```
+
+`cached=null`を`0`へ丸めない。0は「確認できており、保存済みURLが0件」を意味する。
 
 - [ ] **Step 3: REDを確認する**
 
@@ -90,9 +105,11 @@ cache portをfakeし、`cached/total/checking`がrowへ投影されることを�
 npx vitest run --root . tests/event-day-management-view-model.test.ts
 ```
 
-- [ ] **Step 4: pure/view model builderを実装する**
+- [ ] **Step 4: view model builderを実装する**
 
 既存`buildEventDayOptions()`のregistry順序、configured判定、source summary知識を必要に応じて共通helperへ寄せる。同じルールを2箇所へコピーしない。
+
+各configured rowについてcurrent catalog URL集合を作り、`offlineCache.getStatus(urls)`を呼ぶ。status取得失敗はそのrowだけ`cached:null`へ落とす。未設定rowはI/Oせず`{ cached: 0, total: 0 }`でよい。
 
 - [ ] **Step 5: management overview componentを実装する**
 
@@ -105,6 +122,8 @@ Data N件
 GAS同期 N件待ち
 お品書き cached / total 保存済み
 ```
+
+`cached === null`なら数値を捏造せず、たとえば`お品書き 保存状況を確認できません`と表示する。
 
 actionsは次Taskで接続するが、button slot/イベント名はこのTaskで固定する。
 
@@ -126,7 +145,7 @@ headerから独立管理surfaceを開ける入口を追加する。Task 4まで�
 
 - [ ] **Step 8: E2Eで一覧状態を確認する**
 
-C108 day1 configured / day2 unconfigured等のfixtureでsource、count、pending、offline statusを確認する。
+C108 day1 configured / day2 unconfigured等のfixtureでsource、count、pending、offline statusを確認する。Cache Storage status取得を意図的に失敗させたfixtureでは、rowが消えず「確認できません」相当の表示になることも確認する。
 
 - [ ] **Step 9: verification**
 
@@ -152,5 +171,6 @@ git commit -m "feat(management): show event day status overview"
 - registry全event/dayが1画面に並ぶ。
 - 未設定dayも消えない。
 - source/data/outbox/offline statusがrow単位で分かる。
--一覧は完全GAS URLを常時露出しない。
+- offline status取得失敗と「0件保存済み」を区別できる。
+- 一覧は完全GAS URLを常時露出しない。
 - arbitrary event作成UIがない。
