@@ -11,18 +11,20 @@
 - 削除後に旧source/旧activityに属するoutboxを残さない。
 - GAS remote stateをローカル削除に合わせて自動改変しない。
 - unrelatedなLocalStorage schema変更を行わない。
+- 本番で参照されていない表示modelへwarningだけを追加して完了扱いしない。
 
 ## Files
 
 **Modify:**
 - `apps/webapp/js/shared/ui/management-view-model.ts`
 - `apps/webapp/js/features/local-data-deletion/use-cases/delete-local-data.ts`
-- `apps/webapp/js/features/local-data-deletion/ui/local-data-deletion-dialog-model.ts`
 - `apps/webapp/js/components/storage-delete-dialog.ts`
 - `tests/delete-local-data.test.ts`
 - `tests/local-data-deletion-controller.test.ts`
-- `tests/management-session.test.ts`
+- `tests/management-view-model.test.ts`
 - `tests/e2e/management.spec.ts`
+
+`apps/webapp/js/features/local-data-deletion/ui/local-data-deletion-dialog-model.ts`は現行の`storage-delete-dialog`本番wiringでは使われていないため、このTaskの必須変更対象にしない。
 
 ## Interfaces
 
@@ -58,7 +60,16 @@ event-day      => repository entry delete
 all-event-days => all repository entries delete
 ```
 
-`local-data-deletion-dialog-model.ts`はactive delete optionの`pendingDiscardCount`をconfirmation modelへコピーする。`storage-delete-dialog.ts`は0件より大きいときだけ破棄warningを表示する。
+本番の表示経路は次を正本とする。
+
+```text
+buildDeleteOptions()
+  → buildStorageDeleteDialogModel()
+  → BrowserApplication.updateManagementModels()
+  → storage-delete-dialog.ts
+```
+
+`buildStorageDeleteDialogModel()`は選択された`DeleteOptionViewModel`を`option`としてそのまま渡しているため、別のconfirmation modelを新設しない。`storage-delete-dialog.ts`は`model.option.pendingDiscardCount`を参照してwarningを表示する。
 
 ## Steps
 
@@ -85,9 +96,13 @@ it("clears circle source and its pending GAS outbox together", async () => {
 });
 ```
 
-- [ ] **Step 2: delete option/dialog modelのRED testを書く**
+- [ ] **Step 2: delete optionと本番dialog modelのRED testを書く**
 
-`tests/management-session.test.ts`でpending countがあっても`blocked=false`、scopeに応じた`pendingDiscardCount`が入ることを固定する。
+`tests/management-view-model.test.ts`の既存`buildDeleteOptions` / `buildStorageDeleteDialogModel` testを更新し、次を固定する。
+
+- pending countがあっても`blocked=false`、`blockedReason=null`。
+- selected scopeには`selectedPendingCount`、`all-events`には`totalPendingCount`が`pendingDiscardCount`として入る。
+- `buildStorageDeleteDialogModel()`の`option.pendingDiscardCount`へ同じ件数が残る。
 
 `tests/local-data-deletion-controller.test.ts`ではpendingを含むscopeでもconfirmation requestが`DeleteLocalDataUseCase`まで到達することを確認する。
 
@@ -97,7 +112,7 @@ it("clears circle source and its pending GAS outbox together", async () => {
 npx vitest run --root . \
   tests/delete-local-data.test.ts \
   tests/local-data-deletion-controller.test.ts \
-  tests/management-session.test.ts
+  tests/management-view-model.test.ts
 ```
 
 現行`assertNoPendingUpdates()`またはpendingによる`blocked=true`のため失敗することを確認する。
@@ -124,15 +139,9 @@ pending countだけを理由にbuttonをdisabledへしない。
 
 route guidance snapshot/matrix cleanupの既存scope契約は変更しない。
 
-- [ ] **Step 6: confirmation modelへ破棄件数を渡す**
+- [ ] **Step 6: 本番dialogへ破棄件数を表示する**
 
-`local-data-deletion-dialog-model.ts`の表示modelへ次を追加する。
-
-```ts
-readonly pendingDiscardCount: number;
-```
-
-`storage-delete-dialog.ts`では`pendingDiscardCount > 0`のときだけ次のwarningを表示する。
+`storage-delete-dialog.ts`で`model.option.pendingDiscardCount > 0`のときだけ次のwarningを表示する。
 
 ```text
 この操作では未送信GAS同期 3件も破棄されます。
@@ -140,6 +149,8 @@ GAS側へは送信されません。
 ```
 
 0件ならwarningを表示しない。confirm/cancelの既存二段階操作は維持する。
+
+`buildStorageDeleteDialogModel()`が既存どおりmatching `option`を渡すだけで十分なら、別の表示modelやadapterを追加しない。
 
 - [ ] **Step 7: E2Eを追加する**
 
@@ -157,7 +168,7 @@ GAS側へは送信されません。
 npx vitest run --root . \
   tests/delete-local-data.test.ts \
   tests/local-data-deletion-controller.test.ts \
-  tests/management-session.test.ts
+  tests/management-view-model.test.ts
 npm run test:webapp
 npx playwright test tests/e2e/management.spec.ts --grep "全日程|削除"
 npm run check:webapp
@@ -169,11 +180,10 @@ git diff --check
 ```bash
 git add apps/webapp/js/shared/ui/management-view-model.ts \
   apps/webapp/js/features/local-data-deletion/use-cases/delete-local-data.ts \
-  apps/webapp/js/features/local-data-deletion/ui/local-data-deletion-dialog-model.ts \
   apps/webapp/js/components/storage-delete-dialog.ts \
   tests/delete-local-data.test.ts \
   tests/local-data-deletion-controller.test.ts \
-  tests/management-session.test.ts \
+  tests/management-view-model.test.ts \
   tests/e2e/management.spec.ts
 git commit -m "fix(storage): allow explicit deletion with pending GAS updates"
 ```
@@ -181,7 +191,8 @@ git commit -m "fix(storage): allow explicit deletion with pending GAS updates"
 ## 受入条件
 
 - pending GAS queueがあっても全日程削除buttonを押せる。
-- queue破棄件数をconfirmationで確認できる。
+- queue破棄件数を本番confirmationで確認できる。
 - cancel時はqueue/dataとも変化しない。
 - confirm時は削除scopeに属するqueueが残らない。
 - remote GAS送信は発生しない。
+- warningが未接続の別model内だけに存在する状態にならない。
