@@ -22,6 +22,11 @@ export type DeleteScope =
 /** Detail payloads for every bubbling management event. */
 export interface ManagementEventDetailMap {
   "event-day-select": EventDayRef;
+  "event-day-open-request": { ref: EventDayRef };
+  "event-day-refresh-request": { ref: EventDayRef };
+  "event-day-offline-request": { ref: EventDayRef };
+  "event-day-edit-request": { ref: EventDayRef };
+  "event-day-delete-request": { ref: EventDayRef };
   "csv-preview-request": { file: File };
   "gas-sheets-request": { gasUrl: string };
   "gas-preview-request": {

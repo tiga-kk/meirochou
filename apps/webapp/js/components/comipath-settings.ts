@@ -10,9 +10,11 @@ import type {
   EventDayOption,
   OutboxPanelModel,
 } from "../shared/ui/management-view-model";
+import type { EventDayManagementRow } from "../shared/ui/event-day-management-view-model";
 import type { CircleDataSourcePanelModel } from "./circle-data-source-panel";
 import type { StorageDeleteDialogModel } from "./storage-delete-dialog";
 import "./event-day-selector";
+import "./event-day-management-view";
 import "./circle-data-source-panel";
 import "./outbox-panel";
 import "./storage-delete-dialog";
@@ -25,6 +27,7 @@ export class ComipathSettings extends LitElement {
   static properties = {
     open: { type: Boolean },
     eventDayOptions: { attribute: false },
+    eventDayManagementRows: { attribute: false },
     selectedEventId: { type: String },
     selectedDayId: { type: String },
     sourceManagerModel: { attribute: false },
@@ -38,6 +41,7 @@ export class ComipathSettings extends LitElement {
 
   declare open: boolean;
   declare eventDayOptions: readonly EventDayOption[];
+  declare eventDayManagementRows: readonly EventDayManagementRow[];
   declare selectedEventId: string;
   declare selectedDayId: string;
   declare sourceManagerModel: CircleDataSourcePanelModel | null;
@@ -52,6 +56,7 @@ export class ComipathSettings extends LitElement {
     super();
     this.open = false;
     this.eventDayOptions = [];
+    this.eventDayManagementRows = [];
     this.selectedEventId = "";
     this.selectedDayId = "";
     this.sourceManagerModel = null;
@@ -75,6 +80,9 @@ export class ComipathSettings extends LitElement {
   protected render() {
     return html`
       <h2>設定</h2>
+      <event-day-management-view
+        .rows=${this.eventDayManagementRows}
+      ></event-day-management-view>
       <event-day-selector
         .options=${this.eventDayOptions}
         .selectedEventId=${this.selectedEventId}

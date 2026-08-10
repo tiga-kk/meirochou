@@ -138,6 +138,78 @@ input[type="text"] {
   display: block;
 }
 
+.event-day-management {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.event-day-management h2 {
+  margin: 0 0 0.75rem;
+}
+
+.event-day-management-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.event-day-management-row {
+  padding: 0.75rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-card, #fff);
+}
+
+.event-day-management-row[data-selected="true"] {
+  border-color: var(--primary);
+}
+
+.event-day-management-heading,
+.event-day-management-status,
+.event-day-management-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.event-day-management-heading {
+  justify-content: space-between;
+}
+
+.event-day-management-heading h3,
+.event-day-management-source {
+  margin: 0;
+}
+
+.event-day-management-source {
+  color: var(--text-sub);
+  font-size: 0.9rem;
+}
+
+.event-day-management-status {
+  margin: 0.65rem 0;
+  color: var(--text-sub);
+  font-size: 0.9rem;
+}
+
+.event-day-management-status span {
+  margin-right: 0.5rem;
+}
+
+.event-day-management-source-type {
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.event-day-management-actions .btn {
+  min-height: 44px;
+}
+
+.event-day-management-offline-error {
+  color: var(--danger);
+}
+
 .input-group label {
   display: block;
   margin-bottom: 0.25rem;

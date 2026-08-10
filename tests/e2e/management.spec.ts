@@ -145,6 +145,48 @@ test.beforeEach(async ({ context, page }) => {
 });
 
 test.describe("Mobile Management Flows", () => {
+  test("管理overviewにconfiguredとunconfiguredの全日程を表示する", async ({
+    page,
+  }) => {
+    await seedStates(page, [
+      {
+        ref: { eventId: "demo-v1", dayId: "day1" },
+        state: createState({
+          source: { type: "csv", fileName: "circles.csv" },
+          circles: [
+            { space: "東ア23a", tweet: "https://example.test/catalog.png" },
+            { space: "東ア31b" },
+          ],
+          gasOutbox: [
+            {
+              id: "pending-1",
+              eventId: "demo-v1",
+              dayId: "day1",
+              sourceGeneration: "gen-e2e-01",
+              gasUrl: GAS_URL,
+              sheetName: "day1",
+              space: "東ア23a",
+              purchased: true,
+              createdAt: "2026-07-25T00:00:00.000Z",
+              attempts: 0,
+              lastError: null,
+            },
+          ],
+        }),
+      },
+    ]);
+
+    await page.goto("/");
+    await openSettings(page);
+    const rows = page.locator("event-day-management-view .event-day-management-row");
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText("CSV");
+    await expect(rows.nth(0)).toContainText("Data 2件");
+    await expect(rows.nth(0)).toContainText("GAS同期 1件待ち");
+    await expect(rows.nth(1)).toContainText("未設定");
+    await expect(rows.nth(1)).toContainText("設定する");
+  });
+
   test("Flow 1: 初回訪問とCSVプレビュー・適用・ナビゲーション反映", async ({
     page,
   }) => {

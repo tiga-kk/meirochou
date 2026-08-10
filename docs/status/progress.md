@@ -12,7 +12,7 @@
 - Phase 6: 完了・`main`へmerge済み
 - 現在のフェーズ: Phase 6.1 実装完了・既知の検証残件あり（完了判定は完全GREEN扱いにしない）
 - scale values: 確定
-- Phase 7: Task 1完了・Task 2着手可能
+- Phase 7: Task 1〜2完了・Task 3着手可能
 
 ### Phase 6.1の既知残件
 
@@ -101,7 +101,11 @@ Phase計画:
   - `comipath-catalog-v1`へのURL単位cache、opaque response、partial failure、best-effort persistenceを実装。
   - production buildへ`catalog-service-worker.js`を単一ファイルとして含め、GET imageのcache hitだけをoffline fallbackする契約を検証。
   - focused unit/E2E、`npm run verify`、public tree auditを実行済み。
-- 次に着手可能: Task 2 — registry全event/dayのmanagement overview modelと一覧UI
+- Task 2: registry全event/dayのmanagement overview modelと一覧UI — 完了
+  - registry順の全event/day、source/data/GAS queue/offline statusを一覧化し、未設定dayとstatus取得失敗を区別。
+  - overviewのactionイベント契約とsettings surfaceのsnapshotを追加。新規overview E2E、focused tests、webapp全体検証を実行済み。
+  - 既存のsource-diff/outbox/delete visual snapshot失敗は基準commitでも再現したため、今回の回帰とは分類しない。
+- 次に着手可能: Task 3 — 開く/再読込/offline準備/編集/削除actionを一覧へ接続
 
 ## 実装開始時の確認
 

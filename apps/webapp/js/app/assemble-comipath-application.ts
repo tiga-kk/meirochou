@@ -387,6 +387,7 @@ export function assembleComiPathApplication(
       backgroundProcess,
       eventRegistry: options.registry,
       eventDayTransition,
+      catalogOfflineCache,
     },
   });
 

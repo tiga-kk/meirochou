@@ -40,6 +40,7 @@ import type {
   CircleDataSourceController,
 } from "../features/circle-data-source/public-api";
 import type { LocalDataDeletionController } from "../features/local-data-deletion/public-api";
+import type { CatalogOfflineCachePort } from "../features/catalog-offline/public-api";
 import type { MapArea, MapAreaCatalog, RouteMapAssetsLoader, RouteGuidanceController } from "../features/route-guidance/public-api";
 import type {
   RouteGuidanceSession,
@@ -62,6 +63,10 @@ import {
   buildSourceManagerPanelModel,
   buildStorageDeleteDialogModel,
 } from "../shared/ui/management-view-model";
+import {
+  buildEventDayManagementRows,
+  type EventDayManagementRow,
+} from "../shared/ui/event-day-management-view-model";
 import { bindBrowserEvents } from "./bind-browser-events";
 
 /** Validates an event/day reference at the browser event boundary. */
@@ -224,6 +229,7 @@ interface BrowserApplicationOptions {
     readonly eventDayTransition: SwitchEventDayOperation;
     readonly eventRegistry?: EventRegistry;
     readonly eventRegistryUrl?: string;
+    readonly catalogOfflineCache?: CatalogOfflineCachePort;
   };
   readonly routeGuidanceDependencies: {
     readonly routeGuidanceSession: RouteGuidanceSession;
@@ -269,6 +275,7 @@ export class BrowserApplication {
   circleStatusController: CircleStatusController;
   pendingGasUpdatesController: PendingGasUpdatesControllerPort;
   eventDayTransition: SwitchEventDayOperation;
+  catalogOfflineCache: CatalogOfflineCachePort;
   completeCircleVisit: (input: CompleteCircleVisitInput) => Promise<CompleteCircleVisitResult>;
   localDataDeletionController: LocalDataDeletionController;
   spreadsheetTitle: string;
@@ -300,6 +307,8 @@ export class BrowserApplication {
   eventRegistryUrl: string | null = null;
   currentManifest: MapBundleManifest | null = null;
   asyncOperationIndicator: { status: AsyncOperationStatus } | null = null;
+  managementRows: readonly EventDayManagementRow[] = [];
+  private managementUpdateToken = 0;
 
   constructor(options?: BrowserApplicationOptions) {
     this.started = false;
@@ -339,9 +348,16 @@ export class BrowserApplication {
     this.pendingGasUpdatesController =
       eventDayDependencies.pendingGasUpdatesController;
     this.eventDayTransition = eventDayDependencies.eventDayTransition;
+    this.catalogOfflineCache =
+      eventDayDependencies.catalogOfflineCache ?? {
+        getStatus: async () => ({ cached: 0, total: 0 }),
+        cacheAll: async () => ({ cached: [], failed: [] }),
+        remove: async () => {},
+      };
     this.completeCircleVisit = options.completeCircleVisit;
     this.eventRegistry = eventDayDependencies.eventRegistry ?? null;
     this.eventRegistryUrl = eventDayDependencies.eventRegistryUrl ?? null;
+    this.managementRows = [];
     this.localDataDeletionController = options.localDataDeletionController;
     this.spreadsheetTitle = "";
     this.routeGuidanceSession = routeGuidanceDependencies.routeGuidanceSession;
@@ -596,6 +612,7 @@ export class BrowserApplication {
   /** Rebuild the management selector and source manager models from registry and local state. */
   updateManagementModels() {
     if (!this.eventRegistry) return;
+    const updateToken = ++this.managementUpdateToken;
     const states = this.eventDayRepository
       .listEventDays()
       .map((ref) => ({
@@ -683,12 +700,24 @@ export class BrowserApplication {
 
     this.ui?.updateSettingsState({
       eventDayOptions: options,
+      eventDayManagementRows: this.managementRows,
       selectedEventId: this.activeRef?.eventId || "",
       selectedDayId: this.activeRef?.dayId || "",
       sourceManagerModel,
       outboxPanelModel,
       deleteOptions,
       deleteDialogModel,
+    });
+
+    void buildEventDayManagementRows({
+      registry: this.eventRegistry,
+      states,
+      selected: this.activeRef,
+      offlineCache: this.catalogOfflineCache,
+    }).then((rows) => {
+      if (updateToken !== this.managementUpdateToken) return;
+      this.managementRows = rows;
+      this.ui?.updateSettingsState({ eventDayManagementRows: rows });
     });
   }
 
