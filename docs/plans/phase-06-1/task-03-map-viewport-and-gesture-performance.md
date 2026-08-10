@@ -2,7 +2,7 @@
 
 ## 目標
 
-固定縦長canvasと`object-fit: contain`中心のmap viewerを、実画像比率を持つstage + responsive viewportへ置き換える。横長地図の余白を減らしつつ最低220pxの操作領域を確保し、最大約32pxのrubber-band overscrollと軽いpan/pinchを実現する。
+固定縦長canvasと`object-fit: contain`中心のmap viewerを、実画像比率を持つstage + responsive viewportへ置き換える。横長地図の余白を減らしつつ最低220pxの操作領域を確保し、縦長地図でも不要な左右余白を作らず、最大約32pxのrubber-band overscrollと軽いpan/pinchを実現する。
 
 ## やってはいけないこと
 
@@ -11,6 +11,7 @@
 - pointermoveごとに`getBoundingClientRect()`を読む実装へ戻さない。
 - pan中に無制限に地図外を見せない。
 - overscrollを完全hard clampして指の動きを不自然に止めない。
+- `object-fit: contain`のletterboxを別の固定viewportへ残さない。
 - route計算やALNSへviewer geometryを混ぜない。
 
 ## Files
@@ -24,7 +25,7 @@
 
 **Test:**
 - `tests/gesture-zoom-controller.test.ts`
-- route-map layout/model関連testを新規または既存へ追加
+- `tests/route-map-viewport-layout.test.ts`（新規。既存model testへ統合する場合は同じ契約を保持）
 - `tests/e2e/webapp.spec.ts`
 
 ## Interfaces
@@ -54,6 +55,35 @@ export function calculateMapViewportLayout(
 ): MapViewportLayout;
 ```
 
+base scale 1のstageは常にviewportを最低一方向で満たし、初期表示でletterboxを作らない。
+
+```text
+naturalHeight = viewportWidth * imageHeight / imageWidth
+
+if naturalHeight < minimumInteractiveHeight:
+  viewportHeight = minimumInteractiveHeight
+  stageHeight = minimumInteractiveHeight
+  stageWidth = stageHeight * imageWidth / imageHeight
+  initialX = (viewportWidth - stageWidth) / 2
+  initialY = 0
+
+else if naturalHeight <= viewportMaxHeight:
+  viewportHeight = naturalHeight
+  stageWidth = viewportWidth
+  stageHeight = naturalHeight
+  initialX = 0
+  initialY = 0
+
+else:
+  viewportHeight = viewportMaxHeight
+  stageWidth = viewportWidth
+  stageHeight = naturalHeight
+  initialX = 0
+  initialY = (viewportHeight - stageHeight) / 2
+```
+
+つまり極端な横長mapは横方向へ、極端な縦長mapは縦方向へ初期scaleからpan可能とする。
+
 Gesture helper:
 
 ```js
@@ -66,7 +96,7 @@ export function applyRubberBand(value, min, max, overscrollLimit = 32) {}
 
 - [ ] **Step 1: viewport geometryのRED unit testを書く**
 
-最低限、実C108比率を代表する3ケースを固定する。
+実C108比率と境界caseを固定する。
 
 ```ts
 it("uses the natural aspect ratio when it fits the interaction range", () => {
@@ -78,6 +108,7 @@ it("uses the natural aspect ratio when it fits the interaction range", () => {
     imageHeight: 2166,
   });
   expect(layout.viewportHeight).toBeGreaterThan(220);
+  expect(layout.stageWidth).toBe(390);
   expect(layout.stageWidth / layout.stageHeight).toBeCloseTo(2904 / 2166);
 });
 
@@ -91,7 +122,22 @@ it("covers a minimum-height viewport for an extremely wide map", () => {
   });
   expect(layout.viewportHeight).toBe(220);
   expect(layout.stageWidth).toBeGreaterThan(390);
+  expect(layout.stageHeight).toBe(220);
   expect(layout.initialX).toBeLessThan(0);
+});
+
+it("clips and vertically centers an extremely tall map instead of letterboxing", () => {
+  const layout = calculateMapViewportLayout({
+    viewportWidth: 390,
+    viewportMaxHeight: 520,
+    minimumInteractiveHeight: 220,
+    imageWidth: 1000,
+    imageHeight: 2000,
+  });
+  expect(layout.viewportHeight).toBe(520);
+  expect(layout.stageWidth).toBe(390);
+  expect(layout.stageHeight).toBe(780);
+  expect(layout.initialY).toBe(-130);
 });
 ```
 
@@ -123,6 +169,8 @@ npx vitest run --root . tests/gesture-zoom-controller.test.ts tests/route-map-vi
 
 `naturalWidth`/`naturalHeight`とviewport幅から`calculateMapViewportLayout()`を呼び、viewport height、stage size、initial transformを更新する。ResizeObserverでも再計算する。
 
+横長cover時はinitialX、縦長clip時はinitialYを中央へ寄せる。area変更時は旧areaのpan/zoomをそのまま持ち越さず、新しいlayoutのbase transformから開始する。
+
 - [ ] **Step 6: gesture hot pathのlayout readを排除する**
 
 pointerdownで必要ならviewport originを1回取得し、そのgesture中はcached geometryを使う。pointermove/pinch move内の`getBoundingClientRect()`を残さない。
@@ -131,14 +179,18 @@ pointerdownで必要ならviewport originを1回取得し、そのgesture中はc
 
 proposed x/yを直接stateへ加算せず、現在scaleに対するmin/max boundsを求め、範囲外だけ`applyRubberBand()`へ通す。release/cancel/lostcaptureは既存settleへ接続する。
 
+stageがviewportより小さくなるscaleは作らない。base scale 1ですでにcoverされるため、MIN_SCALEは1を維持できる設計を優先する。
+
 - [ ] **Step 8: transform pathをcompositor-friendlyに保つ**
 
 stageに`will-change: transform`を付け、transform更新は既存RAF coalescingの1回/描画frameを維持する。filter/box-shadow等をtransform layerへ追加しない。
 
-- [ ] **Step 9: E2Eで横長・縦長を確認する**
+- [ ] **Step 9: E2Eで横長・通常・縦長を確認する**
 
 - 横長areaでviewport heightが220px以上かつ旧360px固定ではない。
-- stage widthがviewportより大きいcaseで初期位置が中央。
+- stage widthがviewportより大きいcaseで初期Xが中央。
+- 縦長fixtureではstage heightがviewportより大きく、初期Yが中央。
+- 初期表示に不要な薄茶letterboxがない。
 - dragでoverscrollが約32pxを大きく超えない。
 - release後にbound内へ戻る。
 - pointercancel後に次のpanが可能。
@@ -165,8 +217,9 @@ git commit -m "fix(map): align viewport and gestures with map geometry"
 ## 受入条件
 
 - E456 4096x1438級の横長地図でもviewportは最低220pxで、地図は縦方向を埋め、横pan可能。
-- W12/E7等では画像比率に沿った自然なheightになる。
-- 薄茶色の地図外領域はdrag時も最大約32px程度だけ見え、releaseで消える。
+- 自然heightが220〜maxHeightに収まるmapは画像比率どおりのviewportになる。
+- maxHeightを超える縦長mapは横幅を埋めたまま縦panでき、左右letterboxを作らない。
+- 薄茶色の地図外領域は初期表示にはなく、drag時も最大約32px程度だけ見え、releaseで消える。
 - pointermove hot pathにlayout readがない。
 - transform反映は1 frame最大1回。
 - pin/route/imageの座標がずれない。
