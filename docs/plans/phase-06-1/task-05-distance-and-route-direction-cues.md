@@ -18,25 +18,25 @@ Route Guidanceの距離を物理mで表示し、地図だけを一目見てもSt
 - 色だけでStart/Goalを区別しない。
 - reduced-motion利用者へ強制animationしない。
 
-## Files
+## 対象ファイル
 
 ### Scale非依存部分
 
-**Modify:**
+**変更:**
 - `apps/webapp/js/features/route-guidance/domain/routing/grid-route-types.ts`
 - `apps/webapp/js/features/route-guidance/domain/routing/grid-route-planner.ts`
 - `apps/webapp/js/features/route-guidance/ui/dom-route-map-view.ts`
 - `apps/webapp/js/features/route-guidance/ui/route-overlay-svg.ts`
 - `apps/webapp/css/target.css`
 
-**Test:**
+**テスト:**
 - `tests/route-overlay-contract.test.ts`
 - `tests/task10-demo-route-regression.test.mjs`
 - `tests/e2e/webapp.spec.ts`
 
 ### Scale依存部分
 
-**Modify:**
+**変更:**
 - `apps/webapp/map-bundles/C108/manifest.json`
 - `apps/webapp/js/features/event-day/domain/application-contract-types.ts`
 - `apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers.ts`
@@ -44,13 +44,13 @@ Route Guidanceの距離を物理mで表示し、地図だけを一目見てもSt
 - `apps/webapp/js/features/route-guidance/ui/route-guidance-screen-model.ts`
 - `apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts`
 
-**Test:**
+**テスト:**
 - `tests/boundary-parsers.test.ts`
 - `tests/map-manifest-loader.test.ts`
 - `tests/route-guidance-screen-model.test.ts`
 - `tests/e2e/webapp.spec.ts`
 
-## Interfaces
+## インターフェース
 
 C108 source manifest contractとruntime manifest contractの双方へscaleを通す。
 
@@ -98,7 +98,7 @@ route.points[route.points.length - 1] => G marker
 
 これにより`planRouteFromGridIndex()`のmanual startでもSを描画できる。既存`.map-pin.start`の有無へ依存しない。
 
-## Steps
+## 手順
 
 - [ ] **Step 1: C108 scaleの根拠をrepository/historyから調査する**
 
