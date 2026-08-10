@@ -40,7 +40,11 @@ import type {
   CircleDataSourceController,
 } from "../features/circle-data-source/public-api";
 import type { LocalDataDeletionController } from "../features/local-data-deletion/public-api";
-import type { CatalogOfflineCachePort } from "../features/catalog-offline/public-api";
+import {
+  CacheEventDayCatalogsUseCase,
+  catalogUrlsFromCircles,
+  type CatalogOfflineCachePort,
+} from "../features/catalog-offline/public-api";
 import type { MapArea, MapAreaCatalog, RouteMapAssetsLoader, RouteGuidanceController } from "../features/route-guidance/public-api";
 import type {
   RouteGuidanceSession,
@@ -230,6 +234,7 @@ interface BrowserApplicationOptions {
     readonly eventRegistry?: EventRegistry;
     readonly eventRegistryUrl?: string;
     readonly catalogOfflineCache?: CatalogOfflineCachePort;
+    readonly cacheEventDayCatalogs?: CacheEventDayCatalogsUseCase;
   };
   readonly routeGuidanceDependencies: {
     readonly routeGuidanceSession: RouteGuidanceSession;
@@ -276,6 +281,7 @@ export class BrowserApplication {
   pendingGasUpdatesController: PendingGasUpdatesControllerPort;
   eventDayTransition: SwitchEventDayOperation;
   catalogOfflineCache: CatalogOfflineCachePort;
+  cacheEventDayCatalogs: CacheEventDayCatalogsUseCase;
   completeCircleVisit: (input: CompleteCircleVisitInput) => Promise<CompleteCircleVisitResult>;
   localDataDeletionController: LocalDataDeletionController;
   spreadsheetTitle: string;
@@ -354,6 +360,9 @@ export class BrowserApplication {
         cacheAll: async () => ({ cached: [], failed: [] }),
         remove: async () => {},
       };
+    this.cacheEventDayCatalogs =
+      eventDayDependencies.cacheEventDayCatalogs ??
+      new CacheEventDayCatalogsUseCase(this.catalogOfflineCache);
     this.completeCircleVisit = options.completeCircleVisit;
     this.eventRegistry = eventDayDependencies.eventRegistry ?? null;
     this.eventRegistryUrl = eventDayDependencies.eventRegistryUrl ?? null;
@@ -470,6 +479,135 @@ export class BrowserApplication {
       .getAllMapAreas()
       .find((candidate) => candidate.id === areaId);
     this.ui.showGallery(area?.name || areaId, false);
+  }
+
+  private getSourceManager(): {
+    requestCsvFileSelection?: () => void;
+    focusSourceEditor?: () => void;
+  } | null {
+    return this.document.querySelector("source-manager") as {
+      requestCsvFileSelection?: () => void;
+      focusSourceEditor?: () => void;
+    } | null;
+  }
+
+  private async openEventDayForManagement(ref: EventDayRef): Promise<void> {
+    await this.eventDayTransition.execute(ref);
+  }
+
+  private async handleEventDayOpenRequest(detail: unknown): Promise<void> {
+    if (!isEventDayRef((detail as { ref?: unknown })?.ref)) return;
+    try {
+      await this.openEventDayForManagement((detail as { ref: EventDayRef }).ref);
+      this.ui.showToast("日程を開きました");
+    } catch {
+      this.ui.showToast("日程を開けませんでした", "error");
+    }
+  }
+
+  private async handleEventDayRefreshRequest(detail: unknown): Promise<void> {
+    const ref = (detail as { ref?: unknown })?.ref;
+    if (!isEventDayRef(ref)) return;
+    try {
+      await this.openEventDayForManagement(ref);
+      const state = this.eventDayRepository.load(ref);
+      if (!state) return;
+      if (state.source.type === "gas") {
+        await this.circleDataSourceController.refreshSavedGasSource(ref, state.source);
+      } else {
+        this.ui.showSettings();
+        this.getSourceManager()?.requestCsvFileSelection?.();
+      }
+    } catch {
+      this.ui.showToast("再読込を開始できませんでした", "error");
+    }
+  }
+
+  private async handleEventDayOfflineRequest(detail: unknown): Promise<void> {
+    const ref = (detail as { ref?: unknown })?.ref;
+    if (!isEventDayRef(ref)) return;
+    try {
+      await this.openEventDayForManagement(ref);
+      const state = this.eventDayRepository.load(ref);
+      if (!state) return;
+      const urls = catalogUrlsFromCircles(state.circles);
+      if (this.asyncOperationIndicator) {
+        this.asyncOperationIndicator.status = {
+          kind: "loading",
+          label: `お品書きを保存中… 0 / ${urls.length}`,
+        };
+      }
+      const result = await this.cacheEventDayCatalogs.execute({
+        urls,
+        onProgress: ({ current, total }) => {
+          if (!this.asyncOperationIndicator) return;
+          this.asyncOperationIndicator.status = {
+            kind: "loading",
+            label: `お品書きを保存中… ${current} / ${total}`,
+          };
+        },
+      });
+      const suffix = result.failedCount > 0 ? `、${result.failedCount}件失敗` : "";
+      if (this.asyncOperationIndicator) {
+        this.asyncOperationIndicator.status = {
+          kind: "success",
+          label: `お品書き ${result.cachedCount} / ${result.totalCount} 保存済み${suffix}`,
+        };
+      }
+      this.updateManagementModels();
+    } catch (error) {
+      if (this.asyncOperationIndicator) {
+        this.asyncOperationIndicator.status = {
+          kind: "error",
+          label: "お品書き保存に失敗しました",
+        };
+      }
+      this.ui.showToast("オフライン準備に失敗しました", "error");
+      console.warn("Catalog offline preparation failed.", error);
+    }
+  }
+
+  private async handleEventDayEditRequest(detail: unknown): Promise<void> {
+    const ref = (detail as { ref?: unknown })?.ref;
+    if (!isEventDayRef(ref)) return;
+    try {
+      await this.openEventDayForManagement(ref);
+      this.ui.showSettings();
+      this.getSourceManager()?.focusSourceEditor?.();
+    } catch {
+      this.ui.showToast("編集画面を開けませんでした", "error");
+    }
+  }
+
+  private async handleEventDayDeleteRequest(detail: unknown): Promise<void> {
+    const ref = (detail as { ref?: unknown })?.ref;
+    if (!isEventDayRef(ref)) return;
+    try {
+      await this.openEventDayForManagement(ref);
+      this.handleDeleteOptionSelect({ type: "event-day", ref });
+    } catch {
+      this.ui.showToast("削除確認を開けませんでした", "error");
+    }
+  }
+
+  private bindManagementActionEvents(): () => void {
+    const handlers: Record<string, (detail: unknown) => void> = {
+      "event-day-open-request": (detail) => void this.handleEventDayOpenRequest(detail),
+      "event-day-refresh-request": (detail) => void this.handleEventDayRefreshRequest(detail),
+      "event-day-offline-request": (detail) => void this.handleEventDayOfflineRequest(detail),
+      "event-day-edit-request": (detail) => void this.handleEventDayEditRequest(detail),
+      "event-day-delete-request": (detail) => void this.handleEventDayDeleteRequest(detail),
+    };
+    const listeners = Object.entries(handlers).map(([type, handler]) => {
+      const listener = (event: Event) => handler((event as CustomEvent).detail);
+      this.document.addEventListener(type, listener);
+      return [type, listener] as const;
+    });
+    return () => {
+      for (const [type, listener] of listeners) {
+        this.document.removeEventListener(type, listener);
+      }
+    };
   }
 
   handleOptimizationTimeLimitChange(detail: unknown) {
@@ -1360,10 +1498,15 @@ export class BrowserApplication {
     this.localDataDeletionController?.start?.();
     this.eventBindingCleanup?.();
     // The settings-shell binder forwards toggleSettings(this.document.getElementById("toggle-settings")).
-    this.eventBindingCleanup = bindBrowserEvents({
+    const browserEvents = bindBrowserEvents({
       application: this,
       document: this.document,
-    }).stop;
+    });
+    const managementActionCleanup = this.bindManagementActionEvents();
+    this.eventBindingCleanup = () => {
+      browserEvents.stop();
+      managementActionCleanup();
+    };
   }
 
   /**

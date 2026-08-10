@@ -1,4 +1,5 @@
 import { BrowserApplication } from "./browser-application";
+import { DeleteLocalDataWithCatalogCleanup } from "./delete-local-data-with-catalog-cleanup";
 import {
   CacheEventDayCatalogsUseCase,
   GetCatalogOfflineStatusUseCase,
@@ -326,7 +327,7 @@ export function assembleComiPathApplication(
     navigationRuntimeController,
   });
 
-  const deleteLocalData = new DeleteLocalDataUseCase(
+  const deleteLocalDataUseCase = new DeleteLocalDataUseCase(
     repository,
     {
       deleteActivitySnapshot: (ref) =>
@@ -341,6 +342,11 @@ export function assembleComiPathApplication(
           ? crypto.randomUUID()
           : `gen-${Date.now()}`,
     },
+  );
+  const deleteLocalData = new DeleteLocalDataWithCatalogCleanup(
+    deleteLocalDataUseCase,
+    repository,
+    catalogOfflineCache,
   );
   const localDataDeletionController = new LocalDataDeletionController({
     deleteLocalData,
@@ -388,6 +394,7 @@ export function assembleComiPathApplication(
       eventRegistry: options.registry,
       eventDayTransition,
       catalogOfflineCache,
+      cacheEventDayCatalogs,
     },
   });
 

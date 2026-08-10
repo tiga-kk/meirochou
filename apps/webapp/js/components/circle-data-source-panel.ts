@@ -95,6 +95,25 @@ export class CircleDataSourcePanel extends LitElement {
     }
   }
 
+  /** Opens the native picker for a CSV refresh without retaining a File object. */
+  requestCsvFileSelection(): void {
+    this.activeTab = "csv";
+    this.requestUpdate();
+    void this.updateComplete.then(() => {
+      this.querySelector<HTMLInputElement>("#csv-file-input")?.click();
+    });
+  }
+
+  /** Focuses the saved source fields used by the management edit action. */
+  focusSourceEditor(): void {
+    this.activeTab = this.model?.sourceType ?? "csv";
+    this.requestUpdate();
+    void this.updateComplete.then(() => {
+      const selector = this.activeTab === "gas" ? "#gas-url-input" : "#csv-file-input";
+      this.querySelector<HTMLElement>(selector)?.focus();
+    });
+  }
+
   private handleTabSwitch(tab: "csv" | "gas"): void {
     if (this.model?.pendingCount || this.model?.busy) return;
     this.activeTab = tab;

@@ -293,6 +293,18 @@ export class CircleDataSourceController {
     }
   }
 
+  /** Refreshes a persisted GAS source without reopening the source editor. */
+  refreshSavedGasSource(
+    ref: EventDayRef,
+    source: GasDataSource,
+  ): Promise<CircleDataPreview | null> {
+    this.deps.session.updateDraft({
+      draftWebAppUrl: source.gasUrl,
+      selectedSheetName: source.sheetName,
+    });
+    return this.handleGasPreviewRequest(ref, source);
+  }
+
   async applyPreview(previewId: string): Promise<void> {
     if (this.stopped || !this.deps.applyCircleDataPreview) return;
     const preview = this.deps.session.getSnapshot().preview;

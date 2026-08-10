@@ -12,7 +12,7 @@
 - Phase 6: 完了・`main`へmerge済み
 - 現在のフェーズ: Phase 6.1 実装完了・既知の検証残件あり（完了判定は完全GREEN扱いにしない）
 - scale values: 確定
-- Phase 7: Task 1〜2完了・Task 3着手可能
+- Phase 7: Task 1〜3完了・Task 4着手可能
 
 ### Phase 6.1の既知残件
 
@@ -105,7 +105,12 @@ Phase計画:
   - registry順の全event/day、source/data/GAS queue/offline statusを一覧化し、未設定dayとstatus取得失敗を区別。
   - overviewのactionイベント契約とsettings surfaceのsnapshotを追加。新規overview E2E、focused tests、webapp全体検証を実行済み。
   - 既存のsource-diff/outbox/delete visual snapshot失敗は基準commitでも再現したため、今回の回帰とは分類しない。
-- 次に着手可能: Task 3 — 開く/再読込/offline準備/編集/削除actionを一覧へ接続
+- Task 3: 開く/再読込/offline準備/編集/削除actionを一覧へ接続 — 完了
+  - 日程一覧から既存のイベント切替、保存済みGAS再読込、CSV file picker、source editor、削除確認へ接続。
+  - Task 1のcache use caseでoffline準備の進捗と部分失敗を表示し、成功済みcacheをrollbackしない契約を実装。
+  - local deletion後は未参照catalog URLだけをbest-effort cleanupし、共有URL、削除失敗、残存参照取得失敗を安全側へ扱うwrapperとテストを追加。
+  - focused tests、webapp全体検証、management/catalog-offline E2Eを実行。既存のsource-diff/outbox/delete visual snapshot 3件は基準commitでも再現したため、今回の回帰とは分類しない。
+- 次に着手可能: Task 4 — mainとmanagementのvisual hierarchyを再構成
 
 ## 実装開始時の確認
 

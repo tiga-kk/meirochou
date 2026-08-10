@@ -187,6 +187,57 @@ test.describe("Mobile Management Flows", () => {
     await expect(rows.nth(1)).toContainText("設定する");
   });
 
+  test("管理overviewの開くと保存済みGAS再読込を既存フローへ接続する", async ({
+    page,
+  }) => {
+    await routeGas(page, async (route) => {
+      const url = new URL(route.request().url());
+      if (route.request().method() !== "GET") {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          status: "success",
+          sheetName: url.searchParams.get("sheets"),
+          circles: [{ space: "東ア99a", priority: 1 }],
+        }),
+      });
+    });
+    await seedStates(page, [
+      {
+        ref: { eventId: "demo-v1", dayId: "day1" },
+        state: createState({
+          source: { type: "gas", gasUrl: GAS_URL, sheetName: "day1" },
+          circles: [{ space: "東ア23a", priority: 1 }],
+        }),
+      },
+      {
+        ref: { eventId: "demo-v1", dayId: "day2" },
+        state: createState({
+          source: { type: "csv", fileName: "day2.csv" },
+          circles: [{ space: "東ア31b", priority: 2 }],
+        }),
+      },
+    ]);
+
+    await page.goto("/");
+    await openSettings(page);
+    const rows = page.locator("event-day-management-view .event-day-management-row");
+    await rows.nth(1).locator('button[data-action="open"]').click();
+    await expect(page.locator("source-manager h3")).toContainText("day2");
+
+    await rows.nth(0).locator('button[data-action="refresh"]').click();
+    await expect(page.locator("source-manager h3")).toContainText("day1");
+    await expect(
+      page.locator("#source-diff-dialog .source-diff-dialog-overlay"),
+    ).toBeVisible();
+    await page.locator('#source-diff-dialog button[data-action="cancel"]').click();
+  });
+
   test("Flow 1: 初回訪問とCSVプレビュー・適用・ナビゲーション反映", async ({
     page,
   }) => {
