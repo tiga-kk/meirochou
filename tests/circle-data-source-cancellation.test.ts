@@ -199,6 +199,56 @@ describe("CircleDataSourceController", () => {
     expect(operations).toEqual(["csv-preview"]);
   });
 
+  it("does not report old gas sheet success after setSheetNames starts a newer request", async () => {
+    const requests: Array<{
+      resolve: (value: readonly string[]) => void;
+      request: CancelableRequest<readonly string[]>;
+    }> = [];
+    const session = createCircleDataSourceSession();
+    const operations: string[] = [];
+    let controller!: CircleDataSourceController;
+    let reentered = false;
+    session.subscribe(({ operation, sheetNames }) => {
+      if (!reentered && operation === "idle" && sheetNames.length > 0) {
+        reentered = true;
+        void controller.loadGoogleSheetNames(
+          "https://script.google.com/macros/s/test/exec",
+        );
+      }
+    });
+    controller = new CircleDataSourceController({
+      client: {
+        startLoadingSheetNames: vi.fn(() => {
+          let resolve!: (value: readonly string[]) => void;
+          const request: CancelableRequest<readonly string[]> = {
+            result: new Promise((done) => {
+              resolve = done;
+            }),
+            cancel: vi.fn(),
+          };
+          requests.push({ resolve, request });
+          return request;
+        }),
+        startLoadingCircles: vi.fn(),
+      },
+      session,
+      onOperationComplete: (operation) => operations.push(operation),
+    });
+
+    const firstLoading = controller.loadGoogleSheetNames(
+      "https://script.google.com/macros/s/test/exec",
+    );
+    requests[0].resolve(["old"]);
+    await firstLoading;
+
+    expect(operations).toEqual([]);
+    requests[1].resolve(["new"]);
+    await new Promise((resolve) => queueMicrotask(resolve));
+
+    expect(operations).toEqual(["gas-sheet-list"]);
+    expect(session.getSnapshot().sheetNames).toEqual(["new"]);
+  });
+
   it("does not report apply success after setPreview starts a newer request", async () => {
     const preview = { previewId: "preview-1" } as CircleDataPreview;
     const session = createCircleDataSourceSession();

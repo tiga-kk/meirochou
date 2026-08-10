@@ -346,9 +346,11 @@ export class CircleDataSourceController {
     await this.runRequest(
       this.deps.client.startLoadingSheetNames(url),
       "gas-sheet-list",
-      (sheets) => {
+      (sheets, sequence, generation) => {
         this.deps.session.setSheetNames(this.parseStringList(sheets));
-        this.deps.onOperationComplete?.("gas-sheet-list");
+        if (this.isCurrent(sequence, generation)) {
+          this.deps.onOperationComplete?.("gas-sheet-list");
+        }
       },
     );
   }

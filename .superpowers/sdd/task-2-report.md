@@ -59,3 +59,16 @@
 - `npx biome check apps/webapp/js/features/circle-data-source/ui/circle-data-source-controller.ts tests/circle-data-source-cancellation.test.ts` — 成功（format診断なし）。
 - `npm run check:webapp` — 成功（architecture check、typecheck）。
 - `git diff --check` — 成功。
+
+## 再レビュー指摘の修正
+
+- `loadGoogleSheetNames()`の`runRequest()` success callbackで、`setSheetNames()`後に`isCurrent(sequence, generation)`を再確認してから`gas-sheet-list`完了通知を発火するよう修正。
+- `setSheetNames()`の同期subscriberが新しいsheet-list requestを開始する再入を再現するfocused regression testを追加。旧successは発火せず、新request成功の`gas-sheet-list`だけが発火することを確認。
+- RED確認: 完了通知のcurrent性ガードを一時的に外すと、旧`gas-sheet-list` successが発火してテストが失敗。
+
+## 再レビュー修正後の検証
+
+- `npx vitest run --root . tests/async-operation-indicator.test.ts tests/management-session.test.ts tests/source-manager-app.test.ts tests/circle-data-source-cancellation.test.ts` — 成功（26テスト）。
+- `npm run typecheck:webapp` — 成功。
+- `npx biome check apps/webapp/js/features/circle-data-source/ui/circle-data-source-controller.ts tests/circle-data-source-cancellation.test.ts` — 成功。
+- `git diff --check` — 成功。
