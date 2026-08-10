@@ -14,25 +14,25 @@ registry定義済みの全event/dayを一つの管理一覧へ投影し、source
 - async builderが完了してからしか返らないのに、到達不能な`checking` stateをrow contractへ置かない。
 - offline status取得失敗を`0件保存済み`として偽装しない。
 
-## Files
+## 対象ファイル
 
-**Create:**
+**作成:**
 - `apps/webapp/js/components/event-day-management-view.ts`
 - `apps/webapp/js/shared/ui/event-day-management-view-model.ts`
 
-**Modify:**
+**変更:**
 - `apps/webapp/js/components/comipath-settings.ts`（後方互換の一時hostとして利用する場合）
 - `apps/webapp/js/app/browser-application.ts`
 - `apps/webapp/js/app/assemble-comipath-application.ts`
 - `apps/webapp/index.html`
 - 管理画面CSSの既存責務ファイル
 
-**Test:**
+**テスト:**
 - `tests/event-day-management-view-model.test.ts`
 - `tests/event-day-management-view.test.ts`
 - `tests/e2e/management.spec.ts`
 
-## Interfaces
+## インターフェース
 
 ```ts
 export interface EventDayManagementRow {
@@ -68,7 +68,7 @@ Catalog URL集合は`removedFromSource !== true`かつ有効catalog URLを持つ
 
 このbuilderはCache Storage実装を直接知らず`CatalogOfflineCachePort`だけを使うが、status I/Oを行うため「pure function」とは扱わない。複数rowのstatus取得は独立しているため`Promise.all`等で並行化してよい。1 rowのstatus取得失敗はそのrowの`cached=null`へ落とし、他rowとmanagement全体の描画は継続する。
 
-## Steps
+## 手順
 
 - [ ] **Step 1: view modelのRED testを書く**
 
