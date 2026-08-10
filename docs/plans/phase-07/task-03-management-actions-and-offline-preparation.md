@@ -16,12 +16,12 @@ Task 2のevent/day overviewを操作の起点にし、既存Use Caseを再利用
 - あるevent/dayを削除しただけで、別event/dayも参照している同一catalog URLをCache Storageから消さない。
 - cleanup対象の残存参照を確認できない場合に、推測で共有cacheを削除しない。
 
-## Files
+## 対象ファイル
 
-**Create:**
+**作成:**
 - `apps/webapp/js/app/delete-local-data-with-catalog-cleanup.ts`
 
-**Modify:**
+**変更:**
 - `apps/webapp/js/components/event-day-management-view.ts`
 - `apps/webapp/js/components/circle-data-source-panel.ts`
 - `apps/webapp/js/app/browser-application.ts`
@@ -32,13 +32,13 @@ Task 2のevent/day overviewを操作の起点にし、既存Use Caseを再利用
 - `apps/webapp/js/features/catalog-offline/public-api.ts`
 - `apps/webapp/js/shared/ui/management-events.ts`
 
-**Test:**
+**テスト:**
 - `tests/delete-local-data-with-catalog-cleanup.test.ts`
 - `tests/event-day-management-actions.test.ts`
 - `tests/e2e/management.spec.ts`
 - `tests/e2e/catalog-offline.spec.ts`
 
-## Interfaces
+## インターフェース
 
 Management events:
 
@@ -89,7 +89,7 @@ export class DeleteLocalDataWithCatalogCleanup
 
 local deletion後の残存参照確認自体が失敗した場合はfail-closedとし、その回のcache cleanupをskipする。共有cacheを誤削除するより、不要cacheが一時的に残る方を選ぶ。
 
-## Steps
+## 手順
 
 - [ ] **Step 1: action dispatch/ownershipのRED testを書く**
 
