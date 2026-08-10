@@ -56,14 +56,17 @@ describe("DeleteLocalDataUseCase", () => {
     expect(routeGuidanceCleanup.deleteAllRouteData).not.toHaveBeenCalled();
   });
 
-  it("blocks destructive scopes when pending GAS updates exist", async () => {
+  it("clears activity and its pending GAS outbox together", async () => {
     const pendingState = {
       ...state,
       gasOutbox: [{ id: "pending" }],
     } as LocalEventDayState;
+    let current: LocalEventDayState | null = pendingState;
     const repository: EventDayRepository = {
-      load: () => pendingState,
-      save: vi.fn(),
+      load: () => current,
+      save: vi.fn((_ref, next) => {
+        current = next;
+      }),
       saveAndRememberLastOpened: vi.fn(),
       listEventDays: () => [],
       getLastOpenedEventDay: () => null,
@@ -78,12 +81,77 @@ describe("DeleteLocalDataUseCase", () => {
     };
     const useCase = new DeleteLocalDataUseCase(repository, cleanup);
 
-    await expect(
-      useCase.execute({
-        kind: "event-day",
-        eventDay: { eventId: "c108", dayId: "day1" },
+    await useCase.execute({
+      kind: "activity",
+      eventDay: { eventId: "c108", dayId: "day1" },
+    });
+
+    expect(current?.circleStates).toEqual({});
+    expect(current?.gasOutbox).toEqual([]);
+  });
+
+  it("clears circle source and its pending GAS outbox together", async () => {
+    const pendingState = {
+      ...state,
+      gasOutbox: [{ id: "pending" }],
+    } as LocalEventDayState;
+    let current: LocalEventDayState | null = pendingState;
+    const repository: EventDayRepository = {
+      load: () => current,
+      save: vi.fn((_ref, next) => {
+        current = next;
       }),
-    ).rejects.toThrow("Pending GAS updates");
-    expect(repository.deleteEventDay).not.toHaveBeenCalled();
+      saveAndRememberLastOpened: vi.fn(),
+      listEventDays: () => [],
+      getLastOpenedEventDay: () => null,
+      rememberLastOpenedEventDay: vi.fn(),
+      deleteEventDay: vi.fn(),
+      listEventDaysForDeletion: () => [],
+      deleteAllEventDays: vi.fn(),
+    };
+    const cleanup = {
+      deleteActivitySnapshot: vi.fn(),
+      deleteAllRouteData: vi.fn(),
+    };
+    const useCase = new DeleteLocalDataUseCase(repository, cleanup);
+
+    await useCase.execute({
+      kind: "circle-source",
+      eventDay: { eventId: "c108", dayId: "day1" },
+    });
+
+    expect(current?.circles).toEqual([]);
+    expect(current?.gasOutbox).toEqual([]);
+  });
+
+  it("deletes all event days even when GAS outbox exists", async () => {
+    const entries = [
+      {
+        ref: { eventId: "c108", dayId: "day1" },
+        state: { ...state, gasOutbox: [{ id: "pending" }] },
+      },
+    ];
+    const repository: EventDayRepository = {
+      load: () => null,
+      save: vi.fn(),
+      saveAndRememberLastOpened: vi.fn(),
+      listEventDays: () => [],
+      getLastOpenedEventDay: () => null,
+      rememberLastOpenedEventDay: vi.fn(),
+      deleteEventDay: vi.fn(),
+      listEventDaysForDeletion: () => entries,
+      deleteAllEventDays: vi.fn(() => {
+        entries.length = 0;
+      }),
+    };
+    const cleanup = {
+      deleteActivitySnapshot: vi.fn(),
+      deleteAllRouteData: vi.fn(),
+    };
+    const useCase = new DeleteLocalDataUseCase(repository, cleanup);
+
+    await useCase.execute({ kind: "all-event-days" });
+
+    expect(repository.listEventDaysForDeletion()).toEqual([]);
   });
 });

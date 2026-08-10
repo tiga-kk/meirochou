@@ -69,7 +69,7 @@ describe("DeleteLocalDataUseCase", () => {
     expect(cleanup.deleteAllRouteData).not.toHaveBeenCalled();
   });
 
-  it("blocks every destructive scope with pending GAS updates", async () => {
+  it("deletes an event day with pending GAS updates", async () => {
     const repo = new LocalStorageEventDayRepository(storage());
     const ref = { eventId: "demo", dayId: "day1" };
     repo.save(ref, state(ref, 1));
@@ -78,8 +78,7 @@ describe("DeleteLocalDataUseCase", () => {
       deleteAllRouteData: () => {},
     };
     const useCase = new DeleteLocalDataUseCase(repo, cleanup);
-    await expect(
-      useCase.execute({ kind: "event-day", eventDay: ref }),
-    ).rejects.toThrow("Pending GAS");
+    await useCase.execute({ kind: "event-day", eventDay: ref });
+    expect(repo.load(ref)).toBeNull();
   });
 });

@@ -33,6 +33,21 @@ describe("LocalDataDeletionController", () => {
     });
   });
 
+  it("forwards pending-scope confirmation to the use case", async () => {
+    const deleteLocalData = { execute: vi.fn(async () => {}) };
+    const controller = new LocalDataDeletionController({ deleteLocalData });
+    const scope = {
+      type: "all-events",
+      pendingDiscardCount: 2,
+    };
+
+    await controller.confirmDeletion(scope);
+
+    expect(deleteLocalData.execute).toHaveBeenCalledWith({
+      kind: "all-event-days",
+    });
+  });
+
   it("owns deletion request listeners across start and stop", async () => {
     const target = new EventTarget();
     const addEventListener = vi.spyOn(target, "addEventListener");
@@ -51,8 +66,12 @@ describe("LocalDataDeletionController", () => {
 
     controller.start();
     expect(addEventListener).toHaveBeenCalledTimes(3);
-    target.dispatchEvent(new CustomEvent("delete-option-select", { detail: { scope: {} } }));
-    target.dispatchEvent(new CustomEvent("storage-delete-request", { detail: { scope: {} } }));
+    target.dispatchEvent(
+      new CustomEvent("delete-option-select", { detail: { scope: {} } }),
+    );
+    target.dispatchEvent(
+      new CustomEvent("storage-delete-request", { detail: { scope: {} } }),
+    );
     target.dispatchEvent(new CustomEvent("storage-delete-cancel"));
     expect(select).toHaveBeenCalledOnce();
     expect(confirm).toHaveBeenCalledOnce();

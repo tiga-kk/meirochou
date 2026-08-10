@@ -150,6 +150,17 @@ export class StorageDeleteDialog extends LitElement {
           <p class="delete-consequence">${this.model.option.consequence}</p>
 
           ${
+            this.model.option.pendingDiscardCount > 0
+              ? html`
+                <p class="delete-pending-warning" role="alert">
+                  この操作では未送信GAS同期 ${this.model.option.pendingDiscardCount}件も破棄されます。<br />
+                  GAS側へは送信されません。
+                </p>
+              `
+              : ""
+          }
+
+          ${
             this.model.errorMessage
               ? html`<div class="error-alert" role="alert">${this.model.errorMessage}</div>`
               : ""

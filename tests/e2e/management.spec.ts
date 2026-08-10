@@ -494,7 +494,7 @@ test.describe("Mobile Management Flows", () => {
     ).toBeDisabled();
     await expect(
       page.locator(".storage-delete-option button:disabled"),
-    ).toHaveCount(4);
+    ).toHaveCount(0);
 
     const outboxPanel = page.locator("outbox-panel");
     await outboxPanel.locator("input.entry-select").check();
@@ -593,6 +593,70 @@ test.describe("Mobile Management Flows", () => {
     });
     expect(recreated.circles).toEqual([]);
     expect(recreated.source).toEqual({ type: "csv", fileName: "empty.csv" });
+  });
+
+  test("Flow 7.1: pending GAS同期付き全日程削除の確認と破棄", async ({
+    page,
+  }) => {
+    const pendingEntry = {
+      id: "entry-delete-e2e-01",
+      eventId: "demo-v1",
+      dayId: "day1",
+      sourceGeneration: "gen-e2e-01",
+      gasUrl: GAS_URL,
+      sheetName: "day1",
+      space: "東ア23a",
+      purchased: true,
+      createdAt: "2026-07-23T12:00:00.000Z",
+      attempts: 1,
+      lastError: "http-500",
+    };
+    let postCount = 0;
+    await routeGas(page, async (route) => {
+      if (route.request().method() === "POST") postCount += 1;
+      await route.fulfill({ status: 500, body: "must not send" });
+    });
+    await seedStates(page, [
+      {
+        ref: { eventId: "demo-v1", dayId: "day1" },
+        state: createState({
+          circles: [{ space: "東ア23a" }],
+          purchased: ["東ア23a"],
+          gasOutbox: [pendingEntry],
+        }),
+      },
+    ]);
+
+    await page.goto("/");
+    await openSettings(page);
+    await page.evaluate(() => {
+      localStorage.setItem(
+        "comipath:nav-snapshot:demo-v1:day1",
+        JSON.stringify({ schemaVersion: 1, eventId: "demo-v1", dayId: "day1" }),
+      );
+    });
+    const before = await readState(page, { eventId: "demo-v1", dayId: "day1" });
+    const postCountBeforeDeletion = postCount;
+    await page.getByRole("button", { name: /全日程データの削除/ }).click();
+    const dialog = page.locator("storage-delete-dialog");
+    await expect(dialog).toContainText("未送信GAS同期 1件も破棄されます");
+    await dialog.locator(".btn-cancel").click();
+    await expect(dialog.locator(".modal-overlay")).not.toBeVisible();
+    expect(
+      await readState(page, { eventId: "demo-v1", dayId: "day1" }),
+    ).toEqual(before);
+
+    await page.getByRole("button", { name: /全日程データの削除/ }).click();
+    await confirmDelete(page, "全イベントを削除");
+    expect(
+      await page.evaluate(() =>
+        localStorage.getItem("comipath:nav-snapshot:demo-v1:day1"),
+      ),
+    ).toBeNull();
+    expect(
+      (await readState(page, { eventId: "demo-v1", dayId: "day1" })).gasOutbox,
+    ).toEqual([]);
+    expect(postCount).toBe(postCountBeforeDeletion);
   });
 
   test("Flow 8: CSVエクスポートと非変容・除外ルール検証", async ({ page }) => {

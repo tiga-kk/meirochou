@@ -19,12 +19,6 @@ export interface DeleteLocalDataOperation {
   execute(scope: LocalDataDeletionScope): Promise<void>;
 }
 
-function assertNoPendingUpdates(state: LocalEventDayState): void {
-  if (state.gasOutbox.length > 0) {
-    throw new Error("Pending GAS updates must be resolved before deletion");
-  }
-}
-
 function emptySourceState(
   state: LocalEventDayState,
   now: string,
@@ -35,6 +29,7 @@ function emptySourceState(
     source: { type: "csv", fileName: "empty.csv" },
     sourceGeneration,
     circles: [],
+    gasOutbox: [],
     timestamps: {
       ...state.timestamps,
       updatedAt: now,
@@ -80,10 +75,10 @@ export class DeleteLocalDataUseCase implements DeleteLocalDataOperation {
 
   private deleteActivity(ref: EventDayRef): void {
     const state = this.requireState(ref);
-    assertNoPendingUpdates(state);
     this.repository.save(ref, {
       ...state,
       circleStates: {},
+      gasOutbox: [],
       timestamps: { ...state.timestamps, updatedAt: this.now() },
     });
     // Activity reset removes the route snapshot but deliberately keeps matrices.
@@ -92,7 +87,6 @@ export class DeleteLocalDataUseCase implements DeleteLocalDataOperation {
 
   private deleteCircleSource(ref: EventDayRef): void {
     const state = this.requireState(ref);
-    assertNoPendingUpdates(state);
     this.repository.save(
       ref,
       emptySourceState(state, this.now(), this.createSourceGeneration()),
@@ -101,16 +95,13 @@ export class DeleteLocalDataUseCase implements DeleteLocalDataOperation {
   }
 
   private deleteEventDay(ref: EventDayRef): void {
-    const state = this.requireState(ref);
-    assertNoPendingUpdates(state);
+    this.requireState(ref);
     this.repository.deleteEventDay(ref);
     this.routeGuidanceCleanup.deleteAllRouteData(ref);
   }
 
   private deleteAllEventDays(): void {
     const entries = this.repository.listEventDaysForDeletion();
-    for (const entry of entries) assertNoPendingUpdates(entry.state);
-
     this.repository.deleteAllEventDays(
       entries.map(({ ref, state }) => ({
         ref,
