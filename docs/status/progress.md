@@ -10,9 +10,21 @@
 - 計画文書branch: `docs/phase-06-1-phase-07-followup-plan`
 - Phase 5D: 完了
 - Phase 6: 完了・`main`へmerge済み
-- 現在のフェーズ: Phase 6.1 計画完了、実装未開始
-- 次に着手するTask: Phase 6.1 Task 1
-- Phase 7: 計画済み。Phase 6.1完了前には実装開始しない
+- 現在のフェーズ: Phase 6.1 完了（Task 1〜5実装、Task 6検証完了）
+- scale values: 確定
+- Phase 7: 未開始
+
+### Phase 6.1の既知残件
+
+- 同一地点pinのz-orderテストにflakyがあり、CI retryでは通るがfocused再実行では失敗する。今回のPhase 6.1新規回帰とは断定しない。
+- C108 private smoke 8件はfixture unavailableのためskip。以上により完全GREENではない。
+
+### Phase 6.1で確定したscale values
+
+- `e456`: `270 / 4096 m/px = 0.06591796875`。根拠: [東京ビッグサイト公式 東展示棟](https://www.bigsight.jp/organizer/facilities/east.html)の東1〜6各約90m×90m。
+- `e7`: `120 / 1848 m/px = 0.06493506493506493`。根拠: [東京ビッグサイト公式 東展示棟](https://www.bigsight.jp/organizer/facilities/east.html)からリンクされる[東7ホール公式概要PDF（現行リンク）](https://www.bigsight.jp/organizer/facilities/pdf/E_E7_d.pdf)のA-A、30000mm×4。指定された`E_E7_c.pdf`は公式サーバーで404だったため、現行の実在公式URLを記録する。
+- `s12`: `144 / 1872 m/px = 0.07692307692307693`。根拠: [東京ビッグサイト公式 南展示棟](https://www.bigsight.jp/organizer/facilities/south.html)の南1・2各約72m×72m。
+- `w12`: `180 / 2904 m/px = 0.06198347107438017`。根拠: [東京ビッグサイト公式 西展示棟](https://www.bigsight.jp/organizer/facilities/west.html)の西1・2各L字（135×45）＋（45×45）の全体span。
 
 ## Phase 6.1
 
