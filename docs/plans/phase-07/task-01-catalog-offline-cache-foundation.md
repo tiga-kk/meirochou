@@ -16,9 +16,9 @@
 - 同じURLのresponse bodyが裏で変わったことを、opaque responseを読んで自動検出しようとしない。
 - catalog以外のGETや非画像requestを「cacheに偶然matchした」だけで横取りしない。
 
-## Files
+## 対象ファイル
 
-**Create:**
+**作成:**
 - `apps/webapp/catalog-service-worker.js`
 - `apps/webapp/js/features/catalog-offline/application/catalog-offline-cache-port.ts`
 - `apps/webapp/js/features/catalog-offline/infrastructure/browser-catalog-offline-cache.ts`
@@ -29,14 +29,14 @@
 - `tests/catalog-offline-use-cases.test.ts`
 - `tests/e2e/catalog-offline.spec.ts`
 
-**Modify:**
+**変更:**
 - `apps/webapp/js/app/browser-entrypoint.ts`
 - `apps/webapp/js/app/assemble-comipath-application.ts`
 - `vite.config.ts`
 - `scripts/verify-webapp-build.mjs`
 - `README.md`
 
-## Interfaces
+## インターフェース
 
 ```ts
 export interface CatalogOfflineCachePort {
@@ -85,7 +85,7 @@ Phase 7ではcatalog imageの**URL文字列をcontent identity兼Cache Storage k
 
 これはopaque cross-origin responseの内容比較やETag管理を追加しないための明示的な制約であり、実装担当が独自のrefresh metadata DBを追加してはいけない。
 
-## Steps
+## 手順
 
 - [ ] **Step 1: cache portのRED unit testを書く**
 
