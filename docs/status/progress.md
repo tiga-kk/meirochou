@@ -27,7 +27,7 @@ Phase計画:
 実装順:
 
 1. Task 1: pending GASがあっても明示削除できるよう、削除scopeとoutboxの意味を修正する
-2. Task 2: GAS読込等の長時間処理を右下async operation indicatorで表示する
+2. Task 2: GAS/CSV読込やpreview反映等の長時間処理を右下async operation indicatorで表示する
 3. Task 3: map viewport/stageを実画像比率へ合わせ、rubber-bandとgesture性能を修正する
 4. Task 4: Gallery swipeを「開始時は重く、閾値付近で軽い」非線形抵抗へ変更する
 5. Task 5: 距離をm表示し、Start/Goalと軽量なStart→Goal route flow animationを追加する
@@ -37,12 +37,16 @@ Phase計画:
 
 - pending GAS queueは明示削除を禁止するlockではなく、削除confirmationで破棄件数を警告する対象とする。
 - `activity`/`circle-source`削除では、そのscopeに属するpending GAS queueも一緒に破棄し、旧mutationを後からremoteへ送らない。
+- 削除warningの本番表示経路は`buildDeleteOptions()` → `buildStorageDeleteDialogModel()` → `BrowserApplication` → `storage-delete-dialog.ts`とし、未接続の別modelへ追加して完了扱いしない。
+- async operationは`busy`とoperation種別を同じSession snapshotで更新し、GASだけでなくTask 2に列挙したCSV preview/applyも実controller pathから到達可能にする。
 - map viewportは実画像比率へ追従する。横長地図でも操作領域は最低220pxを確保する。
 - 横長地図は必要ならcover表示して横panさせる。地図外は最大約32pxだけrubber-bandし、releaseで戻す。
+- wide/tall mapの`initialX`/`initialY`はbase transformとして保持し、reset/area変更で`{1,0,0}`へ戻して中央位置を失わない。
 - map pointermove hot pathでlayout readを繰り返さない。
-- Galleryの購入方向契約は維持し、表示translationだけ非線形抵抗へする。
+- Galleryの購入方向契約とPhase 6で実際に必要だったfinger travelを維持し、表示translationだけを非線形抵抗へする。現行の実効購入距離は`visualThreshold / 0.6`である。
 - routing costと物理距離を分離する。UIへweighted routing costをそのまま距離として表示しない。
 - `metersPerPixel`はC108各areaの既知実寸根拠を確認してから設定し、推測値をcommitしない。
+- scale根拠が不足してもTask 5全体を停止せず、S/G、route flow、`physicalPixelLength`等のscale非依存部分は先に完了できる。ただしm距離部分が未完了ならPhase 6.1全体は完了扱いにしない。
 - current routeはS/Gを文字表示し、solid base line上にCSS `stroke-dashoffset`のflow lineを重ねる。
 - route animationのためにJavaScript RAF/timer、Dijkstra/ALNS再計算、毎frame DOM再生成を追加しない。
 - `prefers-reduced-motion: reduce`ではflow animationを停止する。
@@ -68,13 +72,16 @@ Phase計画:
 ### Phase 7で固定した重要事項
 
 - offline保存はユーザーが事前に明示実行する。page loadごとの自動全downloadは行わない。
-- Service Workerはcatalog image fallbackに限定し、full PWA、install prompt、background sync、pushを追加しない。
+- Service Workerは`GET` image requestのcatalog cache hitだけをoffline fallbackし、app shell等を一般的なcache-firstへしない。full PWA、install prompt、background sync、pushを追加しない。
+- Phase 7ではcatalog URL文字列をcache identityとして扱い、既に同じURLがcache済みなら再downloadしない。同じURLのresponse body差し替えを自動検出する追加DBやmetadata管理は導入しない。
 - partial download failureでも成功済みcacheを保持する。
 - management一覧にはregistry定義済みevent/dayをすべて表示し、未設定dayも消さない。
+- offline status取得失敗は`cached=null`相当として扱い、正常に確認できた`0件保存済み`と区別する。
 - registry外eventをブラウザだけで任意作成しない。
 - GAS sourceは現行どおりevent/dayあたり1 sheetとし、Phase 7でmulti-sheetへ広げない。
+- 同じcatalog URLは複数event/dayで共有できる。local deletion後のcache cleanupでは残存event/dayの参照を確認し、他dayが参照する共有URLを削除しない。残存参照確認に失敗した場合はcache cleanupをskipし、成功済みlocal deletionは維持する。
 - main navigationから旧inline設定panelの縦積みを外し、管理は独立surfaceへ移す。
-- visual redesignは装飾追加ではなく、map/catalog/actionを主役にした情報階層の整理として行う。
+- visual redesignは装飾追加ではなく、map/catalog/actionを主役にした情報階層の整理として行う。既存tokenを優先し、同義tokenを不要に増やさない。
 
 ## 実装開始時の確認
 
