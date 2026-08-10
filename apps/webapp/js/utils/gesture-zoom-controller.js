@@ -19,18 +19,22 @@ export class GestureZoomController {
     this.BOUNCE_FRICTION = 0.8; // バウンド時の減衰率
 
     this.isDragging = false;
-    this.startX = 0;
-    this.startY = 0;
-    this.lastX = 0;
-    this.lastY = 0;
+    this.activePointers = new Map();
     this.vx = 0;
-    this.vy = 0; // 速度
+    this.vy = 0;
     this.rafId = null;
+    this.transformRafId = null;
+    this.resizeObserver = null;
+    this.layout = {
+      containerWidth: 0,
+      containerHeight: 0,
+      imageWidth: 0,
+      imageHeight: 0,
+    };
 
-    // ピンチ用
     this.initialDistance = 0;
     this.initialScale = 1;
-    this.pinchCenter = { x: 0, y: 0 };
+    this.lastPinchCenter = { x: 0, y: 0 };
 
     this.init();
   }
@@ -38,43 +42,81 @@ export class GestureZoomController {
   init() {
     this.container.style.overflow = "hidden";
     this.container.style.touchAction = "none";
-    this.img.style.transformOrigin = "0 0"; // 左上基準で計算する
+    this.img.style.transformOrigin = "0 0";
+    this.refreshLayout();
     this.updateTransform();
 
-    // 外部からのリセット用に関数を追加
     this.img.resetZoom = () => this.reset();
+    this.img.addEventListener("load", () => this.refreshLayout());
+    if (typeof ResizeObserver === "function") {
+      this.resizeObserver = new ResizeObserver(() => this.refreshLayout());
+      this.resizeObserver.observe(this.container);
+    }
 
-    // タッチイベント登録
-    this.container.addEventListener(
-      "touchstart",
-      (e) => this.handleTouchStart(e),
-      { passive: false },
+    this.container.addEventListener("pointerdown", (e) =>
+      this.handlePointerDown(e),
     );
-    this.container.addEventListener(
-      "touchmove",
-      (e) => this.handleTouchMove(e),
-      { passive: false },
+    this.container.addEventListener("pointermove", (e) =>
+      this.handlePointerMove(e),
     );
-    this.container.addEventListener("touchend", (e) => this.handleTouchEnd(e));
-
-    // マウス・ホイールイベント登録（PCサポート）
-    this.container.addEventListener("mousedown", (e) =>
-      this.handleMouseDown(e),
+    this.container.addEventListener("pointerup", (e) =>
+      this.handlePointerEnd(e),
+    );
+    this.container.addEventListener("pointercancel", (e) =>
+      this.handlePointerEnd(e),
+    );
+    this.container.addEventListener("lostpointercapture", (e) =>
+      this.handlePointerEnd(e),
     );
     this.container.addEventListener("wheel", (e) => this.handleWheel(e), {
       passive: false,
     });
   }
 
+  refreshLayout() {
+    const containerRect = this.container.getBoundingClientRect();
+    const imageRect = this.img.getBoundingClientRect();
+    this.layout = {
+      containerWidth: containerRect.width,
+      containerHeight: containerRect.height,
+      imageWidth:
+        this.img.offsetWidth || imageRect.width / this.state.scale || 0,
+      imageHeight:
+        this.img.offsetHeight || imageRect.height / this.state.scale || 0,
+    };
+  }
+
   updateTransform() {
     this.img.style.transform = `translate3d(${this.state.x}px, ${this.state.y}px, 0) scale(${this.state.scale})`;
+  }
+
+  scheduleTransform() {
+    if (this.transformRafId !== null) return;
+    this.transformRafId = requestAnimationFrame(() => {
+      this.transformRafId = null;
+      this.updateTransform();
+    });
+  }
+
+  cancelAnimation() {
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+    if (this.transformRafId !== null) {
+      cancelAnimationFrame(this.transformRafId);
+      this.transformRafId = null;
+    }
   }
 
   reset() {
     this.state = { scale: 1, x: 0, y: 0 };
     this.vx = 0;
     this.vy = 0;
-    if (this.rafId) cancelAnimationFrame(this.rafId);
+    this.activePointers.clear();
+    this.isDragging = false;
+    this.initialDistance = 0;
+    this.cancelAnimation();
     this.updateTransform();
   }
 
@@ -90,7 +132,7 @@ export class GestureZoomController {
     this.state = { scale, x, y };
     this.vx = 0;
     this.vy = 0;
-    if (this.rafId) cancelAnimationFrame(this.rafId);
+    this.cancelAnimation();
     this.updateTransform();
   }
 
@@ -104,23 +146,39 @@ export class GestureZoomController {
     }
   }
 
+  startInertia() {
+    const curW = this.layout.imageWidth * this.state.scale;
+    const curH = this.layout.imageHeight * this.state.scale;
+    const winW = this.layout.containerWidth;
+    const winH = this.layout.containerHeight;
+    const outOfBounds =
+      (winW >= curW
+        ? this.state.x > 0
+        : this.state.x > 0 || this.state.x < winW - curW) ||
+      (winH >= curH
+        ? this.state.y > 0
+        : this.state.y > 0 || this.state.y < winH - curH);
+    if (Math.abs(this.vx) <= 0.1 && Math.abs(this.vy) <= 0.1 && !outOfBounds)
+      return;
+    if (this.rafId === null) {
+      this.rafId = requestAnimationFrame(() => this.animate());
+    }
+  }
+
   animate() {
+    this.rafId = null;
     if (this.isDragging) return;
 
-    // 減衰
     this.vx *= this.FRICTION;
     this.vy *= this.FRICTION;
 
     this.state.x += this.vx;
     this.state.y += this.vy;
 
-    // 境界チェック (Bouncing)
-    const containerRect = this.container.getBoundingClientRect();
-    const imgRect = this.img.getBoundingClientRect();
-    const curW = imgRect.width;
-    const curH = imgRect.height;
-    const winW = containerRect.width;
-    const winH = containerRect.height;
+    const curW = this.layout.imageWidth * this.state.scale;
+    const curH = this.layout.imageHeight * this.state.scale;
+    const winW = this.layout.containerWidth;
+    const winH = this.layout.containerHeight;
 
     let bounced = false;
 
@@ -163,143 +221,111 @@ export class GestureZoomController {
     }
 
     if (Math.abs(this.vx) > 0.1 || Math.abs(this.vy) > 0.1 || bounced) {
-      this.updateTransform();
+      this.scheduleTransform();
       this.rafId = requestAnimationFrame(() => this.animate());
     }
   }
 
-  handleTouchStart(e) {
-    if (this.rafId) cancelAnimationFrame(this.rafId);
+  handlePointerDown(e) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    this.cancelAnimation();
+    this.activePointers.set(e.pointerId, {
+      x: e.clientX,
+      y: e.clientY,
+    });
+    this.container.setPointerCapture?.(e.pointerId);
     this.isDragging = true;
-
-    if (e.touches.length === 1) {
-      this.startX = e.touches[0].clientX;
-      this.startY = e.touches[0].clientY;
-      this.lastX = this.startX;
-      this.lastY = this.startY;
-      this.vx = 0;
-      this.vy = 0;
-    } else if (e.touches.length === 2) {
-      const t1 = e.touches[0];
-      const t2 = e.touches[1];
-      this.initialDistance = Math.hypot(
-        t2.clientX - t1.clientX,
-        t2.clientY - t1.clientY,
-      );
-      this.initialScale = this.state.scale;
-      this.pinchCenter = {
-        x: (t1.clientX + t2.clientX) / 2,
-        y: (t1.clientY + t2.clientY) / 2,
-      };
-      this.lastX = this.pinchCenter.x;
-      this.lastY = this.pinchCenter.y;
-    }
-  }
-
-  handleTouchMove(e) {
-    if (e.cancelable) e.preventDefault();
-
-    if (e.touches.length === 1) {
-      const cx = e.touches[0].clientX;
-      const cy = e.touches[0].clientY;
-      const dx = cx - this.lastX;
-      const dy = cy - this.lastY;
-
-      this.state.x += dx;
-      this.state.y += dy;
-      this.vx = dx;
-      this.vy = dy;
-
-      this.lastX = cx;
-      this.lastY = cy;
-      this.updateTransform();
-    } else if (e.touches.length === 2) {
-      const t1 = e.touches[0];
-      const t2 = e.touches[1];
-      const currentDist = Math.hypot(
-        t2.clientX - t1.clientX,
-        t2.clientY - t1.clientY,
-      );
-      const currentCenter = {
-        x: (t1.clientX + t2.clientX) / 2,
-        y: (t1.clientY + t2.clientY) / 2,
-      };
-
-      const dx = currentCenter.x - this.lastX;
-      const dy = currentCenter.y - this.lastY;
-      this.state.x += dx;
-      this.state.y += dy;
-      this.lastX = currentCenter.x;
-      this.lastY = currentCenter.y;
-
-      if (this.initialDistance > 0) {
-        const newScale =
-          this.initialScale * (currentDist / this.initialDistance);
-        const containerRect = this.container.getBoundingClientRect();
-        const relX = currentCenter.x - containerRect.left;
-        const relY = currentCenter.y - containerRect.top;
-        const imgX = relX - this.state.x;
-        const imgY = relY - this.state.y;
-        const scaleRatio = newScale / this.state.scale;
-
-        this.state.x -= imgX * (scaleRatio - 1);
-        this.state.y -= imgY * (scaleRatio - 1);
-        this.state.scale = Math.max(
-          this.MIN_SCALE,
-          Math.min(newScale, this.MAX_SCALE),
-        );
-      }
-      this.updateTransform();
-    }
-  }
-
-  handleTouchEnd(e) {
-    if (e.touches.length === 0) {
-      this.isDragging = false;
-      this.rafId = requestAnimationFrame(() => this.animate());
-      if (this.state.scale < this.MIN_SCALE) {
-        this.state.scale = this.MIN_SCALE;
-      }
-    } else if (e.touches.length === 1) {
-      this.lastX = e.touches[0].clientX;
-      this.lastY = e.touches[0].clientY;
-    }
-  }
-
-  // PC (Mouse) パン処理
-  handleMouseDown(e) {
-    if (e.button !== 0) return; // 左クリックのみ
-    if (this.rafId) cancelAnimationFrame(this.rafId);
-    this.isDragging = true;
-    this.startX = e.clientX;
-    this.startY = e.clientY;
-    this.lastX = this.startX;
-    this.lastY = this.startY;
     this.vx = 0;
     this.vy = 0;
 
-    const handleMouseMove = (moveEvent) => {
-      if (!this.isDragging) return;
-      const dx = moveEvent.clientX - this.lastX;
-      const dy = moveEvent.clientY - this.lastY;
+    if (this.activePointers.size === 2) {
+      this.beginPinch();
+    }
+  }
+
+  beginPinch() {
+    const pointers = [...this.activePointers.values()];
+    if (pointers.length !== 2) return;
+    this.initialDistance = Math.hypot(
+      pointers[1].x - pointers[0].x,
+      pointers[1].y - pointers[0].y,
+    );
+    this.initialScale = this.state.scale;
+    this.lastPinchCenter = {
+      x: (pointers[0].x + pointers[1].x) / 2,
+      y: (pointers[0].y + pointers[1].y) / 2,
+    };
+  }
+
+  handlePointerMove(e) {
+    if (!this.activePointers.has(e.pointerId)) return;
+    if (e.cancelable) e.preventDefault();
+    const previous = this.activePointers.get(e.pointerId);
+    this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (this.activePointers.size === 1) {
+      const dx = e.clientX - previous.x;
+      const dy = e.clientY - previous.y;
       this.state.x += dx;
       this.state.y += dy;
       this.vx = dx;
       this.vy = dy;
-      this.lastX = moveEvent.clientX;
-      this.lastY = moveEvent.clientY;
-      this.updateTransform();
-    };
+      this.scheduleTransform();
+      return;
+    }
 
-    const handleMouseUp = () => {
-      this.isDragging = false;
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      this.rafId = requestAnimationFrame(() => this.animate());
+    if (this.activePointers.size !== 2 || this.initialDistance <= 0) return;
+    const pointers = [...this.activePointers.values()];
+    const currentDistance = Math.hypot(
+      pointers[1].x - pointers[0].x,
+      pointers[1].y - pointers[0].y,
+    );
+    const currentCenter = {
+      x: (pointers[0].x + pointers[1].x) / 2,
+      y: (pointers[0].y + pointers[1].y) / 2,
     };
+    this.state.x += currentCenter.x - this.lastPinchCenter.x;
+    this.state.y += currentCenter.y - this.lastPinchCenter.y;
+    const newScale = Math.max(
+      this.MIN_SCALE,
+      Math.min(
+        this.initialScale * (currentDistance / this.initialDistance),
+        this.MAX_SCALE,
+      ),
+    );
+    const containerRect = this.container.getBoundingClientRect();
+    const relX = currentCenter.x - containerRect.left;
+    const relY = currentCenter.y - containerRect.top;
+    const imgX = relX - this.state.x;
+    const imgY = relY - this.state.y;
+    const scaleRatio = newScale / this.state.scale;
+    this.state.x -= imgX * (scaleRatio - 1);
+    this.state.y -= imgY * (scaleRatio - 1);
+    this.state.scale = newScale;
+    this.lastPinchCenter = currentCenter;
+    this.scheduleTransform();
+  }
 
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
+  handlePointerEnd(e) {
+    if (!this.activePointers.has(e.pointerId)) return;
+    this.activePointers.delete(e.pointerId);
+    if (this.container.hasPointerCapture?.(e.pointerId)) {
+      this.container.releasePointerCapture?.(e.pointerId);
+    }
+
+    if (this.activePointers.size === 1) {
+      this.beginPinch();
+      const remaining = [...this.activePointers.values()][0];
+      this.lastPinchCenter = { x: remaining.x, y: remaining.y };
+      this.initialDistance = 0;
+      this.vx = 0;
+      this.vy = 0;
+      this.isDragging = true;
+      return;
+    }
+    this.initialDistance = 0;
+    this.isDragging = false;
+    this.startInertia();
   }
 
   // PC (Wheel) ズーム処理
@@ -401,12 +427,23 @@ export function setupResizableMap(container, header) {
 /**
  * スワイプアクションを設定
  */
-export function setupSwipeAction(element, callback) {
+export function setupSwipeAction(element, callback, options = {}) {
   let startX = 0;
   let startY = 0;
   let currentX = 0;
   let isSwiping = false;
-  const threshold = 100; // アクション発火閾値
+  let gestureAxis = null;
+  let allowedDirection = "both";
+  let callbackStarted = false;
+  const resistance = Math.max(0, Math.min(options.resistance ?? 0.6, 1));
+  const getAllowedDirection = options.getAllowedDirection || (() => "both");
+
+  const reset = () => {
+    element.style.transform = "";
+    element.style.opacity = "1";
+    element.style.transition = "transform 0.3s ease-out, opacity 0.3s";
+    callbackStarted = false;
+  };
 
   element.addEventListener(
     "touchstart",
@@ -415,6 +452,9 @@ export function setupSwipeAction(element, callback) {
       startY = e.touches[0].clientY;
       currentX = 0;
       isSwiping = false;
+      gestureAxis = null;
+      callbackStarted = false;
+      allowedDirection = getAllowedDirection(element) || "both";
       element.style.transition = "none";
     },
     { passive: true },
@@ -428,20 +468,27 @@ export function setupSwipeAction(element, callback) {
       const deltaX = x - startX;
       const deltaY = y - startY;
 
-      if (!isSwiping && Math.abs(deltaY) > Math.abs(deltaX)) {
+      if (!gestureAxis && Math.max(Math.abs(deltaX), Math.abs(deltaY)) > 8) {
+        gestureAxis = Math.abs(deltaY) > Math.abs(deltaX) ? "vertical" : "horizontal";
+      }
+      if (gestureAxis === "vertical") {
         return;
       }
 
-      if (!isSwiping && Math.abs(deltaX) > 10) {
+      if (!isSwiping && gestureAxis === "horizontal") {
         isSwiping = true;
       }
 
       if (isSwiping) {
         if (e.cancelable) e.preventDefault();
-        currentX = deltaX;
-        element.style.transform = `translateX(${deltaX}px)`;
+        currentX = deltaX * resistance;
+        element.style.transform = `translateX(${currentX}px)`;
 
-        if (Math.abs(deltaX) > threshold) {
+        const threshold = Math.max(
+          options.minimumThreshold ?? 100,
+          Math.min((element.getBoundingClientRect().width || 0) * 0.4, 180),
+        );
+        if (Math.abs(currentX) > threshold) {
           element.style.opacity = "0.6";
         } else {
           element.style.opacity = "1";
@@ -452,23 +499,31 @@ export function setupSwipeAction(element, callback) {
   );
 
   element.addEventListener("touchend", () => {
-    element.style.transition = "transform 0.3s ease-out, opacity 0.3s";
-    element.style.opacity = "1";
-
     if (isSwiping) {
-      if (Math.abs(currentX) > threshold) {
-        const direction = currentX > 0 ? 1 : -1;
-        element.style.transform = `translateX(${direction * 100}%)`;
-        setTimeout(() => {
-          callback();
-          setTimeout(() => {
-            if (element.parentNode) element.style.transform = "";
-          }, 500);
-        }, 50);
-      } else {
-        element.style.transform = "";
+      const threshold = Math.max(
+        options.minimumThreshold ?? 100,
+        Math.min((element.getBoundingClientRect().width || 0) * 0.4, 180),
+      );
+      const direction = currentX > 0 ? "right" : "left";
+      const permitted = allowedDirection === "both" || allowedDirection === direction;
+      if (!callbackStarted && permitted && Math.abs(currentX) > threshold) {
+        callbackStarted = true;
+        const directionSign = currentX > 0 ? 1 : -1;
+        element.style.transform = `translateX(${directionSign * 100}%)`;
+        try {
+          const result = callback();
+          if (result && typeof result.then === "function") {
+            result.then(reset, reset);
+          } else {
+            setTimeout(reset, 500);
+          }
+        } catch {
+          reset();
+        }
       }
     }
+    if (!callbackStarted) reset();
     isSwiping = false;
+    gestureAxis = null;
   });
 }

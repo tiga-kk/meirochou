@@ -92,9 +92,18 @@ describe("apps public behavior characterization", () => {
       navigationState: {
         stage: "navigating",
         areaId: "east",
-        currentPosition: null,
+        currentPosition: {
+          areaId: "east",
+          gridIndex: 0,
+          svgX: 0,
+          svgY: 0,
+          source: "manual-start",
+        },
         targetSpace: "E1-01",
-        lockedFirstLeg: null,
+        lockedFirstLeg: {
+          from: { type: "start", areaId: "east", gridIndex: 0 },
+          toSpace: "E1-01",
+        },
         provisionalOrder: ["E1-01", "E1-02"],
         bestOrder: ["E1-01", "E1-02"],
       },
@@ -137,10 +146,18 @@ describe("apps public behavior characterization", () => {
     app.routeGuidanceSession.subscribe((snapshot) => transitions.push(snapshot));
     app.ui.showNavigation = vi.fn();
     app.ui.showToast = vi.fn();
+    const saveNavigationSnapshot = vi.spyOn(app, "saveNavigationSnapshot");
 
     app.handleConfirmRoute();
 
     expect(transitions).toHaveLength(1);
+    expect(saveNavigationSnapshot).toHaveBeenCalledOnce();
+    expect(app.ui.showNavigation).toHaveBeenCalledWith(
+      expect.objectContaining({ fitMode: "current" }),
+    );
+    expect(app.ui.showToast).toHaveBeenCalledWith(
+      "目的地を E1-01 に変更しました",
+    );
     expect(app.routeGuidanceSession.getSnapshot()).toMatchObject({
       currentDestination: activeState.circles[0],
       currentRoute: route,

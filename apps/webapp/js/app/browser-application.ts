@@ -1,7 +1,11 @@
 import "../components/comipath-settings";
 import "../components/navigation-resume-dialog";
 import "../components/source-diff-dialog";
-import { DomRouteGuidanceView } from "../features/route-guidance/public-api";
+import "../components/user-guide-dialog";
+import {
+  DomRouteGuidanceView,
+  buildRouteItineraryModel,
+} from "../features/route-guidance/public-api";
 import { isDevDemoEnabled } from "../dev-demo-data.js";
 import {
   parseSpace,
@@ -31,7 +35,13 @@ import type { CircleStatusControllerPort as CircleStatusController } from "../fe
 import type { CircleDataSourceSession, CircleDataSourceController } from "../features/circle-data-source/public-api";
 import type { LocalDataDeletionController } from "../features/local-data-deletion/public-api";
 import type { MapArea, MapAreaCatalog, RouteMapAssetsLoader, RouteGuidanceController } from "../features/route-guidance/public-api";
-import type { RouteGuidanceSession, RouteGuidanceRuntimePort, GridMeta, PointsPayload } from "../features/route-guidance/public-api";
+import type {
+  RouteGuidanceSession,
+  RouteGuidanceRuntimePort,
+  GridMeta,
+  PointsPayload,
+  RouteItineraryEntry,
+} from "../features/route-guidance/public-api";
 import type { SwitchEventDayOperation } from "../features/event-day/public-api";
 import type { LocalDataDeletionScope } from "../features/local-data-deletion/public-api";
 import type { CompleteCircleVisitInput, CompleteCircleVisitResult } from "./complete-circle-visit";
@@ -97,6 +107,7 @@ type BrowserElement = HTMLElement & {
   errorMessage?: string;
   targetSpace?: string;
   model?: object;
+  entries?: readonly RouteItineraryEntry[];
   value?: string;
 };
 type BrowserInputElement = BrowserElement & { value: string };
@@ -265,6 +276,7 @@ export class BrowserApplication {
   circleDataSourceController: CircleDataSourceController;
   ui: BrowserUi;
   currentStartSpace: string;
+  itineraryOpen: boolean;
   selectionMessage: string;
   transitionToken: number;
   isTransitioning: boolean;
@@ -347,6 +359,7 @@ export class BrowserApplication {
         this.updateManagementModels();
     });
     this.currentStartSpace = "";
+    this.itineraryOpen = false;
     this.selectionMessage = "";
     this.currentManifest = null;
     this.transitionToken = 0;
@@ -489,6 +502,29 @@ export class BrowserApplication {
       nextStatus: "purchased",
       expectedSourceGeneration: this.activeState.sourceGeneration,
     });
+    const routeResult = result.routeGuidanceResult;
+    this.ui.updateCounts(this);
+    this.updateManagementModels();
+    if (routeResult.kind === "ignored") {
+      this.routeGuidanceController.removePurchasedSpaceFromOrder(space);
+      this.ui.showNavigation(this.getNavigationContext("preserve"));
+      this.saveNavigationSnapshot();
+    } else if (routeResult.kind === "advanced") {
+      this.ui.updateCurrentLocation(space);
+      this.ui.showNavigation(this.getNavigationContext("current"));
+      this.saveNavigationSnapshot();
+    } else if (routeResult.kind === "finished") {
+      this.ui.updateCurrentLocation(space);
+      this.ui.showTarget(null);
+      this.saveNavigationSnapshot();
+    } else if (routeResult.kind === "failed") {
+      this.ui.showToast(
+        routeResult.reason === "arrival-position-unavailable"
+          ? "現在地を確定できないため、次の案内へ進めません"
+          : "次の目的地への経路を再構築できませんでした。現在の案内を保持します",
+        "error",
+      );
+    }
     return result.statusResult.state;
   }
 
@@ -515,16 +551,6 @@ export class BrowserApplication {
       });
     }
     return purchased;
-  }
-
-  async flushActiveOutbox() {
-    if (!this.activeRef) return { sent: 0, pending: 0, error: null };
-    const sent =
-      (await this.pendingGasUpdatesController.retryAll(this.activeRef, {
-        updateViewState: false,
-      })) ?? 0;
-    const pending = this.activeState?.gasOutbox.length ?? 0;
-    return { sent, pending, error: pending ? new Error("Pending GAS updates remain") : null };
   }
 
   /** Rebuild the management selector and source manager models from registry and local state. */
@@ -847,7 +873,38 @@ export class BrowserApplication {
       onPreviewRoute: () => this.handlePreviewRoute(),
       onConfirmRoute: () => this.handleConfirmRoute(),
       onCancelRoute: () => this.handleCancelRoute(),
+      onCloseRouteSelection: () => this.handleCloseRouteSelection(),
     });
+    const itineraryButton = this.document.getElementById("btn-open-itinerary");
+    const itineraryDialog = getBrowserElement<BrowserElement>(
+      this.document,
+      "route-itinerary-dialog",
+    );
+    if (itineraryButton && itineraryDialog) {
+      itineraryButton.onclick = () => {
+        itineraryDialog.entries = buildRouteItineraryModel(
+          this.routeGuidanceSession.getSnapshot(),
+          this.getUnvisited(),
+        );
+        this.itineraryOpen = true;
+        this.ui.showNavigation(this.getNavigationContext("preserve"));
+        itineraryDialog.open = true;
+      };
+      itineraryDialog.addEventListener("itinerary-close", () => {
+        this.itineraryOpen = false;
+        this.ui.showNavigation(this.getNavigationContext("preserve"));
+      });
+    }
+    const userGuideButton = this.document.getElementById("btn-open-user-guide");
+    const userGuideDialog = getBrowserElement<BrowserElement>(
+      this.document,
+      "user-guide-dialog",
+    );
+    if (userGuideButton && userGuideDialog) {
+      userGuideButton.onclick = () => {
+        userGuideDialog.open = true;
+      };
+    }
     this.setupEvents();
 
     if (devDemoEnabled) {
@@ -962,6 +1019,9 @@ export class BrowserApplication {
       nextTarget: this.getNextTarget(snapshot),
       selectionState: snapshot.selectionStatus,
       selectionMessage: this.selectionMessage,
+      itineraryEntries: this.itineraryOpen
+        ? buildRouteItineraryModel(snapshot, this.getUnvisited())
+        : [],
       fitMode,
     };
   }
@@ -1090,12 +1150,20 @@ export class BrowserApplication {
     this.selectionMessage = "";
     this.ui.showNavigation(this.getNavigationContext("current"));
     this.ui.showToast(`目的地を ${destination.space} に変更しました`);
+    this.saveNavigationSnapshot();
   }
 
   /** Leave comparison while retaining the selected target details. */
   handleCancelRoute() {
     if (!this.routeGuidanceController.cancelDestinationComparison()) return;
     this.ui.showNavigation(this.getNavigationContext("comparison"));
+  }
+
+  /** Close the candidate panel and invalidate any pending candidate route. */
+  handleCloseRouteSelection() {
+    if (!this.routeGuidanceController.cancelDestinationSelection()) return;
+    this.selectionMessage = "";
+    this.ui.showNavigation(this.getNavigationContext("current"));
   }
 
   /**
@@ -1532,20 +1600,23 @@ export class BrowserApplication {
       type === "purchase" ? `${space} 購入！` : `${space} 保留`,
     );
 
-    if (this.activeState?.source.type === "gas") {
-      this.flushOutboxWithDiagnostic();
-    }
-
     this.ui.updateCounts(this);
     this.updateManagementModels();
-    this.ui.updateCurrentLocation(space); // 現在地を更新
-
     if (isDevDemoEnabled(this.window.location)) {
       void this.handleDevDemoAction(space);
       return;
     }
 
     const routeResult = visitResult.routeGuidanceResult;
+    if (routeResult.kind !== "ignored") {
+      this.ui.updateCurrentLocation(space); // 現在地を更新
+    }
+    if (type === "purchase" && routeResult.kind === "ignored") {
+      this.routeGuidanceController.removePurchasedSpaceFromOrder(space);
+      this.ui.showNavigation(this.getNavigationContext("preserve"));
+      this.saveNavigationSnapshot();
+      return;
+    }
     if (routeResult.kind === "advanced") {
       this.ui.showNavigation(this.getNavigationContext("current"));
       this.saveNavigationSnapshot();
@@ -1580,9 +1651,6 @@ export class BrowserApplication {
         this.reportLocalMutationFailure(error);
         return;
       }
-      if (this.activeState?.source.type === "gas") {
-        this.flushOutboxWithDiagnostic();
-      }
       this.clearNavigationSnapshot();
       this.resetNavigationRuntimeState();
       this.ui.updateCounts(this);
@@ -1604,25 +1672,6 @@ export class BrowserApplication {
       "端末への保存に失敗しました。操作は反映されていません。",
       "error",
     );
-  }
-
-  /** Process GAS after local success and report failures without rolling back. */
-  async flushOutboxWithDiagnostic() {
-    try {
-      const result = await this.flushActiveOutbox();
-      if (result.error) {
-        this.ui.showToast(
-          "GAS同期に失敗しました。未送信データは端末に保持されています。",
-          "warning",
-        );
-      }
-    } catch (error) {
-      console.error("Failed to process GAS outbox:", error);
-      this.ui.showToast(
-        "GAS同期に失敗しました。未送信データは端末に保持されています。",
-        "warning",
-      );
-    }
   }
 
   /**

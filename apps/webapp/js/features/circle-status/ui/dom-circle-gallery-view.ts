@@ -46,6 +46,9 @@ export class DomCircleGalleryView {
     this.sortMode = "priority"; // 'space' | 'priority'
     this.currentGalleryArea = null; // エリア保持用
     this.currentGalleryIsHold = false; // 保留リストかどうか
+    this.inFlightPurchases = new Set();
+    this.hintKey = "comipath:ui:v1:gallery-swipe-hint-seen";
+    this.hintTimer = null;
 
     // フィルタボタンへの参照は init で取得
   }
@@ -292,6 +295,32 @@ export class DomCircleGalleryView {
 
     this.renderGallery();
     this.els.galleryModal.classList.remove("hidden");
+    this.showSwipeHintIfNeeded();
+  }
+
+  showSwipeHintIfNeeded() {
+    if (!this.els.galleryModal || this.els.galleryModal.querySelector(".gallery-swipe-hint")) return;
+    let seen = false;
+    try {
+      seen = window.localStorage.getItem(this.hintKey) === "1";
+    } catch {
+      return;
+    }
+    if (seen) return;
+
+    const hint = document.createElement("div");
+    hint.className = "gallery-swipe-hint";
+    hint.innerHTML =
+      '<strong>外側へスワイプして購入済みにできます</strong><span class="gallery-swipe-hint-arrows" aria-hidden="true">←　→</span>';
+    hint.onclick = () => hint.remove();
+    this.els.galleryModal.appendChild(hint);
+    try {
+      window.localStorage.setItem(this.hintKey, "1");
+    } catch {
+      // UI hint is optional when storage is unavailable.
+    }
+    if (this.hintTimer) clearTimeout(this.hintTimer);
+    this.hintTimer = setTimeout(() => hint.remove(), 3500);
   }
 
   /**
@@ -323,6 +352,7 @@ export class DomCircleGalleryView {
       targets.forEach((c) => {
         const item = document.createElement("div");
         item.className = "gallery-item";
+        item.dataset.space = c.space;
 
         const renderPlaceholder = () => {
           item.querySelector("img")?.remove();
@@ -393,7 +423,16 @@ export class DomCircleGalleryView {
 
         // スワイプアクション
         setupSwipeAction(item, () => {
-          this.handleGalleryPurchase(c);
+          return this.handleGalleryPurchase(c, item);
+        }, {
+          getAllowedDirection: () => {
+            if (item.classList.contains("wide")) return "both";
+            const gridRect = this.els.galleryGrid.getBoundingClientRect();
+            const itemRect = item.getBoundingClientRect();
+            return itemRect.left + itemRect.width / 2 < gridRect.left + gridRect.width / 2
+              ? "left"
+              : "right";
+          },
         });
 
         this.els.galleryGrid.appendChild(item);
@@ -404,14 +443,29 @@ export class DomCircleGalleryView {
   /**
    * ギャラリーからの購入処理
    */
-  async handleGalleryPurchase(circle) {
-    if (!this.dataManager) return;
+  async handleGalleryPurchase(circle, item = null) {
+    if (!this.dataManager || this.inFlightPurchases.has(circle.space)) return;
 
     const space = circle.space;
-    this.dataManager.addPurchased(space, circle.sheetName || "");
-    if (this.uiManager) {
-      this.uiManager.showToast(`${space} 購入完了`);
+    this.inFlightPurchases.add(space);
+    if (item) {
+      item.classList.add("is-purchasing");
+      item.querySelector(".gallery-btn-buy")?.setAttribute("disabled", "");
     }
+    try {
+      await this.dataManager.addPurchased(space);
+    } catch (error) {
+      item?.classList.remove("is-purchasing");
+      item?.querySelector(".gallery-btn-buy")?.removeAttribute("disabled");
+      this.uiManager?.showToast(
+        "端末への保存に失敗しました。操作は反映されていません。",
+        "error",
+      );
+      this.inFlightPurchases.delete(space);
+      return;
+    }
+
+    if (this.uiManager) this.uiManager.showToast(`${space} 購入完了`);
 
     // ギャラリーデータを更新（購入済みを除外）して再描画
     // 現在のリストから削除
@@ -420,6 +474,7 @@ export class DomCircleGalleryView {
 
     // メイン画面のカウントも更新
     if (this.uiManager) this.uiManager.updateCounts(this.dataManager);
+    this.inFlightPurchases.delete(space);
   }
 
   /**

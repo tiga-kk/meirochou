@@ -116,4 +116,48 @@ describe("ChangeCircleStatusUseCase", () => {
       createdAt: NOW,
     });
   });
+
+  it("keeps a committed purchase successful when background notification throws", () => {
+    const initialState = createEmptyEventDayState(
+      { type: "gas", gasUrl: "https://example.test/gas", sheetName: "demo" },
+      "gen-1",
+      NOW,
+    );
+    const savedStates: LocalEventDayState[] = [];
+    const state = { ...initialState, circles: [{ space: "A01" }] };
+    const repository: EventDayRepository = {
+      load: () => state,
+      save: (_ref, nextState) => savedStates.push(nextState),
+    };
+    const activeEventDaySession: ActiveEventDaySession = {
+      getActiveEventDay: () => ({ ref: REF, state }),
+      replaceActiveEventDayState: () => {},
+      setActiveEventDay: () => {},
+      clearActiveEventDay: () => {},
+      subscribe: () => () => {},
+    };
+    const backgroundProcess = {
+      requestSend: vi.fn(() => {
+        throw new Error("background unavailable");
+      }),
+    };
+    const useCase = new ChangeCircleStatusUseCase(
+      repository,
+      activeEventDaySession,
+      backgroundProcess,
+      { createPendingGasUpdateId: () => "pending-1" },
+    );
+
+    expect(() =>
+      useCase.execute({
+        eventDay: REF,
+        circleSpace: "A01",
+        nextStatus: "purchased",
+        expectedSourceGeneration: "gen-1",
+        changedAt: NOW,
+      }),
+    ).not.toThrow();
+    expect(savedStates[0].circleStates.A01).toBe("purchased");
+    expect(savedStates[0].gasOutbox).toHaveLength(1);
+  });
 });

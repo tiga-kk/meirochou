@@ -425,9 +425,7 @@ test.describe("Mobile Management Flows", () => {
       "東ア23a",
     );
     await page.locator("#btn-purchased").click();
-    await expect(page.locator("#toast")).toContainText(
-      "未送信データは端末に保持されています",
-    );
+    await expect(page.locator("#toast")).toContainText("東ア23a 購入！");
     const failedState = await readState(page, {
       eventId: "demo-v1",
       dayId: "day1",

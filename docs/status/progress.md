@@ -2,14 +2,38 @@
 
 更新日: 2026-08-10
 
+## Phase 6 Task 9 の状態
+
+Phase 6 Task 9（ユーザー体験の最終検証）は完了した。経路変更確定後のsnapshot保存、resume中の古いALNS進捗によるsnapshot上書き、低速・範囲外パンのsettle、ギャラリー購入ボタンの44pxタッチターゲット、予定pinのaccessible nameを修正し、計画書が要求する統合検証を追加した。
+
+追加・更新した検証:
+
+- 経路変更→確定→購入→次のお品書き表示
+- 経路変更確定→LocalStorage snapshot→reload→変更後目的地で再開
+- GAS delivery失敗後の次目的地表示と候補経路非表示
+- ギャラリーの左右実スワイプによる購入と端末保存
+- CSV/GAS guideのvalidation差分
+- 予定一覧と地図pinの番号・accessible name整合
+- 44px購入ボタン、200%表示、地図操作、既存のlocal save failure回帰
+
+検証結果:
+
+- `npm run verify`: 成功（webapp 647 tests、Route Guidance 35 tests、Phase 5D回帰4 tests、architecture/typecheck/build/GASを含む）
+- `npm run test:e2e:ci`: 成功（43 passed / 8 skipped）
+- `npx biome check`: repo-wideでは89 errors / 116 warnings / 8 infos。mainでも同じ結果を再現し、Phase 6で追加したコードによる新規errorではない。変更箇所の機械的な既存format debtは修正せず、Phase 6の回帰とは分離して記録する。
+- `node scripts/audit-public-tree.mjs`と`git diff --check`: 成功
+
+次に着手するPhase 6タスクはない。外部公開や不可逆変更を伴う次フェーズは自動開始しない。
+
 ## 現在の対象
 
 - リポジトリ: `tiga-kk/meirochou`
+- ブランチ: `feature/phase-06-task-01`
 - production確認元: `main`
 - Phase 6計画作成時の`main` HEAD: `3322c31cf8c8413ecc6a5d5d2e7abaefea7aa318`
 - 計画文書ブランチ: `docs/phase-06-user-experience-plan`
-- 現在のフェーズ: Phase 6 ユーザー体験と経路案内の改善
-- 次に着手するタスク: Task 1 `docs/plans/phase-06/task-01-fix-route-selection-state.md`
+- 現在のフェーズ: Phase 6 Task 9 完了
+- 次に着手するタスク: なし（Phase 6完了。次Phaseは自動開始しない）
 
 ## Phase 5D
 

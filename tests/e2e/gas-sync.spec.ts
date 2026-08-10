@@ -224,11 +224,11 @@ test("購入は失敗POSTより先にLocalStorageへ保存される", async ({ p
     .toMatchObject([
       { attempts: 1, lastError: "http-500", purchased: true, space: "東ア23a" },
     ]);
-  await expect(page.locator("#toast")).toContainText(
-    "GAS同期に失敗しました。未送信データは端末に保持されています。",
-  );
+  await expect(page.locator("#toast")).toContainText("東ア23a 購入！");
   expect(requests).toEqual(["POST"]);
   expect((await readGasState(page)).purchased).toEqual(["東ア23a"]);
+  await expect(page.locator("#target-space-heading")).toHaveText("東ア31b");
+  await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
 });
 
 test("reload時の再試行が成功するとoutboxを消去する", async ({ page }) => {

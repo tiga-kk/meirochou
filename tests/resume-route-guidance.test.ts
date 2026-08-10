@@ -49,17 +49,20 @@ function createRuntimeController(snapshot: Record<string, unknown> | null) {
 }
 
 function createSession() {
+  let currentSnapshot = {
+    navigationState: null,
+    currentDestination: null,
+    currentRoute: null,
+    selectedDestination: null,
+    selectedRoute: null,
+    selectionStatus: "idle",
+    routeOptimizationGeneration: 1,
+  };
   return {
-    getSnapshot: vi.fn(() => ({
-      navigationState: null,
-      currentDestination: null,
-      currentRoute: null,
-      selectedDestination: null,
-      selectedRoute: null,
-      selectionStatus: "idle",
-      routeOptimizationGeneration: 1,
-    })),
-    replaceSnapshot: vi.fn(),
+    getSnapshot: vi.fn(() => currentSnapshot),
+    replaceSnapshot: vi.fn((next) => {
+      currentSnapshot = next;
+    }),
   };
 }
 
@@ -189,6 +192,111 @@ describe("ResumeRouteGuidanceUseCase", () => {
       null,
     );
     expect(runtimeController.setMatrixRef).toHaveBeenCalledWith("matrix-east-v1");
+  });
+
+  it("ignores stale ALNS progress after the destination was changed manually", async () => {
+    const runtimeController = createRuntimeController({
+      schemaVersion: 1,
+      eventId: "c108",
+      dayId: "day1",
+      areaId: "east",
+      bundleVersion: "v1",
+      matrixRef: "matrix-east-v1",
+      navState: {
+        stage: "navigating",
+        areaId: "east",
+        currentPosition: {
+          areaId: "east",
+          gridIndex: 0,
+          svgX: 10,
+          svgY: 10,
+          source: "manual-start",
+        },
+        targetSpace: "東A01a",
+        lockedFirstLeg: {
+          from: { type: "start", areaId: "east", gridIndex: 0 },
+          toSpace: "東A01a",
+        },
+        provisionalOrder: ["東A01a"],
+        bestOrder: ["東A01a"],
+      },
+      optimizationTimeLimitMs: 10000,
+      savedAt: "2026-08-08T00:00:00.000Z",
+    });
+    const session = createSession();
+    runtimeController.getMatrixRepo.mockReturnValue({
+      load: vi.fn(() => ({
+        schemaVersion: 1,
+        cacheKey: "matrix-east-v1",
+        areaId: "east",
+        spaces: ["東A01a"],
+        size: 1,
+        distances: [0],
+        createdAt: "2026-08-08T00:00:00.000Z",
+      })),
+    });
+    let onProgress: ((nextNavState: any) => void) | undefined;
+    runtimeController.launchAlnsOptimization.mockImplementation(
+      ({ navState }, progress) => {
+        onProgress = progress;
+        return { ...navState, optimizationGeneration: 1 };
+      },
+    );
+
+    const useCase = new ResumeRouteGuidanceUseCase(
+      session as any,
+      runtimeController as any,
+      { loadMapAssets: vi.fn(async () => routeAssets) } as any,
+      {
+        getMapArea: vi.fn(() => ({
+          areaId: "east",
+          id: "east",
+          prefixes: ["東"],
+          labels: ["A"],
+        })),
+        findMapAreaForCircleSpace: vi.fn(() => ({
+          areaId: "east",
+          id: "east",
+          prefixes: ["東"],
+          labels: ["A"],
+        })),
+        getAllMapAreas: vi.fn(() => [
+          { areaId: "east", id: "east", prefixes: ["東"], labels: ["A"] },
+        ]),
+      } as any,
+    );
+
+    await useCase.execute({
+      eventDay: { eventId: "c108", dayId: "day1" },
+      circles: [{ space: "東A01a" }],
+      circleStates: { 東A01a: "pending" },
+    });
+
+    const changedSnapshot = {
+      ...session.getSnapshot(),
+      navigationState: {
+        ...session.getSnapshot().navigationState!,
+        targetSpace: "東A02a",
+        optimizationGeneration: 2,
+      },
+      currentDestination: { space: "東A02a" },
+      selectedDestination: { space: "東A02a" },
+    };
+    session.replaceSnapshot(changedSnapshot as any);
+    const saveCount = runtimeController.saveSnapshot.mock.calls.length;
+
+    onProgress!({
+      ...changedSnapshot.navigationState,
+      targetSpace: "東A01a",
+      optimizationGeneration: 1,
+    });
+
+    expect(session.getSnapshot()).toBe(changedSnapshot);
+    expect(session.getSnapshot().navigationState).toMatchObject({
+      targetSpace: "東A02a",
+      optimizationGeneration: 2,
+    });
+    expect(runtimeController.saveSnapshot).toHaveBeenCalledTimes(saveCount);
   });
 
   it("keeps the pending snapshot when the target no longer exists", async () => {

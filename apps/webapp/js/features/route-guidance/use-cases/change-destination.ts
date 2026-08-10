@@ -179,10 +179,29 @@ export class ChangeDestinationUseCase {
     ) {
       return null;
     }
+    let nextNavigationState: NavigationState;
+    try {
+      nextNavigationState = this.navigationOperations.handleManualTarget(
+        snapshot.navigationState!,
+        snapshot.selectedDestination.space,
+      ).navState;
+    } catch {
+      return null;
+    }
+    if (
+      nextNavigationState.targetSpace !== snapshot.selectedDestination.space ||
+      nextNavigationState.lockedFirstLeg?.toSpace !==
+        snapshot.selectedDestination.space
+    ) {
+      return null;
+    }
     this.session.replaceSnapshot({
       ...snapshot,
+      navigationState: nextNavigationState,
       currentDestination: snapshot.selectedDestination,
       currentRoute: snapshot.selectedRoute,
+      selectedDestination: snapshot.selectedDestination,
+      selectedRoute: snapshot.selectedRoute,
       selectionStatus: "idle",
     });
     return snapshot.selectedDestination;
@@ -193,6 +212,20 @@ export class ChangeDestinationUseCase {
     const snapshot = this.session.getSnapshot();
     if (snapshot.selectionStatus !== "comparing") return false;
     this.session.replaceSnapshot({ ...snapshot, selectionStatus: "ready" });
+    return true;
+  }
+
+  /** Cancels candidate selection and invalidates any late route calculation. */
+  cancelSelection(): boolean {
+    const snapshot = this.session.getSnapshot();
+    if (snapshot.selectionStatus === "idle") return false;
+    this.selectionToken += 1;
+    this.session.replaceSnapshot({
+      ...snapshot,
+      selectedDestination: snapshot.currentDestination,
+      selectedRoute: snapshot.currentRoute,
+      selectionStatus: "idle",
+    });
     return true;
   }
 

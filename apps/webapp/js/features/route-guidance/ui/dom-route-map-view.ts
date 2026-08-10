@@ -295,6 +295,7 @@ export class DomRouteMapView {
       selectedRoute = null,
       startSpace = "",
       selectionState = "idle",
+      itineraryEntries = [],
       fitMode = "current",
     } = context;
     this.lastNavigationTarget = currentTarget;
@@ -342,7 +343,7 @@ export class DomRouteMapView {
 
     this.els.pinLayer.innerHTML = "";
     this.renderRouteOverlay(currentRoute, "current");
-    if (selectionState === "ready" || selectionState === "comparing") {
+    if (selectionState === "comparing") {
       this.renderRouteOverlay(selectedRoute, "candidate");
     }
 
@@ -352,12 +353,42 @@ export class DomRouteMapView {
       button.className = `map-pin ${pin.state}`;
       button.dataset.space = pin.space;
       button.dataset.state = pin.baseState;
+      const itineraryEntry = itineraryEntries.find(
+        (entry) =>
+          entry.space === pin.space &&
+          findAreaForSpace(entry.space, this.mapAreaCatalog)?.id === area?.id,
+      );
+      if (itineraryEntry) {
+        button.classList.add("itinerary-pin");
+        button.dataset.itineraryIndex = String(itineraryEntry.index);
+        button.textContent = String(itineraryEntry.index);
+        button.setAttribute(
+          "aria-label",
+          `${itineraryEntry.index}番 ${pin.space}${
+            itineraryEntry.isCurrent ? "、現在の目的地" : ""
+          }`,
+        );
+      }
       button.style.left = `${pin.x}%`;
       button.style.top = `${pin.y}%`;
       this.applyPinSize(button, pin.state);
+      const normalPinLabel =
+        pin.state === "start"
+          ? `出発地点 ${pin.space}`
+          : pin.state === "next"
+            ? `現在の目的地 ${pin.space}`
+            : pin.state === "selected"
+              ? `候補選択中 ${pin.space}`
+              : pin.state === "done"
+                ? `購入済み ${pin.space}`
+                : pin.state === "hold"
+                  ? `保留中 ${pin.space}`
+                  : `候補として選択可能 ${pin.space}`;
       button.setAttribute(
         "aria-label",
-        pin.state === "start" ? `出発地点 ${pin.space}` : pin.space,
+        itineraryEntry
+          ? `${itineraryEntry.index}番、${normalPinLabel}`
+          : normalPinLabel,
       );
       if (pin.circle && selectionState !== "comparing") {
         button.onclick = (event) => {

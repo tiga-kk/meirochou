@@ -1,5 +1,34 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { routeDemoEventRegistry } from "./fixture-registry";
+
+const pinFor = (page: Page, space: string) =>
+  page.locator(`#navigation-pin-layer .map-pin[data-space="${space}"]`);
+
+async function dispatchTouchSwipe(
+  item: Locator,
+  startX: number,
+  endX: number,
+): Promise<void> {
+  await item.evaluate(
+    (element, coordinates) => {
+      const touch = (clientX: number) => ({
+        identifier: 1,
+        target: element,
+        clientX,
+        clientY: 100,
+      });
+      const dispatch = (type: string, touches: object[]) => {
+        const event = new Event(type, { bubbles: true, cancelable: true });
+        Object.defineProperty(event, "touches", { value: touches });
+        element.dispatchEvent(event);
+      };
+      dispatch("touchstart", [touch(coordinates.startX)]);
+      dispatch("touchmove", [touch(coordinates.endX)]);
+      dispatch("touchend", []);
+    },
+    { startX, endX },
+  );
+}
 
 test.beforeEach(async ({ context, page }) => {
   await context.route(
@@ -21,12 +50,128 @@ test("初回訪問では空のローカルイベント・日程で起動する",
   await expect(page.locator("#toast")).toContainText("CSVデータ未設定");
 });
 
+test("予定を開くと巡回順と地図pinの番号が一致し案内状態を変えない", async ({
+  page,
+}) => {
+  await page.goto("/?demo_ui=1");
+
+  await expect(page.locator("#target-space-heading")).not.toHaveText("---");
+  const beforeTarget = await page
+    .locator("#target-space-heading")
+    .textContent();
+  await page.locator("#btn-open-itinerary").click();
+
+  const dialog = page.locator("#route-itinerary-dialog");
+  await expect(dialog.getByRole("dialog")).toBeVisible();
+  const entries = dialog.locator("[data-itinerary-index]");
+  await expect(entries).not.toHaveCount(0);
+  const entryIndexes = await entries.evaluateAll((items) =>
+    items.map((item) => item.getAttribute("data-itinerary-index")),
+  );
+  const pinIndexes = await page
+    .locator("#navigation-pin-layer .itinerary-pin")
+    .evaluateAll((pins) =>
+      pins
+        .map((pin) => pin.getAttribute("data-itinerary-index"))
+        .sort((left, right) => Number(left) - Number(right)),
+    );
+  expect(pinIndexes).toEqual(
+    entryIndexes
+      .filter((index) => index !== null)
+      .sort((left, right) => Number(left) - Number(right)),
+  );
+  for (const index of pinIndexes) {
+    await expect(
+      page.locator(
+        `#navigation-pin-layer .itinerary-pin[data-itinerary-index="${index}"]`,
+      ),
+    ).toHaveAccessibleName(new RegExp(`^${index}番、`));
+  }
+  await expect(page.locator("#target-space-heading")).toHaveText(
+    beforeTarget || "",
+  );
+
+  await dialog.getByRole("button", { name: "予定を閉じる" }).click();
+  await expect(dialog.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.locator("#navigation-pin-layer .itinerary-pin"),
+  ).toHaveCount(0);
+  await expect(page.locator("#target-space-heading")).toHaveText(
+    beforeTarget || "",
+  );
+});
+
+test("使い方をheaderから開き、本文を拡大表示して閉じられる", async ({
+  page,
+}) => {
+  await page.goto("/?demo_ui=1");
+
+  const guideButton = page.locator("#btn-open-user-guide");
+  await guideButton.click();
+  const guide = page.locator("#user-guide-dialog");
+  const dialog = guide.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(guide.getByRole("heading", { name: "CSVを使う" })).toBeVisible();
+  await expect(
+    guide.getByRole("heading", { name: "Google Spreadsheet / GASを使う" }),
+  ).toBeVisible();
+  await expect(
+    guide.getByRole("heading", { name: "地図と経路変更" }),
+  ).toBeVisible();
+  await expect(
+    guide.getByRole("heading", { name: "一覧とスワイプ" }),
+  ).toBeVisible();
+  await expect(
+    guide.getByRole("heading", { name: "未送信GASデータ" }),
+  ).toBeVisible();
+  const csvSection = guide
+    .getByRole("heading", { name: "CSVを使う" })
+    .locator("..");
+  const gasSection = guide
+    .getByRole("heading", { name: "Google Spreadsheet / GASを使う" })
+    .locator("..");
+  await expect(csvSection).toContainText("space");
+  await expect(csvSection).toContainText("不正なpriority");
+  await expect(csvSection).not.toContainText("認識済みヘッダーの重複");
+  await expect(gasSection).toContainText("isSale");
+  await expect(gasSection).toContainText("認識済みヘッダーの重複");
+  await expect(gasSection).not.toContainText("不正なpriority");
+
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "200%";
+  });
+  const scrollMetrics = await guide
+    .locator(".user-guide-body")
+    .evaluate((body) => {
+      const dialogElement = body.closest<HTMLElement>(".user-guide-dialog");
+      const dialogStyle = dialogElement
+        ? getComputedStyle(dialogElement)
+        : null;
+      const bodyStyle = getComputedStyle(body);
+      return {
+        dialogMaxHeight: dialogStyle?.maxHeight,
+        dialogOverflow: dialogStyle?.overflow,
+        bodyOverflowY: bodyStyle.overflowY,
+        bodyCanScroll: body.scrollHeight > body.clientHeight,
+      };
+    });
+  expect(scrollMetrics.dialogMaxHeight).not.toBe("none");
+  expect(scrollMetrics.dialogOverflow).toBe("hidden");
+  expect(["auto", "scroll"]).toContain(scrollMetrics.bodyOverflowY);
+  expect(scrollMetrics.bodyCanScroll).toBe(true);
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(guideButton).toBeFocused();
+});
+
 test("デモデータで地図・ピン・経路・ボトムシートを表示する", async ({
   page,
 }) => {
   await page.goto("/?demo_ui=1");
 
   await expect(page.locator("#target-content")).toBeVisible();
+  await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
   await expect(page.locator("#navigation-map-image")).toHaveJSProperty(
     "complete",
     true,
@@ -76,9 +221,9 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
     page.locator("#navigation-pin-layer .route-overlay"),
   ).toBeVisible();
   await expect(page.locator(".target-bottom-sheet")).toBeVisible();
-  await page
-    .getByRole("button", { name: "東ア23a", exact: true })
-    .evaluate((button: HTMLButtonElement) => button.click());
+  await pinFor(page, "東ア23a").evaluate((button: HTMLButtonElement) =>
+    button.click(),
+  );
   const catalog = page.locator("#tweet-embed-container img");
   await expect(catalog).toBeVisible();
   await expect(catalog).toHaveCSS("object-fit", "contain");
@@ -99,9 +244,9 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
     "navigation-map-catalog.png",
   );
 
-  await page
-    .getByRole("button", { name: "東ア31b", exact: true })
-    .evaluate((button: HTMLButtonElement) => button.click());
+  await pinFor(page, "東ア31b").evaluate((button: HTMLButtonElement) =>
+    button.click(),
+  );
   const portraitCatalog = page.locator("#tweet-embed-container img");
   await expect(portraitCatalog).toHaveCSS("object-fit", "contain");
   const portraitDimensions = await portraitCatalog.evaluate(
@@ -159,19 +304,21 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   const originalTarget = (await heading.textContent())?.trim();
   const candidate = originalTarget === "東ア23a" ? "東ア31b" : "東ア23a";
 
-  await page
-    .getByRole("button", { name: candidate, exact: true })
-    .evaluate((button: HTMLButtonElement) => button.click());
+  const candidatePin = pinFor(page, candidate);
+  await candidatePin.evaluate((button: HTMLButtonElement) => button.click());
 
   await expect(heading).toHaveText(originalTarget || "");
-  await expect(page.locator("#target-status-label")).toHaveText("選択中");
+  await expect(page.locator("#target-status-label")).toHaveText("候補");
   await expect(page.locator("#selected-target-space")).toHaveText(candidate);
-  await expect(
-    page.getByRole("button", { name: candidate, exact: true }),
-  ).toHaveClass(/selected/);
-  await expect(
-    page.getByRole("button", { name: candidate, exact: true }),
-  ).toHaveCSS("background-color", "rgba(0, 90, 156, 0.4)");
+  await expect(candidatePin).toHaveClass(/selected/);
+  await expect(candidatePin).toHaveCSS(
+    "background-color",
+    "rgba(0, 90, 156, 0.4)",
+  );
+  await expect(candidatePin).toHaveAccessibleName(`候補選択中 ${candidate}`);
+  await expect(page.locator(".candidate-selection-label")).toHaveText("候補");
+  await expect(page.locator("#route-selection-controls")).toBeVisible();
+  await expect(page.locator("#btn-close-route-selection")).toBeVisible();
   await expect(page.locator("#target-dist")).toHaveText(/^距離 \d+$/);
   await expect(page.locator("#target-tweet-link")).toHaveAttribute(
     "href",
@@ -185,17 +332,16 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   );
   await expect(page.locator("#btn-preview-route")).toBeEnabled();
   await expect(page.locator('[data-route-kind="current"]')).toBeVisible();
-  await expect(page.locator('[data-route-kind="candidate"]')).toBeVisible();
-  await expect(
-    page.locator('[data-route-kind="candidate"] .route-overlay-line'),
-  ).toHaveCSS("stroke-dasharray", "22px, 14px");
-  await page
-    .locator("#toast")
-    .evaluate((toast) => toast.classList.remove("show"));
-  await expect(page.locator("#toast")).toBeHidden();
-  await expect(page.locator("#next-target")).toHaveScreenshot(
-    "navigation-map-route-candidate.png",
-  );
+  await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
+
+  await page.locator("#btn-close-route-selection").click();
+  await expect(page.locator("#route-selection-controls")).toBeHidden();
+  await expect(page.locator("#target-status-label")).toHaveText("次の目的地");
+  await expect(heading).toHaveText(originalTarget || "");
+  await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
+
+  await candidatePin.evaluate((button: HTMLButtonElement) => button.click());
+  await expect(page.locator("#btn-preview-route")).toBeEnabled();
 
   await page.locator("#btn-preview-route").click();
 
@@ -218,8 +364,10 @@ test("ピンの候補経路を比較してから目的地を変更する", async
 
   await page.locator("#btn-cancel-route-change").click();
   await expect(page.locator("#route-change-confirmation")).toBeHidden();
-  await expect(page.locator('[data-route-kind="candidate"]')).toBeVisible();
+  await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
   await expect(heading).toHaveText(originalTarget || "");
+  await expect(page.locator("#target-status-label")).toHaveText("候補");
+  await expect(page.locator("#route-selection-controls")).toBeVisible();
 
   await page.locator("#btn-preview-route").click();
   await page.locator("#btn-confirm-route-change").click();
@@ -227,13 +375,17 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
   await expect(page.locator('[data-route-kind="current"]')).toBeVisible();
   await expect(page.locator("#target-status-label")).toHaveText("次の目的地");
+  await page.locator("#btn-purchased").click();
+  await expect(page.locator("#toast")).toContainText(`${candidate} 購入`);
+  await expect(heading).not.toHaveText(candidate);
+  await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
 });
 
 test("URLがない次地点ではNo Imageを大きく表示する", async ({ page }) => {
   await page.goto("/?demo_ui=1");
-  await page
-    .getByRole("button", { name: "東イ08b", exact: true })
-    .evaluate((button: HTMLButtonElement) => button.click());
+  await pinFor(page, "東イ08b").evaluate((button: HTMLButtonElement) =>
+    button.click(),
+  );
 
   const placeholder = page.locator(
     "#tweet-embed-container .catalog-placeholder",
@@ -251,12 +403,12 @@ test("連続してピンを押した時は最後に選んだ候補だけを表�
   await page.goto("/?demo_ui=1");
   await expect(page.locator("#target-space-heading")).not.toHaveText("---");
 
-  await page
-    .getByRole("button", { name: "東ア23a", exact: true })
-    .evaluate((button: HTMLButtonElement) => button.click());
-  await page
-    .getByRole("button", { name: "東ア31b", exact: true })
-    .evaluate((button: HTMLButtonElement) => button.click());
+  await pinFor(page, "東ア23a").evaluate((button: HTMLButtonElement) =>
+    button.click(),
+  );
+  await pinFor(page, "東ア31b").evaluate((button: HTMLButtonElement) =>
+    button.click(),
+  );
 
   await expect(page.locator("#selected-target-space")).toHaveText("東ア31b");
   await expect(page.locator("#target-tweet-link")).toHaveAttribute(
@@ -284,9 +436,9 @@ test("候補経路を探索できない時は現在経路を維持する", async
     .locator("#target-space-heading")
     .textContent();
 
-  await page
-    .getByRole("button", { name: "東ア23a", exact: true })
-    .evaluate((button: HTMLButtonElement) => button.click());
+  await pinFor(page, "東ア23a").evaluate((button: HTMLButtonElement) =>
+    button.click(),
+  );
 
   await expect(page.locator("#target-space-heading")).toHaveText(
     originalTarget || "",
@@ -347,9 +499,9 @@ test("地点JSON取得失敗時は推測位置のピンを表示しない", asyn
 
 test("次地点のお品書き読込失敗をNo Imageへ置き換える", async ({ page }) => {
   await page.goto("/?demo_ui=1");
-  await page
-    .getByRole("button", { name: "東ア23a", exact: true })
-    .evaluate((button: HTMLButtonElement) => button.click());
+  await pinFor(page, "東ア23a").evaluate((button: HTMLButtonElement) =>
+    button.click(),
+  );
 
   const catalog = page.locator("#tweet-embed-container img");
   await expect(catalog).toBeVisible();
@@ -367,17 +519,17 @@ test("切替前の画像エラーで現在の次地点画像を消さない", as
   const originalTarget = await page
     .locator("#target-space-heading")
     .textContent();
-  await page
-    .getByRole("button", { name: "東ア23a", exact: true })
-    .evaluate((button: HTMLButtonElement) => button.click());
+  await pinFor(page, "東ア23a").evaluate((button: HTMLButtonElement) =>
+    button.click(),
+  );
 
   const staleCatalog = await page
     .locator("#tweet-embed-container img")
     .elementHandle();
   expect(staleCatalog).not.toBeNull();
-  await page
-    .getByRole("button", { name: "東ア31b", exact: true })
-    .evaluate((button: HTMLButtonElement) => button.click());
+  await pinFor(page, "東ア31b").evaluate((button: HTMLButtonElement) =>
+    button.click(),
+  );
   await expect(page.locator("#target-space-heading")).toHaveText(
     originalTarget || "",
   );
@@ -412,6 +564,7 @@ test("設定画面の開閉やソース閲覧時に明示的な取得なしにGA
 test("一覧から目的地を選び購入・保留状態を更新する", async ({ page }) => {
   await page.goto("/?demo_ui=1");
   await expect(page.locator("#target-content")).toBeVisible();
+  await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
 
   await page.locator("#btn-open-gallery").click();
   await expect(page.locator("#gallery-modal")).toBeVisible();
@@ -424,6 +577,13 @@ test("一覧から目的地を選び購入・保留状態を更新する", async
     page.locator("#gallery-grid .no-image-placeholder"),
   ).toContainText("No Image");
   await expect(page.locator("#gallery-grid .gallery-item img")).toHaveCount(2);
+  const buyButton = page.locator("#gallery-grid .gallery-btn-buy").first();
+  const buyButtonSize = await buyButton.evaluate((button) => {
+    const rect = button.getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
+  });
+  expect(buyButtonSize.width).toBeGreaterThanOrEqual(44);
+  expect(buyButtonSize.height).toBeGreaterThanOrEqual(44);
   await page
     .locator("#toast")
     .evaluate((toast) => toast.classList.remove("show"));
@@ -451,6 +611,58 @@ test("一覧から目的地を選び購入・保留状態を更新する", async
   await expect(
     page.locator("#stats-table .hold-row .count-cell").first(),
   ).toHaveText("2");
+});
+
+test("一覧の左右スワイプが外側方向の購入と端末保存へ到達する", async ({
+  page,
+}) => {
+  await page.goto("/?demo_ui=1");
+  await page.locator("#btn-open-gallery").click();
+  await expect(page.locator("#gallery-modal")).toBeVisible();
+
+  const leftCard = page.locator('.gallery-item[data-space="東ア31b"]');
+  const rightCard = page.locator('.gallery-item[data-space="東イ08b"]');
+  await expect(leftCard).toBeVisible();
+  await expect(rightCard).toBeVisible();
+
+  const columnCenters = await Promise.all(
+    [leftCard, rightCard].map((card) => card.boundingBox()),
+  );
+  const gridBox = await page.locator("#gallery-grid").boundingBox();
+  expect(columnCenters[0]?.x).toBeLessThan(
+    (gridBox?.x ?? 0) + (gridBox?.width ?? 0) / 2,
+  );
+  expect(columnCenters[1]?.x).toBeGreaterThan(
+    (gridBox?.x ?? 0) + (gridBox?.width ?? 0) / 2,
+  );
+
+  await dispatchTouchSwipe(rightCard, 20, 200);
+  await expect(rightCard).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const state = JSON.parse(
+          localStorage.getItem("comipath:v1:demo-v1:day1:state") || "null",
+        );
+        return state?.circleStates?.["東イ08b"];
+      }),
+    )
+    .toBe("purchased");
+
+  const remainingLeftCard = page.locator('.gallery-item[data-space="東ア31b"]');
+  await expect(remainingLeftCard).toBeVisible();
+  await dispatchTouchSwipe(remainingLeftCard, 200, 20);
+  await expect(remainingLeftCard).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const state = JSON.parse(
+          localStorage.getItem("comipath:v1:demo-v1:day1:state") || "null",
+        );
+        return state?.circleStates?.["東ア31b"];
+      }),
+    )
+    .toBe("purchased");
 });
 
 test("一覧の画像読込失敗をNo Imageへ置き換える", async ({ page }) => {

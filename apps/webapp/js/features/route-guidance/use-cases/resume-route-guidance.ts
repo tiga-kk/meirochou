@@ -239,6 +239,17 @@ export class ResumeRouteGuidanceUseCase {
           initialSolutions: optimizationInput.initialSolutions,
         },
         (nextNavState) => {
+          const currentNavState = this.session.getSnapshot().navigationState;
+          if (
+            currentNavState &&
+            (currentNavState.targetSpace !== nextNavState.targetSpace ||
+              (currentNavState.optimizationGeneration !== undefined &&
+                nextNavState.optimizationGeneration !== undefined &&
+                currentNavState.optimizationGeneration !==
+                  nextNavState.optimizationGeneration))
+          ) {
+            return;
+          }
           this.session.replaceSnapshot({
             ...this.session.getSnapshot(),
             navigationState: nextNavState,

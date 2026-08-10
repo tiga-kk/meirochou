@@ -136,6 +136,7 @@ describe("FinishCurrentCircleUseCase", () => {
     });
     expect(snapshot.selectedDestination).toEqual(snapshot.currentDestination);
     expect(snapshot.selectedRoute).toEqual(snapshot.currentRoute);
+    expect(snapshot.selectionStatus).toBe("idle");
     expect(replaceSnapshot).toHaveBeenCalledOnce();
   });
 
@@ -164,6 +165,7 @@ describe("FinishCurrentCircleUseCase", () => {
     });
     expect(snapshot.navigationState?.currentPosition).toEqual(initialPosition);
     expect(snapshot.currentDestination?.space).toBe(nextCircle.space);
+    expect(snapshot.selectionStatus).toBe("idle");
     expect(replaceSnapshot).toHaveBeenCalledOnce();
   });
 
