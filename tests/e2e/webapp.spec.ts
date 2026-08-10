@@ -220,6 +220,50 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   await expect(
     page.locator("#navigation-pin-layer .route-overlay"),
   ).toBeVisible();
+  await expect(
+    page.locator('[data-route-kind="current"] .route-overlay-line'),
+  ).toHaveCount(1);
+  await expect(
+    page.locator('[data-route-kind="current"] .route-flow-line'),
+  ).toHaveCount(1);
+  await expect(
+    page.locator('[data-route-kind="current"] .route-start-marker'),
+  ).toHaveText("S");
+  await expect(
+    page.locator('[data-route-kind="current"] .route-goal-marker'),
+  ).toHaveText("G");
+  await expect(
+    page.locator('[data-route-kind="current"] .route-flow-line'),
+  ).toHaveCSS("animation-name", "route-flow");
+  const routeFlowOffsets = await page
+    .locator('[data-route-kind="current"] .route-flow-line')
+    .evaluate((element) => {
+      const animation = element
+        .getAnimations()
+        .find(
+          (candidate): candidate is CSSAnimation =>
+            candidate instanceof CSSAnimation &&
+            candidate.animationName === "route-flow",
+        );
+      if (!animation) throw new Error("route-flow animation was not found");
+
+      animation.pause();
+      animation.currentTime = 0;
+      const initial = Number.parseFloat(
+        getComputedStyle(element).strokeDashoffset,
+      );
+      animation.currentTime = 550;
+      const middle = Number.parseFloat(
+        getComputedStyle(element).strokeDashoffset,
+      );
+      return { initial, middle };
+    });
+  expect(routeFlowOffsets.middle).toBeLessThan(routeFlowOffsets.initial);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(
+    page.locator('[data-route-kind="current"] .route-flow-line'),
+  ).toHaveCSS("animation-name", "none");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect(page.locator(".target-bottom-sheet")).toBeVisible();
   await pinFor(page, "東ア23a").evaluate((button: HTMLButtonElement) =>
     button.click(),
@@ -355,6 +399,9 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   await expect(
     page.locator('[data-route-kind="candidate"] .route-overlay-line'),
   ).toHaveCSS("stroke-dasharray", "22px, 14px");
+  await expect(
+    page.locator('[data-route-kind="candidate"] .route-flow-line'),
+  ).toHaveCount(0);
   await expect(page.locator("#btn-purchased")).toBeDisabled();
   await expect(page.locator("#btn-hold")).toBeDisabled();
   await expect(page.locator("#toast")).toBeHidden();
@@ -636,6 +683,19 @@ test("一覧の左右スワイプが外側方向の購入と端末保存へ到�
     (gridBox?.x ?? 0) + (gridBox?.width ?? 0) / 2,
   );
 
+  await dispatchTouchSwipe(rightCard, 20, 170);
+  await expect(rightCard).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const state = JSON.parse(
+          localStorage.getItem("comipath:v1:demo-v1:day1:state") || "null",
+        );
+        return state?.circleStates?.東イ08b;
+      }),
+    )
+    .not.toBe("purchased");
+
   await dispatchTouchSwipe(rightCard, 20, 200);
   await expect(rightCard).toHaveCount(0);
   await expect
@@ -644,7 +704,7 @@ test("一覧の左右スワイプが外側方向の購入と端末保存へ到�
         const state = JSON.parse(
           localStorage.getItem("comipath:v1:demo-v1:day1:state") || "null",
         );
-        return state?.circleStates?.["東イ08b"];
+        return state?.circleStates?.東イ08b;
       }),
     )
     .toBe("purchased");
@@ -659,7 +719,7 @@ test("一覧の左右スワイプが外側方向の購入と端末保存へ到�
         const state = JSON.parse(
           localStorage.getItem("comipath:v1:demo-v1:day1:state") || "null",
         );
-        return state?.circleStates?.["東ア31b"];
+        return state?.circleStates?.東ア31b;
       }),
     )
     .toBe("purchased");

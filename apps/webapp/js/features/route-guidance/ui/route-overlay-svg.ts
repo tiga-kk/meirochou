@@ -8,9 +8,10 @@ interface FallbackOverlay {
   className: string;
   style: { pointerEvents: string };
   getAttribute(name: string): string | null;
-  querySelector(
-    selector: string,
-  ): { getAttribute(name: string): string | null } | null;
+  querySelector(selector: string): {
+    getAttribute(name: string): string | null;
+    textContent?: string | null;
+  } | null;
 }
 
 function createFallbackOverlay(
@@ -28,6 +29,9 @@ function createFallbackOverlay(
       return null;
     },
   };
+  const flow = { getAttribute: () => null };
+  const startMarker = { getAttribute: () => null, textContent: "S" };
+  const goalMarker = { getAttribute: () => null, textContent: "G" };
 
   return {
     className:
@@ -39,7 +43,15 @@ function createFallbackOverlay(
       return attributes.get(name) || null;
     },
     querySelector(selector: string) {
-      return selector === "polyline" ? polyline : null;
+      if (selector === "polyline" || selector === ".route-overlay-line")
+        return polyline;
+      if (selector === ".route-flow-line")
+        return kind === "current" ? flow : null;
+      if (selector === ".route-start-marker")
+        return kind === "current" ? startMarker : null;
+      if (selector === ".route-goal-marker")
+        return kind === "current" ? goalMarker : null;
+      return null;
     },
   };
 }
@@ -82,6 +94,29 @@ export function buildRouteOverlaySvg(
     route.points.map((point) => `${point.x},${point.y}`).join(" "),
   );
   svg.appendChild(polyline);
+
+  if (kind === "current") {
+    const flow = ownerDocument.createElementNS(SVG_NS, "polyline");
+    flow.setAttribute("class", "route-flow-line");
+    flow.setAttribute("points", polyline.getAttribute("points") || "");
+    svg.appendChild(flow);
+
+    const [start, goal] = [route.points[0], route.points.at(-1)];
+    for (const [point, className, label] of [
+      [start, "route-start-marker", "S"],
+      [goal, "route-goal-marker", "G"],
+    ] as const) {
+      const marker = ownerDocument.createElementNS(SVG_NS, "g");
+      marker.setAttribute("class", `route-endpoint ${className}`);
+      marker.setAttribute("transform", `translate(${point.x} ${point.y})`);
+      const circle = ownerDocument.createElementNS(SVG_NS, "circle");
+      circle.setAttribute("r", "18");
+      const text = ownerDocument.createElementNS(SVG_NS, "text");
+      text.textContent = label;
+      marker.append(circle, text);
+      svg.appendChild(marker);
+    }
+  }
 
   return svg;
 }

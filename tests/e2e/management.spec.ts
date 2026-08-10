@@ -322,6 +322,8 @@ test.describe("Mobile Management Flows", () => {
 
   test("Flow 4: GASの初期インポート・置換・リフレッシュ", async ({ page }) => {
     let getCallCount = 0;
+    let delayPreview = false;
+    let releasePreview: (() => void) | null = null;
     await routeGas(page, async (route) => {
       if (route.request().method() !== "GET") {
         await route.continue();
@@ -341,6 +343,11 @@ test.describe("Mobile Management Flows", () => {
           }),
         });
         return;
+      }
+      if (delayPreview) {
+        await new Promise<void>((resolve) => {
+          releasePreview = resolve;
+        });
       }
       await route.fulfill({
         status: 200,
@@ -367,12 +374,24 @@ test.describe("Mobile Management Flows", () => {
     await expect(sourceManager.locator("#gas-sheet-select")).toBeVisible();
     expect(getCallCount).toBe(1);
 
+    delayPreview = true;
     await sourceManager.locator('button[data-action="gas-preview"]').click();
+    await expect(page.locator("async-operation-indicator")).toContainText(
+      "GASからデータを読み込み中…",
+    );
+    releasePreview?.();
+    delayPreview = false;
     const diffDialog = page.locator("#source-diff-dialog");
     const diffOverlay = diffDialog.locator(".source-diff-dialog-overlay");
     await expect(diffOverlay).toBeVisible();
+    await expect(page.locator("async-operation-indicator")).toContainText(
+      "GASデータを読み込みました",
+    );
     await diffDialog.locator('button[data-action="apply"]').click();
     await expect(diffOverlay).not.toBeVisible();
+    await expect(page.locator("async-operation-indicator")).toContainText(
+      "データを保存しました",
+    );
     await expect(sourceManager).toContainText("Googleスプレッドシート");
 
     await sourceManager.locator('button[data-action="gas-preview"]').click();
@@ -494,7 +513,7 @@ test.describe("Mobile Management Flows", () => {
     ).toBeDisabled();
     await expect(
       page.locator(".storage-delete-option button:disabled"),
-    ).toHaveCount(4);
+    ).toHaveCount(0);
 
     const outboxPanel = page.locator("outbox-panel");
     await outboxPanel.locator("input.entry-select").check();
@@ -593,6 +612,70 @@ test.describe("Mobile Management Flows", () => {
     });
     expect(recreated.circles).toEqual([]);
     expect(recreated.source).toEqual({ type: "csv", fileName: "empty.csv" });
+  });
+
+  test("Flow 7.1: pending GAS同期付き全日程削除の確認と破棄", async ({
+    page,
+  }) => {
+    const pendingEntry = {
+      id: "entry-delete-e2e-01",
+      eventId: "demo-v1",
+      dayId: "day1",
+      sourceGeneration: "gen-e2e-01",
+      gasUrl: GAS_URL,
+      sheetName: "day1",
+      space: "東ア23a",
+      purchased: true,
+      createdAt: "2026-07-23T12:00:00.000Z",
+      attempts: 1,
+      lastError: "http-500",
+    };
+    let postCount = 0;
+    await routeGas(page, async (route) => {
+      if (route.request().method() === "POST") postCount += 1;
+      await route.fulfill({ status: 500, body: "must not send" });
+    });
+    await seedStates(page, [
+      {
+        ref: { eventId: "demo-v1", dayId: "day1" },
+        state: createState({
+          circles: [{ space: "東ア23a" }],
+          purchased: ["東ア23a"],
+          gasOutbox: [pendingEntry],
+        }),
+      },
+    ]);
+
+    await page.goto("/");
+    await openSettings(page);
+    await page.evaluate(() => {
+      localStorage.setItem(
+        "comipath:nav-snapshot:demo-v1:day1",
+        JSON.stringify({ schemaVersion: 1, eventId: "demo-v1", dayId: "day1" }),
+      );
+    });
+    const before = await readState(page, { eventId: "demo-v1", dayId: "day1" });
+    const postCountBeforeDeletion = postCount;
+    await page.getByRole("button", { name: /全日程データの削除/ }).click();
+    const dialog = page.locator("storage-delete-dialog");
+    await expect(dialog).toContainText("未送信GAS同期 1件も破棄されます");
+    await dialog.locator(".btn-cancel").click();
+    await expect(dialog.locator(".modal-overlay")).not.toBeVisible();
+    expect(
+      await readState(page, { eventId: "demo-v1", dayId: "day1" }),
+    ).toEqual(before);
+
+    await page.getByRole("button", { name: /全日程データの削除/ }).click();
+    await confirmDelete(page, "全イベントを削除");
+    expect(
+      await page.evaluate(() =>
+        localStorage.getItem("comipath:nav-snapshot:demo-v1:day1"),
+      ),
+    ).toBeNull();
+    expect(
+      (await readState(page, { eventId: "demo-v1", dayId: "day1" })).gasOutbox,
+    ).toEqual([]);
+    expect(postCount).toBe(postCountBeforeDeletion);
   });
 
   test("Flow 8: CSVエクスポートと非変容・除外ルール検証", async ({ page }) => {
@@ -742,7 +825,7 @@ test.describe("Mobile Management Flows", () => {
     ).toBeVisible();
     await expect(page.locator("outbox-panel h3")).toContainText("(1件)");
     await expect(
-      page.locator(".storage-delete-option button:disabled"),
+      page.locator(".storage-delete-option button:not(:disabled)"),
     ).toHaveCount(4);
     await expect(
       page.locator('source-manager button[data-action="csv-export"]'),

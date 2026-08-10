@@ -6,6 +6,23 @@ interface ImageBox {
   width: number;
   height: number;
 }
+
+export interface MapViewportLayoutInput {
+  viewportWidth: number;
+  viewportMaxHeight: number;
+  minimumInteractiveHeight: number;
+  imageWidth: number;
+  imageHeight: number;
+}
+
+export interface MapViewportLayout {
+  viewportWidth: number;
+  viewportHeight: number;
+  stageWidth: number;
+  stageHeight: number;
+  initialX: number;
+  initialY: number;
+}
 interface PointsPayload {
   image?: { width?: number; height?: number };
   points?: readonly {
@@ -77,6 +94,43 @@ export function calculateContainedImageBox(input: {
   const height = containerHeight;
   const width = height * imageRatio;
   return { left: (containerWidth - width) / 2, top: 0, width, height };
+}
+
+export function calculateMapViewportLayout(
+  input: MapViewportLayoutInput,
+): MapViewportLayout {
+  const naturalHeight =
+    (input.viewportWidth * input.imageHeight) / input.imageWidth;
+  if (naturalHeight < input.minimumInteractiveHeight) {
+    const stageHeight = input.minimumInteractiveHeight;
+    const stageWidth = (stageHeight * input.imageWidth) / input.imageHeight;
+    return {
+      viewportWidth: input.viewportWidth,
+      viewportHeight: stageHeight,
+      stageWidth,
+      stageHeight,
+      initialX: (input.viewportWidth - stageWidth) / 2,
+      initialY: 0,
+    };
+  }
+  if (naturalHeight <= input.viewportMaxHeight) {
+    return {
+      viewportWidth: input.viewportWidth,
+      viewportHeight: naturalHeight,
+      stageWidth: input.viewportWidth,
+      stageHeight: naturalHeight,
+      initialX: 0,
+      initialY: 0,
+    };
+  }
+  return {
+    viewportWidth: input.viewportWidth,
+    viewportHeight: input.viewportMaxHeight,
+    stageWidth: input.viewportWidth,
+    stageHeight: naturalHeight,
+    initialX: 0,
+    initialY: (input.viewportMaxHeight - naturalHeight) / 2,
+  };
 }
 
 export function calculateMapPinSize(input: {

@@ -299,6 +299,7 @@ const validC108Manifest = {
     {
       areaId: "area-a",
       displayName: "Area A",
+      metersPerPixel: 0.1,
       assets: {
         svg: "./area-a/map.svg",
         points: "./area-a/points.json",
@@ -309,6 +310,7 @@ const validC108Manifest = {
     {
       areaId: "area-b",
       displayName: "Area B",
+      metersPerPixel: 0.2,
       assets: {
         svg: "./area-b/map.svg",
         points: "./area-b/points.json",
@@ -319,6 +321,7 @@ const validC108Manifest = {
     {
       areaId: "area-c",
       displayName: "Area C",
+      metersPerPixel: 0.3,
       assets: {
         svg: "./area-c/map.svg",
         points: "./area-c/points.json",
@@ -329,6 +332,7 @@ const validC108Manifest = {
     {
       areaId: "area-d",
       displayName: "Area D",
+      metersPerPixel: 0.4,
       assets: {
         svg: "./area-d/map.svg",
         points: "./area-d/points.json",

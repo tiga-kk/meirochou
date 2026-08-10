@@ -34,6 +34,8 @@ export interface MapBundleAreaV1 {
   pointsFile: string;
   gridMetaFile: string;
   gridFile: string;
+  /** Optional for legacy fictional bundles; required by the strict C108 contract. */
+  metersPerPixel?: number;
 }
 
 export interface MapBundleManifestV1 {
@@ -202,6 +204,7 @@ export interface MapAssetPaths {
 export interface EventMapAreaManifest {
   readonly areaId: string;
   readonly displayName: string;
+  readonly metersPerPixel: number;
   readonly assets: MapAssetPaths;
 }
 

@@ -7,6 +7,7 @@ export interface MapArea {
   readonly name?: string;
   readonly prefixes?: readonly string[];
   readonly labels?: readonly string[];
+  readonly metersPerPixel?: number;
   readonly assets?: RouteMapAssetPaths;
 }
 

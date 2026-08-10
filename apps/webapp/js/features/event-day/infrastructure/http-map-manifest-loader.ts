@@ -69,6 +69,7 @@ export function toRuntimeMapBundleManifest(
         id: area.areaId,
         mapId: area.areaId,
         name: area.displayName,
+        metersPerPixel: area.metersPerPixel,
         prefixes: metadata.prefixes,
         labels: metadata.labels,
         mapFile: new URL(area.assets.svg, bundleBase).href,

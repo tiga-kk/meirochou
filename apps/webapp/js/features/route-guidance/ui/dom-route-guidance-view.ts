@@ -1,14 +1,25 @@
 // @ts-nocheck
 
 import { CustomSelect } from "../../../components/custom-select.js";
+import { parseSpace } from "../../../shared/domain/space-parser";
+import { DomUserNotificationView } from "../../../shared/ui/dom-user-notification-view";
 import {
   DomCircleGalleryView,
   DomCircleProgressView,
 } from "../../circle-status/public-api";
 import { DomRouteMapView } from "./dom-route-map-view";
-import { buildRouteGuidanceScreenModel } from "./route-guidance-screen-model";
-import { parseSpace } from "../../../shared/domain/space-parser";
-import { DomUserNotificationView } from "../../../shared/ui/dom-user-notification-view";
+import {
+  buildRouteGuidanceScreenModel,
+  formatRouteDistance,
+} from "./route-guidance-screen-model";
+
+function hasUsableMapScale(area) {
+  return (
+    typeof area?.metersPerPixel === "number" &&
+    Number.isFinite(area.metersPerPixel) &&
+    area.metersPerPixel > 0
+  );
+}
 
 /**
  * Route guidance DOM view and its adjacent browser-owned controls.
@@ -282,20 +293,39 @@ export class DomRouteGuidanceView {
     });
     const detailTarget = selectedTarget || currentTarget;
     const isPreview = detailTarget.space !== currentTarget.space;
+    const detailRoute = isPreview ? state.selectedRoute : currentRoute;
+    const detailArea = this.mapAreaCatalog.findMapAreaForCircleSpace(
+      detailTarget.space,
+    );
+    const getDistanceLabel = (target, route, area) =>
+      route
+        ? formatRouteDistance(route, area?.metersPerPixel)
+        : hasUsableMapScale(area)
+          ? "距離 -"
+          : buildRouteGuidanceScreenModel({
+              currentDestination: target,
+              nextDestination: null,
+              startSpace,
+            }).distanceLabel;
     const distanceLabel =
       selectionState === "loading"
         ? "距離 計算中"
         : selectionState === "error"
           ? "距離 計算不可"
-          : undefined;
+          : getDistanceLabel(detailTarget, detailRoute, detailArea);
 
     this.els.heading.textContent = currentViewModel.space;
     if (this.els.targetStartSpace)
       this.els.targetStartSpace.textContent = startSpace || "-";
     if (this.els.targetRouteLog) {
-      const currentDistance = currentRoute
-        ? `距離 ${Math.round(currentRoute.cost)}`
-        : currentViewModel.distanceLabel;
+      const currentArea = this.mapAreaCatalog.findMapAreaForCircleSpace(
+        currentTarget.space,
+      );
+      const currentDistance = getDistanceLabel(
+        currentTarget,
+        currentRoute,
+        currentArea,
+      );
       this.els.targetRouteLog.textContent = `${currentDistance} / ${currentViewModel.nextLabel}`;
     }
     this.renderTargetDetails(
@@ -327,14 +357,24 @@ export class DomRouteGuidanceView {
     }
     this.els.routeChangeConfirmation?.classList.toggle("hidden", !comparing);
     if (comparing) {
+      const currentArea = this.mapAreaCatalog.findMapAreaForCircleSpace(
+        currentTarget.space,
+      );
+      const candidateArea = this.mapAreaCatalog.findMapAreaForCircleSpace(
+        detailTarget.space,
+      );
       this.els.routeChangeCurrent.textContent = currentTarget.space;
-      this.els.routeChangeCurrentDistance.textContent = currentRoute
-        ? `距離 ${Math.round(currentRoute.cost)}`
-        : "距離 -";
+      this.els.routeChangeCurrentDistance.textContent = getDistanceLabel(
+        currentTarget,
+        currentRoute,
+        currentArea,
+      );
       this.els.routeChangeCandidate.textContent = detailTarget.space;
-      this.els.routeChangeCandidateDistance.textContent = state.selectedRoute
-        ? `距離 ${Math.round(state.selectedRoute.cost)}`
-        : "距離 -";
+      this.els.routeChangeCandidateDistance.textContent = getDistanceLabel(
+        detailTarget,
+        state.selectedRoute,
+        candidateArea,
+      );
     }
     if (this.els.btnPurchased) this.els.btnPurchased.disabled = comparing;
     if (this.els.btnHold) this.els.btnHold.disabled = comparing;

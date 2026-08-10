@@ -396,10 +396,6 @@ export class LocalStorageEventDayRepository implements EventDayRepository {
       }
     }
 
-    if (currentList.some((item) => item.state.gasOutbox.length > 0)) {
-      throw new Error("Pending outbox entries exist before deletion");
-    }
-
     // Capture raw snapshots of all keys before first write
     const stateSnapshots = new Map<string, string>();
     for (const item of currentList) {

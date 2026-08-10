@@ -2,6 +2,8 @@ import "../components/comipath-settings";
 import "../components/navigation-resume-dialog";
 import "../components/source-diff-dialog";
 import "../components/user-guide-dialog";
+import "../components/async-operation-indicator";
+import type { AsyncOperationStatus } from "../components/async-operation-indicator";
 import {
   DomRouteGuidanceView,
   buildRouteItineraryModel,
@@ -32,7 +34,11 @@ import type {
   PendingGasUpdateRetryOptions,
 } from "../features/circle-status/public-api";
 import type { CircleStatusControllerPort as CircleStatusController } from "../features/circle-status/public-api";
-import type { CircleDataSourceSession, CircleDataSourceController } from "../features/circle-data-source/public-api";
+import type {
+  CircleDataSourceOperation,
+  CircleDataSourceSession,
+  CircleDataSourceController,
+} from "../features/circle-data-source/public-api";
 import type { LocalDataDeletionController } from "../features/local-data-deletion/public-api";
 import type { MapArea, MapAreaCatalog, RouteMapAssetsLoader, RouteGuidanceController } from "../features/route-guidance/public-api";
 import type {
@@ -293,6 +299,7 @@ export class BrowserApplication {
   eventRegistry: EventRegistry | null = null;
   eventRegistryUrl: string | null = null;
   currentManifest: MapBundleManifest | null = null;
+  asyncOperationIndicator: { status: AsyncOperationStatus } | null = null;
 
   constructor(options?: BrowserApplicationOptions) {
     this.started = false;
@@ -347,6 +354,9 @@ export class BrowserApplication {
     this.circleDataSourceSession = baseSession;
     this.session = baseSession;
     this.circleDataSourceController = options.circleDataSourceController;
+    this.asyncOperationIndicator = this.document.getElementById(
+      "async-operation-indicator",
+    ) as { status: AsyncOperationStatus } | null;
     this.ui = new DomRouteGuidanceView(this.routeMapAreaCatalog) as BrowserUi;
     this.activeEventDaySession.subscribe(() => {
       if (this.ui) {
@@ -354,7 +364,8 @@ export class BrowserApplication {
         this.ui.updateCounts?.(this);
       }
     });
-    baseSession.subscribe(() => {
+    baseSession.subscribe((snapshot) => {
+      this.renderAsyncOperationStatus(snapshot);
       if (this.ui && !this.suppressSessionModelUpdates)
         this.updateManagementModels();
     });
@@ -383,6 +394,35 @@ export class BrowserApplication {
     };
     this.eventBindingCleanup = null;
 
+  }
+
+  handleCircleDataSourceOperationComplete(
+    operation: Exclude<CircleDataSourceOperation, "idle">,
+  ): void {
+    const labels = {
+      "gas-sheet-list": "シート一覧を読み込みました",
+      "gas-preview": "GASデータを読み込みました",
+      "csv-preview": "CSVを読み込みました",
+      "apply-preview": "データを保存しました",
+    } as const;
+    if (this.asyncOperationIndicator) {
+      this.asyncOperationIndicator.status = { kind: "success", label: labels[operation] };
+    }
+  }
+
+  private renderAsyncOperationStatus(snapshot: ReturnType<CircleDataSourceSession["getSnapshot"]>): void {
+    const labels = {
+      "gas-sheet-list": "シート一覧を取得中…",
+      "gas-preview": "GASからデータを読み込み中…",
+      "csv-preview": "CSVを読み込み中…",
+      "apply-preview": "読み込み結果を保存中…",
+    } as const;
+    const status: AsyncOperationStatus = snapshot.busy
+      ? { kind: "loading", label: labels[snapshot.operation as keyof typeof labels] }
+      : snapshot.errorCode
+        ? { kind: "error", label: "読み込みに失敗しました" }
+        : { kind: "idle" };
+    if (this.asyncOperationIndicator) this.asyncOperationIndicator.status = status;
   }
 
   showToast(message: string, type?: string) {

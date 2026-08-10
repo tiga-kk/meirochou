@@ -69,7 +69,7 @@ export interface OutboxPanelModel {
   readonly errorMessage: string;
 }
 
-/** Counts used to describe and guard each destructive storage option. */
+/** Counts used to describe each destructive storage option. */
 export interface DeleteOptionInput {
   readonly selected: EventDayRef;
   readonly eventDayCount: number;
@@ -79,13 +79,14 @@ export interface DeleteOptionInput {
   readonly totalPendingCount: number;
 }
 
-/** A destructive option with its current pending-outbox lock state. */
+/** A destructive option with its pending-outbox warning metadata. */
 export interface DeleteOptionViewModel {
   readonly scope: DeleteScope;
   readonly label: string;
   readonly consequence: string;
   readonly blocked: boolean;
   readonly blockedReason: string | null;
+  readonly pendingDiscardCount: number;
 }
 
 export interface SourceManagerPanelModelInput {
@@ -267,8 +268,7 @@ export function buildSourceManagerPanelModel(
     pendingCount,
     canExportCsv: activeCircleCount > 0,
     busy: sourceDraft.busy || input.transitionBusy,
-    errorMessage:
-      sourceDraft.errorMessage || input.sourceErrorMessage || "",
+    errorMessage: sourceDraft.errorMessage || input.sourceErrorMessage || "",
   });
 }
 
@@ -431,6 +431,7 @@ function makeDeleteOption(
   consequence: string,
   blocked: boolean,
   blockedReason: string | null,
+  pendingDiscardCount: number,
 ): DeleteOptionViewModel {
   return Object.freeze({
     scope: freezeDeleteScope(scope),
@@ -438,51 +439,46 @@ function makeDeleteOption(
     consequence,
     blocked,
     blockedReason,
+    pendingDiscardCount,
   });
 }
 
-/** Builds the four destructive options and applies the current outbox lock. */
+/** Builds the four destructive options and reports pending outbox discard counts. */
 export function buildDeleteOptions(
   input: DeleteOptionInput,
 ): readonly DeleteOptionViewModel[] {
-  const selectedBlocked = input.selectedPendingCount > 0;
-  const selectedBlockedReason = selectedBlocked
-    ? "送信待ちのGAS同期があるため削除できません。同期を完了するか廃棄してください。"
-    : null;
-
-  const totalBlocked = input.totalPendingCount > 0;
-  const totalBlockedReason = totalBlocked
-    ? "送信待ちのGAS同期があるため削除できません。同期を完了するか廃棄してください。"
-    : null;
-
   const options: DeleteOptionViewModel[] = [
     makeDeleteOption(
       { type: "circles", ref: input.selected },
       `サークルリストの削除（${input.activeCircleCount}件）`,
       "サークル配置情報を削除し、空のリストにします。購入・チェックの活動履歴は保持されます。",
-      selectedBlocked,
-      selectedBlockedReason,
+      false,
+      null,
+      input.selectedPendingCount,
     ),
     makeDeleteOption(
       { type: "activity", ref: input.selected },
       `購入・チェック履歴の削除（${input.activityCount}件）`,
       "この日の購入済み・チェック状態・操作履歴をすべて消去します。サークル情報と距離行列は保持し、ナビゲーション再開情報は削除します。",
-      selectedBlocked,
-      selectedBlockedReason,
+      false,
+      null,
+      input.selectedPendingCount,
     ),
     makeDeleteOption(
       { type: "event-day", ref: input.selected },
       "この日（データ）の削除",
       "この日程のサークル情報、履歴、距離行列、ナビゲーション再開情報をすべて削除します。",
-      selectedBlocked,
-      selectedBlockedReason,
+      false,
+      null,
+      input.selectedPendingCount,
     ),
     makeDeleteOption(
       { type: "all-events" },
       `全日程データの削除（${input.eventDayCount}日程）`,
       "登録されている全日程のサークル情報・履歴・距離行列・ナビゲーション再開情報を消去し、初期状態に戻します。",
-      totalBlocked,
-      totalBlockedReason,
+      false,
+      null,
+      input.totalPendingCount,
     ),
   ];
 
@@ -495,7 +491,7 @@ export function buildStorageDeleteDialogModel(
 ) {
   const selectedScope = input.selectedScope;
   const activeOption = selectedScope
-    ? input.deleteOptions.find((option) => {
+    ? (input.deleteOptions.find((option) => {
         if (option.scope.type !== selectedScope.type) return false;
         if (selectedScope.type === "all-events") return true;
         if (option.scope.type === "all-events") return false;
@@ -504,7 +500,7 @@ export function buildStorageDeleteDialogModel(
           option.scope.ref.eventId === selectedRef.eventId &&
           option.scope.ref.dayId === selectedRef.dayId
         );
-      }) ?? null
+      }) ?? null)
     : null;
 
   return Object.freeze({

@@ -210,6 +210,7 @@ test("runtime loader adapts C108 assets to absolute runtime paths", async () => 
       {
         areaId: "e456",
         displayName: "東456ホール",
+        metersPerPixel: 270 / 4096,
         assets: {
           svg: "./e456/map.svg",
           points: "./e456/points.json",
@@ -220,6 +221,7 @@ test("runtime loader adapts C108 assets to absolute runtime paths", async () => 
       {
         areaId: "e7",
         displayName: "東7ホール",
+        metersPerPixel: 120 / 1848,
         assets: {
           svg: "./e7/map.svg",
           points: "./e7/points.json",
@@ -230,6 +232,7 @@ test("runtime loader adapts C108 assets to absolute runtime paths", async () => 
       {
         areaId: "s12",
         displayName: "南12ホール",
+        metersPerPixel: 144 / 1872,
         assets: {
           svg: "./s12/map.svg",
           points: "./s12/points.json",
@@ -240,6 +243,7 @@ test("runtime loader adapts C108 assets to absolute runtime paths", async () => 
       {
         areaId: "w12",
         displayName: "西12ホール",
+        metersPerPixel: 180 / 2904,
         assets: {
           svg: "./w12/map.svg",
           points: "./w12/points.json",
@@ -269,6 +273,7 @@ test("runtime loader adapts C108 assets to absolute runtime paths", async () => 
     pointsFile: "http://example.test/assets/maps/C108/e456/points.json",
     gridMetaFile: "http://example.test/assets/maps/C108/e456/grid-meta.json",
     gridFile: "http://example.test/assets/maps/C108/e456/grid.bin",
+    metersPerPixel: 270 / 4096,
   });
 });
 

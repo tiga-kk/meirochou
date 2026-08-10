@@ -81,10 +81,14 @@ describe("CircleDataSourceSession & Management Session State", () => {
 
   it("generates monotonically increasing request generation and validates current request token", () => {
     const session = createCircleDataSourceSession();
-    const gen1 = session.beginRequest();
+    const gen1 = session.beginRequest("gas-preview");
+    expect(session.getSnapshot()).toMatchObject({
+      busy: true,
+      operation: "gas-preview",
+    });
     expect(session.isCurrentRequest(gen1)).toBe(true);
 
-    const gen2 = session.beginRequest();
+    const gen2 = session.beginRequest("gas-sheet-list");
     expect(gen2).toBeGreaterThan(gen1);
     expect(session.isCurrentRequest(gen1)).toBe(false);
     expect(session.isCurrentRequest(gen2)).toBe(true);
@@ -97,13 +101,31 @@ describe("CircleDataSourceSession & Management Session State", () => {
       notifications.push(snap.requestGeneration);
     });
 
-    session.beginRequest();
+    session.beginRequest("gas-preview");
     session.setBusy(false);
 
     expect(notifications).toHaveLength(2);
 
     unsubscribe();
-    session.beginRequest();
+    session.beginRequest("gas-preview");
     expect(notifications).toHaveLength(2); // No new notifications after unsubscribe
+  });
+
+  it("keeps busy and operation consistent on terminal transitions", () => {
+    const session = createCircleDataSourceSession();
+    const snapshots: Array<{ busy: boolean; operation: string }> = [];
+    session.subscribe(({ busy, operation }) => snapshots.push({ busy, operation }));
+
+    session.beginRequest("csv-preview");
+    session.setPreview(null);
+    session.beginRequest("apply-preview");
+    session.setError("network_error");
+
+    expect(snapshots).toEqual([
+      { busy: true, operation: "csv-preview" },
+      { busy: false, operation: "idle" },
+      { busy: true, operation: "apply-preview" },
+      { busy: false, operation: "idle" },
+    ]);
   });
 });

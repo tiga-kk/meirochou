@@ -441,6 +441,7 @@ describe("buildDeleteOptions", () => {
         "サークル配置情報を削除し、空のリストにします。購入・チェックの活動履歴は保持されます。",
       blocked: false,
       blockedReason: null,
+      pendingDiscardCount: 0,
     });
 
     expect(options[1]).toEqual({
@@ -450,6 +451,7 @@ describe("buildDeleteOptions", () => {
         "この日の購入済み・チェック状態・操作履歴をすべて消去します。サークル情報と距離行列は保持し、ナビゲーション再開情報は削除します。",
       blocked: false,
       blockedReason: null,
+      pendingDiscardCount: 0,
     });
 
     expect(options[2]).toEqual({
@@ -459,6 +461,7 @@ describe("buildDeleteOptions", () => {
         "この日程のサークル情報、履歴、距離行列、ナビゲーション再開情報をすべて削除します。",
       blocked: false,
       blockedReason: null,
+      pendingDiscardCount: 0,
     });
 
     expect(options[3]).toEqual({
@@ -468,10 +471,11 @@ describe("buildDeleteOptions", () => {
         "登録されている全日程のサークル情報・履歴・距離行列・ナビゲーション再開情報を消去し、初期状態に戻します。",
       blocked: false,
       blockedReason: null,
+      pendingDiscardCount: 0,
     });
   });
 
-  it("blocks selected delete options when selectedPendingCount > 0 and all-events when totalPendingCount > 0", () => {
+  it("exposes pending counts as warnings without blocking deletion", () => {
     const options = buildDeleteOptions({
       selected: { eventId: "c104", dayId: "day1" },
       eventDayCount: 2,
@@ -482,12 +486,18 @@ describe("buildDeleteOptions", () => {
     });
 
     expect(options).toHaveLength(4);
-    for (const opt of options) {
-      expect(opt.blocked).toBe(true);
-      expect(opt.blockedReason).toBe(
-        "送信待ちのGAS同期があるため削除できません。同期を完了するか廃棄してください。",
-      );
-    }
+    expect(options.slice(0, 3).every((opt) => !opt.blocked)).toBe(true);
+    expect(options.slice(0, 3).every((opt) => opt.blockedReason === null)).toBe(
+      true,
+    );
+    expect(
+      options.slice(0, 3).every((opt) => opt.pendingDiscardCount === 2),
+    ).toBe(true);
+    expect(options[3]).toMatchObject({
+      blocked: false,
+      blockedReason: null,
+      pendingDiscardCount: 2,
+    });
   });
 
   it("does not expose mutable input refs through frozen scopes", () => {
@@ -568,6 +578,30 @@ describe("buildStorageDeleteDialogModel", () => {
     expect(model.option?.label).toContain("購入・チェック履歴の削除");
     expect(model.busy).toBe(true);
     expect(model.errorMessage).toBe("削除エラー");
+  });
+
+  it("passes pending discard count through the dialog model", () => {
+    const options = buildDeleteOptions({
+      selected: { eventId: "c104", dayId: "day1" },
+      eventDayCount: 2,
+      activeCircleCount: 1,
+      activityCount: 3,
+      selectedPendingCount: 3,
+      totalPendingCount: 4,
+    });
+
+    const model = buildStorageDeleteDialogModel({
+      selectedScope: {
+        type: "activity",
+        ref: { eventId: "c104", dayId: "day1" },
+      },
+      deleteOptions: options,
+      eventDayLabel: "コミックマーケット104 1日目 (日)",
+      busy: false,
+      errorMessage: "",
+    });
+
+    expect(model.option?.pendingDiscardCount).toBe(3);
   });
 });
 

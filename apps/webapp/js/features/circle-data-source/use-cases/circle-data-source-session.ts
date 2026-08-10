@@ -4,6 +4,13 @@ import type {
   CircleDataSourceErrorCode,
 } from "../domain/circle-data-source-types";
 
+export type CircleDataSourceOperation =
+  | "idle"
+  | "gas-sheet-list"
+  | "gas-preview"
+  | "csv-preview"
+  | "apply-preview";
+
 export interface CircleDataSourceSessionSnapshot {
   readonly requestGeneration: number;
   readonly draftWebAppUrl: string;
@@ -11,12 +18,13 @@ export interface CircleDataSourceSessionSnapshot {
   readonly sheetNames: readonly string[];
   readonly preview: CircleDataPreview | null;
   readonly busy: boolean;
+  readonly operation: CircleDataSourceOperation;
   readonly errorCode: CircleDataSourceErrorCode | null;
 }
 
 export interface CircleDataSourceSession {
   getSnapshot(): CircleDataSourceSessionSnapshot;
-  beginRequest(): number;
+  beginRequest(operation: Exclude<CircleDataSourceOperation, "idle">): number;
   isCurrentRequest(generation: number): boolean;
   updateDraft(input: CircleDataSourceDraftUpdate): void;
   setSheetNames(sheetNames: readonly string[]): void;
@@ -37,6 +45,7 @@ function createInitialSnapshot(): CircleDataSourceSessionSnapshot {
     sheetNames: [],
     preview: null,
     busy: false,
+    operation: "idle",
     errorCode: null,
   };
 }
@@ -73,11 +82,12 @@ export function createCircleDataSourceSession(): CircleDataSourceSession {
 
   return {
     getSnapshot: snapshot,
-    beginRequest() {
+    beginRequest(operation) {
       current = {
         ...current,
         requestGeneration: current.requestGeneration + 1,
         busy: true,
+        operation,
         errorCode: null,
       };
       notify();
@@ -99,19 +109,20 @@ export function createCircleDataSourceSession(): CircleDataSourceSession {
         ...current,
         sheetNames: Object.freeze([...sheetNames]),
         busy: false,
+        operation: "idle",
       };
       notify();
     },
     setPreview(preview) {
-      current = { ...current, preview, busy: false };
+      current = { ...current, preview, busy: false, operation: "idle" };
       notify();
     },
     setBusy(busy) {
-      current = { ...current, busy };
+      current = { ...current, busy, operation: busy ? "gas-preview" : "idle" };
       notify();
     },
     setError(errorCode) {
-      current = { ...current, errorCode, busy: false };
+      current = { ...current, errorCode, busy: false, operation: "idle" };
       notify();
     },
     reset() {

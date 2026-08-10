@@ -607,6 +607,10 @@ export function parseEventMapBundleManifest(
       areaObj.displayName,
       `${areaPath}.displayName`,
     );
+    const metersPerPixel = positiveNumber(
+      areaObj.metersPerPixel,
+      `${areaPath}.metersPerPixel`,
+    );
     const assetsObj = record(areaObj.assets, `${areaPath}.assets`);
 
     const assets: MapAssetPaths = Object.freeze({
@@ -640,6 +644,7 @@ export function parseEventMapBundleManifest(
       Object.freeze({
         areaId,
         displayName,
+        metersPerPixel,
         assets,
       }),
     );
