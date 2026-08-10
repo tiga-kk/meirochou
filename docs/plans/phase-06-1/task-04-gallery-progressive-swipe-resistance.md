@@ -13,13 +13,13 @@
 - touchmoveごとにDOM geometryを再計算しない。
 - 成功前にcardを永続的に削除しないPhase 6契約を壊さない。
 
-## Files
+## 対象ファイル
 
-**Modify:**
+**変更:**
 - `apps/webapp/js/utils/gesture-zoom-controller.js`
 - `apps/webapp/js/features/circle-status/ui/dom-circle-gallery-view.ts`
 
-**Test:**
+**テスト:**
 - `tests/gallery-swipe-action.test.ts`
 - `tests/e2e/webapp.spec.ts`
 
@@ -41,7 +41,7 @@ purchaseTriggerDistance = visualThreshold / 0.6
 
 Phase 6.1では表示translationだけを非線形化し、この`purchaseTriggerDistance`を短くしない。新実装の購入判定はraw finger movementを使うが、閾値値そのものは上式で現行挙動と等価にする。
 
-## Interfaces
+## インターフェース
 
 ```js
 export function calculateSwipeTranslation(rawDelta, triggerDistance) {
@@ -59,7 +59,7 @@ ratio near trigger           ≈ 0.85-0.95
 
 `abs(rawDelta)`が増えるほど`abs(translation)`は単調増加する。符号は保持する。
 
-## Steps
+## 手順
 
 - [ ] **Step 1: 現行の実効購入閾値をRED testで固定する**
 
