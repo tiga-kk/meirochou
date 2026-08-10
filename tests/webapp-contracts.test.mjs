@@ -1457,11 +1457,14 @@ test("webapp injects route guidance and delegates the start flow to its controll
   assert.doesNotMatch(startFlow, /startRouteGuidanceUseCase/);
 });
 
-test("webapp map rendering avoids a permanently low-resolution transform layer", () => {
+test("webapp map rendering keeps the stage compositor-friendly", () => {
   const css = read("apps/webapp/css/target.css");
   const gestureHelper = read("apps/webapp/js/utils/gesture-zoom-controller.js");
 
-  assert.doesNotMatch(css, /will-change:\s*transform/);
+  assert.match(
+    css,
+    /\.map-transform-layer\s*\{[\s\S]*will-change:\s*transform/,
+  );
   assert.doesNotMatch(
     gestureHelper,
     /style\.willChange\s*=\s*["']transform["']/,

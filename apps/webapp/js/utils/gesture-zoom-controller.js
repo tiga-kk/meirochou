@@ -11,6 +11,9 @@ export class GestureZoomController {
       x: 0,
       y: 0,
     };
+    this.baseX = 0;
+    this.baseY = 0;
+    this.hasExplicitLayout = false;
 
     // 設定値
     this.MIN_SCALE = 1;
@@ -28,8 +31,10 @@ export class GestureZoomController {
     this.layout = {
       containerWidth: 0,
       containerHeight: 0,
-      imageWidth: 0,
-      imageHeight: 0,
+      stageWidth: 0,
+      stageHeight: 0,
+      originLeft: 0,
+      originTop: 0,
     };
 
     this.initialDistance = 0;
@@ -74,16 +79,46 @@ export class GestureZoomController {
   }
 
   refreshLayout() {
+    if (this.hasExplicitLayout) return;
     const containerRect = this.container.getBoundingClientRect();
     const imageRect = this.img.getBoundingClientRect();
     this.layout = {
       containerWidth: containerRect.width,
       containerHeight: containerRect.height,
-      imageWidth:
+      stageWidth:
         this.img.offsetWidth || imageRect.width / this.state.scale || 0,
-      imageHeight:
+      stageHeight:
         this.img.offsetHeight || imageRect.height / this.state.scale || 0,
+      originLeft: containerRect.left,
+      originTop: containerRect.top,
     };
+  }
+
+  setLayout({
+    containerWidth,
+    containerHeight,
+    stageWidth,
+    stageHeight,
+    baseX = 0,
+    baseY = 0,
+  }) {
+    if (
+      ![containerWidth, containerHeight, stageWidth, stageHeight].every(
+        Number.isFinite,
+      )
+    )
+      return;
+    this.hasExplicitLayout = true;
+    this.layout = {
+      ...this.layout,
+      containerWidth,
+      containerHeight,
+      stageWidth,
+      stageHeight,
+    };
+    this.baseX = Number.isFinite(baseX) ? baseX : 0;
+    this.baseY = Number.isFinite(baseY) ? baseY : 0;
+    this.reset();
   }
 
   updateTransform() {
@@ -110,7 +145,7 @@ export class GestureZoomController {
   }
 
   reset() {
-    this.state = { scale: 1, x: 0, y: 0 };
+    this.state = { scale: 1, x: this.baseX, y: this.baseY };
     this.vx = 0;
     this.vy = 0;
     this.activePointers.clear();
@@ -146,9 +181,27 @@ export class GestureZoomController {
     }
   }
 
+  getXBounds() {
+    const width = this.layout.stageWidth * this.state.scale;
+    return width >= this.layout.containerWidth
+      ? [this.layout.containerWidth - width, 0]
+      : [this.baseX, this.baseX];
+  }
+
+  getYBounds() {
+    const height = this.layout.stageHeight * this.state.scale;
+    return height >= this.layout.containerHeight
+      ? [this.layout.containerHeight - height, 0]
+      : [this.baseY, this.baseY];
+  }
+
+  applyPan(value, [min, max]) {
+    return this.hasExplicitLayout ? applyRubberBand(value, min, max) : value;
+  }
+
   startInertia() {
-    const curW = this.layout.imageWidth * this.state.scale;
-    const curH = this.layout.imageHeight * this.state.scale;
+    const curW = this.layout.stageWidth * this.state.scale;
+    const curH = this.layout.stageHeight * this.state.scale;
     const winW = this.layout.containerWidth;
     const winH = this.layout.containerHeight;
     const outOfBounds =
@@ -175,8 +228,8 @@ export class GestureZoomController {
     this.state.x += this.vx;
     this.state.y += this.vy;
 
-    const curW = this.layout.imageWidth * this.state.scale;
-    const curH = this.layout.imageHeight * this.state.scale;
+    const curW = this.layout.stageWidth * this.state.scale;
+    const curH = this.layout.stageHeight * this.state.scale;
     const winW = this.layout.containerWidth;
     const winH = this.layout.containerHeight;
 
@@ -229,6 +282,13 @@ export class GestureZoomController {
   handlePointerDown(e) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     this.cancelAnimation();
+    if (!this.hasExplicitLayout) {
+      this.refreshLayout();
+    } else {
+      const rect = this.container.getBoundingClientRect();
+      this.layout.originLeft = rect.left;
+      this.layout.originTop = rect.top;
+    }
     this.activePointers.set(e.pointerId, {
       x: e.clientX,
       y: e.clientY,
@@ -266,8 +326,8 @@ export class GestureZoomController {
     if (this.activePointers.size === 1) {
       const dx = e.clientX - previous.x;
       const dy = e.clientY - previous.y;
-      this.state.x += dx;
-      this.state.y += dy;
+      this.state.x = this.applyPan(this.state.x + dx, this.getXBounds());
+      this.state.y = this.applyPan(this.state.y + dy, this.getYBounds());
       this.vx = dx;
       this.vy = dy;
       this.scheduleTransform();
@@ -293,9 +353,8 @@ export class GestureZoomController {
         this.MAX_SCALE,
       ),
     );
-    const containerRect = this.container.getBoundingClientRect();
-    const relX = currentCenter.x - containerRect.left;
-    const relY = currentCenter.y - containerRect.top;
+    const relX = currentCenter.x - this.layout.originLeft;
+    const relY = currentCenter.y - this.layout.originTop;
     const imgX = relX - this.state.x;
     const imgY = relY - this.state.y;
     const scaleRatio = newScale / this.state.scale;
@@ -355,6 +414,18 @@ export class GestureZoomController {
     this.updateTransform();
     this.rafId = requestAnimationFrame(() => this.animate());
   }
+}
+
+export function applyRubberBand(value, min, max, overscrollLimit = 32) {
+  if (min > max) [min, max] = [max, min];
+  if (value >= min && value <= max) return value;
+  const limit = Math.max(0, overscrollLimit);
+  if (!limit) return Math.max(min, Math.min(value, max));
+  const edge = value < min ? min : max;
+  const overflow = Math.abs(value - edge);
+  return (
+    edge + (Math.sign(value - edge) * (limit * overflow)) / (limit + overflow)
+  );
 }
 
 /**

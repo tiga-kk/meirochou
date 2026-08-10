@@ -1,6 +1,9 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GestureZoomController } from "../apps/webapp/js/utils/gesture-zoom-controller.js";
+import {
+  applyRubberBand,
+  GestureZoomController,
+} from "../apps/webapp/js/utils/gesture-zoom-controller.js";
 
 type RafCallback = (time: number) => void;
 
@@ -186,6 +189,35 @@ describe("GestureZoomController", () => {
     expect(controller.vy).toBe(0);
     expect(controller.rafId).toBeNull();
     expect(image.style.transform).toContain("translate3d(0px, 0px, 0)");
+  });
+
+  it("resets to the configured base transform after pan and zoom", () => {
+    const { container, controller } = createController();
+
+    controller.setLayout({
+      containerWidth: 100,
+      containerHeight: 100,
+      stageWidth: 300,
+      stageHeight: 100,
+      baseX: -100,
+      baseY: 0,
+    });
+    controller.setTransform({ scale: 3, x: -240, y: -80 });
+    controller.reset();
+
+    expect(controller.state).toEqual({ scale: 1, x: -100, y: 0 });
+    expect(controller.baseX).toBe(-100);
+    expect(controller.baseY).toBe(0);
+    expect(container.getBoundingClientRect).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies bounded resistance outside pan limits", () => {
+    const slightlyOutside = applyRubberBand(10, -200, 0, 32);
+    const farOutside = applyRubberBand(200, -200, 0, 32);
+
+    expect(slightlyOutside).toBeGreaterThan(0);
+    expect(farOutside).toBeLessThanOrEqual(32);
+    expect(farOutside - slightlyOutside).toBeLessThan(190);
   });
 
   it("uses cached dimensions during inertia frames", () => {

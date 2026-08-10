@@ -4,9 +4,9 @@ import { GestureZoomController } from "../../../utils/gesture-zoom-controller.js
 import {
   buildMapPins,
   buildMapPointIndex,
-  calculateContainedImageBox,
   calculateFitTransform,
   calculateMapPinSize,
+  calculateMapViewportLayout,
   calculateNativeImageScale,
 } from "./route-map-pin-model";
 import { buildRouteOverlaySvg } from "./route-overlay-svg";
@@ -83,6 +83,7 @@ export class DomRouteMapView {
     this.lastNavigationTarget = null;
     this.lastNavigationContext = null;
     this.navigationMapImageLoadListenerAttached = false;
+    this.navigationMapResizeObserver = null;
 
     this.init();
   }
@@ -108,6 +109,12 @@ export class DomRouteMapView {
         this.els.navigationMap,
         this.els.navigationMapLayer,
       );
+      if (typeof ResizeObserver === "function") {
+        this.navigationMapResizeObserver = new ResizeObserver(() => {
+          this.applyViewportLayout();
+        });
+        this.navigationMapResizeObserver.observe(this.els.navigationMap);
+      }
     }
 
     if (
@@ -155,6 +162,7 @@ export class DomRouteMapView {
       this.els.navigationMapImage.src = area.mapFile;
       this.els.navigationMapImage.alt = `${area.name} 配置図`;
       this.resetPinLayerBox();
+      this.zoomHelper?.reset();
     }
     if (this.els.navigationMap)
       this.els.navigationMap.classList.remove("hidden");
@@ -178,36 +186,53 @@ export class DomRouteMapView {
     const pinLayer = this.els.pinLayer;
     if (!layer || !image || !pinLayer) return;
 
-    const containerWidth = layer.clientWidth;
-    const containerHeight = layer.clientHeight;
     const imageWidth = image.naturalWidth;
-    const imageHeight = image.naturalHeight;
 
-    if (!containerWidth || !containerHeight || !imageWidth || !imageHeight) {
+    if (!imageWidth || !image.naturalHeight) {
       this.resetPinLayerBox();
       return;
     }
 
-    const box = calculateContainedImageBox({
-      containerWidth,
-      containerHeight,
-      imageWidth,
-      imageHeight,
-    });
-
-    pinLayer.style.left = `${box.left}px`;
-    pinLayer.style.top = `${box.top}px`;
-    pinLayer.style.right = "auto";
-    pinLayer.style.bottom = "auto";
-    pinLayer.style.width = `${box.width}px`;
-    pinLayer.style.height = `${box.height}px`;
-
     this.zoomHelper?.setMaxScale(
       calculateNativeImageScale({
         imageWidth,
-        renderedWidth: box.width,
+        renderedWidth: layer.clientWidth,
       }),
     );
+  }
+
+  applyViewportLayout() {
+    const viewport = this.els.navigationMap;
+    const stage = this.els.navigationMapLayer;
+    const image = this.els.navigationMapImage;
+    if (!viewport || !stage || !image?.naturalWidth || !image.naturalHeight)
+      return;
+
+    const viewportWidth =
+      viewport.clientWidth || viewport.getBoundingClientRect().width;
+    if (!viewportWidth) return;
+    const layout = calculateMapViewportLayout({
+      viewportWidth,
+      viewportMaxHeight: 520,
+      minimumInteractiveHeight: 220,
+      imageWidth: image.naturalWidth,
+      imageHeight: image.naturalHeight,
+    });
+    viewport.style.height = `${layout.viewportHeight}px`;
+    stage.style.width = `${layout.stageWidth}px`;
+    stage.style.height = `${layout.stageHeight}px`;
+    stage.style.left = "0";
+    stage.style.top = "0";
+    this.els.pinLayer?.style.setProperty("inset", "0");
+    this.zoomHelper?.setLayout({
+      containerWidth: layout.viewportWidth,
+      containerHeight: layout.viewportHeight,
+      stageWidth: layout.stageWidth,
+      stageHeight: layout.stageHeight,
+      baseX: layout.initialX,
+      baseY: layout.initialY,
+    });
+    this.updatePinLayerBox();
   }
 
   async loadPointIndex(area) {
@@ -301,6 +326,7 @@ export class DomRouteMapView {
     this.lastNavigationTarget = currentTarget;
     this.lastNavigationContext = context;
     const area = this.updateMap(currentTarget?.space || "");
+    this.applyViewportLayout();
     this.updatePinLayerBox();
     const renderToken = ++this.renderToken;
 
