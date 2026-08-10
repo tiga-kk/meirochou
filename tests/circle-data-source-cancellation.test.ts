@@ -3,6 +3,7 @@ import { CircleDataSourceController } from "../apps/webapp/js/features/circle-da
 import type { CancelableRequest } from "../apps/webapp/js/features/circle-data-source/use-cases/cancelable-request";
 import { createCircleDataSourceSession } from "../apps/webapp/js/features/circle-data-source/use-cases/circle-data-source-session";
 import type { GoogleSheetCircleClient } from "../apps/webapp/js/features/circle-data-source/use-cases/google-sheet-circle-client";
+import type { CircleDataPreview } from "../apps/webapp/js/features/circle-data-source/domain/circle-data-source-types";
 
 describe("CircleDataSourceController", () => {
   it("cancels an in-flight request on stop and ignores its result", async () => {
@@ -32,5 +33,72 @@ describe("CircleDataSourceController", () => {
 
     expect(cancelCount).toBe(1);
     expect(session.getSnapshot().sheetNames).toEqual([]);
+  });
+
+  it("reaches csv-preview and apply-preview through controller paths", async () => {
+    const preview = {
+      previewId: "preview-1",
+      ref: { eventId: "c104", dayId: "day1" },
+      mode: "initial",
+      expectedSourceGeneration: "gen-1",
+      diff: { added: [], updated: [], removed: [], unchanged: [] },
+      newCircles: [],
+      fetchedAt: "2026-08-10T00:00:00.000Z",
+      expiresAt: "2026-08-10T01:00:00.000Z",
+    } as CircleDataPreview;
+    const session = createCircleDataSourceSession();
+    const operations: string[] = [];
+    const controller = new CircleDataSourceController({
+      client: {
+        startLoadingSheetNames: vi.fn(),
+        startLoadingCircles: vi.fn(),
+      },
+      session,
+      previewCsvImport: { execute: vi.fn(() => preview) },
+      applyCircleDataPreview: { execute: vi.fn(async () => ({} as never)) },
+      onOperationComplete: (operation) => operations.push(operation),
+    });
+
+    await controller.handleCsvFile(
+      { eventId: "c104", dayId: "day1" },
+      "circles.csv",
+      "space,priority\n東A-01a,1",
+    );
+    await controller.applyPreview("preview-1");
+
+    expect(operations).toEqual(["csv-preview", "apply-preview"]);
+  });
+
+  it("does not report apply success after cancellation", async () => {
+    let resolveApply: (() => void) | undefined;
+    const session = createCircleDataSourceSession();
+    const operations: string[] = [];
+    const preview = {
+      previewId: "preview-1",
+      ref: { eventId: "c104", dayId: "day1" },
+      mode: "initial",
+      expectedSourceGeneration: "gen-1",
+      diff: { added: [], updated: [], removed: [], unchanged: [] },
+      newCircles: [],
+      fetchedAt: "2026-08-10T00:00:00.000Z",
+      expiresAt: "2026-08-10T01:00:00.000Z",
+    } as CircleDataPreview;
+    session.setPreview(preview);
+    const controller = new CircleDataSourceController({
+      client: { startLoadingSheetNames: vi.fn(), startLoadingCircles: vi.fn() },
+      session,
+      applyCircleDataPreview: {
+        execute: vi.fn(() => new Promise((resolve) => { resolveApply = () => resolve({} as never); })),
+      },
+      onOperationComplete: (operation) => operations.push(operation),
+    });
+
+    const applying = controller.applyPreview("preview-1");
+    controller.cancelCurrentRequest();
+    resolveApply?.();
+    await applying;
+
+    expect(operations).toEqual([]);
+    expect(session.getSnapshot()).toMatchObject({ busy: false, operation: "idle" });
   });
 });

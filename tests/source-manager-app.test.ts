@@ -54,6 +54,7 @@ function setupDOM() {
     <button id="btn-redo"></button>
     <button id="btn-reset-all"></button>
     <div id="toast"></div>
+    <async-operation-indicator id="async-operation-indicator"></async-operation-indicator>
     <span id="count-e456"></span>
     <span id="count-e7"></span>
     <span id="count-w12"></span>
@@ -130,7 +131,7 @@ describe("CircleDataSource Orchestration & App Integration", () => {
 
     const reqPromise = controller.loadGoogleSheetNames(validUrl);
     // Simulate generation shift by starting another request
-    session.beginRequest();
+    session.beginRequest("gas-preview");
 
     resolveSheetNames(["SheetA", "SheetB"]);
     await reqPromise;
@@ -245,7 +246,7 @@ describe("CircleDataSource Orchestration & App Integration", () => {
     const session = createCircleDataSourceSession();
     session.setError("network_error");
 
-    session.beginRequest();
+    session.beginRequest("gas-preview");
     expect(session.getSnapshot().errorMessage).toBeNull();
   });
 
@@ -272,6 +273,17 @@ describe("CircleDataSource Orchestration & App Integration", () => {
     const session = app.session;
     session.setSheetNames(["Day1", "Day2"]);
     expect(session.getSnapshot().sheetNames).toEqual(["Day1", "Day2"]);
+  });
+
+  it("renders session loading in the always-visible async indicator", async () => {
+    app.session.beginRequest("gas-preview");
+    await (document.querySelector("async-operation-indicator") as HTMLElement & {
+      updateComplete: Promise<unknown>;
+    }).updateComplete;
+
+    expect(document.querySelector("async-operation-indicator")?.textContent).toContain(
+      "GASからデータを読み込み中",
+    );
   });
 
   it("keeps a typed GAS URL when a sheet-list session update rerenders the panel", async () => {

@@ -8,7 +8,10 @@ import type { CircleDataPreview } from "../domain/circle-data-source-types";
 import type { ApplyCircleDataPreviewUseCase } from "../use-cases/apply-circle-data-preview";
 import type { CancelCircleDataPreviewUseCase } from "../use-cases/cancel-circle-data-preview";
 import type { CancelableRequest } from "../use-cases/cancelable-request";
-import type { CircleDataSourceSession } from "../use-cases/circle-data-source-session";
+import type {
+  CircleDataSourceOperation,
+  CircleDataSourceSession,
+} from "../use-cases/circle-data-source-session";
 import type { ExportCirclesToCsvUseCase } from "../use-cases/export-circles-to-csv";
 import type {
   GoogleSheetCircleClient,
@@ -32,6 +35,9 @@ export interface CircleDataSourceControllerDependencies {
   readonly activeEventDaySession?: ActiveEventDaySession;
   readonly targetElement?: HTMLElement | Window | Document;
   readonly diffDialogElement?: HTMLElement | Window | Document;
+  readonly onOperationComplete?: (
+    operation: Exclude<CircleDataSourceOperation, "idle">,
+  ) => void;
 }
 
 function parseGasUrl(value: unknown): string {
@@ -196,8 +202,20 @@ export class CircleDataSourceController {
     ref: EventDayRef,
     file: File,
   ): Promise<CircleDataPreview | null> {
-    const text = await file.text();
-    return this.handleCsvFile(ref, file.name, text);
+    if (this.stopped || !this.deps.previewCsvImport) return null;
+    this.cancelCurrentRequest();
+    const sequence = ++this.requestSequence;
+    const generation = this.deps.session.beginRequest("csv-preview");
+    this.deps.view?.showLoading();
+    try {
+      const text = await file.text();
+      return this.executeCsvPreview(ref, file.name, text, sequence, generation);
+    } catch (err: unknown) {
+      if (this.isCurrent(sequence, generation)) this.deps.session.setError("invalid_csv");
+      const message = err instanceof Error ? err.message : "CSV preview failed";
+      this.deps.view?.showError(message);
+      throw err;
+    }
   }
 
   async handleCsvFile(
@@ -206,21 +224,33 @@ export class CircleDataSourceController {
     text: string,
   ): Promise<CircleDataPreview | null> {
     if (this.stopped || !this.deps.previewCsvImport) return null;
+    this.cancelCurrentRequest();
+    const sequence = ++this.requestSequence;
+    const generation = this.deps.session.beginRequest("csv-preview");
+    this.deps.view?.showLoading();
     try {
-      this.deps.view?.showLoading();
-      const preview = this.deps.previewCsvImport.execute({
-        eventDay: ref,
-        fileName,
-        text,
-      });
-      this.deps.session.setPreview(preview);
-      this.deps.view?.showPreview(preview);
-      return preview;
+      return this.executeCsvPreview(ref, fileName, text, sequence, generation);
     } catch (err: unknown) {
+      this.deps.session.setError("invalid_csv");
       const message = err instanceof Error ? err.message : "CSV preview failed";
       this.deps.view?.showError(message);
       throw err;
     }
+  }
+
+  private executeCsvPreview(
+    ref: EventDayRef,
+    fileName: string,
+    text: string,
+    sequence: number,
+    generation: number,
+  ): CircleDataPreview | null {
+    if (!this.isCurrent(sequence, generation) || !this.deps.previewCsvImport) return null;
+    const preview = this.deps.previewCsvImport.execute({ eventDay: ref, fileName, text });
+    this.deps.session.setPreview(preview);
+    this.deps.view?.showPreview(preview);
+    this.deps.onOperationComplete?.("csv-preview");
+    return preview;
   }
 
   async handleGasPreviewRequest(
@@ -235,10 +265,11 @@ export class CircleDataSourceController {
         source,
       });
       let preview: CircleDataPreview | null = null;
-      await this.runRequest(request, (value) => {
+      await this.runRequest(request, "gas-preview", (value) => {
         preview = value;
         this.deps.session.setPreview(value);
         this.deps.view?.showPreview(value);
+        this.deps.onOperationComplete?.("gas-preview");
       });
       return preview;
     } catch (err: unknown) {
@@ -256,13 +287,22 @@ export class CircleDataSourceController {
     }
     try {
       this.deps.view?.showLoading();
+      this.cancelCurrentRequest();
+      const sequence = ++this.requestSequence;
+      const generation = this.deps.session.beginRequest("apply-preview");
       await this.deps.applyCircleDataPreview.execute({
         previewId: preview.previewId,
         preview,
       });
-      this.deps.session.setPreview(null);
-      this.deps.view?.showReady();
+      if (this.isCurrent(sequence, generation)) {
+        this.deps.session.setPreview(null);
+        this.deps.view?.showReady();
+        this.deps.onOperationComplete?.("apply-preview");
+      }
     } catch (err: unknown) {
+      if (this.deps.session.getSnapshot().operation === "apply-preview") {
+        this.deps.session.setError("stale_generation");
+      }
       const message =
         err instanceof Error ? err.message : "Apply preview failed";
       this.deps.view?.showError(message);
@@ -289,7 +329,11 @@ export class CircleDataSourceController {
     const url = parseGasUrl(webAppUrl);
     await this.runRequest(
       this.deps.client.startLoadingSheetNames(url),
-      (sheets) => this.deps.session.setSheetNames(this.parseStringList(sheets)),
+      "gas-sheet-list",
+      (sheets) => {
+        this.deps.session.setSheetNames(this.parseStringList(sheets));
+        this.deps.onOperationComplete?.("gas-sheet-list");
+      },
     );
   }
 
@@ -300,6 +344,7 @@ export class CircleDataSourceController {
     let circles: readonly CircleRecord[] = [];
     await this.runRequest(
       this.deps.client.startLoadingCircles(parsed),
+      "gas-preview",
       (value) => {
         circles = value;
       },
@@ -339,11 +384,12 @@ export class CircleDataSourceController {
 
   private async runRequest<T>(
     request: CancelableRequest<T>,
+    operation: Exclude<CircleDataSourceOperation, "idle">,
     onSuccess: (value: T) => void,
   ): Promise<void> {
     this.cancelCurrentRequest();
     const sequence = ++this.requestSequence;
-    const generation = this.deps.session.beginRequest();
+    const generation = this.deps.session.beginRequest(operation);
     this.currentRequest = request as CancelableRequest<unknown>;
     try {
       const value = await request.result;
@@ -368,5 +414,13 @@ export class CircleDataSourceController {
         this.currentRequest = null;
       }
     }
+  }
+
+  private isCurrent(sequence: number, generation: number): boolean {
+    return (
+      !this.stopped &&
+      sequence === this.requestSequence &&
+      this.deps.session.isCurrentRequest(generation)
+    );
   }
 }

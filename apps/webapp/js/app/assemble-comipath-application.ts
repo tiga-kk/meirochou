@@ -224,6 +224,8 @@ export function assembleComiPathApplication(
       typeof options.document.getElementById === "function"
         ? (options.document.getElementById("source-diff-dialog") ?? undefined)
         : undefined,
+    onOperationComplete: (operation) =>
+      browserRuntime?.handleCircleDataSourceOperationComplete(operation),
   });
 
   const routeGuidanceSession = createRouteGuidanceSession();

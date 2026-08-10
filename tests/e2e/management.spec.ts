@@ -322,6 +322,8 @@ test.describe("Mobile Management Flows", () => {
 
   test("Flow 4: GASの初期インポート・置換・リフレッシュ", async ({ page }) => {
     let getCallCount = 0;
+    let delayPreview = false;
+    let releasePreview: (() => void) | null = null;
     await routeGas(page, async (route) => {
       if (route.request().method() !== "GET") {
         await route.continue();
@@ -341,6 +343,11 @@ test.describe("Mobile Management Flows", () => {
           }),
         });
         return;
+      }
+      if (delayPreview) {
+        await new Promise<void>((resolve) => {
+          releasePreview = resolve;
+        });
       }
       await route.fulfill({
         status: 200,
@@ -367,12 +374,24 @@ test.describe("Mobile Management Flows", () => {
     await expect(sourceManager.locator("#gas-sheet-select")).toBeVisible();
     expect(getCallCount).toBe(1);
 
+    delayPreview = true;
     await sourceManager.locator('button[data-action="gas-preview"]').click();
+    await expect(page.locator("async-operation-indicator")).toContainText(
+      "GASからデータを読み込み中…",
+    );
+    releasePreview?.();
+    delayPreview = false;
     const diffDialog = page.locator("#source-diff-dialog");
     const diffOverlay = diffDialog.locator(".source-diff-dialog-overlay");
     await expect(diffOverlay).toBeVisible();
+    await expect(page.locator("async-operation-indicator")).toContainText(
+      "GASデータを読み込みました",
+    );
     await diffDialog.locator('button[data-action="apply"]').click();
     await expect(diffOverlay).not.toBeVisible();
+    await expect(page.locator("async-operation-indicator")).toContainText(
+      "データを保存しました",
+    );
     await expect(sourceManager).toContainText("Googleスプレッドシート");
 
     await sourceManager.locator('button[data-action="gas-preview"]').click();
