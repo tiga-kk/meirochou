@@ -15,21 +15,21 @@
 - route計算やALNSへviewer geometryを混ぜない。
 - responsive layoutで求めた初期中央位置を`reset()`時に`x=0,y=0`へ失わない。
 
-## Files
+## 対象ファイル
 
-**Modify:**
+**変更:**
 - `apps/webapp/index.html`
 - `apps/webapp/css/target.css`
 - `apps/webapp/js/features/route-guidance/ui/dom-route-map-view.ts`
 - `apps/webapp/js/features/route-guidance/ui/route-map-pin-model.ts`
 - `apps/webapp/js/utils/gesture-zoom-controller.js`
 
-**Test:**
+**テスト:**
 - `tests/gesture-zoom-controller.test.ts`
 - `tests/route-map-viewport-layout.test.ts`（新規。既存model testへ統合する場合は同じ契約を保持）
 - `tests/e2e/webapp.spec.ts`
 
-## Interfaces
+## インターフェース
 
 純粋geometry helperをRoute Guidance UI model側へ置く。
 
@@ -95,7 +95,7 @@ export function applyRubberBand(value, min, max, overscrollLimit = 32) {}
 
 このとき`initialX`/`initialY`は単なる初回描画値ではなく、scale 1のbase transformとして保持する。`reset()`/`resetZoom()`は常に`{ scale: 1, x: baseX, y: baseY }`へ戻る。横長・縦長mapで`{1,0,0}`へ戻して中央寄せを壊さない。
 
-## Steps
+## 手順
 
 - [ ] **Step 1: viewport geometryのRED unit testを書く**
 
