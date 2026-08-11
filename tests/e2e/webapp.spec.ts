@@ -665,8 +665,12 @@ test("設定画面の開閉やソース閲覧時に明示的な取得なしにGA
   await page.goto("/");
 
   await page.locator("#toggle-settings").click();
-  await page.locator("#settings-area .management-detail-surface > summary").click();
-  await expect(page.locator("source-manager")).toBeVisible();
+  const selectedRow = page.locator(
+    'event-day-management-view .event-day-management-row[aria-current="true"]',
+  );
+  await selectedRow.locator('button[data-action="detail"]').click();
+  await expect(page.locator("#settings-area .management-detail-pane")).toBeVisible();
+  await expect(page.locator(".source-manager-panel")).toBeVisible();
   expect(requestCount).toBe(0);
 });
 
