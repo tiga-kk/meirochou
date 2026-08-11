@@ -406,15 +406,21 @@ test.describe("Mobile Management Flows", () => {
     ]);
 
     await page.goto("/");
-    await openSettings(page);
+    await openSettingsOverview(page);
     const rows = page.locator("event-day-management-view .event-day-management-row");
-    await rows.nth(1).locator('button[data-action="open"]').click();
+    await rows.nth(1).locator('button[data-action="detail"]').click();
+    await page.locator('.management-detail-actions [data-action="open"]').click();
     await expect(page.locator("#settings-area")).toBeHidden();
 
-    await openSettings(page);
-    await expect(page.locator("source-manager h3")).toContainText("day2");
+    await openSettingsOverview(page);
+    const reopenedRows = page.locator(
+      "event-day-management-view .event-day-management-row",
+    );
+    await reopenedRows.nth(0).locator('button[data-action="detail"]').click();
 
-    await rows.nth(0).locator('button[data-action="refresh"]').click();
+    await page
+      .locator('.management-detail-actions [data-action="refresh"]')
+      .click();
     await expect(page.locator("source-manager h3")).toContainText("day1");
     await expect(
       page.locator("#source-diff-dialog .source-diff-dialog-overlay"),

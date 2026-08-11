@@ -206,6 +206,16 @@ export class ComipathSettings extends LitElement {
     this.detailOpen = true;
   }
 
+  private handleEventDaySelect(event: Event): void {
+    const ref = (event as CustomEvent<EventDayRef>).detail;
+    if (!ref) return;
+    if (
+      this.eventDayManagementRows.some((row) => this.sameRef(row.ref, ref))
+    ) {
+      this.detailRef = { ...ref };
+    }
+  }
+
   private closeDetail(): void {
     this.detailOpen = false;
   }
@@ -274,6 +284,7 @@ export class ComipathSettings extends LitElement {
           .selectedDayId=${this.selectedDayId}
           ?busy=${this.busy}
           .errorMessage=${this.errorMessage}
+          @event-day-select=${this.handleEventDaySelect}
         ></event-day-selector>
         <source-manager .model=${this.sourceManagerModel}></source-manager>
         <outbox-panel .model=${this.outboxPanelModel}></outbox-panel>

@@ -77,6 +77,40 @@ test("settings shell renders event-day-selector and circle-data-source-panel chi
   assert.match(element.textContent || "", /circles\.csv/);
 });
 
+test("selector event follows the selected day in the management detail", async () => {
+  const element = new ComipathSettings();
+  element.eventDayManagementRows = [
+    selectedManagementRow,
+    {
+      ...selectedManagementRow,
+      ref: { eventId: "c104", dayId: "day2" },
+      dayLabel: "2日目 (月)",
+      selected: false,
+    },
+  ];
+  element.detailRef = selectedManagementRow.ref;
+  element.detailOpen = true;
+  document.body.appendChild(element);
+  await element.updateComplete;
+
+  element
+    .querySelector("event-day-selector")
+    ?.dispatchEvent(
+      new CustomEvent("event-day-select", {
+        bubbles: true,
+        composed: true,
+        detail: { eventId: "c104", dayId: "day2" },
+      }),
+    );
+  await element.updateComplete;
+
+  expect(element.detailRef).toEqual({ eventId: "c104", dayId: "day2" });
+  expect(element.querySelector(".management-detail-summary")?.textContent).toContain(
+    "2日目 (月)",
+  );
+  element.remove();
+});
+
 test("settings shell renders enabled delete options and emits only their scope", async () => {
   const element = new ComipathSettings();
   const deleteOption: DeleteOptionViewModel = {
