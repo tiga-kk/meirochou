@@ -8,6 +8,8 @@ Cloudflare Pagesがbranch/commitごとに生成するpreview deploymentを無期
 
 ## まず増加を止める
 
+### 1. Preview branch control
+
 Cloudflare PagesのGit連携では、Preview branch controlで自動preview対象を制限できる。
 
 推奨:
@@ -21,13 +23,30 @@ exclude: docs/*, chore/*
 
 実際に使うbranch namingに合わせてincludeを狭くする。docs-only branchのpreviewが不要なら`docs/*`はCloudflare側で除外する。
 
+### 2. Build watch paths
+
+branchだけでなく変更pathも絞る。Cloudflare PagesのBuild watch pathsでdocs-only pushをbuild対象外にできる。
+
+基本案:
+
+```text
+Include paths: *
+Exclude paths: docs/*
+```
+
+ただし`.github/`、scripts、config変更がwebapp buildへ影響することがあるため、それらを一律excludeしない。`docs/*`のようにproduction artifactへ影響しないことが明確なpathだけから始める。
+
+この設定により、`feature/*` branch上でも変更がdocsだけなら不要なPages buildを抑制できる。
+
+### 3. 単発skip
+
 単発でbuild不要なcommitはcommit message先頭へCloudflare Pagesのskip markerを使える。
 
 ```text
 [CF-Pages-Skip] docs: update implementation plan
 ```
 
-ただし人手で毎回付け忘れるため、恒常運用はbranch controlを主とする。
+ただし人手で毎回付け忘れるため、恒常運用はbranch control + build watch pathsを主とする。
 
 ## 手動cleanup
 
@@ -175,10 +194,11 @@ DELETE /accounts/{account_id}/pages/projects/{project_name}/deployments/{deploym
 ## 導入順序
 
 1. DashboardのPreview branch controlをCustomへ変更し、不要branchの新規previewを止める。
-2. Wrangler `deployment list --json`で現状を把握する。
-3. 古いpreviewを数件だけ手動削除し、branch latestが残ることを確認する。
-4. 1〜2週間運用してretention `7 days`が短すぎないか確認する。
-5. 問題なければdry-run scriptをrepoへ追加する。
-6. dry-run output review後にweekly `--apply`を有効化する。
+2. Build watch pathsで`docs/*`だけの変更をskipする。
+3. Wrangler `deployment list --json`で現状を把握する。
+4. 古いpreviewを数件だけ手動削除し、branch latestが残ることを確認する。
+5. 1〜2週間運用してretention `7 days`が短すぎないか確認する。
+6. 問題なければdry-run scriptをrepoへ追加する。
+7. dry-run output review後にweekly `--apply`を有効化する。
 
 この運用はapp feature Phaseとは別PRにする。
