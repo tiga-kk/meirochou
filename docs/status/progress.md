@@ -13,8 +13,8 @@
 - Phase 6: 完了・`main`へmerge済み
 - Phase 6.1: 完了・`main`へmerge済み
 - Phase 7: 完了・`main`へmerge済み
-- 現在のフェーズ: Phase 7.1 設計・実装計画の敵対的レビュー反映済み、production実装は未開始
-- 次のTask: Phase 7.1 Task 1
+- 現在のフェーズ: Phase 7.1 完了
+- 次のTask: 次フェーズの計画確認
 - scale values: 確定
 
 ### Phase 6.1の既知残件
@@ -179,8 +179,18 @@ Phase計画:
 
 - 設計書: 敵対的レビュー反映済み。
 - Task 1〜7実装計画: 敵対的レビュー反映済み。
-- production code/test変更: 未開始。
-- 次の作業: 最新remote `main`から実装作業を開始し、Task 1から順番にTDDで実装する。
+- production code/test変更: 完了。
+- Task 1: route flowの実動検証とmotion assertion — 完了（`143e93e`）
+- Task 2: navigation summaryの重複解消 — 完了（`58828ef`）
+- Task 3: map pan bounds・release velocity・inertia改善 — 完了（`5e823e2`）
+- Task 4: management surfaceのscroll isolation — 完了（`cdbfa57`）
+- Task 5: Gallery swipe hintのmotion分離 — 完了（`baa4ec8`）
+- Task 6: management list-detail redesign — 完了（`5a91251`、`5d321c3`、`2ac3ec9`）
+- Task 7: 総合検証・snapshot・進捗確定 — 完了（`3cd4cde`、`edd30dd`、`2d97dfd`）
+- 総合検証: Vitest 103 files / 700 tests、route guidance 38 tests、Phase 5D回帰4 tests、GAS 27 tests、CI相当E2E 55 passed / 8 skipped、architecture/typecheck/build/public audit/diff check成功。
+- snapshot: Task 2のsummary変更、Task 4/6のmanagement list-detail・scroll isolation変更に対応する4件と、CIブラウザ差分のoutbox snapshot 1件だけを更新。
+- 既存・環境要因: CI用一時コンテナの`npm ci`がmoderate 1 / high 1のaudit警告を出すが、テスト結果には影響しない。テスト中の既存warningは失敗扱いしない。
+- 次の作業: Phase 7.1を完了として次フェーズの計画確認へ進む。
 
 ## 実装開始時の確認
 
