@@ -239,6 +239,12 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
     page.locator('[data-route-kind="current"] .route-flow-line'),
   ).toHaveCount(1);
   await expect(
+    page.locator('[data-route-kind="current"] .route-flow-comet'),
+  ).toHaveCount(1);
+  await expect(
+    page.locator('[data-route-kind="current"] .route-flow-direction'),
+  ).toHaveAttribute("marker-end", "url(#route-direction-arrow)");
+  await expect(
     page.locator('[data-route-kind="current"] .route-start-marker'),
   ).toHaveText("S");
   await expect(
@@ -246,25 +252,23 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   ).toHaveText("G");
   await expect(
     page.locator('[data-route-kind="current"] .route-flow-line'),
-  ).toHaveCSS("animation-name", "route-flow");
+  ).toHaveCSS("animation-name", "route-flow-comet");
   const routeFlow = page.locator(
-    '[data-route-kind="current"] .route-flow-line',
+    '[data-route-kind="current"] .route-flow-comet',
   );
-  const initialDashOffset = await routeFlow.evaluate(
-    (element) => getComputedStyle(element).strokeDashoffset,
-  );
-  await expect
-    .poll(
-      () =>
-        routeFlow.evaluate(
-          (element) => getComputedStyle(element).strokeDashoffset,
-        ),
-      { timeout: 1500, intervals: [50, 100] },
-    )
-    .not.toBe(initialDashOffset);
+  const offsets = [];
+  for (let index = 0; index < 3; index += 1) {
+    offsets.push(
+      await routeFlow.evaluate(
+        (element) => getComputedStyle(element).strokeDashoffset,
+      ),
+    );
+    await page.waitForTimeout(180);
+  }
+  expect(new Set(offsets).size).toBeGreaterThan(1);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(
-    page.locator('[data-route-kind="current"] .route-flow-line'),
+    page.locator('[data-route-kind="current"] .route-flow-comet'),
   ).toHaveCSS("animation-name", "none");
   await expect(
     page.locator('[data-route-kind="current"] .route-overlay-line'),
@@ -462,7 +466,10 @@ test("ピンの候補経路を比較してから目的地を変更する", async
     page.locator('[data-route-kind="candidate"] .route-overlay-line'),
   ).toHaveCSS("stroke-dasharray", "22px, 14px");
   await expect(
-    page.locator('[data-route-kind="candidate"] .route-flow-line'),
+    page.locator('[data-route-kind="candidate"] .route-flow-comet'),
+  ).toHaveCount(0);
+  await expect(
+    page.locator('[data-route-kind="candidate"] .route-flow-direction'),
   ).toHaveCount(0);
   await expect(page.locator("#btn-purchased")).toBeDisabled();
   await expect(page.locator("#btn-hold")).toBeDisabled();

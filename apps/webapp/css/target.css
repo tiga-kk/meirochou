@@ -97,19 +97,33 @@
   stroke-opacity: 0.78;
 }
 
+.route-flow-comet,
 .route-flow-line {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.8);
-  stroke-width: 4;
+  stroke: rgba(255, 255, 255, 0.96);
+  stroke-width: 5;
   stroke-linecap: round;
-  stroke-dasharray: 18 46;
-  animation: route-flow 1.1s linear infinite;
+  stroke-dasharray: 14 72;
+  animation: route-flow-comet 0.72s linear infinite;
   pointer-events: none;
 }
 
-@keyframes route-flow {
+.route-flow-direction {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 1;
+  marker-end: url("#route-direction-arrow");
+  pointer-events: none;
+}
+
+.route-direction-arrow {
+  fill: var(--danger);
+  stroke: none;
+}
+
+@keyframes route-flow-comet {
   to {
-    stroke-dashoffset: -64;
+    stroke-dashoffset: -86;
   }
 }
 
@@ -131,6 +145,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .route-flow-comet,
   .route-flow-line {
     animation: none;
   }

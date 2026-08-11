@@ -13,8 +13,8 @@
 - Phase 6: 完了・`main`へmerge済み
 - Phase 6.1: 完了・`main`へmerge済み
 - Phase 7: 完了・`main`へmerge済み
-- 現在のフェーズ: Phase 7.2 Task 3 完了
-- 次のTask: Phase 7.2 Task 4「Gallery swipe hintとmotion改善」
+- 現在のフェーズ: Phase 7.2 Task 4 完了
+- 次のTask: Phase 7.2 Task 5「map画質原因の診断とelastic overscroll改善」
 - scale values: 確定
 
 ### Phase 6.1の既知残件
@@ -211,7 +211,11 @@ Phase 7.1統合後の実機確認で判明した経路表示、地図操作、Ga
   - `ready`/`comparing`の候補選択時に、現在経路を残したまま候補経路を青色表示し、候補表示を`変更候補`へ統一した。
   - 候補選択中は購入・保留ボタンを無効化し、`BrowserApplication.handleAction()`にも現在目的地以外を変更しない防御guardを追加した。
   - route overlay、表示guard、購入・保留操作、既存候補経路E2Eとmobile snapshotを検証した。
-- Task 4〜8: 未着手
+- Task 4: current routeを知覚可能なStart→Goal animationへ修正 — 完了
+  - current routeへ視認性の高い`route-flow-comet`と、reduced-motionでも残るGoal方向markerを追加した。candidate routeには追加しない。
+  - Start/Goal markerを維持し、Goal markerを少し大きくしてcurrent routeの方向情報を強調した。
+  - SVG契約、3時点animation E2E、reduced-motion、mobile route snapshot、Webapp全体テストを検証した。
+- Task 5〜8: 未着手
 
 ### Phase 7.2の固定事項
 
