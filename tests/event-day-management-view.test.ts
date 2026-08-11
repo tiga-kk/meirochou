@@ -18,7 +18,7 @@ const row: EventDayManagementRow = {
 };
 
 describe("EventDayManagementView", () => {
-  it("renders status and dispatches the fixed action events", async () => {
+  it("renders status and dispatches only a detail request from each overview row", async () => {
     const view = new EventDayManagementView();
     view.rows = [
       row,
@@ -47,39 +47,31 @@ describe("EventDayManagementView", () => {
     expect(view.textContent).toContain("Data 12件");
     expect(view.textContent).toContain("GAS同期 2件待ち");
     expect(view.textContent).toContain("お品書き 4 / 8 保存済み");
-    expect(view.textContent).toContain("設定する");
+    expect(view.textContent).toContain("詳細を見る");
     expect(view.textContent).toContain("お品書き 保存状況を確認できません");
     expect(view.querySelector('[aria-current="true"]')?.textContent).toContain(
       "[使用中]",
     );
     expect(view.querySelectorAll('[aria-current="true"]')).toHaveLength(1);
 
-    const events: string[] = [];
-    for (const type of [
-      "event-day-open-request",
-      "event-day-refresh-request",
-      "event-day-offline-request",
-      "event-day-edit-request",
-      "event-day-delete-request",
-    ]) {
-      view.addEventListener(type, () => events.push(type));
-    }
-    for (const button of view.querySelectorAll("button[data-action]")) {
-      (button as HTMLButtonElement).click();
-    }
+    expect(view.querySelectorAll("button[data-action]")).toHaveLength(3);
+    expect(view.querySelectorAll('[data-action="open"]')).toHaveLength(0);
+    expect(view.querySelectorAll('[data-action="refresh"]')).toHaveLength(0);
+    expect(view.querySelectorAll('[data-action="edit"]')).toHaveLength(0);
 
-    expect(events).toEqual([
-      "event-day-open-request",
-      "event-day-refresh-request",
-      "event-day-offline-request",
-      "event-day-edit-request",
-      "event-day-delete-request",
-      "event-day-edit-request",
-      "event-day-open-request",
-      "event-day-refresh-request",
-      "event-day-offline-request",
-      "event-day-edit-request",
-      "event-day-delete-request",
+    const events: CustomEvent[] = [];
+    view.addEventListener("event-day-detail-request", (event) =>
+      events.push(event as CustomEvent),
+    );
+    view.querySelectorAll('[data-action="detail"]').forEach((button) => {
+      (button as HTMLButtonElement).click();
+    });
+
+    expect(events).toHaveLength(3);
+    expect(events.map((event) => event.detail.ref)).toEqual([
+      { eventId: "C108", dayId: "day1" },
+      { eventId: "C108", dayId: "day2" },
+      { eventId: "C108", dayId: "day3" },
     ]);
   });
 });

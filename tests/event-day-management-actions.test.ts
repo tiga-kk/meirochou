@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { EventDayManagementView } from "../apps/webapp/js/components/event-day-management-view";
+import { ComipathSettings } from "../apps/webapp/js/components/comipath-settings";
+import type { EventDayManagementRow } from "../apps/webapp/js/shared/ui/event-day-management-view-model";
 
 describe("event/day management actions", () => {
   it("dispatches each action with its row reference", async () => {
-    const view = new EventDayManagementView();
-    view.rows = [{
+    const row: EventDayManagementRow = {
       ref: { eventId: "event", dayId: "day1" },
       eventLabel: "Event",
       dayLabel: "Day 1",
@@ -17,9 +17,13 @@ describe("event/day management actions", () => {
       circleCount: 1,
       pendingGasCount: 0,
       offlineCatalog: { cached: 0, total: 0 },
-    }];
-    document.body.appendChild(view);
-    await view.updateComplete;
+    };
+    const settings = new ComipathSettings();
+    settings.eventDayManagementRows = [row];
+    settings.detailRef = row.ref;
+    settings.detailOpen = true;
+    document.body.appendChild(settings);
+    await settings.updateComplete;
     const events: CustomEvent[] = [];
     for (const type of [
       "event-day-open-request",
@@ -28,9 +32,9 @@ describe("event/day management actions", () => {
       "event-day-edit-request",
       "event-day-delete-request",
     ]) {
-      view.addEventListener(type, (event) => events.push(event as CustomEvent));
+      settings.addEventListener(type, (event) => events.push(event as CustomEvent));
     }
-    view.querySelectorAll("button[data-action]").forEach((button) => {
+    settings.querySelectorAll(".management-detail-actions button[data-action]").forEach((button) => {
       (button as HTMLButtonElement).click();
     });
     expect(events).toHaveLength(5);

@@ -491,11 +491,11 @@ export class BrowserApplication {
     } | null;
   }
 
-  private openManagementDetail(): void {
+  private openManagementDetail(ref?: EventDayRef): void {
     const settings = this.document.getElementById("settings-area") as
-      | (BrowserElement & { openDetail?: () => void })
+      | (BrowserElement & { openDetail?: (ref?: EventDayRef) => void })
       | null;
-    settings?.openDetail?.();
+    settings?.openDetail?.(ref);
   }
 
   private async openEventDayForManagement(ref: EventDayRef): Promise<void> {
@@ -523,11 +523,11 @@ export class BrowserApplication {
       const state = this.eventDayRepository.load(ref);
       if (!state) return;
       if (state.source.type === "gas") {
-        this.openManagementDetail();
+        this.openManagementDetail(ref);
         await this.circleDataSourceController.refreshSavedGasSource(ref, state.source);
       } else {
         this.ui.showSettings();
-        this.openManagementDetail();
+        this.openManagementDetail(ref);
         this.getSourceManager()?.requestCsvFileSelection?.();
       }
     } catch {
@@ -585,7 +585,7 @@ export class BrowserApplication {
     try {
       await this.openEventDayForManagement(ref);
       this.ui.showSettings();
-      this.openManagementDetail();
+      this.openManagementDetail(ref);
       this.getSourceManager()?.focusSourceEditor?.();
     } catch {
       this.ui.showToast("編集画面を開けませんでした", "error");
@@ -598,7 +598,7 @@ export class BrowserApplication {
     try {
       await this.openEventDayForManagement(ref);
       this.ui.showSettings();
-      this.openManagementDetail();
+      this.openManagementDetail(ref);
       this.handleDeleteOptionSelect({ type: "event-day", ref });
     } catch {
       this.ui.showToast("削除確認を開けませんでした", "error");

@@ -3,14 +3,6 @@ import { dispatchManagementEvent } from "../shared/ui/management-events";
 import type { EventDayRef } from "../features/event-day/public-api";
 import type { EventDayManagementRow } from "../shared/ui/event-day-management-view-model";
 
-const actions = [
-  ["open", "開く", "event-day-open-request"],
-  ["refresh", "再読込", "event-day-refresh-request"],
-  ["offline", "オフライン準備", "event-day-offline-request"],
-  ["edit", "編集", "event-day-edit-request"],
-  ["delete", "削除", "event-day-delete-request"],
-] as const;
-
 export class EventDayManagementView extends LitElement {
   static properties = { rows: { attribute: false } };
 
@@ -25,8 +17,8 @@ export class EventDayManagementView extends LitElement {
     return this;
   }
 
-  private request(type: (typeof actions)[number][2], ref: EventDayRef): void {
-    dispatchManagementEvent(this, type, { ref });
+  private requestDetail(ref: EventDayRef): void {
+    dispatchManagementEvent(this, "event-day-detail-request", { ref });
   }
 
   private renderOffline(row: EventDayManagementRow) {
@@ -63,16 +55,12 @@ export class EventDayManagementView extends LitElement {
                       <span>${this.renderOffline(row)}</span>
                     </div>
                     <div class="event-day-management-actions">
-                      ${(row.configured ? actions : [actions[3]]).map(
-                        ([action, label, eventName]) => html`
-                          <button
-                            type="button"
-                            class="btn btn-secondary"
-                            data-action=${action}
-                            @click=${() => this.request(eventName, row.ref)}
-                          >${row.configured ? label : "設定する"}</button>
-                        `,
-                      )}
+                      <button
+                        type="button"
+                        class="btn btn-secondary"
+                        data-action="detail"
+                        @click=${() => this.requestDetail(row.ref)}
+                      >${row.configured ? "詳細を見る" : "設定する"}</button>
                     </div>
                   </article>
                 `,

@@ -81,6 +81,13 @@ async function readState(
   }, ref);
 }
 
+async function readLastOpened(page: Page): Promise<EventDayRef | null> {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem("comipath:v1:last-opened");
+    return raw ? (JSON.parse(raw) as EventDayRef) : null;
+  });
+}
+
 async function routeRegistry(
   page: Page,
   events: readonly Record<string, unknown>[],
@@ -107,15 +114,30 @@ async function routeGas(
   });
 }
 
-async function openSettings(page: Page): Promise<void> {
+async function openSettings(
+  page: Page,
+  options: { detail?: boolean } = { detail: true },
+): Promise<void> {
   await page.locator("#toggle-settings").click();
   const settings = page.locator("#settings-area");
   await expect(settings).toHaveClass(/show/);
-  const detail = settings.locator(".management-detail-surface");
-  if (!(await detail.evaluate((element) => (element as HTMLDetailsElement).open))) {
-    await detail.locator("summary").click();
+  await expect(settings.locator("event-day-management-view")).toBeVisible();
+  if (options.detail !== false) {
+    const selectedRow = settings.locator(
+      'event-day-management-view .event-day-management-row[aria-current="true"]',
+    );
+    await selectedRow.locator('button[data-action="detail"]').click();
+    await expect(settings.locator(".management-detail-pane")).toBeVisible();
+    await expect(settings.locator(".source-manager-panel")).toBeVisible();
   }
-  await expect(settings.locator(".source-manager-panel")).toBeVisible();
+}
+
+async function openSettingsOverview(page: Page): Promise<void> {
+  await openSettings(page, { detail: false });
+}
+
+async function openManagementDetail(page: Page): Promise<void> {
+  await openSettings(page);
 }
 
 async function confirmDelete(page: Page, phrase?: string): Promise<void> {
@@ -234,6 +256,90 @@ test.describe("Mobile Management Flows", () => {
     await expect(rows.nth(0)).toContainText("GAS同期 1件待ち");
     await expect(rows.nth(1)).toContainText("未設定");
     await expect(rows.nth(1)).toContainText("設定する");
+  });
+
+  test("mobileはoverviewからdetailへ進み、戻ってから日程を開ける", async ({
+    page,
+  }) => {
+    await seedStates(page, [
+      {
+        ref: { eventId: "demo-v1", dayId: "day1" },
+        state: createState({
+          circles: [{ space: "東ア23a", priority: 1 }],
+        }),
+      },
+      {
+        ref: { eventId: "demo-v1", dayId: "day2" },
+        state: createState({
+          circles: [{ space: "東ア31b", priority: 2 }],
+        }),
+      },
+    ]);
+    await page.goto("/");
+    await expect.poll(() => readLastOpened(page)).toEqual({
+      eventId: "demo-v1",
+      dayId: "day1",
+    });
+    await openSettingsOverview(page);
+
+    const settings = page.locator("#settings-area");
+    const rows = settings.locator(".event-day-management-row");
+    await rows.nth(1).locator('button[data-action="detail"]').click();
+    await expect(settings.locator(".management-detail-pane")).toBeVisible();
+    await expect(settings.locator(".management-detail-summary")).toContainText(
+      "2日目",
+    );
+    await expect.poll(() => readLastOpened(page)).toEqual({
+      eventId: "demo-v1",
+      dayId: "day1",
+    });
+
+    await settings.locator(".management-detail-back").click();
+    await expect(settings.locator(".management-overview-pane")).toBeVisible();
+    await rows.nth(1).locator('button[data-action="detail"]').click();
+    await settings.locator('.management-detail-actions [data-action="open"]').click();
+    await expect(settings).toBeHidden();
+    await expect.poll(() => readLastOpened(page)).toEqual({
+      eventId: "demo-v1",
+      dayId: "day2",
+    });
+  });
+
+  test("desktopは同じlist/detailを2-pane表示し、detail選択だけでは日程を切り替えない", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await seedStates(page, [
+      {
+        ref: { eventId: "demo-v1", dayId: "day1" },
+        state: createState({ circles: [{ space: "東ア23a" }] }),
+      },
+      {
+        ref: { eventId: "demo-v1", dayId: "day2" },
+        state: createState({ circles: [{ space: "東ア31b" }] }),
+      },
+    ]);
+    await page.goto("/");
+    await expect.poll(() => readLastOpened(page)).toEqual({
+      eventId: "demo-v1",
+      dayId: "day1",
+    });
+    await openSettingsOverview(page);
+    const settings = page.locator("#settings-area");
+    await expect(settings.locator(".management-overview-pane")).toBeVisible();
+    await expect(settings.locator(".management-detail-pane")).toBeVisible();
+    await settings
+      .locator(".event-day-management-row")
+      .nth(1)
+      .locator('button[data-action="detail"]')
+      .click();
+    await expect(settings.locator(".management-detail-summary")).toContainText(
+      "2日目",
+    );
+    await expect.poll(() => readLastOpened(page)).toEqual({
+      eventId: "demo-v1",
+      dayId: "day1",
+    });
   });
 
   test("管理overviewはoffline status取得失敗を0件保存済みと混同しない", async ({

@@ -7,6 +7,21 @@ import type {
   DeleteOptionViewModel,
   EventDayOption,
 } from "../apps/webapp/js/shared/ui/management-view-model";
+import type { EventDayManagementRow } from "../apps/webapp/js/shared/ui/event-day-management-view-model";
+
+const selectedManagementRow: EventDayManagementRow = {
+  ref: { eventId: "c104", dayId: "day1" },
+  eventLabel: "コミックマーケット104",
+  dayLabel: "1日目 (日)",
+  configured: true,
+  selected: true,
+  sourceType: "csv",
+  sourceLabel: "circles.csv",
+  sourceEndpointSummary: null,
+  circleCount: 1,
+  pendingGasCount: 0,
+  offlineCatalog: { cached: 0, total: 0 },
+};
 
 afterEach(() => {
   document.body.innerHTML = "";
@@ -47,6 +62,7 @@ test("settings shell renders event-day-selector and circle-data-source-panel chi
   };
 
   element.eventDayOptions = sampleOptions;
+  element.eventDayManagementRows = [selectedManagementRow];
   element.selectedEventId = "c104";
   element.selectedDayId = "day1";
   element.sourceManagerModel = sampleSourceModel;
@@ -75,6 +91,7 @@ test("settings shell renders enabled delete options and emits only their scope",
     events.push(event as CustomEvent);
   });
   element.deleteOptions = [deleteOption];
+  element.eventDayManagementRows = [selectedManagementRow];
 
   document.body.appendChild(element);
   await element.updateComplete;
@@ -111,6 +128,7 @@ test("blocked delete option exposes reason text with role=status for screen read
     blockedReason: "2件の送信待ちがあります。",
   };
   element.deleteOptions = [blockedOption];
+  element.eventDayManagementRows = [selectedManagementRow];
 
   document.body.appendChild(element);
   await element.updateComplete;
@@ -154,6 +172,7 @@ test("locks and restores body scroll state without destroying existing inline st
   document.body.style.overflow = "scroll";
 
   const element = new ComipathSettings();
+  element.eventDayManagementRows = [selectedManagementRow];
   element.open = true;
   document.body.appendChild(element);
   await element.updateComplete;
@@ -192,6 +211,7 @@ test("locks and restores body scroll state without destroying existing inline st
 
 test("settings shell exposes the approved ALNS search-time choices", async () => {
   const element = new ComipathSettings();
+  element.eventDayManagementRows = [selectedManagementRow];
   const events: CustomEvent[] = [];
   element.addEventListener("optimization-time-limit-change", (event) => {
     events.push(event as CustomEvent);
