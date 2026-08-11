@@ -787,6 +787,49 @@ test("一覧の左右スワイプが外側方向の購入と端末保存へ到�
     .toBe("purchased");
 });
 
+test("一覧の初回swipe hintは短い横移動を示しreduced motionでは停止する", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/?demo_ui=1");
+  await page.evaluate(() =>
+    localStorage.removeItem("comipath:ui:v1:gallery-swipe-hint-seen"),
+  );
+  await page.locator("#btn-open-gallery").click();
+
+  const hint = page.locator(".gallery-swipe-hint");
+  const demo = page.locator(".gallery-swipe-hint-demo-card");
+  await expect(hint).toContainText("外側へスワイプして購入済みにできます");
+  await expect(demo).toBeVisible();
+  await expect(demo).toHaveCSS("animation-name", "gallery-swipe-hint-slide");
+  const initialTransform = await demo.evaluate(
+    (element) => getComputedStyle(element).transform,
+  );
+  await expect
+    .poll(() => demo.evaluate((element) => getComputedStyle(element).transform))
+    .not.toBe(initialTransform);
+
+  await hint.click();
+  await expect(hint).toBeHidden();
+  await page.locator("#btn-close-gallery").click();
+  await page.locator("#btn-open-gallery").click();
+  await expect(page.locator(".gallery-swipe-hint")).toHaveCount(0);
+
+  await page.locator("#btn-close-gallery").click();
+  await page.evaluate(() =>
+    localStorage.removeItem("comipath:ui:v1:gallery-swipe-hint-seen"),
+  );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.locator("#btn-open-gallery").click();
+  await expect(page.locator(".gallery-swipe-hint")).toContainText(
+    "外側へスワイプして購入済みにできます",
+  );
+  await expect(page.locator(".gallery-swipe-hint-demo-card")).toHaveCSS(
+    "animation-name",
+    "none",
+  );
+});
+
 test("一覧の画像読込失敗をNo Imageへ置き換える", async ({ page }) => {
   await page.goto("/?demo_ui=1");
   await page.locator("#btn-open-gallery").click();

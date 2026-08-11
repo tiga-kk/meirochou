@@ -238,22 +238,3 @@
   box-shadow: var(--button-shadow);
   cursor: pointer;
 }
-
-.gallery-swipe-hint-arrows {
-  color: var(--primary);
-  font-family: var(--font-mono);
-  font-size: 1.1rem;
-  font-weight: 900;
-  animation: gallery-swipe-hint-pulse 1.1s ease-in-out infinite alternate;
-}
-
-@keyframes gallery-swipe-hint-pulse {
-  from {
-    opacity: 0.45;
-    letter-spacing: 0;
-  }
-  to {
-    opacity: 1;
-    letter-spacing: 0.18rem;
-  }
-}
