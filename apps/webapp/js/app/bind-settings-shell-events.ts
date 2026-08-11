@@ -1,12 +1,13 @@
+import type { GalleryScope } from "../features/circle-status/public-api";
+
 interface SettingsShellEventApplication {
   readonly ui: {
     readonly els: {
       readonly settingsArea: (EventTarget & { open?: boolean }) | null;
     };
-    showGallery(name: string, open: boolean): void;
   };
   toggleSettings(target: Element | null): void;
-  showGalleryForArea(areaId: string): void;
+  showGallery(scope: GalleryScope): void;
 }
 
 export function bindSettingsShellEvents(
@@ -56,8 +57,7 @@ export function bindSettingsShellEvents(
 
   const gallery = document.getElementById("btn-open-gallery");
   listen(gallery, "click", () => {
-    const areaId = (document.getElementById("loc-ewsn") as HTMLInputElement)?.value;
-    application.showGalleryForArea(areaId);
+    application.showGallery({ kind: "all-unvisited" });
   });
 
   return () => {

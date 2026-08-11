@@ -13,8 +13,8 @@
 - Phase 6: 完了・`main`へmerge済み
 - Phase 6.1: 完了・`main`へmerge済み
 - Phase 7: 完了・`main`へmerge済み
-- 現在のフェーズ: Phase 7.2 Task 5 完了
-- 次のTask: Phase 7.2 Task 6「global Gallery、dynamic priority、tutorial replay」
+- 現在のフェーズ: Phase 7.2 Task 6 完了
+- 次のTask: Phase 7.2 Task 7「target catalog adaptive layout」
 - scale values: 確定
 
 ### Phase 6.1の既知残件
@@ -219,7 +219,12 @@ Phase 7.1統合後の実機確認で判明した経路表示、地図操作、Ga
   - C108 4エリアのmap.svgを検査し、positive viewBox・embedded bitmap 0を確認。asset形式や描画方式は変更していない。
   - 常時`will-change: transform`を外し、mapだけoverscroll limit 18px、他のGallery/PDF callerは既定32pxを維持した。
   - source契約、controller bounds/inertia、auto-fit diagnostics E2E、Webapp全体テストを検証した。
-- Task 6〜8: 未着手
+- Task 6: global Gallery、dynamic priority、tutorial replay — 完了
+  - header一覧を全areaの未訪問スコープへ変更し、area-specific/hold callerはscope指定を維持した。
+  - priority buttonを実データから生成し、未設定・0・負値を区別するGallery view modelとempty stateを追加した。
+  - v2 swipe hint、常設の操作方法button、storage失敗時も壊れないmanual replayを実装した。
+  - Gallery関連E2E 6件、Webapp Vitest 105 files / 718 tests、architecture/typecheck、diff checkを検証した。
+- Task 7〜8: 未着手
 
 ### Phase 7.2の固定事項
 

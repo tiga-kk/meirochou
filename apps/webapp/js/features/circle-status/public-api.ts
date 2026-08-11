@@ -21,6 +21,7 @@ export type { PendingGasUpdateDelivery } from "./use-cases/pending-gas-update-de
 export type { PendingGasUpdateRetryOptions } from "./ui/pending-gas-updates-controller";
 export { DomCircleGalleryView } from "./ui/dom-circle-gallery-view";
 export { DomCircleProgressView } from "./ui/dom-circle-progress-view";
+export type { GalleryScope } from "./ui/gallery-view-model";
 
 export interface CircleStatusControllerPort {
   changeStatus(params: {

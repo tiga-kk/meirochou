@@ -179,8 +179,8 @@ export class DomRouteGuidanceView {
     this.modalManager.showPdfModal(source);
   }
 
-  showGallery(areaKey, isHold = false) {
-    this.modalManager.showGallery(areaKey, isHold);
+  showGallery(scope) {
+    this.modalManager.showGallery(scope);
   }
 
   // --- Sheet List Delegate Methods ---

@@ -1,4 +1,12 @@
 /* Gallery Modal Specific */
+.gallery-help-button {
+  min-height: 44px;
+  margin-left: auto;
+  margin-right: 8px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+}
+
 .gallery-content-wrapper {
   flex: 1;
   display: flex;

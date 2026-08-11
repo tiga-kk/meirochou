@@ -41,6 +41,7 @@ function createDependencies() {
     toggleSettings: vi.fn(),
     closeSettings: vi.fn(),
     handleOptimizationTimeLimitChange: vi.fn(),
+    showGallery: vi.fn(),
     showGalleryForArea: vi.fn(),
   };
   return { application, settings };
@@ -60,6 +61,18 @@ describe("bindBrowserEvents", () => {
     binding.stop();
     document.getElementById("btn-purchased")?.dispatchEvent(new Event("click"));
     expect(application.handleAction).toHaveBeenCalledOnce();
+    binding.stop();
+  });
+
+  it("opens the global gallery without reading the location selector", () => {
+    const { application } = createDependencies();
+    const binding = bindBrowserEvents({ application: application as never, document });
+
+    document.getElementById("loc-ewsn")?.remove();
+    document.getElementById("btn-open-gallery")?.dispatchEvent(new Event("click"));
+
+    expect(application.showGallery).toHaveBeenCalledWith({ kind: "all-unvisited" });
+    expect(application.showGalleryForArea).not.toHaveBeenCalled();
     binding.stop();
   });
 

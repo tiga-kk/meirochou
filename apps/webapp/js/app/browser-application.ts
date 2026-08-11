@@ -32,6 +32,7 @@ import type {
 import type {
   PendingGasUpdateBackgroundProcess,
   PendingGasUpdateRetryOptions,
+  GalleryScope,
 } from "../features/circle-status/public-api";
 import type { CircleStatusControllerPort as CircleStatusController } from "../features/circle-status/public-api";
 import type {
@@ -474,11 +475,12 @@ export class BrowserApplication {
     this.updateManagementModels();
   }
 
+  showGallery(scope: GalleryScope) {
+    this.ui.showGallery(scope);
+  }
+
   showGalleryForArea(areaId: string) {
-    const area = this.routeMapAreaCatalog
-      .getAllMapAreas()
-      .find((candidate) => candidate.id === areaId);
-    this.ui.showGallery(area?.name || areaId, false);
+    this.showGallery({ kind: "area", areaId });
   }
 
   private getSourceManager(): {

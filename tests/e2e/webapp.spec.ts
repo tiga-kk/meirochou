@@ -806,7 +806,7 @@ test("一覧の初回swipe hintは短い横移動を示しreduced motionでは�
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/?demo_ui=1");
   await page.evaluate(() =>
-    localStorage.removeItem("comipath:ui:v1:gallery-swipe-hint-seen"),
+    localStorage.removeItem("comipath:ui:v2:gallery-swipe-hint-seen"),
   );
   await page.locator("#btn-open-gallery").click();
 
@@ -830,7 +830,7 @@ test("一覧の初回swipe hintは短い横移動を示しreduced motionでは�
 
   await page.locator("#btn-close-gallery").click();
   await page.evaluate(() =>
-    localStorage.removeItem("comipath:ui:v1:gallery-swipe-hint-seen"),
+    localStorage.removeItem("comipath:ui:v2:gallery-swipe-hint-seen"),
   );
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.locator("#btn-open-gallery").click();
@@ -860,7 +860,7 @@ test("一覧の画像読込失敗をNo Imageへ置き換える", async ({ page }
 test("一覧を開き直すと優先度フィルターを解除する", async ({ page }) => {
   await page.goto("/?demo_ui=1");
   await page.locator("#btn-open-gallery").click();
-  await page.locator('#gallery-filter-controls [data-priority="10"]').click();
+  await page.locator("#gallery-filter-controls .filter-btn").first().click();
   await expect(page.locator("#gallery-grid .gallery-item")).toHaveCount(1);
 
   await page.locator("#btn-close-gallery").click();
@@ -870,4 +870,16 @@ test("一覧を開き直すと優先度フィルターを解除する", async ({
   await expect(
     page.locator("#gallery-filter-controls .filter-btn.active"),
   ).toHaveCount(0);
+});
+
+test("一覧の操作方法からswipe hintを再表示できる", async ({ page }) => {
+  await page.goto("/?demo_ui=1");
+  await page.evaluate(() =>
+    localStorage.setItem("comipath:ui:v2:gallery-swipe-hint-seen", "1"),
+  );
+  await page.locator("#btn-open-gallery").click();
+  await expect(page.locator(".gallery-swipe-hint")).toHaveCount(0);
+
+  await page.locator("#btn-gallery-help").click();
+  await expect(page.locator(".gallery-swipe-hint")).toBeVisible();
 });

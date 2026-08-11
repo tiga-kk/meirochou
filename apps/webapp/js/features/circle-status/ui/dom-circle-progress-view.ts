@@ -62,7 +62,7 @@ export class DomCircleProgressView {
       td.textContent = "0";
       td.onclick = () => {
         if (td.classList.contains("count-cell")) {
-          this.uiManager.showGallery(area.name, false);
+          this.uiManager.showGallery({ kind: "area", areaId: area.id });
         }
       };
       remainingRow.appendChild(td);
@@ -90,7 +90,7 @@ export class DomCircleProgressView {
       td.onclick = (e) => {
         e.stopPropagation();
         if (td.classList.contains("count-cell")) {
-          this.uiManager.showGallery(area.name, true);
+          this.uiManager.showGallery({ kind: "hold", areaId: area.id });
         }
       };
       holdRow.appendChild(td);

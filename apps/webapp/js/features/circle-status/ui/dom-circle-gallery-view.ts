@@ -1,6 +1,11 @@
 // @ts-nocheck
 import { parseSpace } from "../../../shared/domain/space-parser";
 import {
+  collectGalleryPriorities,
+  galleryPriority,
+  selectGalleryCircles,
+} from "./gallery-view-model";
+import {
   GestureZoomController,
   setupResizableMap,
   setupSwipeAction,
@@ -22,6 +27,7 @@ export class DomCircleGalleryView {
       galleryModal: document.getElementById("gallery-modal"),
       galleryGrid: document.getElementById("gallery-grid"),
       btnCloseGallery: document.getElementById("btn-close-gallery"),
+      btnGalleryHelp: document.getElementById("btn-gallery-help"),
 
       // Sort buttons
       btnSortSpace: document.getElementById("btn-sort-space"),
@@ -44,10 +50,9 @@ export class DomCircleGalleryView {
     this.currentTargets = [];
     this.activePriorities = null;
     this.sortMode = "priority"; // 'space' | 'priority'
-    this.currentGalleryArea = null; // エリア保持用
-    this.currentGalleryIsHold = false; // 保留リストかどうか
+    this.currentGalleryScope = { kind: "all-unvisited" };
     this.inFlightPurchases = new Set();
-    this.hintKey = "comipath:ui:v1:gallery-swipe-hint-seen";
+    this.hintKey = "comipath:ui:v2:gallery-swipe-hint-seen";
     this.hintTimer = null;
 
     // フィルタボタンへの参照は init で取得
@@ -86,17 +91,11 @@ export class DomCircleGalleryView {
       });
     }
 
-    // ギャラリーフィルターボタン設定
-    const filterBtns = document.querySelectorAll(
-      "#gallery-filter-controls .filter-btn",
-    );
-    filterBtns.forEach((btn) => {
-      btn.classList.remove("active");
-      btn.onclick = () => {
-        const p = Number.parseInt(btn.dataset.priority, 10);
-        this.togglePriorityFilter(p, btn);
-      };
-    });
+    if (this.els.btnGalleryHelp) {
+      this.els.btnGalleryHelp.addEventListener("click", () =>
+        this.showSwipeHint({ force: true }),
+      );
+    }
 
     if (this.els.modalImageContainer && this.els.pdfImage) {
       new GestureZoomController(
@@ -172,6 +171,7 @@ export class DomCircleGalleryView {
         (p) => p !== priority,
       );
       btnElement.classList.remove("active");
+      if (this.activePriorities.length === 0) this.activePriorities = null;
     } else {
       this.activePriorities.push(priority);
       btnElement.classList.add("active");
@@ -185,18 +185,10 @@ export class DomCircleGalleryView {
   sortTargets(targets) {
     const sorted = [...targets];
 
-    // Helper to get priority value
-    const getPriorityVal = (p) => {
-      // 数値の場合（10, 9, 8...）
-      const num = parseFloat(p);
-      if (!Number.isNaN(num)) return num;
-      return 0;
-    };
-
     sorted.sort((a, b) => {
       if (this.sortMode === "priority") {
-        const pA = getPriorityVal(a.priority);
-        const pB = getPriorityVal(b.priority);
+        const pA = galleryPriority(a.priority) ?? Number.NEGATIVE_INFINITY;
+        const pB = galleryPriority(b.priority) ?? Number.NEGATIVE_INFINITY;
         if (pA !== pB) return pB - pA; // Descending
       }
 
@@ -251,42 +243,25 @@ export class DomCircleGalleryView {
     this.currentCircle = null;
   }
 
-  /**
-   * ギャラリーモーダルを表示
-   * @param {string} areaKey - エリアキー (例: "東456")
-   * @param {boolean} isHold - 保留リストかどうか
-   */
-  showGallery(areaKey, isHold = false) {
+  /** ギャラリーモーダルを指定スコープで表示 */
+  showGallery(scope) {
     if (!this.els.galleryModal || !this.els.galleryGrid || !this.dataManager)
       return;
 
     this.activePriorities = null;
-    document
-      .querySelectorAll("#gallery-filter-controls .filter-btn")
-      .forEach((btn) => {
-        btn.classList.remove("active");
-      });
-    this.currentGalleryArea = areaKey;
-    this.currentGalleryIsHold = isHold;
+    this.currentGalleryScope = scope;
     const areas = this.mapAreaCatalog?.getAllMapAreas?.() || [];
-
-    // データ取得
-    let targets = [];
-    if (isHold) {
-      targets = this.dataManager.wantToBuy.filter((c) => {
-        if (!this.dataManager.holdList.includes(c.space)) return false;
-        const [key] = parseSpace(c.space, areas);
-        return key === areaKey;
-      });
-    } else {
-      const unvisited = this.dataManager.getUnvisited();
-      targets = unvisited.filter((c) => {
-        const [key] = parseSpace(c.space, areas);
-        return key === areaKey;
-      });
-    }
-
-    this.currentTargets = targets;
+    const resolveAreaId = (space) => {
+      const [areaName] = parseSpace(space, areas);
+      return areas.find((area) => area.name === areaName)?.id ?? null;
+    };
+    this.currentTargets = selectGalleryCircles({
+      scope,
+      unvisited: this.dataManager.getUnvisited(),
+      wantToBuy: this.dataManager.wantToBuy,
+      holdSpaces: new Set(this.dataManager.holdList),
+      resolveAreaId,
+    });
 
     // 地図表示処理（著作権保護のため無効化）
     if (this.els.galleryMapContainer) {
@@ -295,24 +270,28 @@ export class DomCircleGalleryView {
 
     this.renderGallery();
     this.els.galleryModal.classList.remove("hidden");
-    this.showSwipeHintIfNeeded();
+    this.showSwipeHint();
   }
 
-  showSwipeHintIfNeeded() {
+  showSwipeHint({ force = false } = {}) {
     if (!this.els.galleryModal || this.els.galleryModal.querySelector(".gallery-swipe-hint")) return;
-    let seen = false;
-    try {
-      seen = window.localStorage.getItem(this.hintKey) === "1";
-    } catch {
-      return;
+    if (!force) {
+      try {
+        if (window.localStorage.getItem(this.hintKey) === "1") return;
+      } catch {
+        return;
+      }
     }
-    if (seen) return;
 
     const hint = document.createElement("div");
     hint.className = "gallery-swipe-hint";
     hint.innerHTML =
       '<strong>外側へスワイプして購入済みにできます</strong><span class="gallery-swipe-hint-demo" aria-hidden="true"><span class="gallery-swipe-hint-demo-card">←　→</span></span>';
-    hint.onclick = () => hint.remove();
+    hint.onclick = () => {
+      hint.remove();
+      if (this.hintTimer) clearTimeout(this.hintTimer);
+      this.hintTimer = null;
+    };
     this.els.galleryModal.appendChild(hint);
     try {
       window.localStorage.setItem(this.hintKey, "1");
@@ -320,7 +299,42 @@ export class DomCircleGalleryView {
       // UI hint is optional when storage is unavailable.
     }
     if (this.hintTimer) clearTimeout(this.hintTimer);
-    this.hintTimer = setTimeout(() => hint.remove(), 3500);
+    this.hintTimer = setTimeout(() => {
+      hint.remove();
+      this.hintTimer = null;
+    }, 3500);
+  }
+
+  renderPriorityFilters() {
+    const controls = document.getElementById("gallery-filter-controls");
+    if (!controls) return;
+    controls.querySelectorAll(".filter-btn").forEach((btn) => btn.remove());
+    collectGalleryPriorities(this.currentTargets).forEach((priority) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "filter-btn";
+      button.dataset.priority = String(priority);
+      button.textContent = String(priority);
+      button.classList.toggle(
+        "active",
+        this.activePriorities?.includes(priority) ?? false,
+      );
+      button.onclick = () => this.togglePriorityFilter(priority, button);
+      controls.appendChild(button);
+    });
+  }
+
+  getGalleryEmptyMessage() {
+    if (this.activePriorities !== null) {
+      return "この条件に一致するサークルはありません";
+    }
+    if (this.currentGalleryScope.kind === "all-unvisited") {
+      return "未訪問サークルはありません";
+    }
+    if (this.currentGalleryScope.kind === "area") {
+      return "このエリアに未訪問サークルはありません";
+    }
+    return "保留サークルはありません";
   }
 
   /**
@@ -328,22 +342,22 @@ export class DomCircleGalleryView {
    */
   renderGallery() {
     this.els.galleryGrid.innerHTML = "";
+    this.renderPriorityFilters();
 
     // フィルタリング適用
     const filteredTargets =
       this.activePriorities === null
         ? this.currentTargets
         : this.currentTargets.filter((c) => {
-            const p = Number(c.priority);
-            const pVal = Number.isNaN(p) ? 0 : p;
-            return this.activePriorities.includes(pVal);
+            const priority = galleryPriority(c.priority);
+            return priority !== null && this.activePriorities.includes(priority);
           });
 
     const targets = this.sortTargets(filteredTargets);
 
     if (targets.length === 0) {
       const msg = document.createElement("div");
-      msg.textContent = "対象サークルはありません";
+      msg.textContent = this.getGalleryEmptyMessage();
       msg.style.color = "white";
       msg.style.padding = "1rem";
       msg.style.gridColumn = "1 / -1";
@@ -390,9 +404,9 @@ export class DomCircleGalleryView {
         const name = document.createElement("div");
         name.className = "circle-name";
         // 優先度を表示
-        const priorityVal = Number(c.priority);
+        const priorityVal = galleryPriority(c.priority);
         const prioritySpan =
-          !Number.isNaN(priorityVal) && priorityVal > 0
+          priorityVal !== null
             ? `<span class="gallery-priority"><i class="fa-solid fa-star"></i>${priorityVal}</span>`
             : "";
         name.innerHTML = `${c.space}${prioritySpan}`;
@@ -484,5 +498,8 @@ export class DomCircleGalleryView {
     if (!this.els.galleryModal || !this.els.galleryGrid) return;
     this.els.galleryModal.classList.add("hidden");
     this.els.galleryGrid.innerHTML = "";
+    this.els.galleryModal.querySelector(".gallery-swipe-hint")?.remove();
+    if (this.hintTimer) clearTimeout(this.hintTimer);
+    this.hintTimer = null;
   }
 }

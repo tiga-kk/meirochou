@@ -10,7 +10,7 @@
 
 .gallery-swipe-hint-demo-card {
   display: inline-block;
-  animation: gallery-swipe-hint-slide 1.2s ease-in-out 2;
+  animation: gallery-swipe-hint-slide 0.9s ease-in-out 2;
 }
 
 @keyframes gallery-swipe-hint-slide {
