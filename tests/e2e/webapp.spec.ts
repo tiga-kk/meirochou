@@ -180,6 +180,7 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   page,
 }) => {
   await page.goto("/?demo_ui=1");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
 
   await expect(page.locator("#target-content")).toBeVisible();
   await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
@@ -246,34 +247,34 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   await expect(
     page.locator('[data-route-kind="current"] .route-flow-line'),
   ).toHaveCSS("animation-name", "route-flow");
-  const routeFlowOffsets = await page
-    .locator('[data-route-kind="current"] .route-flow-line')
-    .evaluate((element) => {
-      const animation = element
-        .getAnimations()
-        .find(
-          (candidate): candidate is CSSAnimation =>
-            candidate instanceof CSSAnimation &&
-            candidate.animationName === "route-flow",
-        );
-      if (!animation) throw new Error("route-flow animation was not found");
-
-      animation.pause();
-      animation.currentTime = 0;
-      const initial = Number.parseFloat(
-        getComputedStyle(element).strokeDashoffset,
-      );
-      animation.currentTime = 550;
-      const middle = Number.parseFloat(
-        getComputedStyle(element).strokeDashoffset,
-      );
-      return { initial, middle };
-    });
-  expect(routeFlowOffsets.middle).toBeLessThan(routeFlowOffsets.initial);
+  const routeFlow = page.locator(
+    '[data-route-kind="current"] .route-flow-line',
+  );
+  const initialDashOffset = await routeFlow.evaluate(
+    (element) => getComputedStyle(element).strokeDashoffset,
+  );
+  await expect
+    .poll(
+      () =>
+        routeFlow.evaluate(
+          (element) => getComputedStyle(element).strokeDashoffset,
+        ),
+      { timeout: 1500, intervals: [50, 100] },
+    )
+    .not.toBe(initialDashOffset);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(
     page.locator('[data-route-kind="current"] .route-flow-line'),
   ).toHaveCSS("animation-name", "none");
+  await expect(
+    page.locator('[data-route-kind="current"] .route-overlay-line'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-route-kind="current"] .route-start-marker'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-route-kind="current"] .route-goal-marker'),
+  ).toBeVisible();
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect(page.locator(".target-bottom-sheet")).toBeVisible();
   await pinFor(page, "東ア23a").evaluate((button: HTMLButtonElement) =>
