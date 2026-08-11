@@ -123,9 +123,10 @@
           </div>
 
           <div class="target-bottom-sheet">
-            <div class="sheet-main">
-              <div>
-                <span class="target-label" id="target-status-label">次の目的地</span>
+            <div class="target-detail-layout">
+              <div id="tweet-embed-container" class="tweet-preview"></div>
+              <div class="target-detail-meta">
+                <span class="target-label" id="target-status-label">お品書き</span>
                 <span id="target-sheet-name" class="target-sheet-name hidden"></span>
                 <div class="target-meta-grid">
                   <span id="target-priority">優先度 -</span>
@@ -156,7 +157,19 @@
                   <p id="route-selection-message" class="route-selection-message" aria-live="polite"></p>
                 </div>
               </div>
-              <div id="tweet-embed-container" class="tweet-preview"></div>
+              <div class="target-detail-actions">
+                <div id="target-map-container" class="map-embed-container hidden">
+                  <!-- 著作権保護のため一時無効化中 -->
+                </div>
+                <div class="action-grid">
+                  <button type="button" id="btn-purchased" class="btn btn-success">
+                    <i class="fa-solid fa-check"></i> 購入済
+                  </button>
+                  <button type="button" id="btn-hold" class="btn btn-warning">
+                    <i class="fa-solid fa-pause"></i> 保留
+                  </button>
+                </div>
+              </div>
             </div>
 
             <section
@@ -183,19 +196,6 @@
                 <button type="button" id="btn-confirm-route-change" class="btn btn-primary">この地点に変更</button>
               </div>
             </section>
-
-            <div id="target-map-container" class="map-embed-container hidden">
-               <!-- 著作権保護のため一時無効化中 -->
-            </div>
-
-            <div class="action-grid">
-              <button type="button" id="btn-purchased" class="btn btn-success">
-                <i class="fa-solid fa-check"></i> 購入済
-              </button>
-              <button type="button" id="btn-hold" class="btn btn-warning">
-                <i class="fa-solid fa-pause"></i> 保留
-              </button>
-            </div>
           </div>
         </div>
 

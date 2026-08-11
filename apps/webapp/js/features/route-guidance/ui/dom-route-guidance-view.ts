@@ -12,6 +12,7 @@ import {
   buildRouteGuidanceScreenModel,
   formatRouteDistance,
 } from "./route-guidance-screen-model";
+import { classifyCatalogOrientation } from "./catalog-orientation";
 
 function hasUsableMapScale(area) {
   return (
@@ -49,6 +50,7 @@ export class DomRouteGuidanceView {
       headerAreaTitle: document.getElementById("header-area-title"),
       locNumber: document.getElementById("loc-number"),
       targetSection: document.getElementById("target-content"),
+      targetDetail: document.getElementById("next-target"),
       targetEmpty: document.getElementById("target-empty"),
       targetLoading: document.getElementById("target-loading"),
       heading: document.getElementById("target-space-heading"),
@@ -275,6 +277,7 @@ export class DomRouteGuidanceView {
         this.els.targetStartSpace.textContent = startSpace || "-";
       if (this.els.targetRouteLog)
         this.els.targetRouteLog.textContent = "未訪問なし";
+      this.els.targetDetail?.setAttribute("data-catalog-orientation", "none");
       this.els.dist.textContent = "-";
       this.els.priority.textContent = "-";
       this.els.subTargetSpace.textContent = "次 なし";
@@ -326,14 +329,14 @@ export class DomRouteGuidanceView {
         currentRoute,
         currentArea,
       );
-      this.els.targetRouteLog.textContent = `${currentDistance} / ${currentViewModel.nextLabel}`;
+      this.els.targetRouteLog.textContent = currentDistance;
     }
     this.renderTargetDetails(
       detailTarget,
       startSpace,
       isPreview ? null : nextTarget,
       {
-        statusLabel: isPreview ? "変更候補" : "次の目的地",
+        statusLabel: isPreview ? "変更候補" : "お品書き",
         distanceLabel,
         showCandidateDetails: isPreview,
       },
@@ -418,11 +421,15 @@ export class DomRouteGuidanceView {
       );
     }
     this.els.priority.textContent = viewModel.priorityLabel;
-    this.els.subTargetSpace.textContent = viewModel.nextLabel;
+    this.els.subTargetSpace.textContent = options.showCandidateDetails
+      ? `候補 ${viewModel.space}`
+      : "";
     this.els.dist.textContent =
       options.showCandidateDetails === false
         ? ""
-        : options.distanceLabel || viewModel.distanceLabel;
+        : options.showCandidateDetails
+          ? options.distanceLabel || viewModel.distanceLabel
+          : "";
 
     // Twitterリンク
     if (viewModel.accountUrl) {
@@ -438,6 +445,7 @@ export class DomRouteGuidanceView {
     // お品書き画像表示
     const renderCatalogPlaceholder = (failedImage = null) => {
       if (failedImage && !this.els.tweetEmbed.contains(failedImage)) return;
+      this.els.targetDetail?.setAttribute("data-catalog-orientation", "none");
       this.els.tweetEmbed.innerHTML = "";
       const placeholder = document.createElement("div");
       placeholder.className = "catalog-placeholder";
@@ -446,13 +454,23 @@ export class DomRouteGuidanceView {
       this.els.tweetEmbed.appendChild(placeholder);
     };
 
+    this.els.targetDetail?.setAttribute("data-catalog-orientation", "none");
     this.els.tweetEmbed.innerHTML = "";
     if (viewModel.hasCatalogImage) {
       const img = document.createElement("img");
-      img.src = viewModel.catalogUrl;
       img.alt = "お品書き";
       img.loading = "lazy";
+      img.onload = () => {
+        this.els.targetDetail?.setAttribute(
+          "data-catalog-orientation",
+          classifyCatalogOrientation({
+            width: img.naturalWidth,
+            height: img.naturalHeight,
+          }),
+        );
+      };
       img.onerror = () => renderCatalogPlaceholder(img);
+      img.src = viewModel.catalogUrl;
       img.onclick = () => this.modalManager.showPdfModal(target); // ModalManagerへ委譲
       this.els.tweetEmbed.appendChild(img);
     } else {

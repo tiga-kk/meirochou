@@ -83,7 +83,7 @@ describe("DomRouteGuidanceView distance fallbacks", () => {
     });
 
     expect(document.querySelector("#target-route-log")?.textContent).toBe(
-      "距離 - / 次 なし",
+      "距離 -",
     );
     expect(document.querySelector("#target-dist")?.textContent).toBe("距離 -");
     expect(
@@ -110,7 +110,7 @@ describe("DomRouteGuidanceView distance fallbacks", () => {
     });
 
     expect(document.querySelector("#target-route-log")?.textContent).toBe(
-      "距離 18 / 次 なし",
+      "距離 18",
     );
     expect(document.querySelector("#target-dist")?.textContent).toBe("距離 42");
     expect(

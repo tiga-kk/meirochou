@@ -13,8 +13,8 @@
 - Phase 6: 完了・`main`へmerge済み
 - Phase 6.1: 完了・`main`へmerge済み
 - Phase 7: 完了・`main`へmerge済み
-- 現在のフェーズ: Phase 7.2 Task 6 完了
-- 次のTask: Phase 7.2 Task 7「target catalog adaptive layout」
+- 現在のフェーズ: Phase 7.2 Task 7 完了
+- 次のTask: Phase 7.2 Task 8「field acceptance and regression verification」
 - scale values: 確定
 
 ### Phase 6.1の既知残件
@@ -224,7 +224,12 @@ Phase 7.1統合後の実機確認で判明した経路表示、地図操作、Ga
   - priority buttonを実データから生成し、未設定・0・負値を区別するGallery view modelとempty stateを追加した。
   - v2 swipe hint、常設の操作方法button、storage失敗時も壊れないmanual replayを実装した。
   - Gallery関連E2E 6件、Webapp Vitest 105 files / 718 tests、architecture/typecheck、diff checkを検証した。
-- Task 7〜8: 未着手
+- Task 7: target catalog adaptive layout — 完了
+  - navigation summaryをcurrent legだけにし、下部detailの通常時重複を解消した。candidate時の`変更候補`表示は維持した。
+  - catalog画像のportrait/landscape/square/noneをload lifecycleで判定し、単一DOM layoutをresponsiveに切り替えるようにした。
+  - portrait/landscape/200% zoomのE2E snapshot、候補経路、狭幅overflowを検証した。
+  - Webapp Vitest 106 files / 721 tests、Task7対象E2E 7件、architecture/typecheck、diff checkを検証した。
+- Task 8: 未着手
 
 ### Phase 7.2の固定事項
 

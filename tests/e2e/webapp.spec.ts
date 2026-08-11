@@ -288,7 +288,7 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
     ?.split(" /")[0]
     .trim();
   await expect(page.locator("#target-start-space")).not.toHaveText("---");
-  await expect(page.locator("#target-route-log")).toHaveText(/^距離 \d+ /);
+  await expect(page.locator("#target-route-log")).toHaveText(/^距離 \d+$/);
   await expect(page.locator(".target-bottom-sheet")).not.toContainText(
     currentSummaryTarget || "",
   );
@@ -303,6 +303,10 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   );
   const catalog = page.locator("#tweet-embed-container img");
   await expect(catalog).toBeVisible();
+  await expect(page.locator("#next-target")).toHaveAttribute(
+    "data-catalog-orientation",
+    "landscape",
+  );
   await expect(catalog).toHaveCSS("object-fit", "contain");
   const imageBox = await catalog.boundingBox();
   const previewBox = await page.locator("#tweet-embed-container").boundingBox();
@@ -320,12 +324,19 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   await expect(page.locator("#next-target")).toHaveScreenshot(
     "navigation-map-catalog.png",
   );
+  await expect(page.locator("#next-target")).toHaveScreenshot(
+    "navigation-target-landscape-mobile.png",
+  );
 
   await pinFor(page, "東ア31b").evaluate((button: HTMLButtonElement) =>
     button.click(),
   );
   const portraitCatalog = page.locator("#tweet-embed-container img");
   await expect(portraitCatalog).toHaveCSS("object-fit", "contain");
+  await expect(page.locator("#next-target")).toHaveAttribute(
+    "data-catalog-orientation",
+    "portrait",
+  );
   const portraitDimensions = await portraitCatalog.evaluate(
     (image: HTMLImageElement) => ({
       width: image.naturalWidth,
@@ -342,6 +353,9 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   expect(portraitBox?.width).toBeLessThanOrEqual(portraitPreviewBox?.width + 1);
   expect(portraitBox?.height).toBeLessThanOrEqual(
     portraitPreviewBox?.height + 1,
+  );
+  await expect(page.locator("#next-target")).toHaveScreenshot(
+    "navigation-target-portrait-mobile.png",
   );
 });
 
@@ -373,6 +387,9 @@ test("320px幅・200% zoomでも候補と距離を横スクロールなしで表
   });
   expect(overflow.documentWidth, JSON.stringify(overflow)).toBeLessThanOrEqual(
     overflow.viewportWidth,
+  );
+  await expect(page.locator("#next-target")).toHaveScreenshot(
+    "navigation-target-portrait-200-percent.png",
   );
 });
 
@@ -446,7 +463,7 @@ test("ピンの候補経路を比較してから目的地を変更する", async
 
   await page.locator("#btn-close-route-selection").click();
   await expect(page.locator("#route-selection-controls")).toBeHidden();
-  await expect(page.locator("#target-status-label")).toHaveText("次の目的地");
+  await expect(page.locator("#target-status-label")).toHaveText("お品書き");
   await expect(heading).toHaveText(originalTarget || "");
   await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
 
@@ -490,7 +507,7 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   await expect(heading).toHaveText(candidate);
   await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
   await expect(page.locator('[data-route-kind="current"]')).toBeVisible();
-  await expect(page.locator("#target-status-label")).toHaveText("次の目的地");
+  await expect(page.locator("#target-status-label")).toHaveText("お品書き");
   await page.locator("#btn-purchased").click();
   await expect(page.locator("#toast")).toContainText(`${candidate} 購入`);
   await expect(heading).not.toHaveText(candidate);
