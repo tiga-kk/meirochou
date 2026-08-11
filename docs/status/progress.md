@@ -1,22 +1,24 @@
 # 進捗
 
-更新日: 2026-08-10
+更新日: 2026-08-11
 
 ## 現在の状態
 
 - リポジトリ: `tiga-kk/meirochou`
 - production branch: `main`
 - Phase 6 merge commit: `9718f976558e31596585f6e03416db8825c6e13f`（PR #9）
-- 計画文書branch: `docs/phase-06-1-phase-07-followup-plan`
+- Phase 7.1計画基準commit: `c812de4ae68bf720781c8a498a2664990d3546b0`
+- 計画文書branch: `docs/phase-07-1-ux-polish-plan`
 - Phase 5D: 完了
 - Phase 6: 完了・`main`へmerge済み
-- 現在のフェーズ: Phase 7 実装完了・既知の検証残件あり（完了判定は完全GREEN扱いにしない）
+- Phase 6.1: 完了・`main`へmerge済み
+- Phase 7: 完了・`main`へmerge済み
+- 現在のフェーズ: Phase 7.1 設計・実装計画策定完了、production実装は未開始
 - scale values: 確定
-- Phase 7: 完了・既知のvisual snapshot残件あり
 
 ### Phase 6.1の既知残件
 
-- 同一地点pinのz-orderテストは、今回のfocused rerunでは単発・5回反復とも成功したが、過去のCI retry/再実行失敗履歴があるため、間欠残件として追跡中。今回のPhase 6.1新規回帰とは断定しない。
+- 同一地点pinのz-orderテストは、focused rerunでは単発・5回反復とも成功したが、過去のCI retry/再実行失敗履歴があるため、間欠残件として追跡中。Phase 6.1新規回帰とは断定しない。
 - C108 private smoke 8件はfixture unavailableのためskip。以上により完全GREENではない。
 
 ### Phase 6.1で確定したscale values
@@ -28,7 +30,7 @@
 
 ## Phase 6.1
 
-本番`meirochou.tiga.moe`を実機操作して判明した具体的な問題を修正する。
+本番`meirochou.tiga.moe`を実機操作して判明した具体的な問題を修正した。
 
 設計:
 `docs/specs/2026-08-10-phase-06-1-field-ux-followups-design.md`
@@ -53,19 +55,17 @@ Phase計画:
 - async operationは`busy`とoperation種別を同じSession snapshotで更新し、GASだけでなくTask 2に列挙したCSV preview/applyも実controller pathから到達可能にする。
 - map viewportは実画像比率へ追従する。横長地図でも操作領域は最低220pxを確保する。
 - 横長地図は必要ならcover表示して横panさせる。地図外は最大約32pxだけrubber-bandし、releaseで戻す。
-- wide/tall mapの`initialX`/`initialY`はbase transformとして保持し、reset/area変更で`{1,0,0}`へ戻して中央位置を失わない。
+- wide/tall mapの`initialX`/`initialY`はbase transformとして保持し、reset/area変更で中央位置を失わない。
 - map pointermove hot pathでlayout readを繰り返さない。
-- Galleryの購入方向契約とPhase 6で実際に必要だったfinger travelを維持し、表示translationだけを非線形抵抗へする。現行の実効購入距離は`visualThreshold / 0.6`である。
+- Galleryの購入方向contractとPhase 6で実際に必要だったfinger travelを維持し、表示translationだけを非線形抵抗へする。
 - routing costと物理距離を分離する。UIへweighted routing costをそのまま距離として表示しない。
-- `metersPerPixel`はC108各areaの既知実寸根拠を確認してから設定し、推測値をcommitしない。
-- scale根拠が不足してもTask 5全体を停止せず、S/G、route flow、`physicalPixelLength`等のscale非依存部分は先に完了できる。ただしm距離部分が未完了ならPhase 6.1全体は完了扱いにしない。
 - current routeはS/Gを文字表示し、solid base line上にCSS `stroke-dashoffset`のflow lineを重ねる。
 - route animationのためにJavaScript RAF/timer、Dijkstra/ALNS再計算、毎frame DOM再生成を追加しない。
 - `prefers-reduced-motion: reduce`ではflow animationを停止する。
 
 ## Phase 7
 
-Phase 6.1完了後、会場の不安定な通信へ備えたoffline準備と管理画面再設計を行う。
+Phase 6.1完了後、会場の不安定な通信へ備えたoffline準備と管理画面再設計を実装した。
 
 設計:
 `docs/specs/2026-08-10-phase-07-offline-event-management-and-visual-system-design.md`
@@ -99,56 +99,94 @@ Phase計画:
 
 - Task 1: Service Worker + Cache Storageのcatalog offline基盤 — 完了
   - `comipath-catalog-v1`へのURL単位cache、opaque response、partial failure、best-effort persistenceを実装。
-  - production buildへ`catalog-service-worker.js`を単一ファイルとして含め、GET imageのcache hitだけをoffline fallbackする契約を検証。
-  - focused unit/E2E、`npm run verify`、public tree auditを実行済み。
+  - production buildへ`catalog-service-worker.js`を単一ファイルとして含め、GET imageのcache hitだけをoffline fallbackするcontractを検証。
 - Task 2: registry全event/dayのmanagement overview modelと一覧UI — 完了
   - registry順の全event/day、source/data/GAS queue/offline statusを一覧化し、未設定dayとstatus取得失敗を区別。
-  - overviewのactionイベント契約とsettings surfaceのsnapshotを追加。新規overview E2E、focused tests、webapp全体検証を実行済み。
-  - 既存のsource-diff/outbox/delete visual snapshot失敗は基準commitでも再現したため、今回の回帰とは分類しない。
 - Task 3: 開く/再読込/offline準備/編集/削除actionを一覧へ接続 — 完了
   - 日程一覧から既存のイベント切替、保存済みGAS再読込、CSV file picker、source editor、削除確認へ接続。
-  - Task 1のcache use caseでoffline準備の進捗と部分失敗を表示し、成功済みcacheをrollbackしない契約を実装。
-  - local deletion後は未参照catalog URLだけをbest-effort cleanupし、共有URL、削除失敗、残存参照取得失敗を安全側へ扱うwrapperとテストを追加。
-  - focused tests、webapp全体検証、management/catalog-offline E2Eを実行。既存のsource-diff/outbox/delete visual snapshot 3件は基準commitでも再現したため、今回の回帰とは分類しない。
+  - local deletion後は未参照catalog URLだけをbest-effort cleanupし、共有URL、削除失敗、残存参照取得失敗を安全側へ扱うwrapperとtestを追加。
 - Task 4: mainとmanagementのvisual hierarchyを再構成 — 完了
   - main内のinline settings cardを廃止し、headerの「管理」から独立したdialog相当surfaceを開く構造へ変更。
-  - event/day overviewを第一層に置き、safe-area、44px操作領域、keyboard focus、Escape/閉じる時のfocus復帰、dialog semanticsを維持。
-  - source-diff dialogをmanagement surface上で操作できるnested modalとして整理し、既存source preview/applyフローの回帰を解消。
-  - 意図したsettings surface snapshotだけを更新。地図/候補経路、source-diff、outbox、deleteの既存visual snapshot差分は基準時点からの残件として保持。
-  - `npm run verify`、management/webappの代表E2E、CI相当E2E、architecture/typecheck、build、public tree auditを実行。
 - Task 5: offline/management/visualの最終検証 — 完了
-  - catalog offlineのpartial failure/retryで成功済みcacheを保持し、不足URLだけを再取得するE2Eを追加・確認。
-  - management overviewのoffline status取得失敗を`0 / N`保存済みと混同しないE2Eを追加・確認。
-  - 管理、GAS同期、offline準備、cache cleanup、queue操作の利用者向けガイドとREADMEの対応状況を更新。
-  - Task 4の独立dialog化に伴い、背景UI操作前に管理dialogを閉じる既存E2Eの操作順を補正。production codeと既存snapshotは変更していない。
-  - `npm run verify`、catalog-offline E2E 3件、management E2E 15件、対象webapp E2E、`npm run test:e2e:ci`、public tree audit、`git diff --check`を実行。
-  - 全体CIは46件成功。managementの既存visual snapshot 3件は開始基準でも再現するため残件扱い。webappの地図snapshot 1件はretryで成功する既存flakyとして記録。
+  - catalog offline partial failure/retry、management offline status、管理/GAS/offline/cache cleanup/queue操作を検証。
 
 ### Phase 7の既知残件
 
-- `tests/e2e/management.spec.ts`のFlow 1（settings/source preview）、Flow 5（outbox）、Flow 7（scoped deletion）のvisual snapshot 3件は、機能assertionが通過する一方でサイズ差分が残っている。snapshotは根拠なく更新していない。
-- `tests/e2e/webapp.spec.ts`の地図・候補表示snapshotはCIで一度失敗後retryで成功する既存flaky。今回のTask 5追加変更との因果関係は確認できない。
-- `npx biome check .`はリポジトリ既存のlint/format/a11y指摘を含むため、Phase 7の完了判定には使用しない。Task 5では広範な自動整形を行っていない。
+- `tests/e2e/management.spec.ts`の一部visual snapshotは、機能assertionが通過する一方で基準差分の履歴がある。Phase 7.1の管理画面再設計時に意図した新baselineを個別に確立する。
+- `tests/e2e/webapp.spec.ts`の地図・候補表示snapshotには過去にretryで成功するflaky履歴がある。Phase 7.1の地図変更と因果を切り分ける。
+- `npx biome check .`はリポジトリ既存のlint/format/a11y指摘を含むため、広範な自動整形は行わない。
 
 ### Phase 7レビュー指摘対応
 
-- Service Workerのactivateで`clients.claim()`を実行し、初回registration後の同一pageをreloadなしでcontrolできることをcatalog offline E2Eで確認。
+- Service Workerのactivateで`clients.claim()`を実行し、初回registration後の同一pageをreloadなしでcontrolできることを確認。
 - 管理overviewの「開く」は日程切替後にmanagement surfaceを閉じ、main navigationへ戻るよう修正。
-- managementの第一層をevent/day rowsへ限定し、旧selector/source/outbox/optimization/delete操作を閉じたsecondary detail surfaceへ移動。編集・再読込・削除からは必要時にdetailを開く。
+- managementの第一層をevent/day rowsへ限定し、旧selector/source/outbox/optimization/delete操作をsecondary detail surfaceへ移動。
 - 使用中rowへ`[使用中]`と`aria-current="true"`を追加。
-- offline statusとcache cleanupのcatalog URL抽出を`catalogUrlsFromCircles()`へ統一し、残存参照確認をstrict index listingへ変更。確認不能時はcleanupをskipする。
-- nested dialogのancestor/siblingを含むfocus containmentを共通化し、dialog中の外部操作をinert化するunit testを追加。
+- offline statusとcache cleanupのcatalog URL抽出を`catalogUrlsFromCircles()`へ統一し、残存参照確認をstrict index listingへ変更。
+- nested dialogのfocus containmentを共通化し、dialog中の外部操作をinert化するunit testを追加。
+
+## Phase 7.1
+
+Phase 7を本番操作して判明したナビゲーション、地図操作、管理画面、motionの問題を修正する。
+
+設計:
+`docs/specs/2026-08-11-phase-07-1-navigation-motion-and-management-ux-design.md`
+
+Phase計画:
+`docs/plans/phase-07-1/README.md`
+
+実装順:
+
+1. Task 1: current route flow animationの実動検証と修正
+2. Task 2: navigation summaryの情報重複解消
+3. Task 3: map pan physics・bounds・inertia再設計
+4. Task 4: management surfaceの完全遮蔽とbackground scroll lock
+5. Task 5: 分離可能なmotion experiment群
+6. Task 6: management list-detail redesign + Phase 7.1総合検証
+
+### Phase 7.1で確認済みの問題
+
+- current routeにはCSS `stroke-dashoffset` animation定義が存在するが、実機では静止して見える。`animation-name`だけではなくcomputed dash offsetの実時間変化をtestする。
+- 通常案内中、地図上部summaryと下部sheetの双方に次の目的地・距離が表示され、正本が分かりにくい。
+- `GestureZoomController`は慣性を持つが、release velocityが最後のpointer deltaへ強く依存し、frame固定減衰のため端末差が出やすい。
+- C108地図は四辺へ到達できることをpure/E2E contractで固定する必要がある。
+- bounds内dragへ抵抗を掛けず、bounds外だけelastic overscrollにする。release後は直近sampleから慣性移動する。
+- management surfaceはfixed full-screenだが、background document scroll lockとscroll chaining抑止を明示しておらず、下層mainが見える場合がある。
+- Gallery初回swipe hintは現在もmotionを持つが、実際のswipeを模倣せず文字間隔pulse中心なので、操作方向を示す短いtranslate motionへ変更する。
+- management overview rowは機能actionが多く、mobileではlist→detail、desktopでは同じmodelの2-paneへ整理する。
+
+### Phase 7.1で固定する重要事項
+
+- route flowはsolid base + moving dash + S/Gを維持し、JavaScript per-frame route更新を追加しない。
+- 通常案内のtarget/distanceは地図上部summaryを正本とし、下部sheetは詳細/操作へ専念する。
+- pan physicsはDOM非依存pure moduleへ分離する。
+- 初期pan parameterは`velocityWindowMs=100`、`minReleaseSpeedPxPerMs=0.05`、`maxReleaseSpeedPxPerMs=1.8`、`decelerationPxPerMs2=0.0028`、`overscrollLimitPx=24`、`settleDurationMs=180`とし、一箇所から調整できるようにする。
+- bounds内panは1:1、bounds外dragだけrubber-band、release後はdtベースinertiaまたはbounds settleとする。
+- managementは別URL/pageへ分けずfull-screen surfaceを維持し、body fixed scroll lock + opaque surface + overscroll抑止で下層を完全遮蔽する。
+- 非必須motionは`apps/webapp/css/motion.css`へ集約する。
+- motionは操作理解/feedback目的に限定し、`prefers-reduced-motion`を維持する。
+- management detail selectionとmainで現在使用中のevent/dayを別概念として扱い、detailを見るだけでactive dayを変更しない。
+- event/day rowへ5actionを常設せず、detail内で意味単位に配置する。
+
+### Phase 7.1の進捗
+
+- 設計書: 完了・docs branchへpush済み。
+- Task 1〜6実装計画: 完了・docs branchへpush済み。
+- production code/test変更: 未開始。
+- 次の作業: 最新remote `main`から実装branchを作り、Task 1から順番にTDDで実装する。
 
 ## 実装開始時の確認
 
-Phase 6.1のproduction実装は、この計画文書がレビューされ`main`へ反映された後の最新remote `main`から開始する。`docs/phase-06-1-phase-07-followup-plan`へproduction code/test/package/CI変更を追加しない。
+Phase 7.1 production実装は、計画文書がレビューされた後の最新remote `main`から開始する。`docs/phase-07-1-ux-polish-plan`へproduction code/test/package/CI変更を追加しない。
 
-各Task開始直前に最新remote `main`を取得し、Task文書で列挙したファイル名・公開contract・test commandが現在コードと一致するか確認する。private implementationの安全な移動には追従してよいが、ユーザー向け契約が変わっている場合はTaskを勝手に読み替えず計画を再評価する。
+各Task開始直前に最新remote `main`を取得し、Task文書で列挙したファイル名・公開contract・test commandが現在コードと一致するか確認する。private implementationの安全な移動には追従してよいが、ユーザー向けcontractが変わっている場合はTaskを勝手に読み替えず計画を再評価する。
 
-Phase 6.1 Task 6がGREENになり、`docs/status/progress.md`へ完了が記録されるまでPhase 7実装を開始しない。
+Phase 7.1ではTask 3のmap physicsを他のvisual変更と混ぜず、Task単独でreview gateを通す。Task 5のmotion experimentは、個別に削除可能な形を維持する。
 
 ## 完了済みPhaseの参照
 
+- Phase 7: `docs/specs/2026-08-10-phase-07-offline-event-management-and-visual-system-design.md`, `docs/plans/phase-07/`
+- Phase 6.1: `docs/specs/2026-08-10-phase-06-1-field-ux-followups-design.md`, `docs/plans/phase-06-1/`
 - Phase 6: `docs/specs/2026-08-09-phase-06-user-experience-improvements-design.md`, `docs/plans/phase-06/`
 - Phase 5D: `docs/plans/phase-05d/`
 
