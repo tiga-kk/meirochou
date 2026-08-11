@@ -1,322 +1,241 @@
-# Phase 7.1: ナビゲーション・モーション・管理画面UX改善 設計
+# Phase 7.1: ナビゲーション・地図操作・管理画面UX改善 設計
 
 日付: 2026-08-11
 
 ## 1. 目的
 
-Phase 7を本番利用した結果として確認された次の6点を、既存のDomain/Application責務を崩さずUI/interaction層中心に修正する。
+Phase 7を本番利用して確認された次の問題を、既存Domain/Application責務と既存Use Caseを不要に変更せずUI/interaction層中心に修正する。
 
-1. current routeの経路flowが実機で静止して見える。
-2. 地図の上下に距離と次の目的地が重複しており、情報の正本が分かりにくい。
-3. 地図panが重く感じられ、地図端まで確実に見えない場合があり、境界外dragの感触とrelease後の慣性も自然ではない。
-4. 管理画面表示中に下層のmain画面が見える場合がある。
-5. 操作理解と状態遷移を助けるモーションが不足している。特にGallery初回swipe hintは、実際の操作方向を模倣する方が分かりやすい。
-6. 管理画面は機能的には成立しているが、event/dayのscan、detailへの移動、action hierarchyをさらに整理できる。
+1. current routeのflowが実機で静止して見える。
+2. 地図の上下にcurrent targetと距離が重複し、情報の正本が分かりにくい。
+3. 地図panが重く、端への到達・bounds外drag・release後の慣性が安定しない。
+4. 管理画面表示中に下層mainが見える、またはbackground scrollが干渉する場合がある。
+5. Gallery初回swipe hintが実際の操作方向を十分に示さない。
+6. 管理画面overviewのactionが過密で、mobile/desktop双方の情報階層を整理する余地がある。
 
 Phase 7.1は新機能追加フェーズではない。routing、ALNS、circle data source、offline cache、GAS outbox、local deletionのbusiness contractは原則変更しない。
 
-## 2. 現状確認
+## 2. 基準点の扱い
 
-基準commitは`main`の`c812de4ae68bf720781c8a498a2664990d3546b0`。
+計画作成時に確認した`main`は`c812de4ae68bf720781c8a498a2664990d3546b0`である。これは現状分析の履歴上の参照点であり、実装開始SHAではない。
 
-### 2.1 route flow
+各Taskは開始直前に最新`origin/main`または前Task完了HEADを取得し、その時点のコード、test、file pathへ計画を照合する。計画作成時SHAとprivate implementationの差だけを理由に実装を停止しない。一方、外部挙動や責務が変わっている場合は計画を再評価する。
 
-`apps/webapp/css/target.css`には`.route-flow-line`の`stroke-dashoffset` animationが存在し、`prefers-reduced-motion: reduce`では停止する。`buildRouteOverlaySvg()`もcurrent routeにflow polylineを生成している。
+## 3. 現状確認
 
-したがってPhase 7.1では、最初から別方式へ置き換えない。まずno-preference環境でcomputed `stroke-dashoffset`が時間経過により変化するかを検証し、実際に動いていないのか、動いているが視認できないのかを分離する。
+### 3.1 route flow
 
-### 2.2 地図pan
+`apps/webapp/css/target.css`には`.route-flow-line`の`stroke-dashoffset` animationがあり、`prefers-reduced-motion: reduce`では停止する。`buildRouteOverlaySvg()`もcurrent routeへflow polylineとS/Gを生成している。
 
-`GestureZoomController`は現在も慣性を持つが、velocityは最後の`pointermove`の`dx/dy`だけで決まり、frameごとに固定比率`0.92`で減衰する。event間隔の差を考慮しないため、同じ指速度でも端末/ブラウザのpointer event頻度やrelease直前の最後のdeltaに左右される。
+したがって別方式へ置換せず、まずcomputed dash offsetの実時間変化を確認する。動いているが見えない場合だけdash間隔・線幅・速度・コントラストを最小調整する。
 
-またbounds、rubber-band、inertia、pinchが一つのcontroller内で密結合している。Phase 7.1ではcontrollerを全面置換せず、pan physicsをpure functionへ分離して検証可能にする。
+### 3.2 navigation summary
 
-### 2.3 管理画面
+現行`DomRouteGuidanceView.showNavigation()`では、上部summaryは`currentTarget`を維持し、別pinを選んだcandidate previewでは`selectedTarget`のidentity/distanceをbottom sheet側へ表示している。
 
-`#settings-area`は`position: fixed; inset: 0`で独立surfaceになっているが、background document scrollの保存・固定・復元を管理していない。管理surface自体にもscroll boundaryから下層へ連鎖しない契約を明示する必要がある。
+よって通常時の重複を削る際も、candidate preview/loading/readyの文字情報まで消してはいけない。通常・preview・comparisonを別状態として設計する。
 
-UIはevent/day overviewと`選択中の日程の詳細`を持つが、mobileではoverviewとdetailの階層をより明確にし、desktopでは同じmodelを2-paneとして使える構成が適している。
+### 3.3 map pan
 
-## 3. 外部設計原則
+`GestureZoomController`は既にbounds、rubber-band、inertia、pinch、wheel、RAF coalescing、cached layoutを持つ。一方でrelease velocityは最後のpointer deltaへ強く依存し、inertiaはframeごとの固定減衰である。
 
-Phase 7.1は特定製品の見た目をコピーしない。次の原則だけを採用する。
+Phase 7.1ではcontrollerを置換せず、既存処理を再利用してrelease samplingとdt-based inertiaを追加する。pure helperはtestabilityのために使ってよいが、新module化自体を要件にしない。
 
-- Apple Human Interface Guidelines / Motion: モーション自体を目的にせず、状態、フィードバック、指示を補助する。頻繁な操作へ不要な待ち時間を加えない。重要情報をmotionだけで伝えない。
-  - https://developer.apple.com/design/human-interface-guidelines/motion
-- Apple Human Interface Guidelines / Lists and tables: text中心の情報は短いrowでscanしやすくし、大量のdetailをrowへ詰めず選択後のdetail viewへ分離する。
-  - https://developer.apple.com/design/human-interface-guidelines/lists-and-tables
-- Leaflet reference: map panはdrag中にmomentumを蓄え、release後はdecelerationで止まる慣性を持つ。bounds外dragの硬さと慣性を別概念として扱う。
-  - https://leafletjs.com/reference
-- web.dev / high-performance CSS animations: UI motionは可能な限り`transform`と`opacity`を中心にし、layout/paintを毎frame発生させるanimationを避ける。
-  - https://web.dev/articles/animations-guide
-- MDN / overscroll-behavior: full-screen管理surfaceのscroll boundaryからbackgroundへscroll chainingしない。
-  - https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/overscroll-behavior
-- `prefers-reduced-motion`は既存contractを維持し、非必須motionを停止またはfade中心へ縮小する。
-  - https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/%40media/prefers-reduced-motion
+現行`applyRubberBand()`の既定overscroll上限は32pxで、Phase 6.1でも約32pxが既存契約として記録されている。Phase 7.1で根拠なく24pxへ変更しない。
+
+### 3.4 management surface
+
+`#settings-area`は既に`position: fixed; inset: 0; overflow-y: auto; background: var(--bg-body)`である。したがって新しいfull-screen overlayを作り直すのではなく、background document scroll、scroll chaining、viewport/safe-area等の再現した不足だけを直す。
+
+`ComipathSettings`は現在、overviewとsecondary `<details>`の両方を所有する。list/detail redesignでもこの既存ownerをまず再利用する。
+
+### 3.5 management action ownership
+
+`EventDayManagementView`は現在、5 action eventをdispatchし、`BrowserApplication`がUse Caseへ接続する。
+
+重要なのは、現行`BrowserApplication`の`再読込`、`オフライン準備`、`編集`、`削除`handlerが対象refへ`eventDayTransition.execute(ref)`してから処理する点である。
+
+Phase 7.1では「detailを見るだけではactive dayを変えない」を追加するが、既存action実行時の対象day切替まで独断で変更しない。action semantics変更は別の製品仕様判断とする。
 
 ## 4. 設計方針
 
-### 4.1 情報の正本を一つにする
+### 4.1 通常案内の正本を上部summaryへ集約する
 
-通常案内中の`次の目的地`と`距離`は地図上部summaryを正本とする。
-
-推奨表示:
+通常案内中:
 
 ```text
 NEXT  東ア23a
 FROM  東ア10     約84 m
 ```
 
-またはviewport幅に応じて同一内容を1〜2行でwrapする。
+current target、start、current route distanceを上部summaryへ置く。bottom sheetはpriority、source/sheet、catalog link、購入済/保留等の詳細と操作へ専念する。
 
-地図下部sheetは対象の詳細と操作へ専念する。
+candidate preview/loading/readyでは上部summaryをcurrent routeのまま維持し、候補操作領域でcandidate spaceとdistance/statusを明示する。
 
-```text
-優先度 10
-配置シート1
-X / お品書きLink
-[購入済] [保留]
-```
+comparison中だけcurrent/candidate双方を並べる。
 
-通常案内中は下部の`target-dist`、`sub-target-space`、`selected-target-space`による同一情報の重複表示をなくす。候補経路比較中のみ、候補spaceと候補距離をcomparison surfaceへ表示する。
+### 4.2 route flowは既存CSS/SVG方式を維持する
 
-### 4.2 route flowはCSS/SVGの軽量方式を維持する
+current route:
 
-current routeは次の3層とする。
+1. solid base line
+2. moving dash
+3. S/G marker
 
-1. 赤色のsolid base line: 経路そのもの。motion無効でも必ず残る。
-2. 白系のmoving dash: Start→Goal方向の視覚的flow。
-3. S/G marker: motionに依存しない方向情報。
+JavaScript per-frame route更新は追加しない。no-preferenceではcomputed valueが実時間で変化することをE2Eで確認する。特定のdasharray/duration値は初期候補に留め、受入条件にはしない。
 
-JavaScriptのper-frame route再計算、Dijkstra/ALNS再実行、毎frame SVG再生成は追加しない。
+### 4.3 map panは既存controllerを最小改修する
 
-no-preference環境ではcomputed `stroke-dashoffset`が実時間で変化することをE2Eで確認する。動いているが目立たない場合は、dash間隔・太さ・durationだけを調整する。最初の候補値は`stroke-dasharray: 12 28`、`stroke-width: 5`、`0.8s linear infinite`とするが、視認性確認で調整可能とする。
+必須の挙動:
 
-`prefers-reduced-motion: reduce`ではmoving dashを停止し、solid lineとS/Gを維持する。
+- bounds内dragは1:1。
+- bounds外だけ既存rubber-band。
+- release velocityは直近の複数sampleから時間基準で求める。
+- inertiaはRAF timestamp差を使う。
+- bounds到達時はその軸を停止する。
+- bounds外releaseはさらに外へ進めずsettleする。
+- pointerdown/pinch/reset/layout/route fitで進行animationを安全にcancelする。
+- idle時RAFを残さない。
 
-### 4.3 map pan physicsをevent frequency非依存へする
+速度window、max speed、deceleration、settle duration等は一箇所で調整できるようにしてよいが、計画段階の特定値をpublic contractへしない。
 
-pan physicsを`GestureZoomController`からpure functionへ分離する。
+pure helperを既存`gesture-zoom-controller.js`に置くか別fileへ分けるかは、責務の読みやすさとtestabilityで決める。
 
-新規module候補:
+### 4.4 map edgeとroute fitを両方testする
 
-`apps/webapp/js/utils/gesture-pan-physics.js`
+C108各areaで必要なleft/right/top/bottomへ到達できることを確認する。stageがviewportより小さい軸は`baseX/baseY`を維持する。
 
-責務:
+route fit transformをboundsへ補正する場合、単にbounds内であることだけでなくcurrent/comparisonの必要pointが見えることをtestする。clampによるroute fit破壊を許容しない。
 
-```js
-calculatePanBounds(layout, scale)
-applyElasticOverscroll(value, bounds, limitPx)
-recordPanSample(samples, sample)
-calculateReleaseVelocity(samples, nowMs, windowMs, maxSpeedPxPerMs)
-stepPanInertia(state, dtMs, bounds, decelerationPxPerMs2)
-```
+### 4.5 managementは既存full-screen surfaceを維持する
 
-初期調整値は一箇所のconstantへ集約する。
+管理open中:
 
-```js
-export const DEFAULT_PAN_PHYSICS = {
-  velocityWindowMs: 100,
-  minReleaseSpeedPxPerMs: 0.05,
-  maxReleaseSpeedPxPerMs: 1.8,
-  decelerationPxPerMs2: 0.0028,
-  overscrollLimitPx: 24,
-  settleDurationMs: 180,
-};
-```
+- surfaceは即時opaque。
+- background document scrollを止める。
+- management内scrollは許可する。
+- scroll boundaryからbackgroundへのscroll chainingを抑止する。
+- close時に元scroll位置と変更したinline styleを正確に復元する。
+- disconnectでもlockを残さない。
+- safe-area、focus、nested dialogを維持する。
 
-この値は最終的な絶対値ではなくPhase 7.1の初期値であり、Task 3の実機相当E2E/manual profilingで変更してよい。ただし値を各methodへ分散させない。
+scroll lockは一利用者しかいないため、まず`ComipathSettings`のprivate lifecycleとして実装する。別module/interfaceへの抽出は必要性が確認された場合だけ行う。
 
-挙動contract:
+### 4.6 非必須motionを必要箇所だけ分離する
 
-- bounds内dragは指移動に1:1で追従し、常時の抵抗を加えない。
-- bounds外へdragした場合だけ最大24px程度のrubber-bandを許す。
-- release時にbounds外なら、慣性をさらに外へ進めず180ms程度で最寄り境界へ戻す。
-- bounds内releaseでは直近100msの複数sampleからvelocityを算出し、時間基準のdecelerationで慣性移動する。
-- inertia中にboundsへ到達したら境界で止める。地図外を見せ続けない。
-- new pointer down、pinch開始、layout変更、route fitで進行中animationを即時cancelできる。
-- `requestAnimationFrame`はactive drag/inertia/settleがない場合に残さない。
-
-### 4.4 地図端の可視性をcontractにする
-
-wide/tall mapを含め、scaleごとに次をpure testで固定する。
-
-- left boundへpanすると地図左端がviewport左端に一致する。
-- right boundへpanすると地図右端がviewport右端に一致する。
-- top/bottomも同様。
-- stageがviewportより小さい軸はbase positionへ固定する。
-- `calculateFitTransform()`の結果は最終的にpan boundsへ収める。
-
-C108の`e456/e7/s12/w12`について、実際のimage/stage比率を使ったregression testを追加する。地図端が見えない問題をvisual impressionだけで完了判定しない。
-
-### 4.5 管理画面はfull-screen surfaceを維持し、backgroundを完全遮蔽する
-
-別URL/pageへの分離は行わない。理由は次の通り。
-
-- 管理から`開く`、`編集`、GAS preview、delete dialogへ既存application stateを引き継ぎやすい。
-- back/closeでmainへ即復帰できる。
-- routingやcircle sessionを新page lifecycleへ分割する必要がない。
-
-ただし「overlayに見えるが下層が覗く」状態は許容しない。
-
-管理open時:
-
-- background documentの現在scroll位置を保存する。
-- `body`を固定し、main pageのscrollを停止する。
-- management surfaceは`position: fixed; inset: 0; min-height: 100dvh`相当でopaque backgroundを持つ。
-- `overscroll-behavior: contain`または対応環境で`none`を適用し、managementのscroll boundaryからbackgroundへscroll chainさせない。
-- close時にbody styleを正確に復元し、元のscroll位置へ戻す。
-- safe-areaを維持する。
-
-focus/keyboard contractはPhase 7の`DialogFocusController`を維持する。
-
-### 4.6 motion experimentは一つのCSSへ隔離する
-
-新規:
-
-`apps/webapp/css/motion.css`
-
-Phase 7.1で追加する非必須motionをこのfileへ集約し、既存business CSSへanimation定義を散らさない。
-
-候補motion:
+`apps/webapp/css/motion.css`へ次だけを必須範囲として集約する。
 
 1. Gallery初回swipe hint
-   - 現在の文字間隔pulseだけでなく、カード/ミニプレビューが左右へ10〜16px移動して戻る。
-   - 1〜2往復で停止し、3500msずっと動かし続けない。
-   - hint textは残すためmotionがなくても意味が通る。
-2. management open
-   - contentのみ`opacity 0→1` + `translateY(8px→0)`、約180〜220ms。
-   - background自体は瞬時にopaqueにし、下層を一瞬見せない。
-3. management list→detail
-   - mobileのみ短いhorizontal transition、約200〜240ms。
-   - desktop 2-paneでは不要。
-4. purchase/hold feedback
-   - buttonまたは対象cardに短いscale/opacity feedback。操作完了を待たせない。
-5. route marker emphasis
-   - route変更時にS/G markerを一度だけ軽く強調する。current routeの常時loopはflow lineだけとする。
-6. async completion
-   - indicatorの退出を短いfadeにする。
+   - 現行storage/timer lifecycleを再利用する。
+   - 実際の横swipeを模倣する短いtranslate motion。
+   - textだけでも意味が通る。
+2. management entry
+   - surface backgroundは即時opaque。
+   - 必要ならcontentだけ短いopacity/translate。
+3. Task 6で必要になったmobile list/detail transition
+   - 状態変更は即時。
+   - animation終了をbusiness logicの条件にしない。
 
-`prefers-reduced-motion: reduce`では、継続loopや大きなtranslate/scaleを停止し、必要な場合はopacityだけへ縮小する。
+purchase/hold feedback、route endpoint emphasis、async indicator exit animationは今回の確認済み問題に必須ではないため追加しない。
 
-### 4.7 管理画面をlist-detailへする
+特にroute endpointは`renderNavigation()`によるoverlay再生成でroute変更以外にも再animationし得るので、単純な`.route-endpoint` one-shot animationを採用しない。
+
+### 4.7 managementをlist-detailへする
 
 #### Mobile
 
-第一層はevent/day listだけをscanしやすく表示する。
+第一層はscanしやすいevent/day listにする。
 
 ```text
-管理                                      閉じる
-
-C108
-1日目                              使用中  ›
+C108 / 1日目      使用中  ›
 GAS / 配置シート1
 532件  同期0件  お品書き521/532
-
-2日目                                      ›
-未設定
 ```
 
-row全体または明示した`詳細`/chevronでdetailへ進む。5個のaction buttonを一覧rowに常時並べない。
+rowを選ぶとdetailへ進むが、それだけではactive dayを変えない。
 
-detail:
-
-```text
-‹ イベント・日程
-C108 / 1日目       使用中
-
-データソース
-  GAS / 配置シート1
-  [再読込] [編集]
-
-オフライン
-  521 / 532 保存済み
-  [オフライン準備]
-
-GAS同期
-  0件待ち
-  [キューを確認]
-
-巡回設定
-  探索時間 3秒
-
-データ管理
-  [この日程のデータを削除]
-```
-
-未設定day detailではsource設定を主actionにする。
+detailではsource/offline/GAS/巡回設定/削除等を意味単位で配置する。非selected configured dayには`この日程を開く`を明示する。未設定dayは既存設定経路へ接続する`設定する`を主actionにする。
 
 #### Desktop
 
-同じ`EventDayManagementRow`とdetail modelを使い、左list / 右detailの2-paneを許可する。mobileと別business modelを作らない。
+mobileと同じ`rows`/detail selection stateで左list・右detailの2-paneとする。desktop専用repository queryを追加しない。
 
-### 4.8 管理action ownership
+#### component境界
 
-既存event contractを維持する。
-
-- `event-day-open-request`
-- `event-day-refresh-request`
-- `event-day-offline-request`
-- `event-day-edit-request`
-- `event-day-delete-request`
-
-list/detail componentはrepository、network、cacheを直接触らない。BrowserApplication/application controllerが既存Use Caseへ接続する。
+`ComipathSettings`は既にdetail controlsのownerなので、まず同component内のprivate state/renderで実装する。新`EventDayManagementDetail` componentは、実装後の責務が明確に分離できる場合だけ抽出する。
 
 ## 5. 非目標
 
-- MapLibre/Leaflet等の地図libraryへ移行しない。
-- canvas/WebGL rendererへ変更しない。
-- route calculation algorithmを変更しない。
-- full PWA化を追加しない。
-- management専用routerやSPA frameworkを追加しない。
-- motion libraryを追加しない。
-- physics engineを追加しない。
-- haptic/audio feedbackをPhase 7.1へ追加しない。
-- animationのために新しいglobal state storeを作らない。
+- 地図library/canvas/WebGLへの移行。
+- route calculation algorithm変更。
+- full PWA化。
+- management専用router。
+- motion/physics library追加。
+- haptic/audio feedback。
+- 新global state store。
+- 未観測箇所への装飾animation追加。
+- management action semanticsの変更。
 
 ## 6. テスト戦略
 
-### Unit
+### Unit / component
 
-- route overlay structure。
-- pan bounds。
-- release velocity sampling。
-- dtベースinertia。
-- overscroll上限。
-- settle完了とRAF停止。
-- mobile/desktop management view state。
+- current/candidate route overlay構造。
+- navigation state別の表示責務。
+- release velocity sampleとdt-based inertia。
+- bounds/overscroll/RAF停止。
+- management scroll lock lifecycle。
+- overview rowのdetail request。
+- detail selectionとactive dayの分離。
+- 既存5 action eventの`ref` contractをdetail側で維持。
 
 ### E2E
 
-- route flowのcomputed dash offsetが250〜400ms後に変わる。
-- reduced motionではoffset animationが停止する。
--通常案内中に距離/次目的地の重複がない。
-- e456等のwide mapで左右端へ到達できる。
-- drag release後にinertiaが継続し、その後停止する。
-- 管理open中にbody/backgroundがscrollしない。
-- management surfaceの4辺からmain contentが見えない。
-- mobile list→detail→back。
+- route flowの実時間変化。
+- reduced motion。
+- 通常案内の重複なし + candidate preview identity。
+- C108 map edge + inertia。
+- management遮蔽/background scroll lock。
+- Gallery初回hint。
+- mobile list→detail→back/open。
 - desktop 2-pane。
-- Gallery初回hint motionは一度だけで、再訪時は再表示しない。
-- reduced motionで実験motionを停止/縮小する。
+- existing GAS/CSV/offline/delete/outbox path。
+- 200% zoom、keyboard、safe-area。
+
+management E2Eでは、現行`openSettings()`のようにdetailを自動openするhelperをlist/detail検証へ流用しない。overviewから実UI操作でdetailへ進むtestを持つ。
 
 ### Performance
 
-Chrome DevTools相当のperformance traceまたはPlaywright/Performance APIで、map drag中にlayout readをpointermoveごとに繰り返していないことを確認する。animationは原則`transform`/`opacity`を使用する。
+- pointermoveごとのlayout readなし。
+- transform write coalescing維持。
+- idle RAFなし。
+- 非必須motionはtransform/opacity中心。
 
-## 7. Phase受入条件
+## 7. Task構成
 
-- no-preference環境でcurrent route flowが実際に時間変化して見える。
-- reduced motionではroute flowのloopを止めても経路方向を理解できる。
-- 通常案内中の次目的地・距離は一箇所を正本とし、上下で重複しない。
-- C108各areaで地図の全端へ到達可能。
-- bounds内panは1:1で軽く追従する。
-- release後に自然なinertiaがあり、event frequencyへ依存しない。
-- bounds外dragは限定的に柔らかく動くが、release後は必ず正しいboundsへ戻る。
-- management open中に下層mainが見えず、background scrollも発生しない。
-- motion experimentは`motion.css`中心に隔離され、個別削除しやすい。
-- Gallery初回hintは実際のswipe方向をmotionで示す。
-- mobile managementはevent/day list→detail構造になり、一覧rowへactionを過密配置しない。
-- desktopでは同じmodelを2-paneで表示できる。
-- 44px touch target、keyboard focus、safe-area、200% zoom、reduced-motionを維持する。
-- `npm run verify`、`npm run test:e2e:ci`、`node scripts/audit-public-tree.mjs`、`git diff --check`が成功する。
+1. route flow実動検証と最小修正
+2. navigation summary情報重複解消
+3. map pan bounds/release velocity/inertia改善
+4. management遮蔽/background scroll isolation
+5. 必要なmotion feedbackの分離実装
+6. management list-detail redesign
+7. 総合検証・snapshot・進捗確定
+
+Task 7を分離することで、Task 6の大規模UI変更とPhase全体の検証・progress確定を同じcommitへ混ぜない。最終production HEADが確定してからdocs-onlyでprogressへSHAを記録する。
+
+## 8. Phase受入条件
+
+- current route flowがno-preferenceで実時間変化し、reduced motionではsolid route/S/Gだけでも方向が分かる。
+- 通常案内のcurrent target/distanceは上部summaryが正本。
+- candidate previewで候補identity/distance/statusが消えない。
+- C108各areaで必要端へ到達可能。
+- bounds内1:1、multi-sample release velocity、dt-based inertia、bounds settleが成立する。
+- 既存約32px rubber-band契約を根拠なく変更しない。
+- management open中に下層mainが見えずbackground scrollしない。
+- Gallery hintが実swipe方向を示す。
+- 非必須motionが`motion.css`へ分離されreduced motion対応。
+- mobile managementはlist→detail、desktopは同じmodelで2-pane。
+- detailを見るだけではactive dayを変えない。
+- 既存management actionは既存BrowserApplication/Use Caseへ接続される。
+- 44px touch target、keyboard focus、safe-area、200% zoomを維持する。
+- `npm run verify`、`npm run test:e2e:ci`、`node scripts/audit-public-tree.mjs`、`git diff --check`が成功するか、失敗を開始基準との比較で具体的に分類できる。

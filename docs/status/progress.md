@@ -7,13 +7,14 @@
 - リポジトリ: `tiga-kk/meirochou`
 - production branch: `main`
 - Phase 6 merge commit: `9718f976558e31596585f6e03416db8825c6e13f`（PR #9）
-- Phase 7.1計画基準commit: `c812de4ae68bf720781c8a498a2664990d3546b0`
+- Phase 7.1計画作成時main: `c812de4ae68bf720781c8a498a2664990d3546b0`（履歴参照用。実装基準には固定しない）
 - 計画文書branch: `docs/phase-07-1-ux-polish-plan`
 - Phase 5D: 完了
 - Phase 6: 完了・`main`へmerge済み
 - Phase 6.1: 完了・`main`へmerge済み
 - Phase 7: 完了・`main`へmerge済み
-- 現在のフェーズ: Phase 7.1 設計・実装計画策定完了、production実装は未開始
+- 現在のフェーズ: Phase 7.1 設計・実装計画の敵対的レビュー反映済み、production実装は未開始
+- 次のTask: Phase 7.1 Task 1
 - scale values: 確定
 
 ### Phase 6.1の既知残件
@@ -137,51 +138,57 @@ Phase計画:
 
 実装順:
 
-1. Task 1: current route flow animationの実動検証と修正
+1. Task 1: current route flowの実動検証と最小修正
 2. Task 2: navigation summaryの情報重複解消
-3. Task 3: map pan physics・bounds・inertia再設計
-4. Task 4: management surfaceの完全遮蔽とbackground scroll lock
-5. Task 5: 分離可能なmotion experiment群
-6. Task 6: management list-detail redesign + Phase 7.1総合検証
+3. Task 3: map pan bounds・release velocity・inertia改善
+4. Task 4: management surfaceの遮蔽とbackground scroll isolation
+5. Task 5: 必要なmotion feedbackの分離実装
+6. Task 6: management list-detail redesign
+7. Task 7: 総合検証・snapshot・進捗確定
 
 ### Phase 7.1で確認済みの問題
 
 - current routeにはCSS `stroke-dashoffset` animation定義が存在するが、実機では静止して見える。`animation-name`だけではなくcomputed dash offsetの実時間変化をtestする。
-- 通常案内中、地図上部summaryと下部sheetの双方に次の目的地・距離が表示され、正本が分かりにくい。
+- 通常案内中、地図上部summaryと下部sheetの双方にcurrent target/distanceが表示され、正本が分かりにくい。
+- candidate previewでは現行bottom sheetが候補space/distanceの文字表示を担っているため、通常時の重複除去で候補identityまで消さない必要がある。
 - `GestureZoomController`は慣性を持つが、release velocityが最後のpointer deltaへ強く依存し、frame固定減衰のため端末差が出やすい。
-- C108地図は四辺へ到達できることをpure/E2E contractで固定する必要がある。
-- bounds内dragへ抵抗を掛けず、bounds外だけelastic overscrollにする。release後は直近sampleから慣性移動する。
-- management surfaceはfixed full-screenだが、background document scroll lockとscroll chaining抑止を明示しておらず、下層mainが見える場合がある。
-- Gallery初回swipe hintは現在もmotionを持つが、実際のswipeを模倣せず文字間隔pulse中心なので、操作方向を示す短いtranslate motionへ変更する。
-- management overview rowは機能actionが多く、mobileではlist→detail、desktopでは同じmodelの2-paneへ整理する。
+- C108地図は必要な四辺へ到達できることをunit/E2E contractで固定する必要がある。
+- management surfaceはすでにfixed/opaqueだが、background document scroll lockとscroll chaining抑止が不足している可能性がある。
+- Gallery初回swipe hintは実際のswipeを模倣せず文字表現中心なので、操作方向を示す短いtranslate motionへ変更する。
+- management overview rowは5 actionが並び、mobileではlist→detail、desktopでは同じmodelの2-paneへ整理する。
+- 現行managementの`再読込`、offline準備、編集、削除は対象dayへ切り替えてから既存Use Caseを実行する。このaction semanticsと「detailを見るだけではactive dayを変えない」を混同しない。
 
 ### Phase 7.1で固定する重要事項
 
+- 計画作成時main SHAは履歴参照だけに使い、各Task開始SHAは実装開始直前の最新HEADから取得する。
 - route flowはsolid base + moving dash + S/Gを維持し、JavaScript per-frame route更新を追加しない。
-- 通常案内のtarget/distanceは地図上部summaryを正本とし、下部sheetは詳細/操作へ専念する。
-- pan physicsはDOM非依存pure moduleへ分離する。
-- 初期pan parameterは`velocityWindowMs=100`、`minReleaseSpeedPxPerMs=0.05`、`maxReleaseSpeedPxPerMs=1.8`、`decelerationPxPerMs2=0.0028`、`overscrollLimitPx=24`、`settleDurationMs=180`とし、一箇所から調整できるようにする。
-- bounds内panは1:1、bounds外dragだけrubber-band、release後はdtベースinertiaまたはbounds settleとする。
-- managementは別URL/pageへ分けずfull-screen surfaceを維持し、body fixed scroll lock + opaque surface + overscroll抑止で下層を完全遮蔽する。
-- 非必須motionは`apps/webapp/css/motion.css`へ集約する。
-- motionは操作理解/feedback目的に限定し、`prefers-reduced-motion`を維持する。
-- management detail selectionとmainで現在使用中のevent/dayを別概念として扱い、detailを見るだけでactive dayを変更しない。
-- event/day rowへ5actionを常設せず、detail内で意味単位に配置する。
+- 通常案内のcurrent target/distanceは地図上部summaryを正本とし、candidate previewのidentity/distanceは候補操作領域へ残す。
+- pan physicsは既存`GestureZoomController`を再利用し、別pure moduleの作成を必須にしない。
+- 現行約32pxのrubber-band上限を根拠なく24pxへ変更しない。
+- bounds内panは1:1、release velocityは複数sample、inertiaはdtベース、bounds外releaseはsettleとする。
+- managementは既存full-screen surfaceを維持し、再現した不足に対してscroll lock/scroll chainingを最小修正する。
+- scroll lock専用public interface/moduleを一利用者のためだけに必須化しない。
+- 非必須motionは`motion.css`へ集約するが、Phase 7.1の必須範囲はGallery hintとmanagement transitionに限定する。purchase/route endpoint/async completionの追加演出は対象外。
+- management detail selectionとactive event/dayを別概念として扱う。
+- management detailの新component作成を必須にせず、既存`ComipathSettings`のowner責務を優先して再利用する。
+- 既存5 action eventのtest coverageをoverviewからdetailへ移し、削除だけで終わらせない。
+- management E2Eではdetailを自動openするhelperをlist/detail本番経路の証明に使わない。
+- Phase全体の最終検証とprogress確定をTask 7へ分離し、最終production commit SHAが確定した後にdocs-onlyで進捗へ記録する。
 
 ### Phase 7.1の進捗
 
-- 設計書: 完了・docs branchへpush済み。
-- Task 1〜6実装計画: 完了・docs branchへpush済み。
+- 設計書: 敵対的レビュー反映済み。
+- Task 1〜7実装計画: 敵対的レビュー反映済み。
 - production code/test変更: 未開始。
-- 次の作業: 最新remote `main`から実装branchを作り、Task 1から順番にTDDで実装する。
+- 次の作業: 最新remote `main`から実装作業を開始し、Task 1から順番にTDDで実装する。
 
 ## 実装開始時の確認
 
-Phase 7.1 production実装は、計画文書がレビューされた後の最新remote `main`から開始する。`docs/phase-07-1-ux-polish-plan`へproduction code/test/package/CI変更を追加しない。
+Phase 7.1 production実装は、実装開始時点の最新remote `main`から開始する。`docs/phase-07-1-ux-polish-plan`へproduction code/test/package/CI変更を追加しない。
 
-各Task開始直前に最新remote `main`を取得し、Task文書で列挙したファイル名・公開contract・test commandが現在コードと一致するか確認する。private implementationの安全な移動には追従してよいが、ユーザー向けcontractが変わっている場合はTaskを勝手に読み替えず計画を再評価する。
+各Task開始直前に最新remoteを取得し、Task文書で列挙したfile名・公開contract・test commandが現在コードと一致するか確認する。private implementationの安全な移動には追従してよいが、ユーザー向けcontractや既存Use Case semanticsが変わっている場合はTaskを勝手に読み替えず再評価する。
 
-Phase 7.1ではTask 3のmap physicsを他のvisual変更と混ぜず、Task単独でreview gateを通す。Task 5のmotion experimentは、個別に削除可能な形を維持する。
+Phase 7.1ではTask 3のgesture変更を他のvisual変更と混ぜず、Task単独でreviewする。Task 7では新機能を追加せず、Task 1〜6の相互回帰、snapshot、既存failure分類、progress確定だけを行う。
 
 ## 完了済みPhaseの参照
 

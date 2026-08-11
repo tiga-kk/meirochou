@@ -1,31 +1,32 @@
-# Phase 7.1 Task 1: current route flow animationの実動検証と修正
+# Phase 7.1 Task 1: current route flowの実動検証と最小修正
 
 ## 目標
 
-current routeの赤いbase route上にあるflow表現を、`prefers-reduced-motion: no-preference`環境では実際に時間変化して見える状態へする。CSSに`animation-name`が設定されているだけで完了扱いしない。
+current routeの赤いsolid route上にあるflow表現について、`prefers-reduced-motion: no-preference`で実際に時間変化していることを検証し、実機で静止して見えた原因だけを最小修正する。CSSに`animation-name`が存在するだけでは完了扱いしない。
 
 ## やってはいけないこと
 
 - route計算、Dijkstra、ALNSをanimation frameごとに再実行しない。
 - route SVGをanimation frameごとに再生成しない。
-- `setInterval`や常駐JavaScript timerでdash offsetを更新しない。
+- `setInterval`等の常駐JavaScript timerでdash offsetを更新しない。
 - candidate routeへcurrent routeと同じloop animationを追加しない。
-- reduced motion利用者へ常時flow animationを強制しない。
-- 原因を再現せず、無条件に別animation方式へ全面置換しない。
+- reduced motion利用者へloop animationを強制しない。
+- 原因を再現せず、別animation方式や`route-overlay-svg.ts`を無条件に変更しない。
+- 視認性調整値を計画書の候補値どおりにすること自体を目的にしない。
 
 ## 対象ファイル
 
-**変更候補:**
+**まず確認:**
 - `apps/webapp/css/target.css`
 - `apps/webapp/js/features/route-guidance/ui/route-overlay-svg.ts`
 - `tests/e2e/webapp.spec.ts`
 - `tests/route-planner-contract.test.ts`
 
-**原則変更しない:**
-- `grid-route-planner.ts`
-- optimization関連file
+**変更候補:**
+- 原則として`apps/webapp/css/target.css`と、必要なE2E/testだけ。
+- `route-overlay-svg.ts`はcurrent routeのflow polyline生成やS/Gの構造に実際の不具合がある場合だけ変更する。
 
-## 現行interface
+## 維持する表示契約
 
 current route overlayは次を維持する。
 
@@ -38,39 +39,35 @@ current route overlayは次を維持する。
 </svg>
 ```
 
-`route-flow-line.points`は`route-overlay-line.points`と同一順序で、`route.points[0]`がStart、末尾がGoalであることを変えない。
+`route-flow-line.points`はbase lineと同じ順序で、`route.points[0]`がStart、末尾がGoalである。candidate routeはflow lineとS/Gを持たない現行契約を維持する。
 
 ## 手順
 
-- [ ] **Step 1: no-preferenceでdash offsetの時間変化を測るRED E2Eを追加する**
+- [ ] **Step 1: no-preferenceで時間変化を証明するRED E2Eを追加する**
 
-`tests/e2e/webapp.spec.ts`のroute表示flowで、current route表示後に次を確認する。
+current route表示後に初期`strokeDashoffset`を取得し、その後は固定300msの一点比較だけに依存せず、最大約1秒の範囲でcomputed valueが変化することをpollする。
+
+概念例:
 
 ```ts
 await page.emulateMedia({ reducedMotion: "no-preference" });
 const flow = page.locator('[data-route-kind="current"] .route-flow-line');
 await expect(flow).toBeVisible();
-
 const before = await flow.evaluate((element) =>
   getComputedStyle(element).strokeDashoffset,
 );
-await page.waitForTimeout(300);
-const after = await flow.evaluate((element) =>
-  getComputedStyle(element).strokeDashoffset,
-);
-expect(after).not.toBe(before);
+await expect
+  .poll(() =>
+    flow.evaluate((element) => getComputedStyle(element).strokeDashoffset),
+  )
+  .not.toBe(before);
 ```
 
-`animation-name`だけではなくcomputed valueが変わることを固定する。
+animation durationの将来調整によって偶然同じ位相を測るtestにしない。
 
-- [ ] **Step 2: reduced motion contractを同じE2Eで固定する**
+- [ ] **Step 2: reduced motion契約を固定する**
 
-```ts
-await page.emulateMedia({ reducedMotion: "reduce" });
-await expect(flow).toHaveCSS("animation-name", "none");
-await expect(page.locator('.route-start-marker')).toHaveText("S");
-await expect(page.locator('.route-goal-marker')).toHaveText("G");
-```
+`reduce`ではflow loopが停止し、solid routeとS/Gが残ることを確認する。S/Gの存在だけでなくcurrent route自体が可視であることも確認する。
 
 - [ ] **Step 3: focused E2Eを実行して現行挙動を分類する**
 
@@ -80,34 +77,19 @@ npx playwright test tests/e2e/webapp.spec.ts --grep "地図|経路|route"
 
 分類:
 
-1. computed dash offsetも変化しない → CSS animation適用経路を修正する。
-2. computed dash offsetは変化する → 実装は動いているが視認性不足。Step 4のvisual調整だけを行う。
-3. Chromiumでは変化するがproduction mobileで再現しない → browser差を記録し、同じCSS/SVG方式で互換な指定へ修正する。
+1. computed dash offsetも変化しない → CSS適用経路、SVG property、media queryを調査して修正する。
+2. computed dash offsetは変化するが実画面では静止して見える → animation方式は維持し、dash間隔・線幅・速度・コントラストのうち必要最小限を調整する。
+3. Chromiumでは成立するが対象mobile browserだけ再現しない → browser差を再現できる根拠を残し、同じCSS/SVG方式の範囲で互換な指定へ直す。
 
-- [ ] **Step 4: flowを視認可能な初期値へ調整する**
+- [ ] **Step 4: 視認性を必要最小限だけ調整する**
 
-最初の候補:
+現行値を出発点にする。`stroke-dasharray`、`stroke-width`、duration、`stroke-dashoffset`終点は実画面でStart→Goal方向が識別できる範囲で調整してよいが、計画時の特定数値を受入条件にはしない。
 
-```css
-.route-flow-line {
-  stroke: rgba(255, 255, 255, 0.92);
-  stroke-width: 5;
-  stroke-dasharray: 12 28;
-  stroke-dashoffset: 0;
-  animation: route-flow 0.8s linear infinite;
-}
+経路pointsを逆順にしない。方向だけが逆に見える場合はdash offsetの符号を確認する。
 
-@keyframes route-flow {
-  from { stroke-dashoffset: 0; }
-  to { stroke-dashoffset: -40; }
-}
-```
+- [ ] **Step 5: overlay構造の回帰を確認する**
 
-経路pointsは逆順にしない。視覚上の流れがGoal→Startに見える場合は`stroke-dashoffset`の符号だけを反転する。
-
-- [ ] **Step 5: route overlay unit contractを確認する**
-
-`tests/route-planner-contract.test.ts`でcurrent routeのみflow lineを持ち、candidate routeは持たないこと、S/Gがpointsの先頭/末尾に一致することを維持する。
+既存testで、current routeのみflow lineを持つこと、candidate routeは持たないこと、S/Gがpointsの先頭/末尾へ対応することを維持する。不足するassertionだけ追加し、同じ構造testを重複させない。
 
 - [ ] **Step 6: focused verification**
 
@@ -120,21 +102,12 @@ git diff --check
 
 - [ ] **Step 7: commit**
 
-```bash
-git status --short
-git add apps/webapp/css/target.css apps/webapp/js/features/route-guidance/ui/route-overlay-svg.ts tests/e2e/webapp.spec.ts tests/route-planner-contract.test.ts
-git diff --cached --name-status
-git diff --cached --check
-git commit -m "fix(route-guidance): make route flow visibly animate"
-```
-
-実際に変更していないfileは`git add`対象から外す。
+実際に変更したfileだけをstageしてcommitする。CSSだけで修正できた場合に`route-overlay-svg.ts`を触らない。
 
 ## 受入条件
 
-- no-preferenceでcomputed `stroke-dashoffset`が300ms前後で変化する。
-- current routeがStart→Goalへ流れて見える。
-- reduced motionではloopが停止する。
-- solid routeとS/Gはmotion設定に関係なく表示される。
+- no-preferenceでcomputed `stroke-dashoffset`が実時間で変化する。
+- current routeがStart→Goal方向のflowとして視認できる。
+- reduced motionではloopが停止し、solid routeとS/Gが残る。
 - candidate routeは常時loopしない。
-- route calculation回数がanimationによって増えない。
+- route calculation回数やroute SVG生成回数がanimation timerによって増えない。

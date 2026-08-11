@@ -1,199 +1,146 @@
-# Phase 7.1 Task 4: management surfaceの完全遮蔽とbackground scroll lock
+# Phase 7.1 Task 4: management surfaceの遮蔽とbackground scroll isolation
 
 ## 目標
 
-管理画面を開いている間、下層mainの地図・お品書き・headerが画面端やoverscroll時にも見えず、background scrollも動かない状態にする。別URL/pageへ分離せず、Phase 7のfull-screen management surfaceを堅牢化する。
+管理画面を開いている間、下層mainの地図・お品書き・headerがviewport端やoverscroll時にも見えず、background documentも動かない状態にする。別URL/pageへ分離せず、Phase 7のfull-screen management surfaceを必要最小限だけ堅牢化する。
+
+## 現行実装から確認できること
+
+`#settings-area`はすでに次を持つ。
+
+```css
+position: fixed;
+inset: 0;
+z-index: 1000;
+overflow-y: auto;
+background: var(--bg-body);
+```
+
+したがってPhase 7.1で新しいfull-screen overlayを作り直す必要はない。まず本番で報告された「下層が見える」「backgroundが動く」をE2Eで再現し、既存surfaceで不足しているscroll lock、scroll chaining、viewport/safe-area周辺だけを修正する。
 
 ## やってはいけないこと
 
-- managementを別router/pageへ移し、event/day session lifecycleを二重化しない。
-- `overflow:hidden`を永続的にbodyへ設定しない。
+- managementを別router/pageへ移さない。
+- 既存`#settings-area`と重複する新overlayを追加しない。
+- 原因再現前に`100dvh`、wrapper、body style一式を形式的に追加しない。
+- `overflow:hidden`等をbodyへ永続設定しない。
 - open前のscroll位置を失わない。
-- close時に既存inline styleを空文字で上書きして、management以外が設定していたstyleを破壊しない。
-- nested source diff/delete/outbox dialogのfocus trapを壊さない。
-- transparent/backdropだけで下層を隠し、端末overscrollでmainが見える状態を残さない。
+- close時にmanagement以外が持っていたinline styleを破壊しない。
+- nested source diff/delete/outbox dialogのfocus containmentを壊さない。
+- scroll lock専用public interface/moduleを一利用者のためだけに必須化しない。
 
 ## 対象ファイル
 
-**作成:**
-- `apps/webapp/js/ui/page-scroll-lock.ts`
-- `tests/page-scroll-lock.test.ts`
-
-**変更:**
+**まず変更候補:**
 - `apps/webapp/js/components/comipath-settings.ts`
 - `apps/webapp/css/forms.css`
-- `apps/webapp/css/base.css`（root/body background contractが必要な場合のみ）
 - `tests/e2e/management.spec.ts`
-- `tests/comipath-settings.test.ts`または既存settings component test
+- `tests/comipath-settings.test.ts`等の既存settings component test
 
-## 新規interface
+**必要な場合のみ:**
+- `apps/webapp/css/base.css`
+- small private helperまたは`apps/webapp/js/ui/page-scroll-lock.ts`
 
-```ts
-export interface PageScrollLock {
-  release(): void;
-}
+scroll位置とinline styleの保存・復元が`ComipathSettings`内で十分明確に書けるなら、専用`PageScrollLock` interface/moduleを追加しない。複数箇所で再利用する、またはcomponent testから切り離した方が明らかに安全な場合だけ抽出する。
 
-export function lockPageScroll(
-  document: Document,
-  window: Window,
-): PageScrollLock;
-```
+## scroll lock契約
 
-`lockPageScroll()`は呼び出し時のscroll位置と、変更するbody inline styleの元値を保存する。同一lock instanceの`release()`は複数回呼ばれても二重復元しない。
+managementの`open: false → true`で一度だけlockし、`true → false`または`disconnectedCallback()`で一度だけreleaseする。
 
-最低限保存するproperty:
+lock時に必要な状態だけ保存する。
 
-```text
-position
-top
-left
-right
-width
-overflow
-```
+- `scrollX` / `scrollY`
+- 実際に変更するbody inline styleの元値
+- 必要ならroot/bodyへ付けるclassの既存状態
 
-open時:
+body fixed方式を使う場合は、少なくとも`position`、`top`、`left/right`またはwidth、`overflow`のうち実際に変更したpropertyを元値へ戻す。releaseは二重実行しても壊れないようにする。
 
-```text
-scrollY = window.scrollY
-body.position = fixed
-body.top = -scrollY px
-body.left = 0
-body.right = 0
-body.width = 100%
-body.overflow = hidden
-html/bodyへmanagement-open class
-```
+scroll復元は互換性の高い`window.scrollTo(savedX, savedY)`でよい。`behavior: "instant"`を外部契約にしない。
 
-close時:
+## CSS契約
 
-1. 保存したinline styleを元値へ戻す。
-2. `management-open` classを外す。
-3. `window.scrollTo({ top: scrollY, left: originalScrollX, behavior: "instant"相当 })`で元位置へ戻す。test/browser互換のため通常の`scrollTo(x, y)`でもよい。
-
-## CSS contract
-
-```css
-#settings-area {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100dvh;
-  min-height: 100vh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  background: var(--bg-body);
-}
-
-html.management-open,
-body.management-open {
-  overscroll-behavior: none;
-}
-```
-
-`100dvh`非対応環境のfallbackとして既存`inset:0`と`min-height:100vh`を維持する。
-
-management surfaceのbackgroundは完全opaqueにする。opacityをsurface自身へanimationしない。Task 5でentry animationを追加する場合はsurface内contentだけをanimateする。
+- `#settings-area`はopen直後からopaqueである。
+- `position: fixed; inset: 0`を維持する。
+- management自身のscrollは許可する。
+- `overscroll-behavior`で可能な範囲のscroll chainingを抑止し、background document側のlockと併用する。
+- safe-areaの既存paddingを維持する。
+- `100dvh`等を追加するのは、再現したviewport height問題を解消する場合だけとする。
+- Task 5でentry motionを追加しても、surface background自体のopacityはanimateしない。
 
 ## 手順
 
-- [ ] **Step 1: scroll lock unit RED testsを書く**
+- [ ] **Step 1: production pathのRED E2Eを先に追加する**
 
-`tests/page-scroll-lock.test.ts`で次を固定する。
+managementを実際の`#toggle-settings`から開き、次を再現する。
 
-- scroll位置1234pxでlockするとbodyがfixed、`top:-1234px`になる。
-- releaseで元styleを完全復元する。
-- `scrollTo`が元scroll位置で呼ばれる。
-- releaseを2回呼んでも2回目にstyleを壊さない。
-- 元からbodyにinline `position`や`overflow`があるcaseも復元する。
+1. mainを途中までscrollする。
+2. managementを開く。
+3. management内を上端/下端までscrollし、さらにwheel/touch相当入力を行う。
+4. background documentの論理scroll位置が変わらないことを確認する。
+5. managementを閉じる。
+6. open前のscroll位置へ戻ることを確認する。
 
-- [ ] **Step 2: `lockPageScroll()`を実装する**
+四隅について`elementFromPoint()`等で`#settings-area`またはその子孫が最上位にあることを確認してよいが、色だけのsnapshotを唯一の証明にしない。
 
-function内部だけでdocument/windowを扱い、global `window`へ直接依存しない。これによりunit testでstub可能にする。
+- [ ] **Step 2: 現行CSSだけで足りる箇所を分類する**
 
-- [ ] **Step 3: ComipathSettings lifecycleへ接続する**
+`position: fixed; inset:0; background`は既存なので重複実装しない。失敗原因を次のように分ける。
 
-`open`がfalse→trueになった時だけ1個のlockを作る。true→falseまたは`disconnectedCallback()`でreleaseする。
+- background documentがscrollする。
+- scroll chainingが起きる。
+- viewport/safe-area端でsurface自体が不足する。
+- nested dialogのstacking/focusが原因で下層が露出する。
 
-推奨field:
+原因に対応する変更だけを行う。
 
-```ts
-private pageScrollLock: PageScrollLock | null = null;
-```
+- [ ] **Step 3: 最小scroll lockを`ComipathSettings` lifecycleへ接続する**
 
-既存`DialogFocusController`のactivate/deactivateと同じtransitionで管理するが、focus controller内部へscroll lock責務を追加しない。
+`updated()`のopen transitionと`disconnectedCallback()`を既存`DialogFocusController`と同じlifecycleで扱う。ただしfocus controllerへscroll責務を混ぜない。
 
-- [ ] **Step 4: surface CSSをopaque full viewportへ固定する**
+private field/helperで十分ならそのまま実装する。抽出する場合も、APIを将来用途向けに広げない。
 
-`#settings-area`自身はopen直後からopaque backgroundを持つ。Task 5のfade/translateは`.management-surface-content`等の内部wrapperへ適用する。
+- [ ] **Step 4: style/scroll復元のunit testを追加する**
 
-必要なら`comipath-settings.ts`のrenderを次のようなwrapperへする。
+最低限:
 
-```html
-<div class="management-surface-content">
-  ...existing management content...
-</div>
-```
+- scroll位置を保存する。
+- lock中にbackgroundが動かないためのbody stateになる。
+- close/disconnectで元styleとscroll位置を復元する。
+- release相当処理を二度走らせても元styleを壊さない。
+- 元からinline styleがあるcaseを復元する。
 
-- [ ] **Step 5: scroll chainingを抑止する**
+実装をprivate helperのままにした場合はcomponent lifecycle経由でtestする。
 
-management内部を最上端/最下端までscrollしてさらにpointer/wheel/touch scrollしてもmain側scroll位置が変わらないことをE2Eで確認する。
+- [ ] **Step 5: nested modal regressionを確認する**
 
-`overscroll-behavior`だけに依存せず、body fixed lockと併用する。
+management→編集→source diff、management→削除→delete dialog、outbox discard dialogで、nested modalがmanagement上に表示され、Escape/focus returnが既存契約どおりであることを確認する。
 
-- [ ] **Step 6: management 4辺遮蔽E2Eを追加する**
+- [ ] **Step 6: safe-area / 200% zoomを確認する**
 
-managementを開いた状態でviewport cornerのelement/backgroundを確認する。
+管理headerの「閉じる」が到達可能で、四辺の背景切れがないことを確認する。問題が再現しなければ不要なviewport CSSを追加しない。
 
-```ts
-for (const [x, y] of [[1,1], [width - 2,1], [1,height - 2], [width - 2,height - 2]]) {
-  const id = await page.evaluate(({x,y}) => {
-    const element = document.elementFromPoint(x, y);
-    return element?.closest("#settings-area")?.id ?? "";
-  }, {x,y});
-  expect(id).toBe("settings-area");
-}
-```
-
-safe-area端末相当viewportでも実行する。
-
-- [ ] **Step 7: background scroll E2Eを追加する**
-
-mainを途中までscrollして管理を開き、management内scroll後もmainの保存scroll位置が変化しないこと、close後に同じ位置へ戻ることを確認する。
-
-- [ ] **Step 8: nested modal regressionを確認する**
-
-management→編集→source diff、management→削除→delete dialog、outbox discard dialogで、nested modalがmanagement上に表示され、Escape/focus returnが既存contract通りであることを確認する。
-
-- [ ] **Step 9: 200% zoom / safe-area確認**
-
-管理headerの`閉じる`が常に到達可能で、surfaceの背景切れがないことを確認する。
-
-- [ ] **Step 10: verification**
+- [ ] **Step 7: verification**
 
 ```bash
-npx vitest run --root . tests/page-scroll-lock.test.ts
 npm run test:webapp
-npx playwright test tests/e2e/management.spec.ts
+npx playwright test tests/e2e/management.spec.ts --grep "管理|scroll|遮蔽|200%"
 npm run check:webapp
 git diff --check
 ```
 
-- [ ] **Step 11: commit**
+抽出helper testを作った場合だけfocused commandへ追加する。
 
-```bash
-git status --short
-git add apps/webapp/js/ui/page-scroll-lock.ts apps/webapp/js/components/comipath-settings.ts apps/webapp/css/forms.css tests/page-scroll-lock.test.ts tests/e2e/management.spec.ts <実際に変更したtest/CSS>
-git diff --cached --name-status
-git diff --cached --check
-git commit -m "fix(management): fully isolate the management surface"
-```
+- [ ] **Step 8: commit**
+
+実際に変更したsettings/CSS/testだけをstageする。
 
 ## 受入条件
 
-- management表示中、viewport四辺でmain contentが見えない。
-- managementの上端/下端からbackgroundへscroll chainしない。
+- management表示中、viewport端からmain contentが露出しない。
+- managementの上端/下端からbackground documentへscroll chainしない。
 - open前scroll位置をclose後に復元する。
-- nested modalが回帰しない。
-- focus/Escape/close button contractを維持する。
-- safe-area、100dvh、200% zoomでもsurface切れがない。
+- 元のinline styleを破壊しない。
+- disconnect/closeのどちらでもlockが残らない。
+- nested modal、focus、Escape、close buttonが回帰しない。
+- safe-area、200% zoomでもsurface切れがない。
+- 既存full-screen surfaceを重複実装しない。
