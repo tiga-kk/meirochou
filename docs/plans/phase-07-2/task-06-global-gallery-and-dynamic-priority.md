@@ -9,6 +9,7 @@ headerの「一覧」を押したのに未訪問サークルが表示されな�
 - `#gallery-filter-controls`はHTMLへpriority 10/9/8/7を固定している。
 - header「一覧」は`showGalleryForArea(areaId)`を経由し、現在選択されているmap areaへscopeを絞る。
 - そのareaに未訪問が0件でも、他areaに未訪問が残っていることがある。
+- 現行filterはpriorityを数値化できない場合に`0`相当へ寄せる処理があり、将来priority `0`を有効値として扱うと「未設定」と「0」を混同し得る。
 - swipe hintはlocalStorage seen keyで一度だけ表示するため、過去版hintを見た端末では新animationを確認できない。
 
 ## やってはいけないこと
@@ -16,9 +17,10 @@ headerの「一覧」を押したのに未訪問サークルが表示されな�
 - unvisited dataを複製して別storeを作らない。
 - priority filterへ新しい固定範囲を入れ直さない。
 - priority未設定circleを通常一覧から消さない。
+- priority未設定を数値`0`と同一扱いしない。
 - header「一覧」を現在地areaへ暗黙scopeしない。
 - hintをGalleryを開くたび強制表示しない。
-- localStorage unavailableでGallery自体を壊さない。
+- localStorage unavailableでGallery自体や手動helpを壊さない。
 
 ## 対象ファイル
 
@@ -45,13 +47,13 @@ export type GalleryScope =
   | { readonly kind: "hold"; readonly areaId?: string };
 ```
 
-headerの`#btn-open-gallery`はareaIdを読まず、次を呼ぶ。
+headerの`#btn-open-gallery`は`loc-ewsn`を読まず、次を呼ぶ。
 
 ```ts
 application.showGallery({ kind: "all-unvisited" });
 ```
 
-既存のarea-specific呼び出しが別UIで必要なら`showGallery({kind:"area",areaId})`へ移す。
+既存のarea-specific/hold呼び出しが別UIで必要なら対応するscopeへ移す。既存call siteを一括でglobalへ変えない。
 
 `DomCircleGalleryView.showGallery(scope)`はscopeごとにsourceを一度だけ選ぶ。
 
@@ -65,7 +67,7 @@ export function selectGalleryCircles(input: {
 }): Circle[];
 ```
 
-`all-unvisited`はarea filterなしで`unvisited`全件を返す。
+`all-unvisited`はarea filterなしで`unvisited`全件を返す。表示用の並び替えは既存`sortTargets()`相当の責務を維持し、source selectionと混同しない。
 
 ## dynamic priority contract
 
@@ -77,11 +79,13 @@ export function collectGalleryPriorities(
 
 規則:
 
-- `Number(circle.priority)`がfiniteなものだけ。
+- priorityが未設定、空文字、非数値ならpriorityなしとして扱う。
+- 明示された値を`Number(...)`で変換し、finiteなものだけを候補にする。
 - duplicate排除。
 - 降順。
-- 0や負値もデータとして有効なら表示する。現行domain validationが禁止している場合だけ除外する。
-- priorityなしはbuttonを作らないがcircleはfilter未選択時に表示する。
+- 0や負値も現行GAS contractではfinite値として受理されるため、有効値として表示・filterできるようにする。後からdomain validationで禁止する場合は、そのvalidation変更を別仕様として扱う。
+- priorityなしはbuttonを作らないが、filter未選択時にはcircleを表示する。
+- priority `0` filterを選択した時、priority未設定circleを一致扱いしない。
 
 例:
 
@@ -89,14 +93,16 @@ export function collectGalleryPriorities(
 collectGalleryPriorities([
   { priority: 1 },
   { priority: 12 },
-  { priority: 5 },
+  { priority: 0 },
   { priority: 12 },
   { priority: undefined },
 ]);
-// [12, 5, 1]
+// [12, 1, 0]
 ```
 
-`index.html`から固定filter buttonsを削除し、`#gallery-filter-controls`は空containerと「すべて」状態だけを持つ。buttonsはGallery render時に生成する。
+filter判定も同じ正規化規則を使う。現在のように`NaN ? 0 : value`として未設定を0へ畳み込まない。
+
+`index.html`から固定filter buttonsを削除し、`#gallery-filter-controls`は空containerと必要な静的labelだけを持つ。buttonsはGallery render時に生成する。
 
 filter後に0件なら次を区別する。
 
@@ -127,65 +133,50 @@ Gallery headerへ常設の小さい`操作方法`buttonを追加する。
 <button id="btn-gallery-help" type="button">操作方法</button>
 ```
 
-manual replayはseen flagに関係なくhintを再生する。
-
 API:
 
 ```js
 showSwipeHint({ force = false } = {})
 ```
 
-`force:false`はseen確認、`force:true`は常に表示する。
+- `force:false`: storageが読める場合はseenを確認し、unseenだけ自動表示する。storage access自体が失敗した場合はGalleryを壊さず、自動hintを省略してよい。
+- `force:true`: seen flagやstorage access可否に依存せず表示する。手動helpは常にこの経路を使う。
+- force表示後にstorageへ書けなくても、表示自体は成功扱いにする。
+
+## テスト方針
+
+### scope
+
+- East未訪問0、West未訪問2のfixtureで、現在地Eastのままheader「一覧」を開いてWest 2件が見える。
+- area-specific/holdの既存callerは従来scopeを維持する。
+
+### priority
+
+- `[1,3,5,12]`を`[12,5,3,1]`へ生成。
+- duplicate排除。
+- `undefined`、`""`、非数値はbuttonなし。
+- `0`と`-1`は明示値としてbutton生成。
+- priority `0` filter時にmissing priorityを含めない。
+- filter未選択ならmissing priorityも表示する。
+
+### tutorial
+
+- v2 unseenで自動表示。
+- seenで自動表示しない。
+- help buttonはseenでもforce replay。
+- localStorage read/write例外でもhelp buttonのforce replayは表示される。
 
 ## 手順
 
 - [ ] **Step 1: global scope RED testを書く**
-
-```ts
-expect(selectGalleryCircles({
-  scope: { kind: "all-unvisited" },
-  unvisited: [eastCircle, westCircle],
-  ...
-})).toEqual([eastCircle, westCircle]);
-```
-
-- [ ] **Step 2: priority RED testsを書く**
-  - `[1,3,5,12]`を降順生成。
-  - duplicate排除。
-  - missing priorityはbuttonなし。
-
-- [ ] **Step 3: pure modelを実装する**
-
-- [ ] **Step 4: header一覧のevent contractをglobal scopeへ変更する**
-  - `loc-ewsn`を読む処理を削除。
-
+- [ ] **Step 2: priority RED testsを書く。特に`0`とmissingの非同一性を固定する**
+- [ ] **Step 3: pure gallery modelを実装する**
+- [ ] **Step 4: header一覧のevent contractをglobal scopeへ変更し、`loc-ewsn`依存を削除する**
 - [ ] **Step 5: fixed HTML filter buttonsを削除しdynamic renderへ変更する**
-
 - [ ] **Step 6: empty stateをscope/filter別にする**
-
 - [ ] **Step 7: tutorial RED testsを書く**
-  - v2 unseenで自動表示。
-  - seenで自動表示しない。
-  - help buttonはseenでもforce replay。
-  - storage exceptionでもforce replay可能。
-
-- [ ] **Step 8: tutorial replayを実装する**
-
-- [ ] **Step 9: E2Eを追加する**
-
-fixture:
-
-```text
-East area: unvisited 0
-West area: unvisited 2 (priority 12, 3)
-```
-
-現在地をEastにしたままheader「一覧」を押し、West 2件が表示されることを確認する。filter buttonsが`12`と`3`だけであることも確認する。
-
-別fixtureでpriority `1,3,5,12`を入れ、4buttonが降順表示されることを確認する。
-
-help buttonを押して`.gallery-swipe-hint-demo-card`へanimation-nameが付くことを確認する。
-
+- [ ] **Step 8: versioned auto hint + storage非依存のmanual replayを実装する**
+- [ ] **Step 9: E2Eでglobal一覧、任意priority、manual helpを本番UIから確認する**
 - [ ] **Step 10: verification**
 
 ```bash
@@ -199,6 +190,7 @@ git diff --check
 ## 受入条件
 
 - header「一覧」は現在地areaに関係なく未訪問全件を表示する。
-- 任意priority集合にUIが適応する。
+- 任意のfinite priority集合にUIが適応し、`0`とmissingを混同しない。
 - priority filter未選択時にpriorityなしcircleも表示される。
-- swipe tutorialが新規利用者へ表示され、既存利用者も手動再生できる。
+- area-specific/holdの既存Gallery flowをglobal化の副作用で壊さない。
+- swipe tutorialが新規利用者へ表示され、既存利用者もstorage状態に関係なく手動再生できる。
