@@ -149,6 +149,48 @@ test.beforeEach(async ({ context, page }) => {
 });
 
 test.describe("Mobile Management Flows", () => {
+  test("管理surfaceが背景scrollを固定し、viewport全体を遮蔽する", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const before = await page.evaluate(() => {
+      document.body.style.minHeight = "2000px";
+      window.scrollTo(0, 160);
+      return window.scrollY;
+    });
+
+    await page.locator("#toggle-settings").click();
+    const settings = page.locator("#settings-area");
+    await expect(settings).toHaveClass(/show/);
+    await expect
+      .poll(() => page.evaluate(() => document.body.style.position))
+      .toBe("fixed");
+    await expect
+      .poll(() => page.evaluate(() => document.body.style.overflow))
+      .toBe("hidden");
+
+    const cornersAreCovered = await page.evaluate(() => {
+      const surface = document.getElementById("settings-area");
+      if (!surface) return false;
+      return [
+        [1, 1],
+        [window.innerWidth - 1, 1],
+        [1, window.innerHeight - 1],
+        [window.innerWidth - 1, window.innerHeight - 1],
+      ].every(([x, y]) => {
+        const target = document.elementFromPoint(x, y);
+        return target === surface || target instanceof Node && surface.contains(target);
+      });
+    });
+    expect(cornersAreCovered).toBe(true);
+
+    await page.mouse.wheel(0, 1200);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    await settings.locator(".management-surface-close").click();
+    await expect(settings).toBeHidden();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(before);
+  });
+
   test("管理overviewにconfiguredとunconfiguredの全日程を表示する", async ({
     page,
   }) => {

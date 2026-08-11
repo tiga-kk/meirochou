@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import assert from "node:assert/strict";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import type { CircleDataSourcePanelModel } from "../apps/webapp/js/components/circle-data-source-panel";
 import { ComipathSettings } from "../apps/webapp/js/components/comipath-settings";
 import type {
@@ -128,6 +128,66 @@ test("blocked delete option exposes reason text with role=status for screen read
   expect(btn?.disabled).toBe(true);
 
   document.body.removeChild(element);
+});
+
+test("locks and restores body scroll state without destroying existing inline styles", async () => {
+  const originalStyle = document.body.getAttribute("style");
+  const originalScrollX = Object.getOwnPropertyDescriptor(window, "scrollX");
+  const originalScrollY = Object.getOwnPropertyDescriptor(window, "scrollY");
+  const scrollTo = vi
+    .spyOn(window, "scrollTo")
+    .mockImplementation(() => undefined);
+
+  Object.defineProperty(window, "scrollX", {
+    configurable: true,
+    value: 37,
+  });
+  Object.defineProperty(window, "scrollY", {
+    configurable: true,
+    value: 143,
+  });
+  document.body.style.setProperty("position", "relative", "important");
+  document.body.style.top = "7px";
+  document.body.style.left = "8px";
+  document.body.style.right = "9px";
+  document.body.style.width = "80%";
+  document.body.style.overflow = "scroll";
+
+  const element = new ComipathSettings();
+  element.open = true;
+  document.body.appendChild(element);
+  await element.updateComplete;
+
+  expect(document.body.style.position).toBe("fixed");
+  expect(document.body.style.overflow).toBe("hidden");
+  expect(document.body.style.top).toBe("-143px");
+  expect(document.body.style.left).toBe("-37px");
+
+  element.open = false;
+  await element.updateComplete;
+
+  expect(document.body.style.position).toBe("relative");
+  expect(document.body.style.getPropertyPriority("position")).toBe("important");
+  expect(document.body.style.top).toBe("7px");
+  expect(document.body.style.left).toBe("8px");
+  expect(document.body.style.right).toBe("9px");
+  expect(document.body.style.width).toBe("80%");
+  expect(document.body.style.overflow).toBe("scroll");
+  expect(scrollTo).toHaveBeenCalledWith(37, 143);
+
+  element.open = true;
+  await element.updateComplete;
+  element.remove();
+  element.disconnectedCallback();
+  expect(document.body.style.position).toBe("relative");
+  expect(document.body.style.overflow).toBe("scroll");
+  expect(scrollTo).toHaveBeenCalledTimes(2);
+
+  scrollTo.mockRestore();
+  if (originalStyle === null) document.body.removeAttribute("style");
+  else document.body.setAttribute("style", originalStyle);
+  if (originalScrollX) Object.defineProperty(window, "scrollX", originalScrollX);
+  if (originalScrollY) Object.defineProperty(window, "scrollY", originalScrollY);
 });
 
 test("settings shell exposes the approved ALNS search-time choices", async () => {

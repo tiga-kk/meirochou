@@ -54,6 +54,11 @@ export class ComipathSettings extends LitElement {
   declare errorMessage: string;
 
   private isOpen = false;
+  private pageScrollLock: {
+    x: number;
+    y: number;
+    styles: Record<string, { value: string; priority: string }>;
+  } | null = null;
 
   private readonly focusController = new DialogFocusController(this, {
     onEscape: () => this.requestClose(),
@@ -85,17 +90,61 @@ export class ComipathSettings extends LitElement {
     this.classList.toggle("show", this.open);
     if (this.open && !this.isOpen) {
       this.isOpen = true;
+      this.lockPageScroll();
       this.focusController.activate();
     } else if (!this.open && this.isOpen) {
       this.isOpen = false;
       this.focusController.deactivate();
+      this.unlockPageScroll();
     }
   }
 
   disconnectedCallback(): void {
     if (this.isOpen) this.focusController.deactivate();
+    this.unlockPageScroll();
     this.isOpen = false;
     super.disconnectedCallback();
+  }
+
+  private lockPageScroll(): void {
+    if (this.pageScrollLock) return;
+    const body = document.body;
+    const properties = ["position", "top", "left", "right", "width", "overflow"];
+    const styles = Object.fromEntries(
+      properties.map((property) => [
+        property,
+        {
+          value: body.style.getPropertyValue(property),
+          priority: body.style.getPropertyPriority(property),
+        },
+      ]),
+    );
+    this.pageScrollLock = {
+      x: window.scrollX,
+      y: window.scrollY,
+      styles,
+    };
+    body.style.position = "fixed";
+    body.style.top = `-${this.pageScrollLock.y}px`;
+    body.style.left = `-${this.pageScrollLock.x}px`;
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+  }
+
+  private unlockPageScroll(): void {
+    const lock = this.pageScrollLock;
+    if (!lock) return;
+    this.pageScrollLock = null;
+    const body = document.body;
+    for (const [property, style] of Object.entries(lock.styles)) {
+      if (style.value || style.priority) {
+        body.style.setProperty(property, style.value, style.priority);
+      } else {
+        body.style.removeProperty(property);
+      }
+    }
+    window.scrollTo(lock.x, lock.y);
   }
 
   private requestClose(): void {
