@@ -26,6 +26,7 @@
 - existing action handlerが対象dayへ切り替えてから処理する挙動を、このUX整理のついでに変更しない。
 - `event-day-management-actions.test.ts`の5 event contractを、代替testなしに削除しない。
 - E2E helperから直接detailを開き、list→detailの本番UI経路を迂回して成功扱いしない。
+- `matchMedia()`等でmobile/desktop用の別state treeを作らない。responsiveな表示切替は原則CSSで行う。
 - desktop対応のため横scroll必須tableを作らない。
 - Task 5のmotionがなければ操作できない構造にしない。
 
@@ -50,33 +51,39 @@
 
 ## UI state契約
 
-`ComipathSettings`はUI上のdetail selectionだけを持つ。
+管理画面には、少なくとも次の二つのUI専用状態が必要になる。
 
 ```ts
-private detailRef: EventDayRef | null = null;
+// 名前は例。外部APIにはしない。
+detailRef: EventDayRef | null;
+detailOpen: boolean;
 ```
 
-または同等のprivate stateとする。
+- `detailRef`: 管理画面で現在詳細対象として選ばれているrow。
+- `detailOpen`: mobileでoverviewとdetailのどちらを前面表示するか。
+- `row.selected`: mainで現在使用中のevent/day。上二つとは別概念。
 
-- `detailRef`: 管理画面で現在詳細を見ているrow。
-- `row.selected`: mainで現在使用中のevent/day。
+`detailRef`/`detailOpen`は`ComipathSettings`の描画へ影響するため、Litのreactive property/stateとして更新する。現行projectの`static properties`で`attribute: false`にする、または同等に`requestUpdate()`が保証される方法を使う。値を書き換えても再renderされないplain fieldとして実装しない。
 
-この二つを混同しない。
+外部attribute、localStorage、repositoryへこのUI stateを保存しない。
 
 open時:
 
-1. 既存`detailRef`が現在rowsに存在するなら維持してよい。
+1. `detailRef`が現在rowsに存在するならdetail候補として維持してよい。
 2. 無効なら`row.selected`、それもなければ先頭rowをdefault detail候補とする。
-3. mobileではmanagementを開いた直後はoverviewを表示し、default detail候補を持っていても自動でdetail画面へ遷移しない。
-4. desktopではlistとdefault detailを同時表示してよい。
+3. mobileではmanagementを開いた直後に`detailOpen=false`としてoverviewを前面表示する。default `detailRef`があっても自動でdetailへ遷移しない。
+4. row detail requestで`detailRef=ref`、`detailOpen=true`とする。
+5. backで`detailOpen=false`とし、`detailRef`自体は維持してよい。
+6. desktopではCSSでlist/detailを同時表示し、`detailOpen`の値で右paneを消さない。`detailRef`だけを右paneの選択対象に使う。
+7. rows更新でdetail対象が消えた場合だけfallbackする。rowsが空なら`detailRef=null`、`detailOpen=false`へ縮退する。
 
-rows更新でdetail対象が消えた場合だけfallbackする。
+mobile/desktopの判定をJavaScript state分岐へ持ち込まず、同じDOM/modelをCSS media queryで見せ分ける。
 
 ## action semantics
 
 ### detailを見る
 
-row→detail requestは`detailRef`だけを変える。`eventDayTransition.execute()`、repository write、network requestを行わない。
+row→detail requestはUI stateだけを変える。`eventDayTransition.execute()`、repository write、network requestを行わない。
 
 ### この日程を開く
 
@@ -117,17 +124,17 @@ row全体をclick targetにする場合もkeyboard操作可能にする。button
 
 ## detail表示責務
 
-可能なら既存`ComipathSettings`が次をそのまま所有する。
+選択した`detailRef`に対応する`EventDayManagementRow`を、read-only detail summaryの正本にする。少なくともevent/day名、source type/label、circle count、pending GAS count、offline statusはrow modelから描画できる。
 
-- source summary / source-manager
-- outbox
-- optimization time limit
-- delete options / dialog
-- existing action event dispatch
+既存`source-manager`、`outbox-panel`、optimization、delete UIのmodelはactive day向けである。したがって非selected rowをdetail表示している時に、それらを選択row用のstateful controlとして見せない。
 
-detail rendererは選択rowに応じて見出し・status・actionを配置するだけとし、model変換やUse Caseを複製しない。
+基本方針:
 
-active day専用の`source-manager`/`outbox-panel`は、非selected rowを眺めているだけの時にそのrow用と誤認させない。非selected detailではactive専用controlsを隠すか「現在使用中の日程の設定」であることが明確な場合だけ表示する。基本は隠す。
+- selected row（`row.selected=true`）: 既存active-day controlsを表示してよい。
+- nonselected configured row: row model由来のread-only summaryと、`この日程を開く`、既存ref-based actionだけを表示する。active-day専用source/outbox controlsは隠す。
+- unconfigured row: read-only summary + `設定する`。
+
+この整理で足りるなら既存`ComipathSettings`がdetailを所有する。新componentへ抽出する場合もmodel変換やUse Caseを複製しない。
 
 ## Mobile layout
 
@@ -177,7 +184,7 @@ backはmanagementを閉じずoverviewへ戻る。
 
 ## Desktop layout
 
-同じ`rows`と`detailRef`でlist/detailを同時表示する。既存760px上限が実用上不足する場合だけmanagement content幅を広げ、main側tokenは変更しない。
+同じ`rows`、`detailRef`、同じdetail DOMを使い、CSSでlist/detailを同時表示する。既存760px上限が実用上不足する場合だけmanagement content幅を広げ、main側tokenは変更しない。
 
 ```text
 ┌ event/day list ┬ detail ┐
@@ -188,13 +195,16 @@ backはmanagementを閉じずoverviewへ戻る。
 
 ## 手順
 
-- [ ] **Step 1: detail selectionのRED testを追加する**
+- [ ] **Step 1: reactive UI stateのcomponent RED testを追加する**
 
-- mobile overviewでrowを選ぶとdetailへ進む。
+- `detailRef`/`detailOpen`更新でrenderが変わる。
+- mobile相当DOM stateでrow request→detail、back→overviewが成立する。
 - detail selectionだけでは`row.selected`/active dayが変わらない。
-- backでoverviewへ戻る。
-- rows更新で対象が残る限りdetailRefを維持する。
+- rows更新で対象が残る限り`detailRef`を維持する。
 - 対象row削除時だけfallbackする。
+- rows空で安全にoverviewへ戻る。
+
+JSでviewportを判定するtestではなく、component state/classとCSS責務を分ける。
 
 - [ ] **Step 2: overview action過密のRED testを追加する**
 
@@ -206,19 +216,23 @@ row model表示を維持し、detail requestだけを親へ渡す。source label
 
 - [ ] **Step 4: `ComipathSettings`へoverview/detail stateを追加する**
 
-既存`<details>`をmobile/desktop list-detail shellへ置換する。まず同component内のprivate render methodで実装し、必要性が確認できた場合だけ新detail componentへ抽出する。
+既存`<details>`をlist-detail shellへ置換する。まず同component内のprivate render methodで実装し、必要性が確認できた場合だけ新detail componentへ抽出する。
 
-- [ ] **Step 5: 既存action event contractをdetail側へ移す**
+- [ ] **Step 5: selected/nonselectedでdetail controlsを分ける**
+
+nonselected rowへactive dayの`sourceManagerModel`/`outboxPanelModel`を誤表示しない。row model由来のread-only statusは常に表示できるようにする。
+
+- [ ] **Step 6: 既存action event contractをdetail側へ移す**
 
 overviewから削除した5 actionのevent contract testをdetail側へ移植し、正しい`ref`で1回dispatchされることを維持する。test削除だけで終わらせない。
 
-- [ ] **Step 6: BrowserApplication接続を最小調整する**
+- [ ] **Step 7: BrowserApplication接続を最小調整する**
 
 既存handlerは維持する。`refresh/edit/delete`等の処理後に対象detailを開く必要がある場合、既存`openManagementDetail()`を`openManagementDetail(ref?)`相当に広げてよい。
 
 新しいdetail selection eventをBrowserApplicationのbusiness eventとして扱う必要がなければ、settings内部だけで完結させる。
 
-- [ ] **Step 7: E2E helperをlist/detail検証用に分ける**
+- [ ] **Step 8: E2E helperをlist/detail検証用に分ける**
 
 現行`tests/e2e/management.spec.ts`の`openSettings()`はmanagementを開いた後に`.management-detail-surface`を自動で開く。新UXではこのhelperをそのまま使うとoverview→detailの本番経路を迂回し、偽陽性になり得る。
 
@@ -229,7 +243,7 @@ overviewから削除した5 actionのevent contract testをdetail側へ移植し
 
 list/detail自体をtestするcaseではpublic methodや直接state設定でdetailへ入らない。
 
-- [ ] **Step 8: mobile E2Eを追加/更新する**
+- [ ] **Step 9: mobile E2Eを追加/更新する**
 
 ```text
 管理open
@@ -246,18 +260,18 @@ list/detail自体をtestするcaseではpublic methodや直接state設定でdeta
 
 非selected rowの`再読込`等を押した場合は、現行handlerどおり対象dayがactiveになってから処理されることを少なくとも代表caseで確認する。
 
-- [ ] **Step 9: desktop 2-pane E2Eを追加する**
+- [ ] **Step 10: desktop 2-pane E2Eを追加する**
 
-listとdetailが同時に見え、row切替だけではmain active dayが変わらないことを確認する。横scroll tableを要求しない。
+listとdetailが同時に見え、row切替だけではmain active dayが変わらないことを確認する。mobile用`detailOpen=false`でもdesktop detail paneが見えることを確認し、JS viewport分岐に依存させない。
 
-- [ ] **Step 10: keyboard / 200% zoom / nested dialogを確認する**
+- [ ] **Step 11: keyboard / 200% zoom / nested dialogを確認する**
 
 - row→detail→backがkeyboardで操作可能。
 - 44px targetを維持。
 - source diff/delete/outbox dialogのfocus containmentを維持。
 - 200% zoomで主要actionへ到達できる。
 
-- [ ] **Step 11: targeted verification**
+- [ ] **Step 12: targeted verification**
 
 ```bash
 npm run test:webapp
@@ -266,19 +280,20 @@ npm run check:webapp
 git diff --check
 ```
 
-- [ ] **Step 12: implementation commit**
+- [ ] **Step 13: implementation commit**
 
 production code/test/snapshotのうち、このTaskで実際に変更したものだけをstageする。`docs/status/progress.md`へこのcommit自身のSHAを同じcommit内で書こうとしない。進捗確定はTask 7で行う。
 
 ## 受入条件
 
 - mobile overview rowに5 business actionを常設しない。
+- `detailRef`/mobile pane stateはreactiveで、plain field更新による描画漏れがない。
 - mobileはlist→detail→backが明確。
+- desktopは同じDOM/model/stateをCSSで2-pane表示する。
 - detailを見るだけではactive dayを変更しない。
+- nonselected rowへactive-day専用source/outbox controlsを誤表示しない。
 - `この日程を開く`は既存event-day transitionを行いmanagementを閉じる。
 - `再読込`、offline準備、編集、削除は既存BrowserApplication handler/Use Caseへ接続され、既存の対象day切替 semanticsを独断変更しない。
 - unconfigured dayは既存設定経路へ接続する。
-- desktopは同じmodel/stateで2-pane。
-- active day専用source/outbox controlsを非selected row用と誤表示しない。
 - nested modal、keyboard、200% zoom、safe-areaが回帰しない。
 - 新detail componentを作る場合、その必要性が既存`ComipathSettings`の責務分割から説明できる。
