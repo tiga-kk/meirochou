@@ -136,6 +136,7 @@ input[type="text"] {
   inset: 0;
   z-index: 1000;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: max(0.75rem, env(safe-area-inset-top))
     max(0.75rem, env(safe-area-inset-right))
     max(0.75rem, env(safe-area-inset-bottom))
@@ -171,23 +172,78 @@ input[type="text"] {
   flex-shrink: 0;
 }
 
-.management-detail-surface {
+.management-list-detail {
   width: min(760px, 100%);
   margin: 0 auto 1rem;
 }
 
-.management-detail-surface > summary {
-  min-height: 44px;
-  padding: 0.65rem 0.75rem;
-  border: 1px solid var(--ink);
-  background: var(--bg-card);
-  cursor: pointer;
-  font-family: var(--font-ui-sans);
-  font-weight: 800;
+.management-detail-pane {
+  display: none;
+  min-width: 0;
 }
 
-.management-detail-surface[open] > summary {
+.management-detail-back {
+  min-height: 44px;
   margin-bottom: 0.75rem;
+}
+
+.management-detail-pane h2,
+.management-detail-summary h3 {
+  margin: 0 0 0.75rem;
+}
+
+.management-detail-summary {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.management-detail-summary p {
+  margin: 0.35rem 0;
+}
+
+.management-detail-actions,
+.management-active-controls {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.management-detail-actions {
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  margin-bottom: 1rem;
+}
+
+.management-detail-actions .btn {
+  min-height: 44px;
+}
+
+.management-overview-pane.mobile-hidden {
+  display: none;
+}
+
+.management-detail-pane.is-open {
+  display: block;
+}
+
+@media (min-width: 768px) {
+  .management-list-detail {
+    width: min(1120px, 100%);
+    display: grid;
+    grid-template-columns: minmax(16rem, 0.8fr) minmax(0, 1.2fr);
+    gap: 1.25rem;
+  }
+
+  .management-detail-pane {
+    display: block;
+  }
+
+  .management-detail-back {
+    display: none;
+  }
+
+  .management-overview-pane.mobile-hidden {
+    display: block;
+  }
 }
 
 .event-day-management {

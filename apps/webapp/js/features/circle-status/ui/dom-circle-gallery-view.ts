@@ -311,7 +311,7 @@ export class DomCircleGalleryView {
     const hint = document.createElement("div");
     hint.className = "gallery-swipe-hint";
     hint.innerHTML =
-      '<strong>外側へスワイプして購入済みにできます</strong><span class="gallery-swipe-hint-arrows" aria-hidden="true">←　→</span>';
+      '<strong>外側へスワイプして購入済みにできます</strong><span class="gallery-swipe-hint-demo" aria-hidden="true"><span class="gallery-swipe-hint-demo-card">←　→</span></span>';
     hint.onclick = () => hint.remove();
     this.els.galleryModal.appendChild(hint);
     try {

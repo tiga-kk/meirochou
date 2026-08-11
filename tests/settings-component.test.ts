@@ -1,12 +1,27 @@
 // @vitest-environment happy-dom
 import assert from "node:assert/strict";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import type { CircleDataSourcePanelModel } from "../apps/webapp/js/components/circle-data-source-panel";
 import { ComipathSettings } from "../apps/webapp/js/components/comipath-settings";
 import type {
   DeleteOptionViewModel,
   EventDayOption,
 } from "../apps/webapp/js/shared/ui/management-view-model";
+import type { EventDayManagementRow } from "../apps/webapp/js/shared/ui/event-day-management-view-model";
+
+const selectedManagementRow: EventDayManagementRow = {
+  ref: { eventId: "c104", dayId: "day1" },
+  eventLabel: "コミックマーケット104",
+  dayLabel: "1日目 (日)",
+  configured: true,
+  selected: true,
+  sourceType: "csv",
+  sourceLabel: "circles.csv",
+  sourceEndpointSummary: null,
+  circleCount: 1,
+  pendingGasCount: 0,
+  offlineCatalog: { cached: 0, total: 0 },
+};
 
 afterEach(() => {
   document.body.innerHTML = "";
@@ -47,6 +62,7 @@ test("settings shell renders event-day-selector and circle-data-source-panel chi
   };
 
   element.eventDayOptions = sampleOptions;
+  element.eventDayManagementRows = [selectedManagementRow];
   element.selectedEventId = "c104";
   element.selectedDayId = "day1";
   element.sourceManagerModel = sampleSourceModel;
@@ -59,6 +75,40 @@ test("settings shell renders event-day-selector and circle-data-source-panel chi
   assert.ok(element.querySelector("source-manager"));
   assert.match(element.textContent || "", /コミックマーケット104/);
   assert.match(element.textContent || "", /circles\.csv/);
+});
+
+test("detail follows a successful selected-row flip but stays on failure", async () => {
+  const element = new ComipathSettings();
+  const day2 = {
+    ...selectedManagementRow,
+    ref: { eventId: "c104", dayId: "day2" },
+    dayLabel: "2日目 (月)",
+    selected: false,
+  };
+  element.eventDayManagementRows = [selectedManagementRow, day2];
+  element.detailRef = selectedManagementRow.ref;
+  element.detailOpen = true;
+  document.body.appendChild(element);
+  await element.updateComplete;
+
+  element.eventDayManagementRows = [
+    { ...selectedManagementRow, circleCount: 2 },
+    day2,
+  ];
+  await element.updateComplete;
+  expect(element.detailRef).toEqual(selectedManagementRow.ref);
+
+  element.eventDayManagementRows = [
+    { ...selectedManagementRow, selected: false },
+    { ...day2, selected: true },
+  ];
+  await element.updateComplete;
+
+  expect(element.detailRef).toEqual(day2.ref);
+  expect(element.querySelector(".management-detail-summary")?.textContent).toContain(
+    "2日目 (月)",
+  );
+  element.remove();
 });
 
 test("settings shell renders enabled delete options and emits only their scope", async () => {
@@ -75,6 +125,7 @@ test("settings shell renders enabled delete options and emits only their scope",
     events.push(event as CustomEvent);
   });
   element.deleteOptions = [deleteOption];
+  element.eventDayManagementRows = [selectedManagementRow];
 
   document.body.appendChild(element);
   await element.updateComplete;
@@ -111,6 +162,7 @@ test("blocked delete option exposes reason text with role=status for screen read
     blockedReason: "2件の送信待ちがあります。",
   };
   element.deleteOptions = [blockedOption];
+  element.eventDayManagementRows = [selectedManagementRow];
 
   document.body.appendChild(element);
   await element.updateComplete;
@@ -130,8 +182,70 @@ test("blocked delete option exposes reason text with role=status for screen read
   document.body.removeChild(element);
 });
 
+test("locks and restores body scroll state without destroying existing inline styles", async () => {
+  const originalStyle = document.body.getAttribute("style");
+  const originalScrollX = Object.getOwnPropertyDescriptor(window, "scrollX");
+  const originalScrollY = Object.getOwnPropertyDescriptor(window, "scrollY");
+  const scrollTo = vi
+    .spyOn(window, "scrollTo")
+    .mockImplementation(() => undefined);
+
+  Object.defineProperty(window, "scrollX", {
+    configurable: true,
+    value: 37,
+  });
+  Object.defineProperty(window, "scrollY", {
+    configurable: true,
+    value: 143,
+  });
+  document.body.style.setProperty("position", "relative", "important");
+  document.body.style.top = "7px";
+  document.body.style.left = "8px";
+  document.body.style.right = "9px";
+  document.body.style.width = "80%";
+  document.body.style.overflow = "scroll";
+
+  const element = new ComipathSettings();
+  element.eventDayManagementRows = [selectedManagementRow];
+  element.open = true;
+  document.body.appendChild(element);
+  await element.updateComplete;
+
+  expect(document.body.style.position).toBe("fixed");
+  expect(document.body.style.overflow).toBe("hidden");
+  expect(document.body.style.top).toBe("-143px");
+  expect(document.body.style.left).toBe("-37px");
+
+  element.open = false;
+  await element.updateComplete;
+
+  expect(document.body.style.position).toBe("relative");
+  expect(document.body.style.getPropertyPriority("position")).toBe("important");
+  expect(document.body.style.top).toBe("7px");
+  expect(document.body.style.left).toBe("8px");
+  expect(document.body.style.right).toBe("9px");
+  expect(document.body.style.width).toBe("80%");
+  expect(document.body.style.overflow).toBe("scroll");
+  expect(scrollTo).toHaveBeenCalledWith(37, 143);
+
+  element.open = true;
+  await element.updateComplete;
+  element.remove();
+  element.disconnectedCallback();
+  expect(document.body.style.position).toBe("relative");
+  expect(document.body.style.overflow).toBe("scroll");
+  expect(scrollTo).toHaveBeenCalledTimes(2);
+
+  scrollTo.mockRestore();
+  if (originalStyle === null) document.body.removeAttribute("style");
+  else document.body.setAttribute("style", originalStyle);
+  if (originalScrollX) Object.defineProperty(window, "scrollX", originalScrollX);
+  if (originalScrollY) Object.defineProperty(window, "scrollY", originalScrollY);
+});
+
 test("settings shell exposes the approved ALNS search-time choices", async () => {
   const element = new ComipathSettings();
+  element.eventDayManagementRows = [selectedManagementRow];
   const events: CustomEvent[] = [];
   element.addEventListener("optimization-time-limit-change", (event) => {
     events.push(event as CustomEvent);

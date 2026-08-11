@@ -180,6 +180,7 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   page,
 }) => {
   await page.goto("/?demo_ui=1");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
 
   await expect(page.locator("#target-content")).toBeVisible();
   await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
@@ -246,34 +247,51 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   await expect(
     page.locator('[data-route-kind="current"] .route-flow-line'),
   ).toHaveCSS("animation-name", "route-flow");
-  const routeFlowOffsets = await page
-    .locator('[data-route-kind="current"] .route-flow-line')
-    .evaluate((element) => {
-      const animation = element
-        .getAnimations()
-        .find(
-          (candidate): candidate is CSSAnimation =>
-            candidate instanceof CSSAnimation &&
-            candidate.animationName === "route-flow",
-        );
-      if (!animation) throw new Error("route-flow animation was not found");
-
-      animation.pause();
-      animation.currentTime = 0;
-      const initial = Number.parseFloat(
-        getComputedStyle(element).strokeDashoffset,
-      );
-      animation.currentTime = 550;
-      const middle = Number.parseFloat(
-        getComputedStyle(element).strokeDashoffset,
-      );
-      return { initial, middle };
-    });
-  expect(routeFlowOffsets.middle).toBeLessThan(routeFlowOffsets.initial);
+  const routeFlow = page.locator(
+    '[data-route-kind="current"] .route-flow-line',
+  );
+  const initialDashOffset = await routeFlow.evaluate(
+    (element) => getComputedStyle(element).strokeDashoffset,
+  );
+  await expect
+    .poll(
+      () =>
+        routeFlow.evaluate(
+          (element) => getComputedStyle(element).strokeDashoffset,
+        ),
+      { timeout: 1500, intervals: [50, 100] },
+    )
+    .not.toBe(initialDashOffset);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(
     page.locator('[data-route-kind="current"] .route-flow-line'),
   ).toHaveCSS("animation-name", "none");
+  await expect(
+    page.locator('[data-route-kind="current"] .route-overlay-line'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-route-kind="current"] .route-start-marker'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-route-kind="current"] .route-goal-marker'),
+  ).toBeVisible();
+  const currentSummaryTarget = (
+    await page.locator("#target-space-heading").textContent()
+  )?.trim();
+  const currentSummaryDistance = (
+    await page.locator("#target-route-log").textContent()
+  )
+    ?.split(" /")[0]
+    .trim();
+  await expect(page.locator("#target-start-space")).not.toHaveText("---");
+  await expect(page.locator("#target-route-log")).toHaveText(/^距離 \d+ /);
+  await expect(page.locator(".target-bottom-sheet")).not.toContainText(
+    currentSummaryTarget || "",
+  );
+  await expect(page.locator(".target-bottom-sheet")).not.toContainText(
+    currentSummaryDistance || "",
+  );
+  await expect(page.locator("#route-selection-controls")).toBeHidden();
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect(page.locator(".target-bottom-sheet")).toBeVisible();
   await pinFor(page, "東ア23a").evaluate((button: HTMLButtonElement) =>
@@ -320,6 +338,37 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   expect(portraitBox?.width).toBeLessThanOrEqual(portraitPreviewBox?.width + 1);
   expect(portraitBox?.height).toBeLessThanOrEqual(
     portraitPreviewBox?.height + 1,
+  );
+});
+
+test("320px幅・200% zoomでも候補と距離を横スクロールなしで表示する", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/?demo_ui=1");
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "200%";
+  });
+
+  await expect(page.locator("#target-space-heading")).not.toHaveText("---");
+  const currentTarget = (
+    await page.locator("#target-space-heading").textContent()
+  )?.trim();
+  const candidate = currentTarget === "東ア23a" ? "東ア31b" : "東ア23a";
+  await pinFor(page, candidate).evaluate((button: HTMLButtonElement) =>
+    button.click(),
+  );
+  await expect(page.locator("#selected-target-space")).toBeVisible();
+  await expect(page.locator("#target-dist")).toHaveText(/^距離 /);
+
+  const overflow = await page.evaluate(() => {
+    return {
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth,
+    };
+  });
+  expect(overflow.documentWidth, JSON.stringify(overflow)).toBeLessThanOrEqual(
+    overflow.viewportWidth,
   );
 });
 
@@ -616,8 +665,12 @@ test("設定画面の開閉やソース閲覧時に明示的な取得なしにGA
   await page.goto("/");
 
   await page.locator("#toggle-settings").click();
-  await page.locator("#settings-area .management-detail-surface > summary").click();
-  await expect(page.locator("source-manager")).toBeVisible();
+  const selectedRow = page.locator(
+    'event-day-management-view .event-day-management-row[aria-current="true"]',
+  );
+  await selectedRow.locator('button[data-action="detail"]').click();
+  await expect(page.locator("#settings-area .management-detail-pane")).toBeVisible();
+  await expect(page.locator(".source-manager-panel")).toBeVisible();
   expect(requestCount).toBe(0);
 });
 
@@ -736,6 +789,49 @@ test("一覧の左右スワイプが外側方向の購入と端末保存へ到�
       }),
     )
     .toBe("purchased");
+});
+
+test("一覧の初回swipe hintは短い横移動を示しreduced motionでは停止する", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/?demo_ui=1");
+  await page.evaluate(() =>
+    localStorage.removeItem("comipath:ui:v1:gallery-swipe-hint-seen"),
+  );
+  await page.locator("#btn-open-gallery").click();
+
+  const hint = page.locator(".gallery-swipe-hint");
+  const demo = page.locator(".gallery-swipe-hint-demo-card");
+  await expect(hint).toContainText("外側へスワイプして購入済みにできます");
+  await expect(demo).toBeVisible();
+  await expect(demo).toHaveCSS("animation-name", "gallery-swipe-hint-slide");
+  const initialTransform = await demo.evaluate(
+    (element) => getComputedStyle(element).transform,
+  );
+  await expect
+    .poll(() => demo.evaluate((element) => getComputedStyle(element).transform))
+    .not.toBe(initialTransform);
+
+  await hint.click();
+  await expect(hint).toBeHidden();
+  await page.locator("#btn-close-gallery").click();
+  await page.locator("#btn-open-gallery").click();
+  await expect(page.locator(".gallery-swipe-hint")).toHaveCount(0);
+
+  await page.locator("#btn-close-gallery").click();
+  await page.evaluate(() =>
+    localStorage.removeItem("comipath:ui:v1:gallery-swipe-hint-seen"),
+  );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.locator("#btn-open-gallery").click();
+  await expect(page.locator(".gallery-swipe-hint")).toContainText(
+    "外側へスワイプして購入済みにできます",
+  );
+  await expect(page.locator(".gallery-swipe-hint-demo-card")).toHaveCSS(
+    "animation-name",
+    "none",
+  );
 });
 
 test("一覧の画像読込失敗をNo Imageへ置き換える", async ({ page }) => {

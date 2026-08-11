@@ -1,0 +1,33 @@
+/* Gallery swipe hint */
+.gallery-swipe-hint-demo {
+  display: inline-flex;
+  justify-content: center;
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 900;
+}
+
+.gallery-swipe-hint-demo-card {
+  display: inline-block;
+  animation: gallery-swipe-hint-slide 1.2s ease-in-out 2;
+}
+
+@keyframes gallery-swipe-hint-slide {
+  0%,
+  100% {
+    transform: translateX(-12px);
+  }
+
+  50% {
+    transform: translateX(12px);
+  }
+}
+
+/* Reduced motion overrides */
+@media (prefers-reduced-motion: reduce) {
+  .gallery-swipe-hint-demo-card {
+    animation: none;
+    transform: none;
+  }
+}

@@ -335,6 +335,7 @@ export class DomRouteGuidanceView {
       {
         statusLabel: isPreview ? "候補" : "次の目的地",
         distanceLabel,
+        showCandidateDetails: isPreview,
       },
     );
 
@@ -405,8 +406,10 @@ export class DomRouteGuidanceView {
       this.els.targetStatusLabel.textContent =
         options.statusLabel || viewModel.statusLabel;
     }
-    if (this.els.selectedTargetSpace)
-      this.els.selectedTargetSpace.textContent = viewModel.space;
+    if (this.els.selectedTargetSpace) {
+      this.els.selectedTargetSpace.textContent =
+        options.showCandidateDetails === false ? "" : viewModel.space;
+    }
     if (this.els.targetSheetName) {
       this.els.targetSheetName.textContent = viewModel.sheetNameLabel;
       this.els.targetSheetName.classList.toggle(
@@ -417,7 +420,9 @@ export class DomRouteGuidanceView {
     this.els.priority.textContent = viewModel.priorityLabel;
     this.els.subTargetSpace.textContent = viewModel.nextLabel;
     this.els.dist.textContent =
-      options.distanceLabel || viewModel.distanceLabel;
+      options.showCandidateDetails === false
+        ? ""
+        : options.distanceLabel || viewModel.distanceLabel;
 
     // Twitterリンク
     if (viewModel.accountUrl) {

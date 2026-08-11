@@ -1,6 +1,21 @@
 import { expect, test } from "@playwright/test";
 import { routeDemoEventRegistry } from "./fixture-registry";
 
+async function clickOfflineAction(page: import("@playwright/test").Page) {
+  const settings = page.locator("#settings-area");
+  const detail = settings.locator(".management-detail-pane");
+  if (!(await detail.isVisible())) {
+    const row = page
+      .locator("event-day-management-view .event-day-management-row")
+      .first();
+    await row.locator('button[data-action="detail"]').click();
+    await expect(detail).toBeVisible();
+  }
+  await settings
+    .locator('.management-detail-actions [data-action="offline"]')
+    .click();
+}
+
 const catalogPixel = Uint8Array.from([
   137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
   0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0,
@@ -56,7 +71,7 @@ test("管理overviewのoffline準備が対象catalogの進捗を表示する", a
   await page.locator("#toggle-settings").click();
   const row = page.locator("event-day-management-view .event-day-management-row").first();
   await expect(row).toContainText("Data 1件");
-  await row.locator('button[data-action="offline"]').click();
+  await clickOfflineAction(page);
   await expect(page.locator("async-operation-indicator")).toContainText(
     "お品書き 1 / 1 保存済み",
   );
@@ -125,15 +140,14 @@ test("offline準備のpartial failureは成功cacheを保持しretryで不足分
   firstRequests = 0;
   secondRequests = 0;
   await page.locator("#toggle-settings").click();
-  const row = page.locator("event-day-management-view .event-day-management-row").first();
-  await row.locator('button[data-action="offline"]').click();
+  await clickOfflineAction(page);
   await expect(page.locator("async-operation-indicator")).toContainText(
     "お品書き 1 / 2 保存済み、1件失敗",
   );
   const firstAfterInitial = firstRequests;
   const secondAfterInitial = secondRequests;
   failSecond = false;
-  await row.locator('button[data-action="offline"]').click();
+  await clickOfflineAction(page);
   await expect(page.locator("async-operation-indicator")).toContainText(
     "お品書き 2 / 2 保存済み",
   );

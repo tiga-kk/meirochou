@@ -23,6 +23,7 @@ export type DeleteScope =
 export interface ManagementEventDetailMap {
   "settings-close-request": Record<string, never>;
   "event-day-select": EventDayRef;
+  "event-day-detail-request": { ref: EventDayRef };
   "event-day-open-request": { ref: EventDayRef };
   "event-day-refresh-request": { ref: EventDayRef };
   "event-day-offline-request": { ref: EventDayRef };
