@@ -44,6 +44,7 @@ test("tracked public tree excludes private projects and credentials", () => {
     result.files.includes("apps/webapp/map-bundles/C108/manifest.json"),
   );
   assert.ok(result.files.includes("apps/webapp/map-bundles/C108/e456/map.svg"));
+  assert.ok(result.files.includes("apps/catalog-extension/manifest.json"));
 
   for (const path of [
     "wrangler.toml",

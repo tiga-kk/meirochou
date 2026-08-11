@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>ComiPath Catalog Sender</title>
+    <style>
+      body { width: 280px; margin: 16px; font: 14px sans-serif; }
+      p { overflow-wrap: anywhere; }
+      button { min-height: 44px; width: 100%; }
+      [hidden] { display: none; }
+    </style>
+  </head>
+  <body>
+    <h1>カタログ送信</h1>
+    <p id="message" role="status">取得中…</p>
+    <dl id="result" hidden>
+      <dt>スペース</dt><dd id="space"></dd>
+      <dt>画像</dt><dd id="tweet"></dd>
+    </dl>
+    <button id="send" type="button" disabled>このお品書きをGASへ送る</button>
+    <button id="options" type="button">設定を開く</button>
+    <script src="popup.js"></script>
+  </body>
+</html>

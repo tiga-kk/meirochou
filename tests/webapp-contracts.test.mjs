@@ -335,7 +335,7 @@ test("webapp CI runs clean install, full verification, and mobile E2E", () => {
     /image:\s*mcr\.microsoft\.com\/playwright:v1\.61\.1-noble/,
   );
   assert.doesNotMatch(workflow, /playwright install --with-deps chromium/);
-  assert.match(workflow, /run:\s*npm run verify:webapp/);
+  assert.match(workflow, /run:\s*npm run verify/);
   assert.match(workflow, /run:\s*npm run test:e2e/);
   assert.match(workflow, /if:\s*failure\(\)/);
 });

@@ -12,7 +12,6 @@ const EXCLUDE_DIRS = new Set([
 ]);
 
 const FORBIDDEN_PATHS = [
-  "apps/catalog-extension",
   "apps/pebble",
   "apps/webapp/AGENT.md",
   "apps/webapp/README.md",

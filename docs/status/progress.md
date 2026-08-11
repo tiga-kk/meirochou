@@ -13,8 +13,8 @@
 - Phase 6: 完了・`main`へmerge済み
 - Phase 6.1: 完了・`main`へmerge済み
 - Phase 7: 完了・`main`へmerge済み
-- 現在のフェーズ: Phase 7.2 Task 1 完了
-- 次のTask: Phase 7.2 Task 2「カタログページ用Chrome拡張とCI接続」
+- 現在のフェーズ: Phase 7.2 Task 2 完了
+- 次のTask: Phase 7.2 Task 3「candidate route previewと購入・保留guard」
 - scale values: 確定
 
 ### Phase 6.1の既知残件
@@ -203,7 +203,11 @@ Phase 7.1統合後の実機確認で判明した経路表示、地図操作、Ga
   - `upsertCatalog`を既存`sale`と明示`action`で分離し、既存行では`tweet`列だけを更新し、新規spaceは列位置を保って追加する。
   - Vite dev/buildの`Code.gs.txt`公開とsource/artifact byte一致検証を追加した。
   - GAS 30 tests、UI focused tests、webapp build、architecture/typecheck、public build auditを実行した。
-- Task 2〜8: 未着手
+- Task 2: カタログページ用Chrome拡張とCI接続 — 完了
+  - Manifest V3拡張を`apps/catalog-extension/`へ追加し、指定DOMからspace/image URLを抽出するclassic content scriptを実装した。
+  - background moduleが設定済みGASへ明示操作の`upsertCatalog`だけを送信し、GAS URL・sheet名をrepositoryへ含めない構成にした。
+  - Node標準extension tests 9件を`npm run verify`とGitHub Actionsから実行するよう接続した。
+- Task 3〜8: 未着手
 
 ### Phase 7.2の固定事項
 
