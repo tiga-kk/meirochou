@@ -275,6 +275,23 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   await expect(
     page.locator('[data-route-kind="current"] .route-goal-marker'),
   ).toBeVisible();
+  const currentSummaryTarget = (
+    await page.locator("#target-space-heading").textContent()
+  )?.trim();
+  const currentSummaryDistance = (
+    await page.locator("#target-route-log").textContent()
+  )
+    ?.split(" /")[0]
+    .trim();
+  await expect(page.locator("#target-start-space")).not.toHaveText("---");
+  await expect(page.locator("#target-route-log")).toHaveText(/^距離 \d+ /);
+  await expect(page.locator(".target-bottom-sheet")).not.toContainText(
+    currentSummaryTarget || "",
+  );
+  await expect(page.locator(".target-bottom-sheet")).not.toContainText(
+    currentSummaryDistance || "",
+  );
+  await expect(page.locator("#route-selection-controls")).toBeHidden();
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await expect(page.locator(".target-bottom-sheet")).toBeVisible();
   await pinFor(page, "東ア23a").evaluate((button: HTMLButtonElement) =>
@@ -321,6 +338,37 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   expect(portraitBox?.width).toBeLessThanOrEqual(portraitPreviewBox?.width + 1);
   expect(portraitBox?.height).toBeLessThanOrEqual(
     portraitPreviewBox?.height + 1,
+  );
+});
+
+test("320px幅・200% zoomでも候補と距離を横スクロールなしで表示する", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/?demo_ui=1");
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "200%";
+  });
+
+  await expect(page.locator("#target-space-heading")).not.toHaveText("---");
+  const currentTarget = (
+    await page.locator("#target-space-heading").textContent()
+  )?.trim();
+  const candidate = currentTarget === "東ア23a" ? "東ア31b" : "東ア23a";
+  await pinFor(page, candidate).evaluate((button: HTMLButtonElement) =>
+    button.click(),
+  );
+  await expect(page.locator("#selected-target-space")).toBeVisible();
+  await expect(page.locator("#target-dist")).toHaveText(/^距離 /);
+
+  const overflow = await page.evaluate(() => {
+    return {
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth,
+    };
+  });
+  expect(overflow.documentWidth, JSON.stringify(overflow)).toBeLessThanOrEqual(
+    overflow.viewportWidth,
   );
 });
 

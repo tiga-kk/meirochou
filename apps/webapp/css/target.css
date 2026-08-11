@@ -452,7 +452,7 @@
 
 .target-meta-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 4px;
   margin-top: 8px;
 }
@@ -492,6 +492,22 @@
   font-family: var(--font-mono);
   font-size: 0.78rem;
   font-weight: 900;
+}
+
+.candidate-selection-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.candidate-selection-distance {
+  color: var(--text-sub);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .candidate-selection-actions {
@@ -605,6 +621,36 @@
 }
 
 @media (max-width: 480px) {
+  header {
+    flex-wrap: wrap;
+  }
+
+  .header-sign,
+  .header-actions {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .header-actions {
+    justify-content: stretch;
+    margin: 0;
+  }
+
+  .header-btn {
+    flex: 1 1 0;
+  }
+
+  #toast {
+    max-width: calc(100vw - 24px);
+    box-sizing: border-box;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .location-controls {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .current-location-header {
     grid-template-columns: auto minmax(0, 1fr);
   }

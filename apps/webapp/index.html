@@ -125,10 +125,8 @@
             <div class="sheet-main">
               <div>
                 <span class="target-label" id="target-status-label">次の目的地</span>
-                <strong id="selected-target-space" class="selected-target-space">---</strong>
                 <span id="target-sheet-name" class="target-sheet-name hidden"></span>
                 <div class="target-meta-grid">
-                  <span id="target-dist">距離 -</span>
                   <span id="target-priority">優先度 -</span>
                   <span id="sub-target-space">次 -</span>
                 </div>
@@ -142,6 +140,10 @@
                 </a>
                 <div id="route-selection-controls" class="route-selection-controls hidden">
                   <div class="candidate-selection-label">候補</div>
+                  <div class="candidate-selection-summary">
+                    <strong id="selected-target-space" class="selected-target-space">---</strong>
+                    <span id="target-dist" class="candidate-selection-distance">距離 -</span>
+                  </div>
                   <div class="candidate-selection-actions">
                     <button type="button" id="btn-preview-route" class="btn btn-primary" disabled>
                       <i class="fa-solid fa-route"></i> 経路を比較
