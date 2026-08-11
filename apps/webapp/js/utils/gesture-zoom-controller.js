@@ -1,6 +1,28 @@
 /**
  * 高度な画像ズーム（ピンチズーム、パン、慣性、バウンド、PCマウス・ホイール対応）を設定するクラス
  */
+function calculateReleaseVelocity(samples) {
+  if (samples.length < 2) return { x: 0, y: 0 };
+  const latest = samples.at(-1);
+  if (!latest || !Number.isFinite(latest.time)) return { x: 0, y: 0 };
+
+  let first = null;
+  for (let index = samples.length - 2; index >= 0; index -= 1) {
+    const candidate = samples[index];
+    const elapsed = latest.time - candidate.time;
+    if (Number.isFinite(elapsed) && elapsed > 0 && elapsed <= 120) {
+      first = candidate;
+    }
+  }
+  if (!first) return { x: 0, y: 0 };
+
+  const elapsed = latest.time - first.time;
+  return {
+    x: (latest.x - first.x) / elapsed,
+    y: (latest.y - first.y) / elapsed,
+  };
+}
+
 export class GestureZoomController {
   constructor(container, img) {
     this.container = container;
@@ -25,6 +47,8 @@ export class GestureZoomController {
     this.activePointers = new Map();
     this.vx = 0;
     this.vy = 0;
+    this.panSamples = [];
+    this.inertiaLastTimestamp = null;
     this.rafId = null;
     this.transformRafId = null;
     this.resizeObserver = null;
@@ -157,6 +181,8 @@ export class GestureZoomController {
     this.state = { scale: 1, x: this.baseX, y: this.baseY };
     this.vx = 0;
     this.vy = 0;
+    this.panSamples = [];
+    this.inertiaLastTimestamp = null;
     this.activePointers.clear();
     this.isDragging = false;
     this.initialDistance = 0;
@@ -176,6 +202,8 @@ export class GestureZoomController {
     this.state = { scale, x, y };
     this.vx = 0;
     this.vy = 0;
+    this.panSamples = [];
+    this.inertiaLastTimestamp = null;
     this.cancelAnimation();
     this.updateTransform();
   }
@@ -209,90 +237,79 @@ export class GestureZoomController {
   }
 
   startInertia() {
-    const curW = this.layout.stageWidth * this.state.scale;
-    const curH = this.layout.stageHeight * this.state.scale;
-    const winW = this.layout.containerWidth;
-    const winH = this.layout.containerHeight;
+    const [xMin, xMax] = this.getXBounds();
+    const [yMin, yMax] = this.getYBounds();
     const outOfBounds =
-      (winW >= curW
-        ? this.state.x > 0
-        : this.state.x > 0 || this.state.x < winW - curW) ||
-      (winH >= curH
-        ? this.state.y > 0
-        : this.state.y > 0 || this.state.y < winH - curH);
-    if (Math.abs(this.vx) <= 0.1 && Math.abs(this.vy) <= 0.1 && !outOfBounds)
+      this.state.x < xMin ||
+      this.state.x > xMax ||
+      this.state.y < yMin ||
+      this.state.y > yMax;
+    if (Math.abs(this.vx) <= 0.01 && Math.abs(this.vy) <= 0.01 && !outOfBounds)
       return;
     if (this.rafId === null) {
-      this.rafId = requestAnimationFrame(() => this.animate());
+      this.inertiaLastTimestamp = null;
+      this.rafId = requestAnimationFrame((timestamp) =>
+        this.animate(timestamp),
+      );
     }
   }
 
-  animate() {
+  animate(timestamp) {
     this.rafId = null;
     if (this.isDragging) return;
 
-    this.vx *= this.FRICTION;
-    this.vy *= this.FRICTION;
+    const previousTimestamp = this.inertiaLastTimestamp;
+    const validTimestamp = Number.isFinite(timestamp);
+    const elapsed =
+      previousTimestamp !== null &&
+      validTimestamp &&
+      timestamp > previousTimestamp
+        ? Math.min(timestamp - previousTimestamp, 64)
+        : 16;
+    this.inertiaLastTimestamp = validTimestamp
+      ? timestamp
+      : previousTimestamp;
 
-    this.state.x += this.vx;
-    this.state.y += this.vy;
-
-    const curW = this.layout.stageWidth * this.state.scale;
-    const curH = this.layout.stageHeight * this.state.scale;
-    const winW = this.layout.containerWidth;
-    const winH = this.layout.containerHeight;
-
-    let bounced = false;
     let needsTransform = false;
-    const applyBounce = (axis, velocityKey, boundary) => {
-      needsTransform = true;
-      const next =
-        this.state[axis] + (boundary - this.state[axis]) * 0.2;
-      if (Math.abs(boundary - next) < 0.25) {
-        this.state[axis] = boundary;
+    const advanceAxis = (axis, velocityKey, [min, max]) => {
+      const position = this.state[axis];
+      if (position < min || position > max) {
+        const boundary = position < min ? min : max;
+        const next = position + (boundary - position) * 0.2;
+        this.state[axis] = Math.abs(boundary - next) < 0.25 ? boundary : next;
         this[velocityKey] = 0;
+        needsTransform = true;
+        return this.state[axis] !== boundary;
+      }
+
+      const next = position + this[velocityKey] * elapsed;
+      if (next < min || next > max) {
+        this.state[axis] = Math.max(min, Math.min(next, max));
+        this[velocityKey] = 0;
+        needsTransform = true;
         return false;
       }
+
       this.state[axis] = next;
-      this[velocityKey] *= this.BOUNCE_FRICTION;
-      return true;
+      this[velocityKey] *= Math.pow(this.FRICTION, elapsed / 16);
+      needsTransform ||= next !== position;
+      return Math.abs(this[velocityKey]) > 0.01;
     };
 
-    // X軸の境界
-    if (winW >= curW) {
-      if (this.state.x > 0) {
-        bounced = applyBounce("x", "vx", 0) || bounced;
-      }
-    } else {
-      if (this.state.x > 0) {
-        bounced = applyBounce("x", "vx", 0) || bounced;
-      } else if (this.state.x < winW - curW) {
-        bounced =
-          applyBounce("x", "vx", winW - curW) || bounced;
-      }
-    }
-
-    // Y軸の境界
-    if (winH >= curH) {
-      if (this.state.y > 0) {
-        bounced = applyBounce("y", "vy", 0) || bounced;
-      }
-    } else {
-      if (this.state.y > 0) {
-        bounced = applyBounce("y", "vy", 0) || bounced;
-      } else if (this.state.y < winH - curH) {
-        bounced =
-          applyBounce("y", "vy", winH - curH) || bounced;
-      }
-    }
+    const xContinues = advanceAxis("x", "vx", this.getXBounds());
+    const yContinues = advanceAxis("y", "vy", this.getYBounds());
 
     const shouldContinue =
-      Math.abs(this.vx) > 0.1 || Math.abs(this.vy) > 0.1 || bounced;
+      xContinues || yContinues;
     if (needsTransform || shouldContinue) {
       this.scheduleTransform();
     }
     if (shouldContinue) {
-      this.rafId = requestAnimationFrame(() => this.animate());
+      this.rafId = requestAnimationFrame((nextTimestamp) =>
+        this.animate(nextTimestamp),
+      );
+    } else {
+      this.inertiaLastTimestamp = null;
     }
   }
 
@@ -316,7 +333,12 @@ export class GestureZoomController {
     this.vy = 0;
 
     if (this.activePointers.size === 2) {
+      this.panSamples = [];
       this.beginPinch();
+    } else {
+      this.panSamples = [
+        { x: e.clientX, y: e.clientY, time: e.timeStamp },
+      ];
     }
   }
 
@@ -345,8 +367,20 @@ export class GestureZoomController {
       const dy = e.clientY - previous.y;
       this.state.x = this.applyPan(this.state.x + dx, this.getXBounds());
       this.state.y = this.applyPan(this.state.y + dy, this.getYBounds());
-      this.vx = dx;
-      this.vy = dy;
+      if (Number.isFinite(e.timeStamp)) {
+        this.panSamples.push({
+          x: e.clientX,
+          y: e.clientY,
+          time: e.timeStamp,
+        });
+        while (
+          this.panSamples.length > 1 &&
+          Number.isFinite(this.panSamples[0].time) &&
+          e.timeStamp - this.panSamples[0].time > 120
+        ) {
+          this.panSamples.shift();
+        }
+      }
       this.scheduleTransform();
       return;
     }
@@ -398,11 +432,16 @@ export class GestureZoomController {
       this.initialDistance = 0;
       this.vx = 0;
       this.vy = 0;
+      this.panSamples = [];
       this.isDragging = true;
       return;
     }
     this.initialDistance = 0;
     this.isDragging = false;
+    const releaseVelocity = calculateReleaseVelocity(this.panSamples);
+    this.vx = releaseVelocity.x;
+    this.vy = releaseVelocity.y;
+    this.panSamples = [];
     this.startInertia();
   }
 

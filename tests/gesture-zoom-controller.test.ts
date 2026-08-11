@@ -12,7 +12,7 @@ function pointerEvent(
   pointerId: number,
   clientX: number,
   clientY: number,
-  options: { button?: number } = {},
+  options: { button?: number; timeStamp?: number } = {},
 ) {
   const event = new Event(type, { bubbles: true, cancelable: true });
   Object.defineProperties(event, {
@@ -21,6 +21,7 @@ function pointerEvent(
     clientX: { value: clientX },
     clientY: { value: clientY },
     button: { value: options.button ?? 0 },
+    timeStamp: { value: options.timeStamp ?? 0 },
   });
   return event;
 }
@@ -95,10 +96,99 @@ describe("GestureZoomController", () => {
   });
 
   function flushRaf() {
+    flushRafAt(0);
+  }
+
+  function flushRafAt(time: number) {
     const pending = [...callbacks.entries()];
     callbacks.clear();
-    pending.forEach(([, callback]) => callback(0));
+    pending.forEach(([, callback]) => callback(time));
   }
+
+  it("keeps bounded pan 1:1 and reaches wide/tall edges while centered axes stay centered", () => {
+    const { container, controller } = createController();
+    controller.setLayout({
+      containerWidth: 100,
+      containerHeight: 100,
+      stageWidth: 300,
+      stageHeight: 80,
+      baseX: -100,
+      baseY: 10,
+    });
+    controller.setTransform({ scale: 1, x: -100, y: 10 });
+
+    container.dispatchEvent(pointerEvent("pointerdown", 1, 50, 50));
+    container.dispatchEvent(pointerEvent("pointermove", 1, 60, 50));
+    expect(controller.state.x).toBe(-90);
+    container.dispatchEvent(pointerEvent("pointermove", 1, -50, 50));
+    expect(controller.state.x).toBe(-200);
+    container.dispatchEvent(pointerEvent("pointermove", 1, 50, 50));
+    expect(controller.state.x).toBe(-100);
+    container.dispatchEvent(pointerEvent("pointermove", 1, 150, 50));
+    expect(controller.state.x).toBe(0);
+    expect(controller.state.y).toBe(10);
+
+    controller.reset();
+    controller.setLayout({
+      containerWidth: 100,
+      containerHeight: 100,
+      stageWidth: 80,
+      stageHeight: 300,
+      baseX: 10,
+      baseY: -100,
+    });
+    controller.setTransform({ scale: 1, x: 10, y: -100 });
+    container.dispatchEvent(pointerEvent("pointerdown", 2, 50, 50));
+    container.dispatchEvent(pointerEvent("pointermove", 2, 50, 60));
+    expect(controller.state.y).toBe(-90);
+    container.dispatchEvent(pointerEvent("pointermove", 2, 50, -50));
+    expect(controller.state.y).toBe(-200);
+    container.dispatchEvent(pointerEvent("pointermove", 2, 50, 50));
+    expect(controller.state.y).toBe(-100);
+    container.dispatchEvent(pointerEvent("pointermove", 2, 50, 150));
+    expect(controller.state.y).toBe(0);
+    expect(controller.state.x).toBe(10);
+  });
+
+  it("keeps release velocity from multiple recent samples when the last delta is small", () => {
+    const { container, controller } = createController();
+    controller.setLayout({
+      containerWidth: 100,
+      containerHeight: 100,
+      stageWidth: 1000,
+      stageHeight: 100,
+    });
+
+    container.dispatchEvent(pointerEvent("pointerdown", 1, 100, 50, { timeStamp: 100 }));
+    container.dispatchEvent(pointerEvent("pointermove", 1, 160, 50, { timeStamp: 116 }));
+    container.dispatchEvent(pointerEvent("pointermove", 1, 162, 50, { timeStamp: 132 }));
+    container.dispatchEvent(pointerEvent("pointerup", 1, 162, 50, { timeStamp: 140 }));
+
+    expect(controller.vx).toBeGreaterThan(0.5);
+  });
+
+  it("uses elapsed time instead of RAF count for inertia", () => {
+    const run = (step: number) => {
+      const { controller } = createController();
+      controller.setLayout({
+        containerWidth: 100,
+        containerHeight: 100,
+        stageWidth: 1000,
+        stageHeight: 100,
+      });
+      controller.state.x = -200;
+      controller.vx = 0.5;
+      controller.startInertia();
+      for (let time = 0; time <= 160; time += step) flushRafAt(time);
+      return controller.state.x;
+    };
+
+    const fine = run(16);
+    const coarse = run(32);
+    expect(fine).toBeGreaterThan(-200);
+    expect(coarse).toBeGreaterThan(-200);
+    expect(Math.abs(fine - coarse)).toBeLessThan(8);
+  });
 
   it("coalesces pointer pan transform writes into one RAF", () => {
     const { container, image } = createController();
