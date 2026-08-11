@@ -312,6 +312,8 @@ test("webapp uses Vite with a relative static-host base and dedicated output", (
   assert.match(viteConfig, /base:\s*["']\.\/["']/);
   assert.match(viteConfig, /outDir:\s*webappOutput/);
   assert.match(viteConfig, /server\.middlewares\.use\(["']\/assets\/maps["']/);
+  assert.match(viteConfig, /Code\.gs\.txt/);
+  assert.match(viteConfig, /text\/plain; charset=utf-8/);
   assert.match(
     viteConfig,
     /cpSync\(bundleDirectory,\s*resolve\(outputDirectory,\s*["']assets\/maps["']/,

@@ -29,7 +29,7 @@ Unknown columns are ignored. Duplicate recognized headers and rows without a `sp
 
 ## Deployment Steps
 
-1. Run `npm run build:gas` to produce `Code.gs`.
+1. Run `npm run build:gas` to produce `Code.gs`, or use **GASコードをコピー** in ComiPath's management screen.
 2. Open your Google Spreadsheet for the event.
 3. Open **Extensions** → **Apps Script**.
 4. Paste the contents of `Code.gs` into the Apps Script editor.
@@ -42,6 +42,19 @@ Unknown columns are ignored. Duplicate recognized headers and rows without a `sp
 7. Paste this URL into your ComiPath application's local settings. The deployed URL belongs only in that user's local settings and is stored in the browser's `LocalStorage`; it is not supplied by this repository.
 
 The client uses `GET <local WebApp URL>?action=getSheets` to list sheet names and `GET <local WebApp URL>?sheets=<url-encoded-sheetName>` to fetch one selected sheet. Purchases use a one-way `POST` with a JSON body containing `action: "sale"`, `sheetName`, `space`, and boolean `undo`.
+
+Catalog image URLs use a separate explicit `upsertCatalog` POST:
+
+```json
+{
+  "action": "upsertCatalog",
+  "sheetName": "day1",
+  "space": "東ア01a",
+  "tweet": "https://example.invalid/catalog.jpg"
+}
+```
+
+It updates only the `tweet` cell for an existing unique `space`, or writes `space` and `tweet` into a new row. Duplicate spaces, missing `tweet` headers, and non-HTTP(S) URLs are rejected.
 
 ## Data Synchronization & Queueing
 

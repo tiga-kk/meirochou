@@ -73,6 +73,7 @@ test("settings shell renders event-day-selector and circle-data-source-panel chi
   assert.equal(element.classList.contains("show"), true);
   assert.ok(element.querySelector("event-day-selector"));
   assert.ok(element.querySelector("source-manager"));
+  assert.ok(element.querySelector("gas-setup-panel"));
   assert.match(element.textContent || "", /コミックマーケット104/);
   assert.match(element.textContent || "", /circles\.csv/);
 });

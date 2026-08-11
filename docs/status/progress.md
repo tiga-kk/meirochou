@@ -13,8 +13,8 @@
 - Phase 6: 完了・`main`へmerge済み
 - Phase 6.1: 完了・`main`へmerge済み
 - Phase 7: 完了・`main`へmerge済み
-- 現在のフェーズ: Phase 7.1 完了
-- 次のTask: 次フェーズの計画確認
+- 現在のフェーズ: Phase 7.2 Task 1 完了
+- 次のTask: Phase 7.2 Task 2「カタログページ用Chrome拡張とCI接続」
 - scale values: 確定
 
 ### Phase 6.1の既知残件
@@ -191,6 +191,25 @@ Phase計画:
 - snapshot: Task 2のsummary変更、Task 4/6のmanagement list-detail・scroll isolation変更に対応する4件と、CIブラウザ差分のoutbox snapshot 1件だけを更新。
 - 既存・環境要因: CI用一時コンテナの`npm ci`がmoderate 1 / high 1のaudit警告を出すが、テスト結果には影響しない。テスト中の既存warningは失敗扱いしない。
 - 次の作業: Phase 7.1を完了として次フェーズの計画確認へ進む。
+
+## Phase 7.2
+
+Phase 7.1統合後の実機確認で判明した経路表示、地図操作、Gallery、目的地詳細の残件を修正し、カタログページ用Chrome拡張とGAS catalog upsertを追加する。計画・設計文書はGitHubの`docs/phase-07-2-field-followup-plan`から取得して参照する。
+
+### Phase 7.2の進捗
+
+- Task 1: GASコードコピーUIとcatalog upsert API — 完了
+  - 管理画面から生成済み`Code.gs`を取得してClipboardへコピーできるUIを追加。Clipboard拒否時は手動コピーfallbackを表示する。
+  - `upsertCatalog`を既存`sale`と明示`action`で分離し、既存行では`tweet`列だけを更新し、新規spaceは列位置を保って追加する。
+  - Vite dev/buildの`Code.gs.txt`公開とsource/artifact byte一致検証を追加した。
+  - GAS 30 tests、UI focused tests、webapp build、architecture/typecheck、public build auditを実行した。
+- Task 2〜8: 未着手
+
+### Phase 7.2の固定事項
+
+- `integrations/gas-spreadsheet/Code.gs`を唯一のコピー用artifactとし、webappへGASコード文字列を複製しない。
+- `doPost(e)`のJSON解析は一度だけとし、`upsertCatalog`と`sale`を`action`で振り分ける。
+- `upsertCatalog`は`priority`、`isSale`、`account`、`memo`を変更せず、duplicate spaceを安全に拒否する。
 
 ## 実装開始時の確認
 

@@ -4,6 +4,7 @@ import {
   cpSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   unlinkSync,
@@ -51,6 +52,7 @@ function writeJson(path, value) {
 function createFixture() {
   const root = mkdtempSync(join(tmpdir(), "comipath-deploy-audit-"));
   const sourceEvents = join(root, "apps/webapp/events");
+  const sourceGas = join(root, "integrations/gas-spreadsheet");
   const sourceBundle = join(root, "apps/webapp/map-bundles/C108");
   const publicBundle = join(root, "apps/webapp/map-bundles/public-v1");
   const publicArea = join(publicBundle, "public-east");
@@ -59,14 +61,18 @@ function createFixture() {
   const outputBundle = join(outputRoot, "assets/maps/C108");
   const outputPublicBundle = join(outputRoot, "assets/maps/public-v1");
   const outputAssets = join(outputRoot, "assets");
+  const outputGas = join(outputAssets, "integrations/gas-spreadsheet");
 
   mkdirSync(sourceEvents, { recursive: true });
+  mkdirSync(sourceGas, { recursive: true });
   mkdirSync(sourceBundle, { recursive: true });
   mkdirSync(publicArea, { recursive: true });
   mkdirSync(outputEvents, { recursive: true });
   mkdirSync(outputAssets, { recursive: true });
+  mkdirSync(outputGas, { recursive: true });
 
   writeJson(join(sourceEvents, "manifest.json"), registry);
+  writeFileSync(join(sourceGas, "Code.gs"), "function doPost() {}\n");
   writeJson(join(sourceBundle, "manifest.json"), mapManifest);
 
   for (const areaId of ["e456", "e7", "s12", "w12"]) {
@@ -126,6 +132,10 @@ function createFixture() {
   writeFileSync(
     join(outputRoot, "catalog-service-worker.js"),
     "self.addEventListener('fetch', () => {});\n",
+  );
+  writeFileSync(
+    join(outputGas, "Code.gs.txt"),
+    readFileSync(join(sourceGas, "Code.gs")),
   );
 
   return root;

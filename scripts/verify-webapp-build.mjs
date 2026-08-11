@@ -166,6 +166,14 @@ export function verifyWebappBuild({
     outputRoot,
     "catalog-service-worker.js",
   );
+  const gasCodeSourceFile = resolve(
+    resolvedRepositoryRoot,
+    "integrations/gas-spreadsheet/Code.gs",
+  );
+  const gasCodeOutputFile = resolve(
+    outputRoot,
+    "assets/integrations/gas-spreadsheet/Code.gs.txt",
+  );
   const registrySourcePath = resolve(webappRoot, "events/manifest.json");
   const sourceBundlesRoot = resolve(webappRoot, "map-bundles");
 
@@ -185,6 +193,13 @@ export function verifyWebappBuild({
   assert.ok(
     existsSync(sourceBundlesRoot),
     "source map-bundles directory is missing",
+  );
+  assert.ok(existsSync(gasCodeSourceFile), "source Code.gs is missing");
+  assert.ok(existsSync(gasCodeOutputFile), "built Code.gs artifact is missing");
+  assert.deepEqual(
+    readFileSync(gasCodeOutputFile),
+    readFileSync(gasCodeSourceFile),
+    "built Code.gs artifact differs from source",
   );
 
   const sourceRegistry = JSON.parse(readFileSync(registrySourcePath, "utf8"));

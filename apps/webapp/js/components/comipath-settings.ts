@@ -1,18 +1,18 @@
 import { html, LitElement, nothing, type PropertyValues } from "lit";
+import type { EventDayRef } from "../features/event-day/public-api";
 import {
   ALNS_SEARCH_TIME_LIMITS,
   type AlnsSearchTimeLimitMs,
   DEFAULT_SEARCH_TIME_LIMIT_MS,
 } from "../features/route-guidance/domain/optimization/time-decayed-objective";
+import type { EventDayManagementRow } from "../shared/ui/event-day-management-view-model";
 import { dispatchManagementEvent } from "../shared/ui/management-events";
-import { DialogFocusController } from "../ui/dialog-focus";
 import type {
   DeleteOptionViewModel,
   EventDayOption,
   OutboxPanelModel,
 } from "../shared/ui/management-view-model";
-import type { EventDayManagementRow } from "../shared/ui/event-day-management-view-model";
-import type { EventDayRef } from "../features/event-day/public-api";
+import { DialogFocusController } from "../ui/dialog-focus";
 import type { CircleDataSourcePanelModel } from "./circle-data-source-panel";
 import type { StorageDeleteDialogModel } from "./storage-delete-dialog";
 import "./event-day-selector";
@@ -20,6 +20,7 @@ import "./event-day-management-view";
 import "./circle-data-source-panel";
 import "./outbox-panel";
 import "./storage-delete-dialog";
+import "./gas-setup-panel";
 
 /**
  * Shell container for management settings, hosting the event/day selector,
@@ -392,6 +393,7 @@ export class ComipathSettings extends LitElement {
           @click=${this.requestClose}
         >閉じる</button>
       </div>
+      <gas-setup-panel></gas-setup-panel>
       <div class="management-list-detail">
         <div class=${this.detailOpen ? "management-overview-pane mobile-hidden" : "management-overview-pane"}>
           <event-day-management-view

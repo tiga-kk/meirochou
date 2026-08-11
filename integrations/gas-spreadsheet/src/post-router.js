@@ -15,6 +15,10 @@ function doPost(e) {
     );
   }
 
+  if (data.action === "upsertCatalog") {
+    return doPostCatalog(data);
+  }
+
   if (data.action === "sale") {
     return doPostSale(data);
   }

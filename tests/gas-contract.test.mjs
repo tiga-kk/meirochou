@@ -29,9 +29,14 @@ function setupGasContext(sheetsData, spreadsheetTitle = "Test Spreadsheet") {
         return {
           setValue(val) {
             // Row and Col are 1-based indexes
+            while (self.data.length < row) self.data.push([]);
+            while (self.data[row - 1].length < col) self.data[row - 1].push("");
             self.data[row - 1][col - 1] = val;
           },
         };
+      },
+      getLastRow() {
+        return this.data.length;
       },
     };
   });
@@ -84,6 +89,26 @@ function setupGasContext(sheetsData, spreadsheetTitle = "Test Spreadsheet") {
     spreadsheet,
     textOutputs,
   };
+}
+
+function loadGas(sheetsData) {
+  const gas = setupGasContext(sheetsData);
+  const context = {
+    SpreadsheetApp: gas.SpreadsheetApp,
+    ContentService: gas.ContentService,
+    console: { log() {}, warn() {}, error() {} },
+  };
+  vm.createContext(context);
+  vm.runInContext(readFileSync(codePath, "utf8"), context);
+  return { gas, context };
+}
+
+function post(context, body) {
+  return JSON.parse(
+    context
+      .doPost({ postData: { contents: JSON.stringify(body) } })
+      .getContent(),
+  );
 }
 
 test("gas Code.gs matches basic public constraints", () => {
@@ -892,4 +917,107 @@ test("doPost returns a stable safe error for invalid or missing JSON", () => {
     assert.equal(payload.code, "INVALID_INPUT");
     assert.equal(payload.message, "Invalid request body.");
   }
+});
+
+test("upsertCatalog updates only tweet in the matching row regardless of header order", () => {
+  const { gas, context } = loadGas({
+    Sheet1: [
+      ["memo", "tweet", "space", "priority", "isSale", "account"],
+      ["keep memo", "old", "東A01a", "7", "x", "@circle"],
+    ],
+  });
+
+  const payload = post(context, {
+    action: "upsertCatalog",
+    sheetName: "Sheet1",
+    space: "東A01a",
+    tweet: "https://example.invalid/new.jpg",
+  });
+
+  assert.deepEqual(payload.stored, {
+    sheetName: "Sheet1",
+    space: "東A01a",
+    tweet: "https://example.invalid/new.jpg",
+  });
+  assert.equal(payload.row, 2);
+  assert.equal(payload.created, false);
+  assert.deepEqual(gas.spreadsheet.sheets[0].data[1], [
+    "keep memo",
+    "https://example.invalid/new.jpg",
+    "東A01a",
+    "7",
+    "x",
+    "@circle",
+  ]);
+});
+
+test("upsertCatalog creates a new row without overwriting unrelated columns", () => {
+  const { gas, context } = loadGas({
+    Sheet1: [
+      ["priority", "space", "tweet", "memo"],
+      ["5", "東A01a", "old", "keep"],
+    ],
+  });
+
+  const payload = post(context, {
+    action: "upsertCatalog",
+    sheetName: "Sheet1",
+    space: "西B02b",
+    tweet: "http://example.invalid/catalog.png",
+  });
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.row, 3);
+  assert.equal(payload.created, true);
+  assert.deepEqual(gas.spreadsheet.sheets[0].data[2], [
+    "",
+    "西B02b",
+    "http://example.invalid/catalog.png",
+  ]);
+});
+
+test("upsertCatalog rejects duplicate spaces, missing tweet headers, and invalid URLs", () => {
+  const duplicate = loadGas({
+    Sheet1: [
+      ["space", "tweet"],
+      ["東A01a", "old"],
+      ["東A01a", "duplicate"],
+    ],
+  });
+  assert.equal(
+    post(duplicate.context, {
+      action: "upsertCatalog",
+      sheetName: "Sheet1",
+      space: "東A01a",
+      tweet: "https://example.invalid/new.jpg",
+    }).code,
+    "INVALID_SHEET_DATA",
+  );
+
+  const missingTweet = loadGas({ Sheet1: [["space"], ["東A01a"]] });
+  assert.equal(
+    post(missingTweet.context, {
+      action: "upsertCatalog",
+      sheetName: "Sheet1",
+      space: "東A01a",
+      tweet: "https://example.invalid/new.jpg",
+    }).code,
+    "INVALID_SHEET_DATA",
+  );
+
+  const invalidUrl = loadGas({
+    Sheet1: [
+      ["space", "tweet"],
+      ["東A01a", "old"],
+    ],
+  });
+  assert.equal(
+    post(invalidUrl.context, {
+      action: "upsertCatalog",
+      sheetName: "Sheet1",
+      space: "東A01a",
+      tweet: "javascript:alert(1)",
+    }).code,
+    "INVALID_INPUT",
+  );
 });

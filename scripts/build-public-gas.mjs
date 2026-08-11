@@ -7,7 +7,13 @@ export function buildPublicGas({ repositoryRoot }) {
     repositoryRoot instanceof URL
       ? fileURLToPath(repositoryRoot)
       : repositoryRoot;
-  const order = ["config.js", "response.js", "web-api.js", "post-router.js"];
+  const order = [
+    "config.js",
+    "response.js",
+    "web-api.js",
+    "catalog-api.js",
+    "post-router.js",
+  ];
   return `${order
     .map((name) =>
       readFileSync(

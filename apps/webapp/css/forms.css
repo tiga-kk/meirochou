@@ -163,6 +163,39 @@ input[type="text"] {
   border-bottom: 2px solid var(--ink);
 }
 
+.gas-setup-panel {
+  width: min(760px, 100%);
+  margin: 0 auto 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.gas-setup-panel h3,
+.gas-setup-panel p {
+  margin: 0 0 0.5rem;
+}
+
+.gas-setup-panel button {
+  min-height: 44px;
+}
+
+.gas-setup-status,
+.gas-setup-error {
+  margin-top: 0.75rem;
+}
+
+.gas-setup-error {
+  color: var(--danger, #b42318);
+}
+
+.gas-setup-manual-code {
+  display: block;
+  width: 100%;
+  margin-top: 0.75rem;
+  font: 0.8rem/1.4 monospace;
+  text-align: left;
+}
+
 .management-surface-header h2 {
   margin: 0;
 }

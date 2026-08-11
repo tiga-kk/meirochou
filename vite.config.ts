@@ -2,6 +2,7 @@ import {
   cpSync,
   createReadStream,
   existsSync,
+  mkdirSync,
   readdirSync,
   readFileSync,
   realpathSync,
@@ -251,6 +252,14 @@ function mapBundlePlugin(
   webappRoot: string,
   outputDirectory: string,
 ): Plugin {
+  const gasCodePath = resolve(
+    webappRoot,
+    "../../integrations/gas-spreadsheet/Code.gs",
+  );
+  const gasCodeOutputPath = resolve(
+    outputDirectory,
+    "assets/integrations/gas-spreadsheet/Code.gs.txt",
+  );
   return {
     name: "comipath-map-bundle",
     configureServer(server) {
@@ -278,6 +287,28 @@ function mapBundlePlugin(
             return;
           }
           const stream = createReadStream(registryPath);
+          stream.on("error", next);
+          stream.pipe(response);
+        },
+      );
+      server.middlewares.use(
+        "/assets/integrations/gas-spreadsheet/Code.gs.txt",
+        (request, response, next) => {
+          if (!existsSync(gasCodePath)) {
+            response.statusCode = 404;
+            response.end("Not found");
+            return;
+          }
+          if (request.method !== "GET" && request.method !== "HEAD") {
+            next();
+            return;
+          }
+          response.setHeader("Content-Type", "text/plain; charset=utf-8");
+          if (request.method === "HEAD") {
+            response.end();
+            return;
+          }
+          const stream = createReadStream(gasCodePath);
           stream.on("error", next);
           stream.pipe(response);
         },
@@ -355,6 +386,11 @@ function mapBundlePlugin(
       });
     },
     closeBundle() {
+      mkdirSync(dirname(gasCodeOutputPath), { recursive: true });
+      cpSync(gasCodePath, gasCodeOutputPath, {
+        force: true,
+        preserveTimestamps: true,
+      });
       cpSync(
         resolve(webappRoot, "catalog-service-worker.js"),
         resolve(outputDirectory, "catalog-service-worker.js"),
