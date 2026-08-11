@@ -77,34 +77,34 @@ test("settings shell renders event-day-selector and circle-data-source-panel chi
   assert.match(element.textContent || "", /circles\.csv/);
 });
 
-test("selector event follows the selected day in the management detail", async () => {
+test("detail follows a successful selected-row flip but stays on failure", async () => {
   const element = new ComipathSettings();
-  element.eventDayManagementRows = [
-    selectedManagementRow,
-    {
-      ...selectedManagementRow,
-      ref: { eventId: "c104", dayId: "day2" },
-      dayLabel: "2日目 (月)",
-      selected: false,
-    },
-  ];
+  const day2 = {
+    ...selectedManagementRow,
+    ref: { eventId: "c104", dayId: "day2" },
+    dayLabel: "2日目 (月)",
+    selected: false,
+  };
+  element.eventDayManagementRows = [selectedManagementRow, day2];
   element.detailRef = selectedManagementRow.ref;
   element.detailOpen = true;
   document.body.appendChild(element);
   await element.updateComplete;
 
-  element
-    .querySelector("event-day-selector")
-    ?.dispatchEvent(
-      new CustomEvent("event-day-select", {
-        bubbles: true,
-        composed: true,
-        detail: { eventId: "c104", dayId: "day2" },
-      }),
-    );
+  element.eventDayManagementRows = [
+    { ...selectedManagementRow, circleCount: 2 },
+    day2,
+  ];
+  await element.updateComplete;
+  expect(element.detailRef).toEqual(selectedManagementRow.ref);
+
+  element.eventDayManagementRows = [
+    { ...selectedManagementRow, selected: false },
+    { ...day2, selected: true },
+  ];
   await element.updateComplete;
 
-  expect(element.detailRef).toEqual({ eventId: "c104", dayId: "day2" });
+  expect(element.detailRef).toEqual(day2.ref);
   expect(element.querySelector(".management-detail-summary")?.textContent).toContain(
     "2日目 (月)",
   );

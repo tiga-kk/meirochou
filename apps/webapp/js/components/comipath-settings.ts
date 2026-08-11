@@ -107,7 +107,13 @@ export class ComipathSettings extends LitElement {
   }
 
   protected willUpdate(changed: PropertyValues<this>): void {
-    if (changed.has("eventDayManagementRows")) this.reconcileDetail();
+    if (changed.has("eventDayManagementRows")) {
+      this.reconcileDetail(
+        changed.get("eventDayManagementRows") as
+          | readonly EventDayManagementRow[]
+          | undefined,
+      );
+    }
     if (changed.has("open") && this.open && !this.isOpen) {
       this.detailOpen = false;
     }
@@ -175,7 +181,9 @@ export class ComipathSettings extends LitElement {
     );
   }
 
-  private reconcileDetail(): void {
+  private reconcileDetail(
+    previousRows: readonly EventDayManagementRow[] | undefined,
+  ): void {
     const rows = this.eventDayManagementRows;
     if (rows.length === 0) {
       this.detailRef = null;
@@ -183,8 +191,17 @@ export class ComipathSettings extends LitElement {
       return;
     }
     const current = rows.find((row) => this.sameRef(row.ref, this.detailRef));
-    if (current) return;
-    const fallback = rows.find((row) => row.selected) ?? rows[0];
+    const previous = previousRows?.find((row) =>
+      this.sameRef(row.ref, this.detailRef),
+    );
+    const selected = rows.find((row) => row.selected);
+    if (current) {
+      if (previous?.selected && !current.selected && selected) {
+        this.detailRef = { ...selected.ref };
+      }
+      return;
+    }
+    const fallback = selected ?? rows[0];
     this.detailRef = fallback?.ref ?? null;
   }
 
@@ -204,16 +221,6 @@ export class ComipathSettings extends LitElement {
     if (!ref) return;
     this.detailRef = { ...ref };
     this.detailOpen = true;
-  }
-
-  private handleEventDaySelect(event: Event): void {
-    const ref = (event as CustomEvent<EventDayRef>).detail;
-    if (!ref) return;
-    if (
-      this.eventDayManagementRows.some((row) => this.sameRef(row.ref, ref))
-    ) {
-      this.detailRef = { ...ref };
-    }
   }
 
   private closeDetail(): void {
@@ -284,7 +291,6 @@ export class ComipathSettings extends LitElement {
           .selectedDayId=${this.selectedDayId}
           ?busy=${this.busy}
           .errorMessage=${this.errorMessage}
-          @event-day-select=${this.handleEventDaySelect}
         ></event-day-selector>
         <source-manager .model=${this.sourceManagerModel}></source-manager>
         <outbox-panel .model=${this.outboxPanelModel}></outbox-panel>

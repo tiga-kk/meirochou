@@ -590,6 +590,9 @@ test.describe("Mobile Management Flows", () => {
       "Demo Event 1",
     );
     releaseSecondManifest?.();
+    await expect(page.locator(".management-detail-summary")).toContainText(
+      "Demo Event 2",
+    );
     await expect(page.locator("source-manager h3")).toContainText(
       "Demo Event 2",
     );
@@ -597,7 +600,9 @@ test.describe("Mobile Management Flows", () => {
     await page
       .locator("event-day-selector #event-select")
       .selectOption("demo-v1");
-    await expect(page.locator(".settings-error")).toBeVisible();
+    await expect(page.locator(".management-detail-summary")).toContainText(
+      "Demo Event 2",
+    );
     await expect(page.locator("source-manager h3")).toContainText(
       "Demo Event 2",
     );
