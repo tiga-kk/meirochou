@@ -101,6 +101,23 @@ function createSetup(
 }
 
 describe("circle-status production integration", () => {
+  test.each(["purchase", "hold"] as const)(
+    "does not mutate a selected candidate before route confirmation (%s)",
+    async (action) => {
+      const fixture = createSetup({ type: "csv", fileName: "day1.csv" });
+      fixture.app.routeGuidanceSession.replaceSnapshot({
+        ...fixture.app.routeGuidanceSession.getSnapshot(),
+        currentDestination: { space: "A-01", sheetName: "Day1" },
+        selectedDestination: { space: "A-02", sheetName: "Day1" },
+        selectionStatus: "ready",
+      });
+
+      await fixture.app.handleAction(action);
+
+      expect(fixture.completeCircleVisitOperation).not.toHaveBeenCalled();
+    },
+  );
+
   test("routes a purchase through the injected plain operation", async () => {
     const fixture = createSetup({ type: "csv", fileName: "day1.csv" });
 

@@ -121,3 +121,44 @@ describe("DomRouteGuidanceView distance fallbacks", () => {
     ).toBe("距離 42");
   });
 });
+
+describe("DomRouteGuidanceView candidate mutation guard", () => {
+  beforeEach(() => {
+    document.body.innerHTML = elementIds
+      .map((id) => `<div id="${id}"></div>`)
+      .join("");
+  });
+
+  it("marks a ready candidate as a change candidate and disables purchase actions", () => {
+    const area = makeArea("east", ["東"], ["A"], 1);
+    const view = makeView([area]);
+    const route = {
+      image: { width: 100, height: 100 },
+      points: [
+        { x: 1, y: 1 },
+        { x: 20, y: 20 },
+      ],
+      startPosition: { x: 1, y: 1 },
+      targetPosition: { x: 20, y: 20 },
+    };
+
+    view.showNavigation({
+      currentTarget: { space: "東A01", priority: 1 },
+      selectedTarget: { space: "東A02", priority: 2 },
+      currentRoute: route,
+      selectedRoute: route,
+      selectionState: "ready",
+      startSpace: "東A00",
+    });
+
+    expect(document.querySelector("#target-status-label")?.textContent).toBe(
+      "変更候補",
+    );
+    expect(
+      (document.querySelector("#btn-purchased") as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(
+      (document.querySelector("#btn-hold") as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+});

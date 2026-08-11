@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import assert from "node:assert/strict";
-import { test } from "vitest";
+import { describe, expect, it, test } from "vitest";
 import {
   planRoute,
   planRouteFromGridIndex,
@@ -10,6 +10,7 @@ import type {
   GridMeta,
   PointsPayload,
 } from "../apps/webapp/js/features/route-guidance/domain/routing/grid-route-types";
+import { DomRouteMapView } from "../apps/webapp/js/features/route-guidance/ui/dom-route-map-view";
 import { buildRouteOverlaySvg } from "../apps/webapp/js/features/route-guidance/ui/route-overlay-svg";
 
 const fictionalPoints: PointsPayload = {
@@ -180,4 +181,72 @@ test("planRouteFromGridIndex keeps ordered points for current route endpoints an
   assert.equal(candidate.querySelector(".route-flow-line"), null);
   assert.equal(candidate.querySelector(".route-start-marker"), null);
   assert.equal(candidate.querySelector(".route-goal-marker"), null);
+});
+
+const candidateRoute = {
+  image: { width: 100, height: 100 },
+  points: [
+    { x: 1, y: 1 },
+    { x: 20, y: 20 },
+  ],
+  startPosition: { x: 1, y: 1 },
+  targetPosition: { x: 20, y: 20 },
+};
+
+function makeRouteMapView() {
+  const pinLayer = document.createElement("div");
+  const area = { id: "east", prefixes: ["東"], labels: ["A"] };
+  const view = Object.create(DomRouteMapView.prototype) as DomRouteMapView;
+  view.els = { pinLayer, navigationMapImage: document.createElement("img") };
+  view.uiManager = {
+    dataManager: {
+      getUnvisited: () => [],
+      wantToBuy: [],
+      holdList: [],
+      purchasedList: [],
+    },
+  };
+  view.mapAreaCatalog = { getAllMapAreas: () => [area] };
+  view.pointIndexCache = new Map([["east", null]]);
+  view.renderToken = 0;
+  view.updateMap = () => area;
+  view.applyViewportLayout = () => {};
+  view.updatePinLayerBox = () => {};
+  view.applyPinSize = () => {};
+  view.maybeFitRoutes = () => {};
+  const overlays: string[] = [];
+  view.renderRouteOverlay = (_route, kind) => overlays.push(kind);
+  return { overlays, view };
+}
+
+describe("route overlay candidate contract", () => {
+  it.each(["ready", "comparing"])(
+    "keeps the current route and renders a candidate route in %s",
+    (selectionState) => {
+      const { overlays, view } = makeRouteMapView();
+      view.renderNavigation({
+        currentTarget: { space: "東A01" },
+        selectedTarget: { space: "東A02" },
+        currentRoute: candidateRoute,
+        selectedRoute: candidateRoute,
+        selectionState,
+      });
+      expect(overlays).toEqual(["current", "candidate"]);
+    },
+  );
+
+  it.each(["idle", "loading", "error"])(
+    "does not render a candidate route in %s",
+    (selectionState) => {
+      const { overlays, view } = makeRouteMapView();
+      view.renderNavigation({
+        currentTarget: { space: "東A01" },
+        selectedTarget: { space: "東A02" },
+        currentRoute: candidateRoute,
+        selectedRoute: candidateRoute,
+        selectionState,
+      });
+      expect(overlays).toEqual(["current"]);
+    },
+  );
 });

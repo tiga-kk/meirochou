@@ -369,7 +369,13 @@ export class DomRouteMapView {
 
     this.els.pinLayer.innerHTML = "";
     this.renderRouteOverlay(currentRoute, "current");
-    if (selectionState === "comparing") {
+    const candidateRouteVisible =
+      selectedTarget?.space &&
+      currentTarget?.space &&
+      selectedTarget.space !== currentTarget.space &&
+      selectedRoute &&
+      (selectionState === "ready" || selectionState === "comparing");
+    if (candidateRouteVisible) {
       this.renderRouteOverlay(selectedRoute, "candidate");
     }
 

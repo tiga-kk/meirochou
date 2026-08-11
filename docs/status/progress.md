@@ -13,8 +13,8 @@
 - Phase 6: 完了・`main`へmerge済み
 - Phase 6.1: 完了・`main`へmerge済み
 - Phase 7: 完了・`main`へmerge済み
-- 現在のフェーズ: Phase 7.2 Task 2 完了
-- 次のTask: Phase 7.2 Task 3「candidate route previewと購入・保留guard」
+- 現在のフェーズ: Phase 7.2 Task 3 完了
+- 次のTask: Phase 7.2 Task 4「Gallery swipe hintとmotion改善」
 - scale values: 確定
 
 ### Phase 6.1の既知残件
@@ -207,7 +207,11 @@ Phase 7.1統合後の実機確認で判明した経路表示、地図操作、Ga
   - Manifest V3拡張を`apps/catalog-extension/`へ追加し、指定DOMからspace/image URLを抽出するclassic content scriptを実装した。
   - background moduleが設定済みGASへ明示操作の`upsertCatalog`だけを送信し、GAS URL・sheet名をrepositoryへ含めない構成にした。
   - Node標準extension tests 9件を`npm run verify`とGitHub Actionsから実行するよう接続した。
-- Task 3〜8: 未着手
+- Task 3: candidate route previewと購入・保留guard — 完了
+  - `ready`/`comparing`の候補選択時に、現在経路を残したまま候補経路を青色表示し、候補表示を`変更候補`へ統一した。
+  - 候補選択中は購入・保留ボタンを無効化し、`BrowserApplication.handleAction()`にも現在目的地以外を変更しない防御guardを追加した。
+  - route overlay、表示guard、購入・保留操作、既存候補経路E2Eとmobile snapshotを検証した。
+- Task 4〜8: 未着手
 
 ### Phase 7.2の固定事項
 

@@ -333,7 +333,7 @@ export class DomRouteGuidanceView {
       startSpace,
       isPreview ? null : nextTarget,
       {
-        statusLabel: isPreview ? "候補" : "次の目的地",
+        statusLabel: isPreview ? "変更候補" : "次の目的地",
         distanceLabel,
         showCandidateDetails: isPreview,
       },
@@ -377,8 +377,8 @@ export class DomRouteGuidanceView {
         candidateArea,
       );
     }
-    if (this.els.btnPurchased) this.els.btnPurchased.disabled = comparing;
-    if (this.els.btnHold) this.els.btnHold.disabled = comparing;
+    if (this.els.btnPurchased) this.els.btnPurchased.disabled = isPreview;
+    if (this.els.btnHold) this.els.btnHold.disabled = isPreview;
 
     if (this.mapRenderer) {
       this.mapRenderer.renderNavigation(state);

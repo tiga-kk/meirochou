@@ -1802,8 +1802,16 @@ export class BrowserApplication {
     const guidanceSnapshot = this.routeGuidanceSession.getSnapshot();
     if (guidanceSnapshot.selectionStatus === "comparing") return;
     if (type !== "purchase" && type !== "hold") return;
-    const actionTarget =
-      guidanceSnapshot.selectedDestination || guidanceSnapshot.currentDestination;
+    const currentDestination = guidanceSnapshot.currentDestination;
+    const selectedDestination = guidanceSnapshot.selectedDestination;
+    if (
+      currentDestination &&
+      selectedDestination &&
+      currentDestination.space !== selectedDestination.space
+    ) {
+      return;
+    }
+    const actionTarget = currentDestination || selectedDestination;
     if (!actionTarget) return;
     const activeRef = this.activeRef;
     const activeState = this.activeState;

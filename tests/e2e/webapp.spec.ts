@@ -412,7 +412,7 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   await candidatePin.evaluate((button: HTMLButtonElement) => button.click());
 
   await expect(heading).toHaveText(originalTarget || "");
-  await expect(page.locator("#target-status-label")).toHaveText("候補");
+  await expect(page.locator("#target-status-label")).toHaveText("変更候補");
   await expect(page.locator("#selected-target-space")).toHaveText(candidate);
   await expect(candidatePin).toHaveClass(/selected/);
   await expect(candidatePin).toHaveCSS(
@@ -420,7 +420,9 @@ test("ピンの候補経路を比較してから目的地を変更する", async
     "rgba(0, 90, 156, 0.4)",
   );
   await expect(candidatePin).toHaveAccessibleName(`候補選択中 ${candidate}`);
-  await expect(page.locator(".candidate-selection-label")).toHaveText("候補");
+  await expect(page.locator(".candidate-selection-label")).toHaveText(
+    "変更候補",
+  );
   await expect(page.locator("#route-selection-controls")).toBeVisible();
   await expect(page.locator("#btn-close-route-selection")).toBeVisible();
   await expect(page.locator("#target-dist")).toHaveText(/^距離 \d+$/);
@@ -436,7 +438,7 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   );
   await expect(page.locator("#btn-preview-route")).toBeEnabled();
   await expect(page.locator('[data-route-kind="current"]')).toBeVisible();
-  await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
+  await expect(page.locator('[data-route-kind="candidate"]')).toBeVisible();
 
   await page.locator("#btn-close-route-selection").click();
   await expect(page.locator("#route-selection-controls")).toBeHidden();
@@ -471,9 +473,9 @@ test("ピンの候補経路を比較してから目的地を変更する", async
 
   await page.locator("#btn-cancel-route-change").click();
   await expect(page.locator("#route-change-confirmation")).toBeHidden();
-  await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
+  await expect(page.locator('[data-route-kind="candidate"]')).toBeVisible();
   await expect(heading).toHaveText(originalTarget || "");
-  await expect(page.locator("#target-status-label")).toHaveText("候補");
+  await expect(page.locator("#target-status-label")).toHaveText("変更候補");
   await expect(page.locator("#route-selection-controls")).toBeVisible();
 
   await page.locator("#btn-preview-route").click();
