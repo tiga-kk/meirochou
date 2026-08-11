@@ -1,4 +1,7 @@
+// @vitest-environment happy-dom
+
 import { describe, expect, it } from "vitest";
+import { DomRouteMapView } from "../apps/webapp/js/features/route-guidance/ui/dom-route-map-view";
 import { calculateMapViewportLayout } from "../apps/webapp/js/features/route-guidance/ui/route-map-pin-model";
 
 describe("calculateMapViewportLayout", () => {
@@ -48,5 +51,27 @@ describe("calculateMapViewportLayout", () => {
     expect(layout.stageHeight).toBe(780);
     expect(layout.initialX).toBe(0);
     expect(layout.initialY).toBe(-130);
+  });
+});
+
+describe("DomRouteMapView map gesture tuning", () => {
+  it("uses the map-only 18px overscroll limit", () => {
+    document.body.innerHTML = `
+      <div id="target-map-container">
+        <div id="navigation-map">
+          <div id="navigation-map-layer"></div>
+        </div>
+      </div>
+      <div id="navigation-map-image"></div>
+      <div id="navigation-pin-layer"></div>
+      <div id="map-links-container"></div>
+    `;
+
+    const view = new DomRouteMapView(
+      { dataManager: {} },
+      { getAllMapAreas: () => [] },
+    );
+
+    expect(view.zoomHelper.overscrollLimit).toBe(18);
   });
 });

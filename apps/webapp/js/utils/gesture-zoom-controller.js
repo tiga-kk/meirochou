@@ -24,9 +24,12 @@ function calculateReleaseVelocity(samples) {
 }
 
 export class GestureZoomController {
-  constructor(container, img) {
+  constructor(container, img, options = {}) {
     this.container = container;
     this.img = img;
+    this.overscrollLimit = Number.isFinite(options.overscrollLimit)
+      ? Math.max(0, options.overscrollLimit)
+      : 32;
 
     this.state = {
       scale: 1,
@@ -233,7 +236,9 @@ export class GestureZoomController {
   }
 
   applyPan(value, [min, max]) {
-    return this.hasExplicitLayout ? applyRubberBand(value, min, max) : value;
+    return this.hasExplicitLayout
+      ? applyRubberBand(value, min, max, this.overscrollLimit)
+      : value;
   }
 
   startInertia() {

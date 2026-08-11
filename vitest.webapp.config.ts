@@ -6,6 +6,7 @@ export default defineConfig({
     exclude: [
       "tests/e2e/**",
       "tests/catalog-extension-*.test.mjs",
+      "tests/map-svg-vector-contract.test.mjs",
       "tests/gas-contract.test.mjs",
       "tests/gas-build.test.mjs",
     ],

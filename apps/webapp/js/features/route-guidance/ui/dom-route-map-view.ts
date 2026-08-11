@@ -108,6 +108,7 @@ export class DomRouteMapView {
       this.zoomHelper = new GestureZoomController(
         this.els.navigationMap,
         this.els.navigationMapLayer,
+        { overscrollLimit: 18 },
       );
       if (typeof ResizeObserver === "function") {
         this.navigationMapResizeObserver = new ResizeObserver(() => {

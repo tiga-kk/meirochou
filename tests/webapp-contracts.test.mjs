@@ -1459,11 +1459,11 @@ test("webapp injects route guidance and delegates the start flow to its controll
   assert.doesNotMatch(startFlow, /startRouteGuidanceUseCase/);
 });
 
-test("webapp map rendering keeps the stage compositor-friendly", () => {
+test("webapp map rendering avoids persistent compositor promotion", () => {
   const css = read("apps/webapp/css/target.css");
   const gestureHelper = read("apps/webapp/js/utils/gesture-zoom-controller.js");
 
-  assert.match(
+  assert.doesNotMatch(
     css,
     /\.map-transform-layer\s*\{[\s\S]*will-change:\s*transform/,
   );

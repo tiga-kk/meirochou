@@ -13,8 +13,8 @@
 - Phase 6: 完了・`main`へmerge済み
 - Phase 6.1: 完了・`main`へmerge済み
 - Phase 7: 完了・`main`へmerge済み
-- 現在のフェーズ: Phase 7.2 Task 4 完了
-- 次のTask: Phase 7.2 Task 5「map画質原因の診断とelastic overscroll改善」
+- 現在のフェーズ: Phase 7.2 Task 5 完了
+- 次のTask: Phase 7.2 Task 6「global Gallery、dynamic priority、tutorial replay」
 - scale values: 確定
 
 ### Phase 6.1の既知残件
@@ -215,7 +215,11 @@ Phase 7.1統合後の実機確認で判明した経路表示、地図操作、Ga
   - current routeへ視認性の高い`route-flow-comet`と、reduced-motionでも残るGoal方向markerを追加した。candidate routeには追加しない。
   - Start/Goal markerを維持し、Goal markerを少し大きくしてcurrent routeの方向情報を強調した。
   - SVG契約、3時点animation E2E、reduced-motion、mobile route snapshot、Webapp全体テストを検証した。
-- Task 5〜8: 未着手
+- Task 5: map画質原因の特定とelastic overscroll調整 — 完了
+  - C108 4エリアのmap.svgを検査し、positive viewBox・embedded bitmap 0を確認。asset形式や描画方式は変更していない。
+  - 常時`will-change: transform`を外し、mapだけoverscroll limit 18px、他のGallery/PDF callerは既定32pxを維持した。
+  - source契約、controller bounds/inertia、auto-fit diagnostics E2E、Webapp全体テストを検証した。
+- Task 6〜8: 未着手
 
 ### Phase 7.2の固定事項
 

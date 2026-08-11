@@ -26,7 +26,7 @@ function pointerEvent(
   return event;
 }
 
-function createController() {
+function createController(options: Record<string, unknown> = {}) {
   const container = document.createElement("div");
   const image = document.createElement("img");
   Object.defineProperty(container, "getBoundingClientRect", {
@@ -68,7 +68,7 @@ function createController() {
   return {
     container,
     image,
-    controller: new GestureZoomController(container, image),
+    controller: new GestureZoomController(container, image, options),
   };
 }
 
@@ -359,6 +359,17 @@ describe("GestureZoomController", () => {
     expect(slightlyOutside).toBeGreaterThan(0);
     expect(farOutside).toBeLessThanOrEqual(32);
     expect(farOutside - slightlyOutside).toBeLessThan(190);
+  });
+
+  it("keeps the default overscroll and allows map-specific tuning", () => {
+    const defaultController = createController().controller;
+    const mapController = createController({ overscrollLimit: 18 }).controller;
+
+    expect(defaultController.overscrollLimit).toBe(32);
+    expect(mapController.overscrollLimit).toBe(18);
+    expect(
+      applyRubberBand(200, -200, 0, mapController.overscrollLimit),
+    ).toBeLessThanOrEqual(18);
   });
 
   it("uses cached dimensions during inertia frames", () => {
