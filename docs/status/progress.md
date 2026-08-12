@@ -7,9 +7,9 @@
 ## 現在状態
 
 - 現在フェーズ: **Phase 7.3**
-- 現在Task: **Task 7: Gallery購入時の退出表示と完全Undo**
-- 次に着手するTask: **Task 7**
-- 実装状態: **Task 1〜6完了、Task 7未着手**
+- 現在Task: **Task 8: 実機受入・回帰検証・終了判定**
+- 次に着手するTask: **Task 8**
+- 実装状態: **Task 1〜7完了、Task 8未着手**
 - canonical plan: `docs/plans/phase-07-3/README.md`
 - 設計仕様: `docs/specs/2026-08-12-phase-07-3-field-followups-design.md`
 
@@ -40,7 +40,7 @@ Phase 7.3は上記未確認を隠すための再実装ではない。実機で�
 | 4 | 地図ドラッグ遅延の計測と最小改善 | 完了 | Task 3 |
 | 5 | 現在経路の方向表示強化 | 完了 | Task 3 |
 | 6 | 目的地カタログのモバイルレイアウト修正 | 完了 | Task 3 |
-| 7 | Gallery購入時の退出表示と完全Undo | 未着手 | Task 3 |
+| 7 | Gallery購入時の退出表示と完全Undo | 完了 | Task 3 |
 | 8 | 実機受入・回帰検証・終了判定 | 未着手 | Task 1〜7 |
 
 Task 2は自動検証まで完了したが、実GAS deployment、資格情報、headed browserが利用できず、実機probe・catalog POST・同一space再送・Sheet列確認は未確認としてTask 8へ引き継ぐ。Task 3以降を阻止しない。
@@ -51,7 +51,9 @@ Task 5は意味的契約・全体自動検証を通過したが、実機visual�
 
 Task 6は390pxのportraitカタログ一列、200% zoomの横overflowなし、640px以上のportrait二列をfocused E2Eで確認し、`npm run verify`も通過した。意図した画像高さ変更による既存visual snapshot差分は更新せず、実機visual確認とともにTask 8へ引き継ぐ。
 
-複数Taskが着手可能な場合、WIPがあればそれを優先し、なければ番号が最小の着手可能Taskを選ぶ。したがって次はTask 7が着手可能である。
+Task 7はGalleryの実DOM購入ボタン・swipeから退出表示と最新1件Undo snackbarへ接続し、既存status Undoと逆向きGAS outbox、購入前route session snapshotを一貫して戻すfocused/unit/E2Eと`npm run verify`を通過した。実機visualと実GAS/headed確認はTask 8へ引き継ぐ。
+
+複数Taskが着手可能な場合、WIPがあればそれを優先し、なければ番号が最小の着手可能Taskを選ぶ。したがって次はTask 8が着手可能である。
 
 Task 2の実GAS確認だけが外部環境待ちになった場合は、その事実をここへ記録してTask 3以降を進める。Task 8で再確認する。
 
