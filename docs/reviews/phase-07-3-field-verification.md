@@ -59,4 +59,4 @@ secret、GAS URL、実データは取得・保存・報告していない。
 
 ## Phase 7.3完了判定案
 
-**アプリ実装完了・外部検証待ち。** `npm run verify`、関連focused検証、CI相当E2Eのbehavior assertionが通過している。Task 2はユーザー確認によりprobe/catalog送信とPixiv fallbackの保存成功を確認し、Task 8のtarget catalogは390px/200% zoomで横overflowなし・表示崩れなしを確認した。一方、同一space再送・Sheet列保持の明示証拠、current/candidate visual、Gallery visualは未確認。Task 4はC108 e456のbefore/after DevTools traceを取得したが、pointermove処理に明確な改善はなく、体感遅延の原因を確定できなかったため追加実装を保留する。残る7件は意図した画面変更または既知のmanagement visual差分で、snapshotは更新していない。headed運用とCloudflare Pages運用設定は外部確認待ちとして分離する。
+**アプリ実装完了・外部検証待ち。** `npm run verify`、関連focused検証、CI相当E2Eのbehavior assertionが通過している。Task 2はユーザー確認によりprobe/catalog送信とPixiv fallbackの保存成功を確認し、Task 8のtarget catalogは390px/200% zoomで横overflowなし・表示崩れなし、Gallery visualも確認済み。一方、同一space再送・Sheet列保持の明示証拠、current/candidate visualは未確認。一覧以外の購入経路でUndoできない点は残タスクとして記録する。Task 4はC108 e456のbefore/after DevTools traceを取得したが、pointermove処理に明確な改善はなく、体感遅延の原因を確定できなかったため追加実装を保留する。snapshotは更新していない。headed運用とCloudflare Pages運用設定は外部確認待ちとして分離する。

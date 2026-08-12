@@ -9,7 +9,7 @@
 - 現在フェーズ: **Phase 7.3（アプリ実装完了・外部確認待ち）**
 - 現在Task: **Task 8: 実機visual確認（外部確認待ち）**
 - 次に着手するTask: **390px/200% zoom、現在経路・候補経路、Gallery購入/Undoの実機visual確認**
-- 実装状態: **Task 1〜8の本番実装・自動検証を完了。Task 2のprobe/catalog送信とPixiv fallbackはユーザー確認済み。Task 8のtarget catalogは390px/200% zoomでユーザー確認済み。同一space再送・Sheet列保持の明示証拠、current/candidate visual、Gallery visual、Cloudflare運用設定は別途確認待ち。Task 4はC108 e456のbefore/after DevTools traceを取得したが、改善は確認できず追加実装を保留**
+- 実装状態: **Task 1〜8の本番実装・自動検証を完了。Task 2のprobe/catalog送信とPixiv fallback、Task 8のtarget catalogとGallery visualはユーザー確認済み。同一space再送・Sheet列保持の明示証拠、current/candidate visual、Cloudflare運用設定は別途確認待ち。一覧以外の購入経路でUndoできない点は残タスク。Task 4はC108 e456のbefore/after DevTools traceを取得したが、改善は確認できず追加実装を保留**
 - canonical plan: `docs/plans/phase-07-3/README.md`
 - 設計仕様: `docs/specs/2026-08-12-phase-07-3-field-followups-design.md`
 
@@ -40,7 +40,7 @@ Phase 7.3は上記未確認を隠すための再実装ではない。実機で�
 | 4 | 地図ドラッグ遅延の計測と最小改善 | 検証済み（改善未確認・追加対応保留） | Task 3 |
 | 5 | 現在経路の方向表示強化 | 完了 | Task 3 |
 | 6 | 目的地カタログのモバイルレイアウト修正 | 完了 | Task 3 |
-| 7 | Gallery購入時の退出表示と完全Undo | 完了 | Task 3 |
+| 7 | Gallery購入時の退出表示と完全Undo | 完了（一覧以外の購入Undoは残タスク） | Task 3 |
 | 8 | 実機受入・回帰検証・終了判定 | 完了 | Task 1〜7 |
 
 Task 2は自動検証を通過し、ユーザー確認により実GASへのprobe/catalog送信とPixiv fallbackを確認した。同一space再送で既存行を更新すること、およびSheet列保持の明示証拠は未記録としてTask 8へ引き継ぐ。GAS URL・資格情報は保存していない。
@@ -51,11 +51,11 @@ Task 5は意味的契約・全体自動検証を通過したが、実機visual�
 
 Task 6は390pxのportraitカタログ一列、200% zoomの横overflowなし、640px以上のportrait二列をfocused E2Eで確認し、`npm run verify`も通過した。意図した画像高さ変更による既存visual snapshot差分は更新せず、実機visual確認とともにTask 8へ引き継ぐ。
 
-Task 7はGalleryの実DOM購入ボタン・swipeから退出表示と最新1件Undo snackbarへ接続し、既存status Undoと逆向きGAS outbox、購入前route session snapshotを一貫して戻すfocused/unit/E2Eと`npm run verify`を通過した。実機visualと実GAS/headed確認はTask 8へ引き継ぐ。
+Task 7はGalleryの実DOM購入ボタン・swipeから退出表示と最新1件Undo snackbarへ接続し、既存status Undoと逆向きGAS outbox、購入前route session snapshotを一貫して戻すfocused/unit/E2Eと`npm run verify`を通過した。Gallery visualはユーザー確認済み。ただし一覧以外の購入経路ではUndoできない点を残タスクとして記録する。
 
 Task 8は`npm run verify`を通過し、CI相当E2Eはbehavior assertionをすべて通過した。残る7件はmanagement、route/catalog、Galleryの意図したvisualまたは既知snapshot差分であり、snapshotは更新していない。旧E2Eの候補preview導線不整合は、現行の「経路を比較」「行き先変更」導線へ更新して解消した。
 
-Phase 7.3のアプリ実装は完了している。CI相当E2Eは52 passed / 7 snapshot failed / 8 private C108 skipped。Task 2のprobe/catalog送信とPixiv fallback、Task 8のtarget catalog（390px/200% zoom）はユーザー確認済みだが、同一space再送・Sheet列保持の明示証拠、current/candidate visual、Gallery visualは未確認。Task 4は改善未確認・追加対応保留として記録し、体感遅延の原因追及は別課題へ切り離す。Cloudflare Pagesのmain-only運用設定も環境待ちとして残す。
+Phase 7.3のアプリ実装は完了している。CI相当E2Eは52 passed / 7 snapshot failed / 8 private C108 skipped。Task 2のprobe/catalog送信とPixiv fallback、Task 8のtarget catalog（390px/200% zoom）とGallery visualはユーザー確認済みだが、同一space再送・Sheet列保持の明示証拠、current/candidate visualは未確認。一覧以外の購入経路でUndoできない点は残タスクとして切り離す。Task 4は改善未確認・追加対応保留として記録し、体感遅延の原因追及は別課題へ切り離す。Cloudflare Pagesのmain-only運用設定はユーザー作業として残す。
 
 Task 2の実GAS確認だけが外部環境待ちになった場合は、その事実をここへ記録してTask 3以降を進める。Task 8で再確認する。
 
