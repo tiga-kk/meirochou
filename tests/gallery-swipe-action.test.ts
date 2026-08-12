@@ -4,6 +4,7 @@ import {
   calculateSwipeTranslation,
   setupSwipeAction,
 } from "../apps/webapp/js/utils/gesture-zoom-controller.js";
+import { DomCircleGalleryView } from "../apps/webapp/js/features/circle-status/ui/dom-circle-gallery-view";
 
 function touchEvent(type: string, x: number, y: number) {
   const event = new Event(type, { bubbles: true, cancelable: true });
@@ -137,5 +138,53 @@ describe("setupSwipeAction", () => {
     await Promise.resolve();
     expect(element.parentNode).not.toBeNull();
     expect(element.style.transform).toBe("");
+  });
+});
+
+describe("DomCircleGalleryView purchase feedback", () => {
+  it("keeps only the purchased item in the exit state and replaces the undo snackbar", async () => {
+    const modal = new DomCircleGalleryView({ getAllMapAreas: () => [] });
+    const grid = document.createElement("div");
+    const galleryModal = document.createElement("div");
+    document.body.append(galleryModal);
+    modal.els.galleryGrid = grid;
+    modal.els.galleryModal = galleryModal;
+    modal.currentTargets = [{ space: "A-01" }, { space: "A-02" }];
+    modal.dataManager = {
+      addPurchased: vi.fn().mockResolvedValue(undefined),
+      undoLastPurchase: vi.fn().mockResolvedValue(true),
+      getUnvisited: () => [],
+      wantToBuy: [],
+      holdList: [],
+    };
+    modal.uiManager = { showToast: vi.fn(), updateCounts: vi.fn() };
+    const item = document.createElement("div");
+    item.dataset.space = "A-01";
+    grid.appendChild(item);
+    modal.els.galleryGrid.appendChild(item);
+
+    await modal.handleGalleryPurchase({ space: "A-01" }, item);
+
+    expect(item.classList.contains("is-purchased-leaving")).toBe(true);
+    expect(item.parentNode).toBe(grid);
+    expect(galleryModal.querySelectorAll(".gallery-undo-snackbar")).toHaveLength(1);
+    item.dispatchEvent(new Event("transitionend"));
+    expect(item.parentNode).toBeNull();
+
+    modal.showUndoSnackbar("A-02");
+    expect(galleryModal.querySelectorAll(".gallery-undo-snackbar")).toHaveLength(1);
+  });
+
+  it("removes the item immediately for reduced motion", () => {
+    const previousMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn(() => ({ matches: true })) as typeof window.matchMedia;
+    const modal = new DomCircleGalleryView({ getAllMapAreas: () => [] });
+    const item = document.createElement("div");
+    document.body.appendChild(item);
+
+    modal.startGalleryItemExit(item);
+
+    expect(item.parentNode).toBeNull();
+    window.matchMedia = previousMatchMedia;
   });
 });

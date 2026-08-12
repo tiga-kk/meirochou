@@ -54,6 +54,8 @@ export class DomCircleGalleryView {
     this.inFlightPurchases = new Set();
     this.hintKey = "comipath:ui:v2:gallery-swipe-hint-seen";
     this.hintTimer = null;
+    this.undoSnackbar = null;
+    this.undoTimer = null;
 
     // フィルタボタンへの参照は init で取得
   }
@@ -429,7 +431,7 @@ export class DomCircleGalleryView {
         buyBtn.innerHTML = '<i class="fa-solid fa-check"></i>';
         buyBtn.onclick = (e) => {
           e.stopPropagation();
-          this.handleGalleryPurchase(c);
+          this.handleGalleryPurchase(c, item);
         };
         info.appendChild(buyBtn);
 
@@ -484,11 +486,79 @@ export class DomCircleGalleryView {
     // ギャラリーデータを更新（購入済みを除外）して再描画
     // 現在のリストから削除
     this.currentTargets = this.currentTargets.filter((c) => c.space !== space);
-    this.renderGallery();
+    const leavingItem = item || [...this.els.galleryGrid.querySelectorAll("[data-space]")]
+      .find((candidate) => candidate.dataset.space === space);
+    if (leavingItem) this.startGalleryItemExit(leavingItem);
+    this.showUndoSnackbar(space);
 
     // メイン画面のカウントも更新
     if (this.uiManager) this.uiManager.updateCounts(this.dataManager);
     this.inFlightPurchases.delete(space);
+  }
+
+  startGalleryItemExit(item) {
+    item.classList.remove("is-purchasing");
+    item.classList.add("is-purchased-leaving");
+    const remove = () => {
+      if (item.parentNode) item.remove();
+    };
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      remove();
+      return;
+    }
+    let timer = setTimeout(remove, 260);
+    item.addEventListener("transitionend", () => {
+      clearTimeout(timer);
+      remove();
+    }, { once: true });
+  }
+
+  showUndoSnackbar(space) {
+    this.undoSnackbar?.remove();
+    if (this.undoTimer) clearTimeout(this.undoTimer);
+    const snackbar = document.createElement("div");
+    snackbar.className = "gallery-undo-snackbar";
+    snackbar.setAttribute("role", "status");
+    const message = document.createElement("span");
+    message.textContent = `${space}を購入済みにしました`;
+    snackbar.appendChild(message);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "元に戻す";
+    button.onclick = async () => {
+      button.disabled = true;
+      const restored = await this.dataManager?.undoLastPurchase?.();
+      if (restored) {
+        this.refreshGalleryTargets();
+        snackbar.remove();
+      } else {
+        button.disabled = false;
+        this.uiManager?.showToast("購入を元に戻せませんでした", "error");
+      }
+    };
+    snackbar.appendChild(button);
+    this.els.galleryModal.appendChild(snackbar);
+    this.undoSnackbar = snackbar;
+    this.undoTimer = setTimeout(() => {
+      snackbar.remove();
+      this.undoSnackbar = null;
+    }, 5000);
+  }
+
+  refreshGalleryTargets() {
+    const areas = this.mapAreaCatalog?.getAllMapAreas?.() || [];
+    const resolveAreaId = (space) => {
+      const [areaName] = parseSpace(space, areas);
+      return areas.find((area) => area.name === areaName)?.id ?? null;
+    };
+    this.currentTargets = selectGalleryCircles({
+      scope: this.currentGalleryScope,
+      unvisited: this.dataManager.getUnvisited(),
+      wantToBuy: this.dataManager.wantToBuy,
+      holdSpaces: new Set(this.dataManager.holdList),
+      resolveAreaId,
+    });
+    this.renderGallery();
   }
 
   /**
@@ -498,6 +568,9 @@ export class DomCircleGalleryView {
     if (!this.els.galleryModal || !this.els.galleryGrid) return;
     this.els.galleryModal.classList.add("hidden");
     this.els.galleryGrid.innerHTML = "";
+    this.undoSnackbar?.remove();
+    if (this.undoTimer) clearTimeout(this.undoTimer);
+    this.undoSnackbar = null;
     this.els.galleryModal.querySelector(".gallery-swipe-hint")?.remove();
     if (this.hintTimer) clearTimeout(this.hintTimer);
     this.hintTimer = null;

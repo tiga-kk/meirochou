@@ -890,6 +890,83 @@ test("一覧の左右スワイプが外側方向の購入と端末保存へ到�
     .toBe("purchased");
 });
 
+test("Galleryの購入buttonが退出表示と完全Undoへ到達する", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/?demo_ui=1");
+  await page.locator("#btn-open-gallery").click();
+
+  const space = "東ア31b";
+  const card = page.locator(`.gallery-item[data-space="${space}"]`);
+  await expect(card).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const state = JSON.parse(
+          localStorage.getItem("comipath:v1:demo-v1:day1:state") || "null",
+        );
+        return state?.circleStates?.["東ア31b"];
+      }),
+    )
+    .not.toBe("purchased");
+
+  await card.evaluate((element) => {
+    const state = {
+      connectedWithExitClass: false,
+      snackbarVisibleWithExitClass: false,
+    };
+    const observer = new MutationObserver(() => {
+      if (element.classList.contains("is-purchased-leaving")) {
+        state.connectedWithExitClass = element.isConnected;
+        state.snackbarVisibleWithExitClass = Boolean(
+          document.querySelector(".gallery-undo-snackbar"),
+        );
+      }
+    });
+    observer.observe(element, { attributes: true, attributeFilter: ["class"] });
+    (window as Window & { galleryPurchaseFeedback?: typeof state }).galleryPurchaseFeedback = state;
+  });
+  await card.locator(".gallery-btn-buy").click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (window as Window & {
+          galleryPurchaseFeedback?: {
+            connectedWithExitClass: boolean;
+            snackbarVisibleWithExitClass: boolean;
+          };
+        }).galleryPurchaseFeedback,
+      ),
+    )
+    .toEqual({ connectedWithExitClass: true, snackbarVisibleWithExitClass: true });
+  const snackbar = page.locator(".gallery-undo-snackbar");
+  await expect(snackbar).toBeVisible();
+  await expect(snackbar.getByRole("button", { name: "元に戻す" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const state = JSON.parse(
+          localStorage.getItem("comipath:v1:demo-v1:day1:state") || "null",
+        );
+        return state?.circleStates?.["東ア31b"];
+      }),
+    )
+    .toBe("purchased");
+
+  await snackbar.getByRole("button", { name: "元に戻す" }).click();
+  await expect(card).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const state = JSON.parse(
+          localStorage.getItem("comipath:v1:demo-v1:day1:state") || "null",
+        );
+        return state?.circleStates?.["東ア31b"];
+      }),
+    )
+    .not.toBe("purchased");
+});
+
 test("一覧の初回swipe hintは短い横移動を示しreduced motionでは停止する", async ({
   page,
 }) => {

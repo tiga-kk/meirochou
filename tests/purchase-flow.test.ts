@@ -132,8 +132,12 @@ describe("circle-status production integration", () => {
     expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("purchased");
   });
 
-  test("reaches the real FinishCurrentCircleUseCase and shared Session", async () => {
-    const fixture = createSetup({ type: "csv", fileName: "day1.csv" });
+  test("reaches the real FinishCurrentCircleUseCase and fully undoes through the shared Session", async () => {
+    const fixture = createSetup({
+      type: "gas",
+      gasUrl: "https://example.test/gas",
+      sheetName: "Day1",
+    });
     fixture.app.routeMapAreaCatalog.replaceMapAreas([{ id: "east" }]);
     const loadMapAssets = vi
       .spyOn(fixture.app.routeMapAssetsLoader, "loadMapAssets")
@@ -189,8 +193,9 @@ describe("circle-status production integration", () => {
       selectionStatus: "ready",
       routeOptimizationGeneration: 1,
     });
+    const beforePurchase = fixture.app.routeGuidanceSession.getSnapshot();
 
-    await fixture.app.handleAction("purchase");
+    await fixture.app.addPurchased("A-01");
 
     expect(loadMapAssets).toHaveBeenCalledOnce();
     expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("purchased");
@@ -205,6 +210,14 @@ describe("circle-status production integration", () => {
         circleSpace: "A-01",
       },
     });
+    expect(fixture.repository.load(REF)?.gasOutbox).toHaveLength(1);
+
+    expect(await fixture.app.undoLastPurchase()).toBe(true);
+    expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBeUndefined();
+    expect(fixture.repository.load(REF)?.gasOutbox).toHaveLength(2);
+    expect(fixture.repository.load(REF)?.gasOutbox.at(-1)?.purchased).toBe(false);
+    expect(fixture.app.routeGuidanceSession.getSnapshot()).toEqual(beforePurchase);
+    expect(fixture.app.ui.showNavigation).toHaveBeenCalled();
   });
 
   test("saves a purchase before attempting GAS delivery", async () => {
@@ -220,6 +233,37 @@ describe("circle-status production integration", () => {
     expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("purchased");
     expect(fixture.repository.load(REF)?.gasOutbox).toHaveLength(1);
     expect(fixture.app.ui.showToast).toHaveBeenCalledWith("A-01 購入！");
+  });
+
+  test("undoes the latest gallery purchase with route and GAS meaning intact", async () => {
+    const fixture = createSetup({
+      type: "gas",
+      gasUrl: "https://example.test/gas",
+      sheetName: "Day1",
+    });
+    const beforePurchase = fixture.app.routeGuidanceSession.getSnapshot();
+
+    await fixture.app.addPurchased("A-01");
+    expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("purchased");
+    expect(fixture.repository.load(REF)?.gasOutbox).toHaveLength(1);
+
+    expect(await fixture.app.undoLastPurchase()).toBe(true);
+    expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBeUndefined();
+    expect(fixture.repository.load(REF)?.gasOutbox).toHaveLength(2);
+    expect(fixture.repository.load(REF)?.gasOutbox.at(-1)?.purchased).toBe(false);
+    expect(fixture.app.routeGuidanceSession.getSnapshot()).toEqual(beforePurchase);
+    expect(fixture.app.ui.showTarget).not.toHaveBeenCalled();
+  });
+
+  test("invalidates a gallery token after another status operation", async () => {
+    const fixture = createSetup({ type: "csv", fileName: "day1.csv" });
+
+    await fixture.app.addPurchased("A-01");
+    await fixture.app.addHold("A-01");
+
+    expect(await fixture.app.undoLastPurchase()).toBe(false);
+    expect(await fixture.app.undoLastPurchase()).toBe(false);
+    expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("held");
   });
 
   test("reports local save failure without calling GAS or claiming success", async () => {

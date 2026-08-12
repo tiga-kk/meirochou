@@ -107,6 +107,39 @@
   pointer-events: none;
 }
 
+.gallery-item.is-purchased-leaving {
+  opacity: 0;
+  transform: translateX(18px) scale(0.98);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+
+.gallery-undo-snackbar {
+  position: fixed;
+  z-index: 2100;
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #1e293b;
+  color: white;
+}
+
+.gallery-undo-snackbar button {
+  min-height: 44px;
+  padding: 6px 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery-item.is-purchased-leaving {
+    transition: none;
+  }
+}
+
 .gallery-item.wide {
   grid-column: 1 / -1; /* Full width (span 2) */
 }

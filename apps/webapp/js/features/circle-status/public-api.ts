@@ -31,6 +31,7 @@ export interface CircleStatusControllerPort {
     readonly expectedSourceGeneration: string;
   }): ChangeCircleStatusResult;
   undo(): boolean;
+  getLastUndoToken(): import("./domain/circle-status-types").CircleStatusUndoToken | null;
 }
 
 export interface PendingGasUpdatesControllerPort {
