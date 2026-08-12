@@ -48,7 +48,7 @@ CIコンテナの `npm ci` は moderate 1件 / high 1件のaudit warningを出�
 
 | 確認項目 | 判定 | 理由 |
 |---|---|---|
-| 実GAS deployment | 未実施 | 検証用deploymentを使用していない。GAS URLは取得・記録していない。 |
+| 実GAS deployment | 部分実施（ユーザー確認） | probe/catalog送信とPixiv fallbackの保存成功を確認。同一space再送による既存行更新とSheet列保持の明示証拠は未記録。GAS URLは取得・記録していない。 |
 | GAS credential | 利用不可 | 環境変数・credential fileを読み取って利用する構成ではなく、credentialを探索・記録していない。 |
 | headed browser | 未実施 | `DISPLAY` が空で、ホスト側のheaded browser executableも確認できなかった。CIはheadless Playwright container。 |
 | private C108 fixture | 利用可能 | リポジトリ内の `apps/webapp/map-bundles/C108/e456` をChrome MCPで実ブラウザへ読み込み、C108の経路表示とpin 2個を確認。専用の `RUN_C108_SMOKE=1` E2Eは未実行。 |
@@ -58,4 +58,4 @@ secret、GAS URL、実データは取得・保存・報告していない。
 
 ## Phase 7.3完了判定案
 
-**アプリ実装完了・外部検証待ち。** `npm run verify`、関連focused検証、CI相当E2Eのbehavior assertionが通過している。Task 4はC108 e456のbefore/after DevTools traceを取得したが、pointermove処理に明確な改善はなく、体感遅延の原因を確定できなかったため追加実装を保留する。残る7件は意図した画面変更または既知のmanagement visual差分で、snapshotは更新していない。実GAS、headed運用、実機visual、Cloudflare Pages運用設定は外部確認待ちとして分離する。
+**アプリ実装完了・外部検証待ち。** `npm run verify`、関連focused検証、CI相当E2Eのbehavior assertionが通過している。Task 2はユーザー確認によりprobe/catalog送信とPixiv fallbackの保存成功を確認したが、同一space再送・Sheet列保持の明示証拠は未記録。Task 4はC108 e456のbefore/after DevTools traceを取得したが、pointermove処理に明確な改善はなく、体感遅延の原因を確定できなかったため追加実装を保留する。残る7件は意図した画面変更または既知のmanagement visual差分で、snapshotは更新していない。headed運用、実機visual、Cloudflare Pages運用設定は外部確認待ちとして分離する。
