@@ -24,7 +24,7 @@
     "build:gas": "node scripts/build-public-gas.mjs",
     "test:gas": "vitest run --root . tests/gas-contract.test.mjs tests/gas-build.test.mjs",
     "verify:gas": "node scripts/build-public-gas.mjs --check && npm run test:gas",
-    "test:catalog-extension": "node --test tests/catalog-extension-extractor.test.mjs tests/catalog-extension-client.test.mjs tests/catalog-extension-command.test.mjs",
+    "test:catalog-extension": "node --test tests/catalog-extension-extractor.test.mjs tests/catalog-extension-client.test.mjs tests/catalog-extension-command.test.mjs tests/catalog-extension-shortcut.test.mjs",
     "verify": "npm run verify:webapp && npm run verify:gas && npm run test:catalog-extension",
     "test:e2e:ci": "scripts/run-e2e-in-ci-container.sh",
     "test:e2e:ci:update": "scripts/run-e2e-in-ci-container.sh --update-snapshots"

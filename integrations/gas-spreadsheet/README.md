@@ -50,11 +50,12 @@ Catalog image URLs use a separate explicit `upsertCatalog` POST:
   "action": "upsertCatalog",
   "sheetName": "day1",
   "space": "東ア01a",
+  "account": "https://twitter.com/example",
   "tweet": "https://example.invalid/catalog.jpg"
 }
 ```
 
-It updates only the `tweet` cell for an existing unique `space`, or writes `space` and `tweet` into a new row. Duplicate spaces, missing `tweet` headers, and non-HTTP(S) URLs are rejected.
+It updates the supplied `account` and `tweet` cells for an existing unique `space`, or writes `space`, `account`, and `tweet` into a new row. `account` is optional; when supplied, the sheet must have an `account` header. Duplicate spaces and non-HTTP(S) URLs are rejected.
 
 ## Data Synchronization & Queueing
 

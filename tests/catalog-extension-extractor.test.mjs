@@ -77,6 +77,40 @@ test("extracts space from the classic web catalog infotable", () => {
   );
 });
 
+test("normalizes the classic day prefix from the space label", () => {
+  const { document, extractor } = loadExtractor(`
+    <div class="m-circletable">
+      <div class="space-box"><div>日-東ア31ab</div></div>
+    </div>
+  `);
+
+  assert.equal(extractor.extractSpace(document), "東ア31ab");
+});
+
+test("extracts the Twitter account separately from the catalog image", () => {
+  const { document, extractor } = loadExtractor(`
+    <div class="m-circletable">
+      <div class="m-media__image">
+        <img src="https://classic-webcatalog.circle.ms/Spa/CachedImage/23005658/2/catalog.jpg">
+      </div>
+      <div class="md-detailsns">
+        <div class="md-twitter md-snssection">
+          <a href="https://twitter.com/mignon">MIGNON</a>
+        </div>
+      </div>
+    </div>
+  `);
+
+  assert.equal(
+    extractor.extractCatalogImageUrl(document),
+    "https://classic-webcatalog.circle.ms/Spa/CachedImage/23005658/2/catalog.jpg",
+  );
+  assert.equal(
+    extractor.extractTwitterUrl(document),
+    "https://twitter.com/mignon",
+  );
+});
+
 test("returns null for missing space or non-HTTP(S) catalog URLs", () => {
   const missing = loadExtractor(
     '<main id="mainSection"><div class="m-media m-circletable"><div class="m-media__image"><img src="https://example.invalid/catalog.jpg"></div></div></main>',
@@ -136,6 +170,7 @@ test("keeps Manifest V3 permissions and script formats scoped", () => {
   });
   assert.equal(manifest.background.type, "module");
   assert.deepEqual(manifest.content_scripts[0].js, [
+    "lib/catalog-shortcut.js",
     "lib/catalog-extractor.js",
     "content.js",
   ]);

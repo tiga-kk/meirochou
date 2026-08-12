@@ -12,6 +12,7 @@ test("shortcut sends the active tab catalog payload through the existing sender"
         ok: true,
         payload: {
           space: "東ア01a",
+          account: "https://twitter.com/mignon",
           tweet: "https://example.test/catalog.jpg",
         },
       };
@@ -25,7 +26,14 @@ test("shortcut sends the active tab catalog payload through the existing sender"
   assert.deepEqual(result, { ok: true, message: "東ア01aを保存しました" });
   assert.deepEqual(calls, [
     ["extract", 42, { type: "COMIPATH_EXTRACT_CATALOG" }],
-    ["send", { space: "東ア01a", tweet: "https://example.test/catalog.jpg" }],
+    [
+      "send",
+      {
+        space: "東ア01a",
+        account: "https://twitter.com/mignon",
+        tweet: "https://example.test/catalog.jpg",
+      },
+    ],
   ]);
 });
 

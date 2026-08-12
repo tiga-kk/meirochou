@@ -33,3 +33,6 @@ integrations/gas-spreadsheet/README.md
 # Cache directories
 .vite/
 .vitest-cache/
+
+# Local browser save; may contain private catalog data
+MIGNON WORKS _ Comike Web Catalog_files/

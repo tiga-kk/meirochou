@@ -919,7 +919,7 @@ test("doPost returns a stable safe error for invalid or missing JSON", () => {
   }
 });
 
-test("upsertCatalog updates only tweet in the matching row regardless of header order", () => {
+test("upsertCatalog updates account and tweet in the matching row regardless of header order", () => {
   const { gas, context } = loadGas({
     Sheet1: [
       ["memo", "tweet", "space", "priority", "isSale", "account"],
@@ -931,12 +931,14 @@ test("upsertCatalog updates only tweet in the matching row regardless of header 
     action: "upsertCatalog",
     sheetName: "Sheet1",
     space: "東A01a",
+    account: "https://twitter.com/new-account",
     tweet: "https://example.invalid/new.jpg",
   });
 
   assert.deepEqual(payload.stored, {
     sheetName: "Sheet1",
     space: "東A01a",
+    account: "https://twitter.com/new-account",
     tweet: "https://example.invalid/new.jpg",
   });
   assert.equal(payload.row, 2);
@@ -947,15 +949,15 @@ test("upsertCatalog updates only tweet in the matching row regardless of header 
     "東A01a",
     "7",
     "x",
-    "@circle",
+    "https://twitter.com/new-account",
   ]);
 });
 
 test("upsertCatalog creates a new row without overwriting unrelated columns", () => {
   const { gas, context } = loadGas({
     Sheet1: [
-      ["priority", "space", "tweet", "memo"],
-      ["5", "東A01a", "old", "keep"],
+      ["priority", "space", "account", "tweet", "memo"],
+      ["5", "東A01a", "old-account", "old", "keep"],
     ],
   });
 
@@ -963,6 +965,7 @@ test("upsertCatalog creates a new row without overwriting unrelated columns", ()
     action: "upsertCatalog",
     sheetName: "Sheet1",
     space: "西B02b",
+    account: "https://x.com/new-account",
     tweet: "http://example.invalid/catalog.png",
   });
 
@@ -972,6 +975,7 @@ test("upsertCatalog creates a new row without overwriting unrelated columns", ()
   assert.deepEqual(gas.spreadsheet.sheets[0].data[2], [
     "",
     "西B02b",
+    "https://x.com/new-account",
     "http://example.invalid/catalog.png",
   ]);
 });
@@ -1017,6 +1021,40 @@ test("upsertCatalog rejects duplicate spaces, missing tweet headers, and invalid
       sheetName: "Sheet1",
       space: "東A01a",
       tweet: "javascript:alert(1)",
+    }).code,
+    "INVALID_INPUT",
+  );
+
+  const missingAccount = loadGas({
+    Sheet1: [
+      ["space", "tweet"],
+      ["東A01a", "old"],
+    ],
+  });
+  assert.equal(
+    post(missingAccount.context, {
+      action: "upsertCatalog",
+      sheetName: "Sheet1",
+      space: "東A01a",
+      account: "https://twitter.com/mignon",
+      tweet: "https://example.invalid/new.jpg",
+    }).code,
+    "INVALID_SHEET_DATA",
+  );
+
+  const invalidAccount = loadGas({
+    Sheet1: [
+      ["space", "account", "tweet"],
+      ["東A01a", "old", "old"],
+    ],
+  });
+  assert.equal(
+    post(invalidAccount.context, {
+      action: "upsertCatalog",
+      sheetName: "Sheet1",
+      space: "東A01a",
+      account: "javascript:alert(1)",
+      tweet: "https://example.invalid/new.jpg",
     }).code,
     "INVALID_INPUT",
   );

@@ -15,7 +15,11 @@
         "https://classic-webcatalog.circle.ms/CircleRapid/Cut2*",
         "https://classic-webcatalog.circle.ms/Circle/*"
       ],
-      "js": ["lib/catalog-extractor.js", "content.js"],
+      "js": [
+        "lib/catalog-shortcut.js",
+        "lib/catalog-extractor.js",
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],

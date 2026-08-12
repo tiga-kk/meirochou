@@ -9,6 +9,7 @@ const EXCLUDE_DIRS = new Set([
   "test-results",
   "playwright-report",
   ".superpowers",
+  "MIGNON WORKS _ Comike Web Catalog_files",
 ]);
 
 const FORBIDDEN_PATHS = [

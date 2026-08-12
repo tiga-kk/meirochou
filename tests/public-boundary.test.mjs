@@ -99,6 +99,21 @@ test("allows a harmless Cloudflare variable-name mention", () => {
   assert.ok(result.files.includes("apps/webapp/config.js"));
 });
 
+test("ignores the local catalog save directory", () => {
+  const result = withFixture(
+    {
+      "MIGNON WORKS _ Comike Web Catalog_files/page.html":
+        "saved from /home/private/catalog.html\n",
+    },
+    (rootUrl) => auditPublicTree(rootUrl),
+  );
+
+  assert.notEqual(
+    result.files.find((path) => path.includes("MIGNON WORKS")),
+    "MIGNON WORKS _ Comike Web Catalog_files/page.html",
+  );
+});
+
 test("Cloudflare Pages runbook documents the minimal deployment contract", () => {
   const guide = readFileSync(
     new URL("../guides/cloudflare-pages-deployment.md", import.meta.url),

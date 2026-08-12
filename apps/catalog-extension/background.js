@@ -48,6 +48,29 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type !== "COMIPATH_SEND_CATALOG_SHORTCUT") return false;
+  const tabId = sender.tab?.id;
+  if (typeof tabId !== "number") return false;
+
+  (async () => {
+    try {
+      const result = await sendActiveCatalog({
+        tabId,
+        sendTabMessage,
+        sendCatalogPayload: sendConfiguredCatalog,
+      });
+      setCommandBadge(tabId, result);
+      sendResponse(result);
+    } catch {
+      const result = { ok: false, message: "送信できませんでした" };
+      setCommandBadge(tabId, result);
+      sendResponse(result);
+    }
+  })();
+  return true;
+});
+
 chrome.commands.onCommand.addListener((command, tab) => {
   if (command !== "send-catalog" || typeof tab?.id !== "number") return;
 

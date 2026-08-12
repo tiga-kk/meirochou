@@ -33,6 +33,14 @@ function doPostCatalog(requestData) {
       );
     }
 
+    const account =
+      typeof requestData.account === "string" ? requestData.account.trim() : "";
+    if (account && !/^https?:\/\/[^/\s]+(?:\/[^\s]*)?$/i.test(account)) {
+      return jsonResponse(
+        errorResponse("Account must be an HTTP or HTTPS URL.", "INVALID_INPUT"),
+      );
+    }
+
     const sheetName = requestData.sheetName.trim();
     const space = requestData.space.trim();
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
@@ -54,6 +62,14 @@ function doPostCatalog(requestData) {
       return jsonResponse(
         errorResponse(
           `Header 'tweet' is missing in sheet "${sheetName}".`,
+          "INVALID_SHEET_DATA",
+        ),
+      );
+    }
+    if (account && headerParsed.cols.account === undefined) {
+      return jsonResponse(
+        errorResponse(
+          `Header 'account' is missing in sheet "${sheetName}".`,
           "INVALID_SHEET_DATA",
         ),
       );
@@ -99,14 +115,23 @@ function doPostCatalog(requestData) {
     const rowNumber = created ? sheet.getLastRow() + 1 : targetRowIndex + 1;
     const spaceColumnNumber = headerParsed.cols.space + 1;
     const tweetColumnNumber = headerParsed.cols.tweet + 1;
+    const accountColumnNumber =
+      headerParsed.cols.account === undefined
+        ? null
+        : headerParsed.cols.account + 1;
     if (created) {
       sheet.getRange(rowNumber, spaceColumnNumber).setValue(space);
     }
+    if (account && accountColumnNumber !== null) {
+      sheet.getRange(rowNumber, accountColumnNumber).setValue(account);
+    }
     sheet.getRange(rowNumber, tweetColumnNumber).setValue(tweet);
 
+    const stored = { sheetName, space, tweet };
+    if (account) stored.account = account;
     return jsonResponse(
       successResponse({
-        stored: { sheetName, space, tweet },
+        stored,
         row: rowNumber,
         created,
       }),

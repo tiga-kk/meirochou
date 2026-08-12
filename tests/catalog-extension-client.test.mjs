@@ -15,6 +15,7 @@ test("builds the exact upsertCatalog request body", () => {
   assert.deepEqual(
     buildCatalogRequest(settings, {
       space: " 東ア01a ",
+      account: "https://twitter.com/mignon",
       tweet: "https://catalog.youyou.co.jp/images/catalog.jpg",
     }),
     {
@@ -23,6 +24,7 @@ test("builds the exact upsertCatalog request body", () => {
         action: "upsertCatalog",
         sheetName: "day1",
         space: "東ア01a",
+        account: "https://twitter.com/mignon",
         tweet: "https://catalog.youyou.co.jp/images/catalog.jpg",
       },
     },
@@ -51,6 +53,7 @@ test("sends exact JSON and returns a safe success message", async () => {
     settings,
     {
       space: "東ア01a",
+      account: "https://twitter.com/mignon",
       tweet: "https://example.invalid/catalog.jpg",
     },
     async (url, options) => {
@@ -75,6 +78,7 @@ test("sends exact JSON and returns a safe success message", async () => {
         action: "upsertCatalog",
         sheetName: "day1",
         space: "東ア01a",
+        account: "https://twitter.com/mignon",
         tweet: "https://example.invalid/catalog.jpg",
       }),
     },
@@ -87,6 +91,7 @@ test("distinguishes network and GAS response errors without exposing raw HTML", 
     settings,
     {
       space: "東ア01a",
+      account: "https://twitter.com/mignon",
       tweet: "https://example.invalid/catalog.jpg",
     },
     async () => ({ ok: false, json: async () => ({}) }),
@@ -97,6 +102,7 @@ test("distinguishes network and GAS response errors without exposing raw HTML", 
     settings,
     {
       space: "東ア01a",
+      account: "https://twitter.com/mignon",
       tweet: "https://example.invalid/catalog.jpg",
     },
     async () => ({

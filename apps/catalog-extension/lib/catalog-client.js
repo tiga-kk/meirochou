@@ -11,6 +11,28 @@ function asHttpUrl(value) {
   return url.href;
 }
 
+function asAccountUrl(value) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return null;
+  }
+  let url;
+  try {
+    url = new URL(String(value).trim());
+  } catch {
+    throw new Error("Twitter URLが不正です。");
+  }
+  const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+  if (
+    (url.protocol !== "https:" && url.protocol !== "http:") ||
+    (hostname !== "twitter.com" && hostname !== "x.com") ||
+    url.pathname.length <= 1 ||
+    /^\/intent\//i.test(url.pathname)
+  ) {
+    throw new Error("Twitter URLが不正です。");
+  }
+  return url.href;
+}
+
 export function normalizeSettings(settings) {
   const gasUrl =
     typeof settings?.gasUrl === "string" ? settings.gasUrl.trim() : "";
@@ -40,14 +62,17 @@ export function buildCatalogRequest(settings, payload) {
   const space = typeof payload?.space === "string" ? payload.space.trim() : "";
   if (!space) throw new Error("スペースを取得できませんでした。");
   const tweet = asHttpUrl(payload?.tweet || "");
+  const account = asAccountUrl(payload?.account);
+  const body = {
+    action: "upsertCatalog",
+    sheetName: normalized.sheetName,
+    space,
+  };
+  if (account) body.account = account;
+  body.tweet = tweet;
   return {
     url: normalized.gasUrl,
-    body: {
-      action: "upsertCatalog",
-      sheetName: normalized.sheetName,
-      space,
-      tweet,
-    },
+    body,
   };
 }
 
