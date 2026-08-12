@@ -7,9 +7,9 @@
 ## 現在状態
 
 - 現在フェーズ: **Phase 7.3**
-- 現在Task: **Task 4: 地図ドラッグ遅延の計測と最小改善**
-- 次に着手するTask: **Task 4**
-- 実装状態: **Task 1〜3完了、Task 4未着手**
+- 現在Task: **Task 5: 現在経路の方向表示強化**
+- 次に着手するTask: **Task 5**
+- 実装状態: **Task 1〜4完了、Task 5未着手**
 - canonical plan: `docs/plans/phase-07-3/README.md`
 - 設計仕様: `docs/specs/2026-08-12-phase-07-3-field-followups-design.md`
 
@@ -37,15 +37,17 @@ Phase 7.3は上記未確認を隠すための再実装ではない。実機で�
 | 1 | サークルスペース表記の正規化 | 完了 | なし |
 | 2 | カタログ拡張→GAS POST経路の診断 | 完了 | Task 1 |
 | 3 | 購入済みピン非表示と候補表示の分離 | 完了 | なし |
-| 4 | 地図ドラッグ遅延の計測と最小改善 | **次に着手** | Task 3 |
-| 5 | 現在経路の方向表示強化 | 未着手 | Task 3 |
+| 4 | 地図ドラッグ遅延の計測と最小改善 | 完了 | Task 3 |
+| 5 | 現在経路の方向表示強化 | **次に着手** | Task 3 |
 | 6 | 目的地カタログのモバイルレイアウト修正 | 未着手 | Task 3 |
 | 7 | Gallery購入時の退出表示と完全Undo | 未着手 | Task 3 |
 | 8 | 実機受入・回帰検証・終了判定 | 未着手 | Task 1〜7 |
 
 Task 2は自動検証まで完了したが、実GAS deployment、資格情報、headed browserが利用できず、実機probe・catalog POST・同一space再送・Sheet列確認は未確認としてTask 8へ引き継ぐ。Task 3以降を阻止しない。
 
-複数Taskが着手可能な場合、WIPがあればそれを優先し、なければ番号が最小の着手可能Taskを選ぶ。したがって次はTask 4が着手可能である。
+Task 4はfocused/全体自動検証を通過したが、実機DevTools traceは利用できず、before/afterの実機性能差は未確認としてTask 8へ引き継ぐ。構造上はdrag中のみcompositor hintを付け、終了時に解除する。
+
+複数Taskが着手可能な場合、WIPがあればそれを優先し、なければ番号が最小の着手可能Taskを選ぶ。したがって次はTask 5が着手可能である。
 
 Task 2の実GAS確認だけが外部環境待ちになった場合は、その事実をここへ記録してTask 3以降を進める。Task 8で再確認する。
 
