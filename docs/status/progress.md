@@ -7,9 +7,9 @@
 ## 現在状態
 
 - 現在フェーズ: **Phase 7.3**
-- 現在Task: **Task 6: 目的地カタログのモバイルレイアウト修正**
-- 次に着手するTask: **Task 6**
-- 実装状態: **Task 1〜5完了、Task 6未着手**
+- 現在Task: **Task 7: Gallery購入時の退出表示と完全Undo**
+- 次に着手するTask: **Task 7**
+- 実装状態: **Task 1〜6完了、Task 7未着手**
 - canonical plan: `docs/plans/phase-07-3/README.md`
 - 設計仕様: `docs/specs/2026-08-12-phase-07-3-field-followups-design.md`
 
@@ -39,7 +39,7 @@ Phase 7.3は上記未確認を隠すための再実装ではない。実機で�
 | 3 | 購入済みピン非表示と候補表示の分離 | 完了 | なし |
 | 4 | 地図ドラッグ遅延の計測と最小改善 | 完了 | Task 3 |
 | 5 | 現在経路の方向表示強化 | 完了 | Task 3 |
-| 6 | 目的地カタログのモバイルレイアウト修正 | **次に着手** | Task 3 |
+| 6 | 目的地カタログのモバイルレイアウト修正 | 完了 | Task 3 |
 | 7 | Gallery購入時の退出表示と完全Undo | 未着手 | Task 3 |
 | 8 | 実機受入・回帰検証・終了判定 | 未着手 | Task 1〜7 |
 
@@ -49,7 +49,9 @@ Task 4はfocused/全体自動検証を通過したが、実機DevTools traceは�
 
 Task 5は意味的契約・全体自動検証を通過したが、実機visualと新しいsnapshot baselineは未確認としてTask 8へ引き継ぐ。既存snapshotは自動更新していない。
 
-複数Taskが着手可能な場合、WIPがあればそれを優先し、なければ番号が最小の着手可能Taskを選ぶ。したがって次はTask 6が着手可能である。
+Task 6は390pxのportraitカタログ一列、200% zoomの横overflowなし、640px以上のportrait二列をfocused E2Eで確認し、`npm run verify`も通過した。意図した画像高さ変更による既存visual snapshot差分は更新せず、実機visual確認とともにTask 8へ引き継ぐ。
+
+複数Taskが着手可能な場合、WIPがあればそれを優先し、なければ番号が最小の着手可能Taskを選ぶ。したがって次はTask 7が着手可能である。
 
 Task 2の実GAS確認だけが外部環境待ちになった場合は、その事実をここへ記録してTask 3以降を進める。Task 8で再確認する。
 
