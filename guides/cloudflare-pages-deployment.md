@@ -6,6 +6,10 @@ Cloudflare PagesのGit integrationは、production branchである `main` の自
 
 GitHub Actions CIはCloudflare Pagesとは独立して維持する。preview deploymentを減らすためにCIを無効化・弱体化しない。
 
+公開プロジェクトは `meirochou` とし、Build commandは `npm run build:webapp`、Build output directoryは `dist/webapp`、Nodeは `NODE_VERSION=22.14.0`、production custom domainは `meirochou.tiga.moe` とする。productionとpreviewのレスポンスは、previewでは`X-Robots-Tag: noindex`を確認する。
+
+preview Accessは有効化し、productionは公開のままにする。
+
 ## Cloudflare Pages設定
 
 Pages projectのBuilds & deploymentsで次を確認する。
@@ -45,3 +49,5 @@ cleanupで履歴破壊や外部URLの削除が必要な場合は、Cloudflare側
 Cloudflare account token、GAS URL、credentialをrepositoryの文書やコードへ埋め込まない。アカウント設定を変更できない実装担当は推測で代替設定を追加せず、`docs/status/progress.md`へ運用設定待ちとして残す。
 
 Cloudflare設定待ちは、独立して進められるPhase 7.3のアプリ実装を停止させない。
+
+production障害時は、PagesのDeploymentsから直前の成功済みproduction deploymentをRollbackできる。Rollback後はrepository側でforward fixを行う。

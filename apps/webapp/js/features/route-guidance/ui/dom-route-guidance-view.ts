@@ -7,12 +7,12 @@ import {
   DomCircleGalleryView,
   DomCircleProgressView,
 } from "../../circle-status/public-api";
+import { classifyCatalogOrientation } from "./catalog-orientation";
 import { DomRouteMapView } from "./dom-route-map-view";
 import {
   buildRouteGuidanceScreenModel,
   formatRouteDistance,
 } from "./route-guidance-screen-model";
-import { classifyCatalogOrientation } from "./catalog-orientation";
 
 function hasUsableMapScale(area) {
   return (
@@ -35,6 +35,10 @@ export class DomRouteGuidanceView {
     this.onPreviewRoute = null;
     this.onConfirmRoute = null;
     this.onCancelRoute = null;
+    this.lastNavigationState = null;
+    this.candidatePreviewTarget = null;
+    this.candidatePreviewOutsideClick = null;
+    this.candidatePreviewEscape = null;
     this.statsRenderer = new DomCircleProgressView(this, mapAreaCatalog);
     this.modalManager = new DomCircleGalleryView(mapAreaCatalog);
     this.mapRenderer = new DomRouteMapView(this, mapAreaCatalog);
@@ -50,6 +54,9 @@ export class DomRouteGuidanceView {
       headerAreaTitle: document.getElementById("header-area-title"),
       locNumber: document.getElementById("loc-number"),
       targetSection: document.getElementById("target-content"),
+      candidatePreviewSurface: document.getElementById(
+        "candidate-preview-surface",
+      ),
       targetDetail: document.getElementById("next-target"),
       targetEmpty: document.getElementById("target-empty"),
       targetLoading: document.getElementById("target-loading"),
@@ -249,6 +256,8 @@ export class DomRouteGuidanceView {
 
   /** Render the active route and an independently selected map target. */
   showNavigation(state) {
+    this.closeCandidatePreview();
+    this.lastNavigationState = state;
     const {
       currentTarget,
       currentRoute = null,
@@ -478,9 +487,150 @@ export class DomRouteGuidanceView {
     }
   }
 
-  previewTarget(target) {
-    if (!target) return;
-    if (this.onSelectTarget) this.onSelectTarget(target);
+  showCandidatePreview(target, anchor = null) {
+    const surface = this.els.candidatePreviewSurface;
+    if (!target || !surface) return;
+
+    this.closeCandidatePreview();
+    this.candidatePreviewTarget = target;
+    const state = this.lastNavigationState || {};
+    const screenModel = buildRouteGuidanceScreenModel({
+      currentDestination: target,
+      nextDestination: null,
+      startSpace: state.startSpace || "",
+    });
+
+    surface.innerHTML = "";
+    const card = document.createElement("article");
+    card.className = "candidate-preview-card";
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-label", `変更候補 ${target.space}`);
+    card.addEventListener("click", (event) => event.stopPropagation());
+
+    const header = document.createElement("div");
+    header.className = "candidate-preview-header";
+    const title = document.createElement("strong");
+    title.textContent = "変更候補";
+    const closeButton = document.createElement("button");
+    closeButton.type = "button";
+    closeButton.className = "candidate-preview-close";
+    closeButton.setAttribute("aria-label", "候補を閉じる");
+    closeButton.textContent = "×";
+    closeButton.onclick = () =>
+      this.closeCandidatePreview({ cancelSelection: true });
+    header.append(title, closeButton);
+    card.appendChild(header);
+
+    const space = document.createElement("strong");
+    space.className = "candidate-preview-space";
+    space.textContent = target.space;
+    card.appendChild(space);
+
+    const meta = document.createElement("div");
+    meta.className = "candidate-preview-meta";
+    const distance = document.createElement("span");
+    distance.textContent = Number.isFinite(Number(target.gridDistance))
+      ? `距離 ${Math.round(Number(target.gridDistance))}`
+      : screenModel.distanceLabel;
+    const priority = document.createElement("span");
+    priority.textContent = screenModel.priorityLabel;
+    meta.append(distance, priority);
+    card.appendChild(meta);
+
+    if (screenModel.hasCatalogImage) {
+      const image = document.createElement("img");
+      image.className = "candidate-preview-thumbnail";
+      image.alt = `${target.space} お品書き`;
+      image.loading = "lazy";
+      image.src = screenModel.catalogUrl;
+      card.appendChild(image);
+    }
+    if (screenModel.accountUrl) {
+      const account = document.createElement("a");
+      account.className = "candidate-preview-account";
+      account.href = screenModel.accountUrl;
+      account.target = "_blank";
+      account.rel = "noopener noreferrer";
+      account.textContent = screenModel.accountLabel;
+      card.appendChild(account);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "candidate-preview-actions";
+    const compareButton = document.createElement("button");
+    compareButton.type = "button";
+    compareButton.className = "btn btn-primary";
+    compareButton.textContent = "経路を比較";
+    compareButton.onclick = () => {
+      const selected = this.candidatePreviewTarget;
+      this.closeCandidatePreview();
+      if (selected) this.onSelectTarget?.(selected);
+    };
+    const changeButton = document.createElement("button");
+    changeButton.type = "button";
+    changeButton.className = "btn btn-secondary";
+    changeButton.textContent = "行き先変更";
+    changeButton.onclick = () => {
+      const selected = this.candidatePreviewTarget;
+      this.closeCandidatePreview();
+      if (selected) this.onSetNextTarget?.(selected);
+    };
+    actions.append(compareButton, changeButton);
+    card.appendChild(actions);
+    surface.appendChild(card);
+
+    const containerRect = this.els.targetSection?.getBoundingClientRect();
+    const anchorRect = anchor?.getBoundingClientRect?.();
+    if (containerRect && anchorRect) {
+      const cardWidth = Math.min(320, Math.max(220, containerRect.width - 24));
+      const left = Math.max(
+        8,
+        Math.min(
+          anchorRect.left - containerRect.left,
+          containerRect.width - cardWidth - 8,
+        ),
+      );
+      const top = Math.max(8, anchorRect.bottom - containerRect.top + 8);
+      surface.style.left = `${left}px`;
+      surface.style.top = `${top}px`;
+      surface.style.width = `${cardWidth}px`;
+    }
+    surface.classList.remove("hidden");
+
+    this.candidatePreviewOutsideClick = (event) => {
+      if (!surface.contains(event.target)) {
+        this.closeCandidatePreview({ cancelSelection: true });
+      }
+    };
+    this.candidatePreviewEscape = (event) => {
+      if (event.key === "Escape") {
+        this.closeCandidatePreview({ cancelSelection: true });
+      }
+    };
+    document.addEventListener("click", this.candidatePreviewOutsideClick);
+    document.addEventListener("keydown", this.candidatePreviewEscape);
+  }
+
+  closeCandidatePreview({ cancelSelection = false } = {}) {
+    const surface = this.els?.candidatePreviewSurface;
+    const selectionState = this.lastNavigationState?.selectionState;
+    const shouldCancelSelection =
+      cancelSelection &&
+      ["loading", "ready", "error", "comparing"].includes(selectionState);
+    if (this.candidatePreviewOutsideClick) {
+      document.removeEventListener("click", this.candidatePreviewOutsideClick);
+      this.candidatePreviewOutsideClick = null;
+    }
+    if (this.candidatePreviewEscape) {
+      document.removeEventListener("keydown", this.candidatePreviewEscape);
+      this.candidatePreviewEscape = null;
+    }
+    this.candidatePreviewTarget = null;
+    if (surface) {
+      surface.classList.add("hidden");
+      surface.innerHTML = "";
+    }
+    if (shouldCancelSelection) this.onCloseRouteSelection?.();
   }
 
   /**

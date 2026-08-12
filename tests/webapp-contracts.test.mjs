@@ -348,7 +348,7 @@ test("webapp CI runs for main integration and explicit manual dispatch", () => {
   assert.match(workflow, /workflow_dispatch:/);
 });
 
-test("webapp navigation view model marks selected, purchased, and hold pins", () => {
+test("webapp navigation view model omits purchased candidate pins", () => {
   const circles = [
     { space: "東A23a", priority: 10, tweet: "https://example.com/a.jpg" },
     { space: "東A31b", priority: 9 },
@@ -361,17 +361,36 @@ test("webapp navigation view model marks selected, purchased, and hold pins", ()
     holdList: ["東A41a"],
   });
 
-  assert.equal(pins.length, 3);
+  assert.equal(pins.length, 2);
   assert.equal(pins.find((pin) => pin.space === "東A23a").state, "next");
   assert.equal(pins.find((pin) => pin.space === "東A23a").baseState, "todo");
-  assert.equal(pins.find((pin) => pin.space === "東A31b").state, "done");
-  assert.equal(pins.find((pin) => pin.space === "東A31b").baseState, "done");
   assert.equal(pins.find((pin) => pin.space === "東A41a").state, "hold");
   assert.equal(pins.find((pin) => pin.space === "東A41a").baseState, "hold");
   pins.forEach((pin) => {
     assert.ok(pin.x >= 8 && pin.x <= 88);
     assert.ok(pin.y >= 16 && pin.y <= 82);
   });
+});
+
+test("webapp navigation view model keeps a purchased special marker", () => {
+  const pins = buildMapPins(
+    [{ space: "東A23a" }, { space: "東A31b" }, { space: "東A41a" }],
+    {
+      currentTargetSpace: "東A23a",
+      selectedSpace: "東A31b",
+      startSpace: "東A41a",
+      purchasedList: ["東A23a", "東A31b", "東A41a"],
+    },
+  );
+
+  assert.deepEqual(
+    pins.map((pin) => [pin.space, pin.state]),
+    [
+      ["東A23a", "next"],
+      ["東A31b", "selected"],
+      ["東A41a", "start"],
+    ],
+  );
 });
 
 test("webapp navigation view model distinguishes the current and previewed pins", () => {
@@ -1486,6 +1505,24 @@ test("webapp navigation map loads the configured point index for pins", () => {
     mapRenderer,
     /requireIndexedPositions:\s*Boolean\(area\?\.pointsFile\)/,
   );
+});
+
+test("webapp map pins connect to the independent candidate surface", () => {
+  const html = read("apps/webapp/index.html");
+  const mapRenderer = read(
+    "apps/webapp/js/features/route-guidance/ui/dom-route-map-view.ts",
+  );
+  const guidanceView = read(
+    "apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts",
+  );
+
+  assert.match(html, /id="candidate-preview-surface"/);
+  assert.match(mapRenderer, /showCandidatePreview\?\.\(pin\.circle, button\)/);
+  assert.doesNotMatch(mapRenderer, /previewTarget\(pin\.circle\)/);
+  assert.match(guidanceView, /closeCandidatePreview\(\)/);
+  assert.match(guidanceView, /onSelectTarget\?\.\(selected\)/);
+  assert.match(guidanceView, /onSetNextTarget\?\.\(selected\)/);
+  assert.match(guidanceView, /document\.addEventListener\("keydown"/);
 });
 
 test("webapp navigation map load listener is guarded across repeated init calls", () => {

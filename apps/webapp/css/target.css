@@ -33,6 +33,10 @@
   background: var(--bg-card);
 }
 
+#target-content {
+  position: relative;
+}
+
 .navigation-card {
   border-radius: var(--border-radius);
 }
@@ -269,6 +273,85 @@
 
 .map-pin.hold {
   background-color: rgba(183, 121, 31, 0.4);
+}
+
+.candidate-preview-surface {
+  position: absolute;
+  z-index: 20;
+  pointer-events: auto;
+}
+
+.candidate-preview-card {
+  display: grid;
+  gap: 8px;
+  max-width: 320px;
+  padding: 10px;
+  border: 2px solid var(--primary);
+  background: var(--bg-card);
+  box-shadow: var(--shadow);
+}
+
+.candidate-preview-header,
+.candidate-preview-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.candidate-preview-header {
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.candidate-preview-close {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid var(--ink);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.candidate-preview-space {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+}
+
+.candidate-preview-meta {
+  color: var(--text-sub);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.candidate-preview-thumbnail {
+  display: block;
+  width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+  background: var(--panel);
+}
+
+.candidate-preview-account {
+  overflow: hidden;
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.candidate-preview-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.candidate-preview-actions .btn {
+  width: 100%;
 }
 
 .map-pin.itinerary-pin {

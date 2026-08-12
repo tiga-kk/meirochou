@@ -312,6 +312,11 @@ export function buildMapPins(
   const pins: MapPin[] = [];
   for (const circle of circles) {
     if (!circle?.space || seen.has(circle.space)) continue;
+    const isSpecialMarker =
+      circle.space === current ||
+      circle.space === preview ||
+      circle.space === options.startSpace;
+    if (purchased.has(circle.space) && !isSpecialMarker) continue;
     seen.add(circle.space);
     const indexedPosition =
       options.positionOverrides?.get(circle.space) ??
@@ -334,7 +339,9 @@ export function buildMapPins(
         ? "next"
         : circle.space === preview
           ? "selected"
-          : baseState;
+          : circle.space === options.startSpace
+            ? "start"
+            : baseState;
     pins.push({
       circle,
       space: circle.space,

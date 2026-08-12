@@ -34,9 +34,15 @@ function areSpacesInSameArea(spaceA, spaceB, mapAreaCatalog) {
   return Boolean(areaA && areaB && areaA.id === areaB.id);
 }
 
-export function getRouteStartSpaceForMap(startSpace, targetSpace, mapAreaCatalog) {
+export function getRouteStartSpaceForMap(
+  startSpace,
+  targetSpace,
+  mapAreaCatalog,
+) {
   if (!startSpace || !targetSpace) return "";
-  return areSpacesInSameArea(startSpace, targetSpace, mapAreaCatalog) ? startSpace : "";
+  return areSpacesInSameArea(startSpace, targetSpace, mapAreaCatalog)
+    ? startSpace
+    : "";
 }
 
 function readPixelBox(element) {
@@ -426,7 +432,7 @@ export class DomRouteMapView {
       if (pin.circle && selectionState !== "comparing") {
         button.onclick = (event) => {
           event.stopPropagation();
-          this.uiManager.previewTarget(pin.circle);
+          this.uiManager.showCandidatePreview?.(pin.circle, button);
         };
       }
       if (selectionState === "comparing" && pin.circle) button.disabled = true;
