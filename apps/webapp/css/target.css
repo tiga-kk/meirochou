@@ -104,9 +104,9 @@
 .route-flow-line {
   fill: none;
   stroke: rgba(255, 255, 255, 0.96);
-  stroke-width: 5;
+  stroke-width: 9;
   stroke-linecap: round;
-  stroke-dasharray: 18 82;
+  stroke-dasharray: 32 68;
   animation: route-flow-comet 0.9s linear infinite;
   pointer-events: none;
 }

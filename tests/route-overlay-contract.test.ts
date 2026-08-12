@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, expect, it, test } from "vitest";
 import {
   planRoute,
@@ -46,6 +47,20 @@ const fictionalGridMeta: GridMeta = {
 // 100x80 grid: all cells walkable (value 1)
 const fictionalGridBytes = new Uint8Array(100 * 80);
 fictionalGridBytes.fill(1);
+
+test("route cues are distinct and long enough to read on both route overlays", () => {
+  const css = readFileSync("apps/webapp/css/target.css", "utf8");
+  const cue = css.match(
+    /\.route-flow-comet,[\s\S]*?stroke-width:\s*(\d+);[\s\S]*?stroke-dasharray:\s*([\d.]+)\s+([\d.]+);/,
+  );
+
+  assert.ok(cue);
+  assert.ok(Number(cue[1]) >= 8, "moving cue must remain visible after map scaling");
+  assert.ok(Number(cue[2]) >= 28, "moving cue dash must be long enough to follow");
+  assert.notEqual(cue[1], "12", "cue width must differ from the solid base path");
+  assert.notEqual(`${cue[2]} ${cue[3]}`, "22 14", "cue dash must differ from candidate base styling");
+  assert.match(css, /\.route-overlay-candidate \.route-flow-comet[\s\S]*?stroke:/);
+});
 
 test("planRoute and buildRouteOverlaySvg fulfill coordinate contracts with fictional data", () => {
   const route = planRoute(

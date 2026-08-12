@@ -605,6 +605,12 @@ test("ピンの候補経路を比較してから目的地を変更する", async
     page.locator('[data-route-kind="candidate"] .route-flow-comet'),
   ).toHaveCount(1);
   await expect(
+    page.locator('[data-route-kind="candidate"] .route-flow-comet'),
+  ).toHaveCSS("stroke-width", "9px");
+  await expect(
+    page.locator('[data-route-kind="candidate"] .route-flow-comet'),
+  ).toHaveCSS("stroke-dasharray", "32px, 68px");
+  await expect(
     page.locator('[data-route-kind="candidate"] .route-flow-line'),
   ).toHaveCSS("animation-name", "route-flow-comet");
   await expect(
