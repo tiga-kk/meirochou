@@ -504,6 +504,9 @@ test("ピンの候補経路を比較してから目的地を変更する", async
 
   const candidatePin = pinFor(page, candidate);
   await candidatePin.evaluate((button: HTMLButtonElement) => button.click());
+  const candidatePreview = page.locator(".candidate-preview-card");
+  await expect(candidatePreview).toBeVisible();
+  await candidatePreview.getByRole("button", { name: "経路を比較" }).click();
 
   await expect(heading).toHaveText(originalTarget || "");
   await expect(page.locator("#target-status-label")).toHaveText("変更候補");
@@ -541,6 +544,8 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
 
   await candidatePin.evaluate((button: HTMLButtonElement) => button.click());
+  await expect(candidatePreview).toBeVisible();
+  await candidatePreview.getByRole("button", { name: "経路を比較" }).click();
   await expect(page.locator("#btn-preview-route")).toBeEnabled();
 
   await page.locator("#btn-preview-route").click();
@@ -592,6 +597,9 @@ test("URLがない次地点ではNo Imageを大きく表示する", async ({ pag
   await pinFor(page, "東イ08b").evaluate((button: HTMLButtonElement) =>
     button.click(),
   );
+  const candidatePreview = page.locator(".candidate-preview-card");
+  await expect(candidatePreview).toBeVisible();
+  await candidatePreview.getByRole("button", { name: "行き先変更" }).click();
 
   const placeholder = page.locator(
     "#tweet-embed-container .catalog-placeholder",
@@ -612,9 +620,15 @@ test("連続してピンを押した時は最後に選んだ候補だけを表�
   await pinFor(page, "東ア23a").evaluate((button: HTMLButtonElement) =>
     button.click(),
   );
+  let candidatePreview = page.locator(".candidate-preview-card");
+  await expect(candidatePreview).toBeVisible();
+  await candidatePreview.getByRole("button", { name: "経路を比較" }).click();
   await pinFor(page, "東ア31b").evaluate((button: HTMLButtonElement) =>
     button.click(),
   );
+  candidatePreview = page.locator(".candidate-preview-card");
+  await expect(candidatePreview).toBeVisible();
+  await candidatePreview.getByRole("button", { name: "経路を比較" }).click();
 
   await expect(page.locator("#selected-target-space")).toHaveText("東ア31b");
   await expect(page.locator("#target-tweet-link")).toHaveAttribute(
@@ -645,6 +659,9 @@ test("候補経路を探索できない時は現在経路を維持する", async
   await pinFor(page, "東ア23a").evaluate((button: HTMLButtonElement) =>
     button.click(),
   );
+  const candidatePreview = page.locator(".candidate-preview-card");
+  await expect(candidatePreview).toBeVisible();
+  await candidatePreview.getByRole("button", { name: "経路を比較" }).click();
 
   await expect(page.locator("#target-space-heading")).toHaveText(
     originalTarget || "",
@@ -729,6 +746,9 @@ test("切替前の画像エラーで現在の次地点画像を消さない", as
   await pinFor(page, "東ア23a").evaluate((button: HTMLButtonElement) =>
     button.click(),
   );
+  let candidatePreview = page.locator(".candidate-preview-card");
+  await expect(candidatePreview).toBeVisible();
+  await candidatePreview.getByRole("button", { name: "行き先変更" }).click();
 
   const staleCatalog = await page
     .locator("#tweet-embed-container img")
@@ -737,10 +757,12 @@ test("切替前の画像エラーで現在の次地点画像を消さない", as
   await pinFor(page, "東ア31b").evaluate((button: HTMLButtonElement) =>
     button.click(),
   );
+  candidatePreview = page.locator(".candidate-preview-card");
+  await expect(candidatePreview).toBeVisible();
+  await candidatePreview.getByRole("button", { name: "行き先変更" }).click();
   await expect(page.locator("#target-space-heading")).toHaveText(
-    originalTarget || "",
+    "東ア31b",
   );
-  await expect(page.locator("#selected-target-space")).toHaveText("東ア31b");
   await expect(page.locator("#tweet-embed-container img")).toBeVisible();
 
   await staleCatalog?.evaluate((image) =>

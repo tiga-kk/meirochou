@@ -177,6 +177,9 @@ test("confirmed route change is saved and resumes with the changed destination",
   await candidatePin.evaluate((button) =>
     (button as HTMLButtonElement).click(),
   );
+  const candidatePreview = page.locator(".candidate-preview-card");
+  await expect(candidatePreview).toBeVisible();
+  await candidatePreview.getByRole("button", { name: "経路を比較" }).click();
   await expect(page.locator("#selected-target-space")).toHaveText("東ア31b");
   await expect(page.locator("#btn-preview-route")).toBeEnabled();
   await page.locator("#btn-preview-route").click();
