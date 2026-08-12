@@ -129,7 +129,7 @@ describe("GasApiClient request shape", () => {
         headers: { Accept: "application/json" },
       }),
     );
-    expect(result.circles[0].space).toBe("東A01a");
+    expect(result.circles[0].space).toBe("東A1a");
   });
 
   it("sends sale update via POST text/plain with JSON body", async () => {

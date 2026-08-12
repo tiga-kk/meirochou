@@ -1,3 +1,4 @@
+import { canonicalizeSpace } from "../../../shared/domain/space-parser";
 import type {
   Circle,
   EventDay,
@@ -327,9 +328,13 @@ export function parseGasSheetListResponse(
 
 function parseCircle(input: unknown, path: string): Circle {
   const value = record(input, path);
-  const space = text(value.space, `${path}.space`).trim();
+  const rawSpace = text(value.space, `${path}.space`);
+  const space = canonicalizeSpace(rawSpace);
   if (!space) {
-    throw new BoundaryValidationError(`${path}.space`, "a non-empty string");
+    throw new BoundaryValidationError(
+      `${path}.space`,
+      "a valid circle space identifier",
+    );
   }
   const circle: Circle = {
     ...value,

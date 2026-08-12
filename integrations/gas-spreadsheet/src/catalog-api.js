@@ -36,7 +36,11 @@ function doPostCatalog(requestData) {
     }
 
     const sheetName = requestData.sheetName.trim();
-    const space = requestData.space.trim();
+    const requestedSpace = requestData.space.trim();
+    const space = canonicalizeSpace(requestedSpace);
+    if (!space) {
+      return jsonResponse(errorResponse("Space is invalid.", "INVALID_INPUT"));
+    }
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = spreadsheet.getSheetByName(sheetName);
     if (!sheet) {
@@ -93,7 +97,16 @@ function doPostCatalog(requestData) {
           ),
         );
       }
-      if (seenSpaces.has(rawSpace)) {
+      const canonicalSpace = canonicalizeSpace(rawSpace);
+      if (!canonicalSpace) {
+        return jsonResponse(
+          errorResponse(
+            `Row ${rowNum} in sheet "${sheetName}" has an invalid 'space'.`,
+            "INVALID_SHEET_DATA",
+          ),
+        );
+      }
+      if (seenSpaces.has(canonicalSpace)) {
         return jsonResponse(
           errorResponse(
             `Duplicate space at row ${rowNum} in sheet "${sheetName}".`,
@@ -101,8 +114,8 @@ function doPostCatalog(requestData) {
           ),
         );
       }
-      seenSpaces.add(rawSpace);
-      if (rawSpace === space) targetRowIndex = i;
+      seenSpaces.add(canonicalSpace);
+      if (canonicalSpace === space) targetRowIndex = i;
     }
 
     const created = targetRowIndex === -1;
@@ -117,7 +130,7 @@ function doPostCatalog(requestData) {
         ? null
         : headerParsed.cols.account + 1;
     if (created) {
-      sheet.getRange(rowNumber, spaceColumnNumber).setValue(space);
+      sheet.getRange(rowNumber, spaceColumnNumber).setValue(requestedSpace);
     }
     if (account && accountColumnNumber !== null) {
       sheet.getRange(rowNumber, accountColumnNumber).setValue(account);
@@ -126,7 +139,7 @@ function doPostCatalog(requestData) {
       sheet.getRange(rowNumber, tweetColumnNumber).setValue(tweet);
     }
 
-    const stored = { sheetName, space };
+    const stored = { sheetName, space: requestedSpace };
     if (account) stored.account = account;
     if (tweet) stored.tweet = tweet;
     return jsonResponse(

@@ -75,6 +75,7 @@ export class PreviewCsvImportUseCase {
       return "Missing required header column";
     }
     if (message.startsWith("Duplicate space:")) return "Duplicate space";
+    if (message.startsWith("Invalid space:")) return "Invalid space";
     if (message.startsWith("Syntax error:")) return "CSV syntax error";
     return "Invalid CSV data";
   }

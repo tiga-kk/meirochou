@@ -1,3 +1,4 @@
+import { canonicalizeSpace } from "../../../shared/domain/space-parser";
 import type { CircleRecord } from "../../event-day/public-api";
 import type { CsvImportResult, CsvIssue } from "./circle-data-source-types";
 
@@ -188,18 +189,25 @@ export function parseCircleCsv(text: string): CsvImportResult {
       continue;
     }
 
-    const space = spaceIdx < fields.length ? fields[spaceIdx].trim() : "";
-    if (!space) {
+    const rawSpace = spaceIdx < fields.length ? fields[spaceIdx].trim() : "";
+    const space = canonicalizeSpace(rawSpace);
+    if (!rawSpace) {
       issues.push({
         row: record.line,
         column: "space",
         message: "Missing required field: space",
       });
+    } else if (!space) {
+      issues.push({
+        row: record.line,
+        column: "space",
+        message: `Invalid space: ${rawSpace}`,
+      });
     } else if (seenSpaces.has(space)) {
       issues.push({
         row: record.line,
         column: "space",
-        message: `Duplicate space: ${space}`,
+        message: `Duplicate space: ${rawSpace}`,
       });
     } else {
       seenSpaces.add(space);
@@ -232,7 +240,7 @@ export function parseCircleCsv(text: string): CsvImportResult {
       memoIdx !== -1 && memoIdx < fields.length ? fields[memoIdx] : "";
 
     circles.push({
-      space,
+      space: space ?? rawSpace,
       priority,
       isSale,
       account,

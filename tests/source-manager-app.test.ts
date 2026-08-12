@@ -185,7 +185,7 @@ describe("CircleDataSource Orchestration & App Integration", () => {
       useCase.execute({
         eventDay: { eventId: "c104", dayId: "day1" },
         fileName: "duplicate.csv",
-        text: "space,priority\nSECRET-CELL,1\nSECRET-CELL,2",
+        text: "space,priority,memo\n東A-01a,1,SECRET-CELL\n東A-01a,2,SECRET-CELL",
       });
     } catch (err: any) {
       expect(err.message).not.toContain("SECRET-CELL");

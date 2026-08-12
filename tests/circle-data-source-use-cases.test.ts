@@ -11,7 +11,7 @@ describe("Circle Data Source Domain Codecs", () => {
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.circles.length).toBe(1);
-      expect(res.circles[0].space).toBe("A01");
+      expect(res.circles[0].space).toBe("A1");
     }
   });
 

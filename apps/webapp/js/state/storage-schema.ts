@@ -13,6 +13,7 @@ import {
   parseEventId,
   parseSourceGeneration,
 } from "../features/event-day/infrastructure/application-boundary-parsers";
+import { canonicalizeSpace } from "../shared/domain/space-parser";
 
 export class StorageSchemaError extends Error {
   constructor(message: string) {
@@ -26,7 +27,14 @@ export function getCircleVisitState(
   overrides: CircleStateOverrides,
   space: string,
 ): CircleVisitState {
-  return overrides[space] || "pending";
+  if (overrides[space]) return overrides[space];
+  const key = canonicalizeSpace(space);
+  if (!key) return "pending";
+  // ponytail: linear scan keeps legacy raw keys readable; normalize storage on a future schema migration.
+  for (const [storedSpace, state] of Object.entries(overrides)) {
+    if (canonicalizeSpace(storedSpace) === key) return state;
+  }
+  return "pending";
 }
 
 export function transitionCircleVisitState(

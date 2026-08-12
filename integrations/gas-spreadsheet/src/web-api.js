@@ -80,13 +80,21 @@ function parseSheetDataRows(data, sheetName) {
       };
     }
 
-    if (seenSpaces.has(rawSpace)) {
+    const canonicalSpace = canonicalizeSpace(rawSpace);
+    if (!canonicalSpace) {
+      return {
+        circles: null,
+        error: `Row ${rowNum} in sheet "${sheetName}" has an invalid 'space'.`,
+      };
+    }
+
+    if (seenSpaces.has(canonicalSpace)) {
       return {
         circles: null,
         error: `Duplicate space at row ${rowNum} in sheet "${sheetName}".`,
       };
     }
-    seenSpaces.add(rawSpace);
+    seenSpaces.add(canonicalSpace);
 
     const circle = { space: rawSpace, sheetName: sheetName };
 
@@ -245,7 +253,10 @@ function doPostSale(requestData) {
     }
 
     const requestedSheetName = requestData.sheetName.trim();
-    const spaceToUpdate = requestData.space.trim();
+    const spaceToUpdate = canonicalizeSpace(requestData.space);
+    if (!spaceToUpdate) {
+      return jsonResponse(errorResponse("Space is invalid.", "INVALID_INPUT"));
+    }
     const undo = requestData.undo;
 
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
@@ -303,7 +314,17 @@ function doPostSale(requestData) {
         );
       }
 
-      if (seenSpaces.has(rawSpace)) {
+      const canonicalSpace = canonicalizeSpace(rawSpace);
+      if (!canonicalSpace) {
+        return jsonResponse(
+          errorResponse(
+            `Row ${rowNum} in sheet "${requestedSheetName}" has an invalid 'space'.`,
+            "INVALID_SHEET_DATA",
+          ),
+        );
+      }
+
+      if (seenSpaces.has(canonicalSpace)) {
         return jsonResponse(
           errorResponse(
             `Duplicate space at row ${rowNum} in sheet "${requestedSheetName}".`,
@@ -311,9 +332,9 @@ function doPostSale(requestData) {
           ),
         );
       }
-      seenSpaces.add(rawSpace);
+      seenSpaces.add(canonicalSpace);
 
-      if (rawSpace === spaceToUpdate) {
+      if (canonicalSpace === spaceToUpdate) {
         targetRowIndex = i;
       }
     }

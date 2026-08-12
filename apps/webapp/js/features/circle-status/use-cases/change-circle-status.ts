@@ -1,3 +1,4 @@
+import { canonicalizeSpace } from "../../../shared/domain/space-parser";
 import type {
   ActiveEventDaySession,
   EventDayRepository,
@@ -47,13 +48,21 @@ export class ChangeCircleStatusUseCase {
     if (state.sourceGeneration !== input.expectedSourceGeneration) {
       throw new Error("Source generation changed");
     }
-    if (!state.circles.some((circle) => circle.space === input.circleSpace)) {
+    const inputSpaceKey =
+      canonicalizeSpace(input.circleSpace) ?? input.circleSpace;
+    const circle = state.circles.find(
+      (candidate) =>
+        (canonicalizeSpace(candidate.space) ?? candidate.space) ===
+        inputSpaceKey,
+    );
+    if (!circle) {
       throw new Error("Circle not found");
     }
+    const circleSpace = circle.space;
 
     const { state: statusState, previousStatus } = applyCircleStatusChange(
       state,
-      input.circleSpace,
+      circleSpace,
       input.nextStatus,
     );
 
@@ -64,7 +73,7 @@ export class ChangeCircleStatusUseCase {
       const outboxResult = appendPendingGasUpdate(
         statusState,
         input.eventDay,
-        input.circleSpace,
+        circleSpace,
         input.nextStatus,
         input.changedAt,
         this.createPendingGasUpdateId,
@@ -102,7 +111,7 @@ export class ChangeCircleStatusUseCase {
       undoToken: {
         undoId: this.createUndoId(),
         eventDay: { ...input.eventDay },
-        circleSpace: input.circleSpace,
+        circleSpace,
         previousStatus,
         currentStatus: input.nextStatus,
         expectedSourceGeneration: input.expectedSourceGeneration,

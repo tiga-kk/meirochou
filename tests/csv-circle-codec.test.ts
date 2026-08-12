@@ -19,7 +19,7 @@ describe("csv-circle-codec", () => {
       if (result.ok) {
         expect(result.circles).toEqual([
           {
-            space: "東A01a",
+            space: "東A1a",
             priority: 10,
             isSale: "x",
             account: "acc1",
@@ -27,7 +27,7 @@ describe("csv-circle-codec", () => {
             memo: "memo1",
           },
           {
-            space: "東A01b",
+            space: "東A1b",
             priority: undefined,
             isSale: "X",
             account: "acc2",
@@ -35,7 +35,7 @@ describe("csv-circle-codec", () => {
             memo: "memo2",
           },
           {
-            space: "東A02a",
+            space: "東A2a",
             priority: 5,
             isSale: "",
             account: "acc3",
@@ -57,7 +57,7 @@ describe("csv-circle-codec", () => {
       if (result.ok) {
         expect(result.circles).toEqual([
           {
-            space: "東A01a",
+            space: "東A1a",
             priority: 10,
             isSale: "",
             account: "acc,1",
@@ -65,7 +65,7 @@ describe("csv-circle-codec", () => {
             memo: 'memo "with" quotes',
           },
           {
-            space: "東A01b",
+            space: "東A1b",
             priority: 5,
             isSale: "x",
             account: "acc2",
@@ -86,7 +86,7 @@ describe("csv-circle-codec", () => {
       if (result.ok) {
         expect(result.circles).toEqual([
           {
-            space: "東A01a",
+            space: "東A1a",
             priority: 10,
             isSale: "x",
             account: "acc1",
@@ -153,6 +153,25 @@ describe("csv-circle-codec", () => {
             row: 3,
             column: "space",
             message: "Duplicate space: 東A01a",
+          },
+        ]);
+      }
+    });
+
+    it("should canonicalize space formatting before storing and detecting duplicates", () => {
+      const csv =
+        "space,priority,isSale,account,tweet,memo\n" +
+        "東Ａ３２ａ,10,,,,\n" +
+        "東A 032-A,5,,,,";
+
+      const result = parseCircleCsv(csv);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.issues).toEqual([
+          {
+            row: 3,
+            column: "space",
+            message: "Duplicate space: 東A 032-A",
           },
         ]);
       }

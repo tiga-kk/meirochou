@@ -1,0 +1,6 @@
+[
+  { "input": "東A  32-a", "canonical": "東A32a" },
+  { "input": "東Ａ３２ａ", "canonical": "東A32a" },
+  { "input": "東A32A", "canonical": "東A32a" },
+  { "input": "東ア 032-b", "canonical": "東ア32b" }
+]

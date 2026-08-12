@@ -1,8 +1,13 @@
+import { canonicalizeSpace } from "../../../shared/domain/space-parser";
 import type {
   CircleRecord,
   LocalEventDayState,
 } from "../../event-day/public-api";
 import type { SourceDiff } from "./circle-data-source-types";
+
+function spaceKey(space: string): string {
+  return canonicalizeSpace(space) ?? space;
+}
 
 /**
  * Calculates a pure diff between current active circles and incoming new ones.
@@ -17,10 +22,10 @@ export function diffCircleSources(
   const activeCurrent = current.filter((c) => !c.removedFromSource);
 
   const activeCurrentMap = new Map<string, CircleRecord>(
-    activeCurrent.map((c) => [c.space, c]),
+    activeCurrent.map((c) => [spaceKey(c.space), c]),
   );
   const incomingMap = new Map<string, CircleRecord>(
-    incoming.map((c) => [c.space, c]),
+    incoming.map((c) => [spaceKey(c.space), c]),
   );
 
   const added: CircleRecord[] = [];
@@ -30,7 +35,7 @@ export function diffCircleSources(
 
   // Determine added, updated, unchanged based on incoming order
   for (const inc of incoming) {
-    const cur = activeCurrentMap.get(inc.space);
+    const cur = activeCurrentMap.get(spaceKey(inc.space));
     if (!cur) {
       added.push({ ...inc });
     } else {
@@ -54,7 +59,7 @@ export function diffCircleSources(
 
   // Determine removed based on current order (active only)
   for (const cur of activeCurrent) {
-    if (!incomingMap.has(cur.space)) {
+    if (!incomingMap.has(spaceKey(cur.space))) {
       removed.push({ ...cur });
     }
   }
@@ -81,7 +86,7 @@ export function applySourceDiff(
   incoming: readonly CircleRecord[],
   now: string,
 ): LocalEventDayState {
-  const incomingSpaces = new Set(incoming.map((c) => c.space));
+  const incomingSpaces = new Set(incoming.map((c) => spaceKey(c.space)));
 
   // Build the new circles array with stable order:
   // 1. Incoming circles
@@ -93,7 +98,7 @@ export function applySourceDiff(
   });
 
   for (const cur of current.circles) {
-    if (!incomingSpaces.has(cur.space)) {
+    if (!incomingSpaces.has(spaceKey(cur.space))) {
       nextCircles.push({
         ...cur,
         removedFromSource: true,
@@ -105,12 +110,18 @@ export function applySourceDiff(
   const nextCircleStates: Record<string, "purchased" | "held" | "excluded"> = {
     ...current.circleStates,
   };
+  const stateKeys = new Map(
+    Object.keys(nextCircleStates).map((space) => [spaceKey(space), space]),
+  );
 
   // Check for auto-purchases (isSale=x or X in incoming)
   for (const inc of incoming) {
     const isSaleFlag = inc.isSale?.toLowerCase() === "x";
-    if (isSaleFlag && nextCircleStates[inc.space] !== "purchased") {
-      nextCircleStates[inc.space] = "purchased";
+    const key = spaceKey(inc.space);
+    const stateSpace = stateKeys.get(key) ?? inc.space;
+    if (isSaleFlag && nextCircleStates[stateSpace] !== "purchased") {
+      nextCircleStates[stateSpace] = "purchased";
+      stateKeys.set(key, stateSpace);
     }
   }
 

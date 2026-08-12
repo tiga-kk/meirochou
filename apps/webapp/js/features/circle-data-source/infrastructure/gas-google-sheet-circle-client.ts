@@ -1,3 +1,4 @@
+import { canonicalizeSpace } from "../../../shared/domain/space-parser";
 import type { CircleRecord } from "../../event-day/public-api";
 import type { CancelableRequest } from "../use-cases/cancelable-request";
 import type {
@@ -33,16 +34,20 @@ function parseStringList(value: unknown): readonly string[] {
 
 function parseCircles(value: unknown): readonly CircleRecord[] {
   if (!Array.isArray(value)) throw new Error("Invalid circle response");
+  const seenSpaces = new Set<string>();
   return value.map((item): CircleRecord => {
     if (typeof item !== "object" || item === null) {
       throw new Error("Invalid circle response");
     }
     const record = item as Record<string, unknown>;
-    if (typeof record.space !== "string" || record.space.trim() === "") {
+    const space = canonicalizeSpace(record.space);
+    if (!space) {
       throw new Error("Invalid circle response");
     }
+    if (seenSpaces.has(space)) throw new Error("Invalid circle response");
+    seenSpaces.add(space);
     return {
-      space: record.space,
+      space,
       ...(typeof record.priority === "number"
         ? { priority: record.priority }
         : {}),

@@ -5,6 +5,23 @@ var spreadsheetConfig = {
   purchasedStatusText: "x",
 };
 
+// biome-ignore lint/correctness/noUnusedVariables: global helper used by concatenated Apps Script files
+function canonicalizeSpace(value) {
+  if (typeof value !== "string") return null;
+  var cleaned = value.normalize("NFKC").replace(/\s/g, "");
+  var match =
+    /^(?:(.)([A-Za-z\u3041-\u3096\u30A1-\u30FA])-?([0-9]+)(?:-?([A-Za-z]))?|([A-Za-z\u3041-\u3096\u30A1-\u30FA])-?([0-9]+)(?:-?([A-Za-z]))?|(.+?)-?([A-Za-z0-9\u3041-\u3096\u30A1-\u30FA])([0-9]+)(?:-?([A-Za-z]))?)$/.exec(
+      cleaned,
+    );
+  if (!match) return null;
+  var prefix = match[1] || match[8] || "";
+  var label = match[2] || match[5] || match[9];
+  var number = match[3] || match[6] || match[10];
+  var side = match[4] || match[7] || match[11] || "";
+  prefix = prefix.replace(/-$/, "");
+  return prefix + label + number.replace(/^0+(?=\d)/, "") + side.toLowerCase();
+}
+
 // biome-ignore lint/correctness/noUnusedVariables: global function exposed to Apps Script environment
 function successResponse(payload) {
   return Object.assign(
@@ -120,13 +137,21 @@ function parseSheetDataRows(data, sheetName) {
       };
     }
 
-    if (seenSpaces.has(rawSpace)) {
+    const canonicalSpace = canonicalizeSpace(rawSpace);
+    if (!canonicalSpace) {
+      return {
+        circles: null,
+        error: `Row ${rowNum} in sheet "${sheetName}" has an invalid 'space'.`,
+      };
+    }
+
+    if (seenSpaces.has(canonicalSpace)) {
       return {
         circles: null,
         error: `Duplicate space at row ${rowNum} in sheet "${sheetName}".`,
       };
     }
-    seenSpaces.add(rawSpace);
+    seenSpaces.add(canonicalSpace);
 
     const circle = { space: rawSpace, sheetName: sheetName };
 
@@ -285,7 +310,10 @@ function doPostSale(requestData) {
     }
 
     const requestedSheetName = requestData.sheetName.trim();
-    const spaceToUpdate = requestData.space.trim();
+    const spaceToUpdate = canonicalizeSpace(requestData.space);
+    if (!spaceToUpdate) {
+      return jsonResponse(errorResponse("Space is invalid.", "INVALID_INPUT"));
+    }
     const undo = requestData.undo;
 
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
@@ -343,7 +371,17 @@ function doPostSale(requestData) {
         );
       }
 
-      if (seenSpaces.has(rawSpace)) {
+      const canonicalSpace = canonicalizeSpace(rawSpace);
+      if (!canonicalSpace) {
+        return jsonResponse(
+          errorResponse(
+            `Row ${rowNum} in sheet "${requestedSheetName}" has an invalid 'space'.`,
+            "INVALID_SHEET_DATA",
+          ),
+        );
+      }
+
+      if (seenSpaces.has(canonicalSpace)) {
         return jsonResponse(
           errorResponse(
             `Duplicate space at row ${rowNum} in sheet "${requestedSheetName}".`,
@@ -351,9 +389,9 @@ function doPostSale(requestData) {
           ),
         );
       }
-      seenSpaces.add(rawSpace);
+      seenSpaces.add(canonicalSpace);
 
-      if (rawSpace === spaceToUpdate) {
+      if (canonicalSpace === spaceToUpdate) {
         targetRowIndex = i;
       }
     }
@@ -424,7 +462,11 @@ function doPostCatalog(requestData) {
     }
 
     const sheetName = requestData.sheetName.trim();
-    const space = requestData.space.trim();
+    const requestedSpace = requestData.space.trim();
+    const space = canonicalizeSpace(requestedSpace);
+    if (!space) {
+      return jsonResponse(errorResponse("Space is invalid.", "INVALID_INPUT"));
+    }
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = spreadsheet.getSheetByName(sheetName);
     if (!sheet) {
@@ -481,7 +523,16 @@ function doPostCatalog(requestData) {
           ),
         );
       }
-      if (seenSpaces.has(rawSpace)) {
+      const canonicalSpace = canonicalizeSpace(rawSpace);
+      if (!canonicalSpace) {
+        return jsonResponse(
+          errorResponse(
+            `Row ${rowNum} in sheet "${sheetName}" has an invalid 'space'.`,
+            "INVALID_SHEET_DATA",
+          ),
+        );
+      }
+      if (seenSpaces.has(canonicalSpace)) {
         return jsonResponse(
           errorResponse(
             `Duplicate space at row ${rowNum} in sheet "${sheetName}".`,
@@ -489,8 +540,8 @@ function doPostCatalog(requestData) {
           ),
         );
       }
-      seenSpaces.add(rawSpace);
-      if (rawSpace === space) targetRowIndex = i;
+      seenSpaces.add(canonicalSpace);
+      if (canonicalSpace === space) targetRowIndex = i;
     }
 
     const created = targetRowIndex === -1;
@@ -505,7 +556,7 @@ function doPostCatalog(requestData) {
         ? null
         : headerParsed.cols.account + 1;
     if (created) {
-      sheet.getRange(rowNumber, spaceColumnNumber).setValue(space);
+      sheet.getRange(rowNumber, spaceColumnNumber).setValue(requestedSpace);
     }
     if (account && accountColumnNumber !== null) {
       sheet.getRange(rowNumber, accountColumnNumber).setValue(account);
@@ -514,7 +565,7 @@ function doPostCatalog(requestData) {
       sheet.getRange(rowNumber, tweetColumnNumber).setValue(tweet);
     }
 
-    const stored = { sheetName, space };
+    const stored = { sheetName, space: requestedSpace };
     if (account) stored.account = account;
     if (tweet) stored.tweet = tweet;
     return jsonResponse(

@@ -7,6 +7,10 @@ const codePath = new URL(
   "../integrations/gas-spreadsheet/Code.gs",
   import.meta.url,
 );
+const spaceFixturePath = new URL(
+  "./fixtures/space-canonicalization.json",
+  import.meta.url,
+);
 
 function setupGasContext(sheetsData, spreadsheetTitle = "Test Spreadsheet") {
   const sheets = Object.entries(sheetsData).map(([name, data]) => {
@@ -120,6 +124,14 @@ test("gas Code.gs matches basic public constraints", () => {
   assert.doesNotMatch(code, /catalogSpreadsheetId/);
   assert.doesNotMatch(code, /doPostCatalogSpace/);
   assert.doesNotMatch(code, /makeCircleClean/);
+});
+
+test("GAS canonicalizer matches the shared space fixture", () => {
+  const { context } = loadGas({});
+  const cases = JSON.parse(readFileSync(spaceFixturePath, "utf8"));
+  for (const { input, canonical } of cases) {
+    assert.equal(context.canonicalizeSpace(input), canonical);
+  }
 });
 
 test("doGet with action=getSheets returns all sheet names and spreadsheet title", () => {
@@ -951,6 +963,31 @@ test("upsertCatalog updates account and tweet in the matching row regardless of 
     "x",
     "https://twitter.com/new-account",
   ]);
+});
+
+test("upsertCatalog matches canonical-equivalent spaces without adding a row", () => {
+  const { gas, context } = loadGas({
+    Sheet1: [
+      ["space", "account", "tweet"],
+      ["東A 032-a", "@old", "old"],
+    ],
+  });
+
+  const payload = post(context, {
+    action: "upsertCatalog",
+    sheetName: "Sheet1",
+    space: "東Ａ３２Ａ",
+    account: "https://x.com/new-account",
+  });
+
+  assert.equal(payload.ok, true);
+  assert.equal(payload.created, false);
+  assert.equal(payload.row, 2);
+  assert.equal(gas.spreadsheet.sheets[0].data.length, 2);
+  assert.equal(
+    gas.spreadsheet.sheets[0].data[1][1],
+    "https://x.com/new-account",
+  );
 });
 
 test("upsertCatalog updates account without overwriting an existing tweet", () => {
