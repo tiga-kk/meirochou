@@ -360,6 +360,31 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   expect(portraitBox?.height).toBeLessThanOrEqual(
     portraitPreviewBox?.height + 1,
   );
+  const targetLayout = page.locator(".target-detail-layout");
+  const mobileLayout = await targetLayout.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const meta = element.querySelector(".target-detail-meta");
+    const actions = element.querySelector(".target-detail-actions");
+    const metaBox = meta?.getBoundingClientRect();
+    const actionsBox = actions?.getBoundingClientRect();
+    return {
+      columns: style.gridTemplateColumns,
+      areas: style.gridTemplateAreas,
+      metaTop: metaBox?.top ?? 0,
+      actionsTop: actionsBox?.top ?? 0,
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth,
+    };
+  });
+  expect(mobileLayout.columns.split(" ")).toHaveLength(1);
+  expect(mobileLayout.areas).toContain('"catalog"');
+  expect(mobileLayout.actionsTop).toBeGreaterThanOrEqual(mobileLayout.metaTop);
+  expect(mobileLayout.documentWidth).toBeLessThanOrEqual(
+    mobileLayout.viewportWidth,
+  );
+  expect(portraitBox?.height).toBeLessThanOrEqual(
+    (page.viewportSize()?.height ?? 0) * 0.6 + 2,
+  );
   await expect(page.locator("#next-target")).toHaveScreenshot(
     "navigation-target-portrait-mobile.png",
   );
@@ -382,6 +407,9 @@ test("320px幅・200% zoomでも候補と距離を横スクロールなしで表
   await pinFor(page, candidate).evaluate((button: HTMLButtonElement) =>
     button.click(),
   );
+  const candidatePreview = page.locator(".candidate-preview-card");
+  await expect(candidatePreview).toBeVisible();
+  await candidatePreview.getByRole("button", { name: "経路を比較" }).click();
   await expect(page.locator("#selected-target-space")).toBeVisible();
   await expect(page.locator("#target-dist")).toHaveText(/^距離 /);
 
@@ -397,6 +425,45 @@ test("320px幅・200% zoomでも候補と距離を横スクロールなしで表
   await expect(page.locator("#next-target")).toHaveScreenshot(
     "navigation-target-portrait-200-percent.png",
   );
+});
+
+test("390px幅のportraitカタログは一列で横スクロールしない", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?demo_ui=1");
+  await pinFor(page, "東ア31b").evaluate((button: HTMLButtonElement) =>
+    button.click(),
+  );
+  await expect(pinFor(page, "東ア31b")).toBeVisible();
+  await page.getByRole("button", { name: "行き先変更" }).click();
+  await expect(page.locator("#tweet-embed-container img")).toBeVisible();
+  await expect(page.locator("#next-target")).toHaveAttribute(
+    "data-catalog-orientation",
+    "portrait",
+  );
+  const layout = page.locator(".target-detail-layout");
+  const metrics = await layout.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const meta = element.querySelector(".target-detail-meta");
+    const actions = element.querySelector(".target-detail-actions");
+    return {
+      columns: style.gridTemplateColumns,
+      metaTop: meta?.getBoundingClientRect().top ?? 0,
+      actionsTop: actions?.getBoundingClientRect().top ?? 0,
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth,
+    };
+  });
+  expect(metrics.columns.split(" ")).toHaveLength(1);
+  expect(metrics.actionsTop).toBeGreaterThanOrEqual(metrics.metaTop);
+  expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+
+  await page.setViewportSize({ width: 700, height: 844 });
+  const wideColumns = await layout.evaluate(
+    (element) => getComputedStyle(element).gridTemplateColumns.split(" "),
+  );
+  expect(wideColumns).toHaveLength(2);
 });
 
 test("同一地点では次目的地ピンを通常ピンより前面に表示する", async ({
