@@ -106,6 +106,7 @@ export class GestureZoomController {
   }
 
   refreshLayout() {
+    this.setDirectManipulation(false);
     if (this.hasExplicitLayout) return;
     const containerRect = this.container.getBoundingClientRect();
     const imageRect = this.img.getBoundingClientRect();
@@ -180,6 +181,10 @@ export class GestureZoomController {
     }
   }
 
+  setDirectManipulation(active) {
+    this.img.classList.toggle("is-direct-manipulation", active);
+  }
+
   reset() {
     this.state = { scale: 1, x: this.baseX, y: this.baseY };
     this.vx = 0;
@@ -190,6 +195,7 @@ export class GestureZoomController {
     this.isDragging = false;
     this.initialDistance = 0;
     this.cancelAnimation();
+    this.setDirectManipulation(false);
     this.updateTransform();
   }
 
@@ -208,6 +214,7 @@ export class GestureZoomController {
     this.panSamples = [];
     this.inertiaLastTimestamp = null;
     this.cancelAnimation();
+    this.setDirectManipulation(false);
     this.updateTransform();
   }
 
@@ -249,8 +256,14 @@ export class GestureZoomController {
       this.state.x > xMax ||
       this.state.y < yMin ||
       this.state.y > yMax;
-    if (Math.abs(this.vx) <= 0.01 && Math.abs(this.vy) <= 0.01 && !outOfBounds)
+    if (
+      Math.abs(this.vx) <= 0.01 &&
+      Math.abs(this.vy) <= 0.01 &&
+      !outOfBounds
+    ) {
+      this.setDirectManipulation(false);
       return;
+    }
     if (this.rafId === null) {
       this.inertiaLastTimestamp = null;
       this.rafId = requestAnimationFrame((timestamp) =>
@@ -315,6 +328,7 @@ export class GestureZoomController {
       );
     } else {
       this.inertiaLastTimestamp = null;
+      this.setDirectManipulation(false);
     }
   }
 
@@ -334,6 +348,7 @@ export class GestureZoomController {
     });
     this.container.setPointerCapture?.(e.pointerId);
     this.isDragging = true;
+    this.setDirectManipulation(true);
     this.vx = 0;
     this.vy = 0;
 
@@ -443,6 +458,7 @@ export class GestureZoomController {
     }
     this.initialDistance = 0;
     this.isDragging = false;
+    this.setDirectManipulation(true);
     const releaseVelocity = calculateReleaseVelocity(this.panSamples);
     this.vx = releaseVelocity.x;
     this.vy = releaseVelocity.y;

@@ -213,6 +213,68 @@ describe("GestureZoomController", () => {
     expect(transformWrites[0]).toContain("translate3d(25px, 15px, 0)");
   });
 
+  it("keeps direct manipulation active through inertia and clears it on settle", () => {
+    const { container, image, controller } = createController();
+    controller.setLayout({
+      containerWidth: 100,
+      containerHeight: 100,
+      stageWidth: 300,
+      stageHeight: 100,
+    });
+
+    controller.setTransform({ scale: 1, x: 20, y: 0 });
+    container.dispatchEvent(pointerEvent("pointerdown", 1, 10, 10));
+    expect(image.classList.contains("is-direct-manipulation")).toBe(true);
+
+    container.dispatchEvent(pointerEvent("pointerup", 1, 10, 10));
+    expect(controller.rafId).not.toBeNull();
+    expect(image.classList.contains("is-direct-manipulation")).toBe(true);
+
+    for (let frame = 0; frame < 100; frame += 1) flushRaf();
+
+    expect(image.classList.contains("is-direct-manipulation")).toBe(false);
+  });
+
+  it("clears direct manipulation on pointer cancel and capture loss", () => {
+    const { container, image } = createController();
+
+    container.dispatchEvent(pointerEvent("pointerdown", 1, 10, 10));
+    container.dispatchEvent(pointerEvent("pointercancel", 1, 10, 10));
+    expect(image.classList.contains("is-direct-manipulation")).toBe(false);
+
+    container.dispatchEvent(pointerEvent("pointerdown", 2, 10, 10));
+    container.dispatchEvent(pointerEvent("lostpointercapture", 2, 10, 10));
+    expect(image.classList.contains("is-direct-manipulation")).toBe(false);
+  });
+
+  it("clears direct manipulation when layout refreshes", () => {
+    const { container, image, controller } = createController();
+
+    container.dispatchEvent(pointerEvent("pointerdown", 1, 10, 10));
+    expect(image.classList.contains("is-direct-manipulation")).toBe(true);
+
+    controller.refreshLayout();
+
+    expect(image.classList.contains("is-direct-manipulation")).toBe(false);
+  });
+
+  it("does not read layout during the pointermove hot path", () => {
+    const { container, image } = createController();
+
+    container.dispatchEvent(pointerEvent("pointerdown", 1, 10, 10));
+    const containerReads = container.getBoundingClientRect as ReturnType<
+      typeof vi.fn
+    >;
+    const imageReads = image.getBoundingClientRect as ReturnType<typeof vi.fn>;
+    containerReads.mockClear();
+    imageReads.mockClear();
+
+    container.dispatchEvent(pointerEvent("pointermove", 1, 20, 20));
+
+    expect(containerReads).not.toHaveBeenCalled();
+    expect(imageReads).not.toHaveBeenCalled();
+  });
+
   it("keeps pinch scale within the configured limits", () => {
     const { container, controller } = createController();
 
@@ -308,6 +370,7 @@ describe("GestureZoomController", () => {
     expect(controller.state).toEqual({ scale: 1, x: 0, y: 0 });
     expect(controller.activePointers.size).toBe(0);
     expect(controller.isDragging).toBe(false);
+    expect(image.classList.contains("is-direct-manipulation")).toBe(false);
     expect(controller.vx).toBe(0);
     expect(controller.vy).toBe(0);
     expect(controller.rafId).toBeNull();
@@ -392,16 +455,18 @@ describe("GestureZoomController", () => {
   it("settles a bounds violation after a low-speed pointer release", () => {
     const { container, image, controller } = createController();
 
-    container.dispatchEvent(pointerEvent("pointerdown", 1, 10, 10));
     controller.setTransform({ scale: 1, x: 20, y: 20 });
+    container.dispatchEvent(pointerEvent("pointerdown", 1, 10, 10));
     container.dispatchEvent(pointerEvent("pointerup", 1, 10, 10));
 
     expect(controller.rafId).not.toBeNull();
+    expect(image.classList.contains("is-direct-manipulation")).toBe(true);
     for (let frame = 0; frame < 100; frame += 1) flushRaf();
 
     expect(controller.state.x).toBe(0);
     expect(controller.state.y).toBe(0);
     expect(controller.rafId).toBeNull();
+    expect(image.classList.contains("is-direct-manipulation")).toBe(false);
     expect(callbacks).toHaveLength(0);
     expect(image.style.transform).toContain("translate3d(0px, 0px, 0)");
   });

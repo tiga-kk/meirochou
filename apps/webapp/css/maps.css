@@ -1,4 +1,8 @@
 /* Map Links */
+.is-direct-manipulation {
+  will-change: transform;
+}
+
 .map-links-grid {
   display: flex;
   flex-wrap: wrap;

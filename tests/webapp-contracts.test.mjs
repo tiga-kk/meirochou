@@ -1480,6 +1480,7 @@ test("webapp injects route guidance and delegates the start flow to its controll
 
 test("webapp map rendering avoids persistent compositor promotion", () => {
   const css = read("apps/webapp/css/target.css");
+  const mapCss = read("apps/webapp/css/maps.css");
   const gestureHelper = read("apps/webapp/js/utils/gesture-zoom-controller.js");
 
   assert.doesNotMatch(
@@ -1489,6 +1490,10 @@ test("webapp map rendering avoids persistent compositor promotion", () => {
   assert.doesNotMatch(
     gestureHelper,
     /style\.willChange\s*=\s*["']transform["']/,
+  );
+  assert.match(
+    mapCss,
+    /\.is-direct-manipulation\s*\{[\s\S]*will-change:\s*transform/,
   );
   assert.match(gestureHelper, /setMaxScale/);
 });
