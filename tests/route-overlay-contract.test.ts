@@ -93,17 +93,35 @@ test("planRoute and buildRouteOverlaySvg fulfill coordinate contracts with ficti
   }
 
   assert.ok(svg.querySelector(".route-overlay-line"));
+  assert.equal(
+    svg.querySelector(".route-overlay-line")?.getAttribute("pathLength"),
+    "100",
+  );
   assert.ok(svg.querySelector(".route-flow-line"));
   assert.ok(svg.querySelector(".route-flow-comet"));
+  assert.equal(
+    svg.querySelector(".route-flow-comet")?.getAttribute("pathLength"),
+    "100",
+  );
   assert.equal(
     svg.querySelector(".route-flow-direction")?.getAttribute("marker-end"),
     "url(#route-direction-arrow)",
   );
+  assert.equal(
+    svg.querySelector(".route-flow-direction")?.getAttribute("pathLength"),
+    "100",
+  );
+  assert.ok(svg.querySelector("marker#route-direction-arrow"));
   assert.equal(svg.querySelector(".route-start-marker")?.textContent, "S");
   assert.equal(svg.querySelector(".route-goal-marker")?.textContent, "G");
 
   const candidate = buildRouteOverlaySvg(route, undefined, "candidate");
   assert.ok(candidate);
+  assert.equal(
+    candidate.querySelector(".route-overlay-line")?.getAttribute("pathLength"),
+    "100",
+  );
+  assert.equal(candidate.querySelector("marker"), null);
   assert.equal(candidate.querySelector(".route-flow-line"), null);
   assert.equal(candidate.querySelector(".route-flow-comet"), null);
   assert.equal(candidate.querySelector(".route-flow-direction"), null);
@@ -190,6 +208,8 @@ test("planRouteFromGridIndex keeps ordered points for current route endpoints an
   assert.equal(candidate.querySelector(".route-flow-direction"), null);
   assert.equal(candidate.querySelector(".route-start-marker"), null);
   assert.equal(candidate.querySelector(".route-goal-marker"), null);
+
+  assert.equal(buildRouteOverlaySvg(null), null);
 });
 
 const candidateRoute = {

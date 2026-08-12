@@ -106,8 +106,8 @@
   stroke: rgba(255, 255, 255, 0.96);
   stroke-width: 5;
   stroke-linecap: round;
-  stroke-dasharray: 14 72;
-  animation: route-flow-comet 0.72s linear infinite;
+  stroke-dasharray: 18 82;
+  animation: route-flow-comet 0.9s linear infinite;
   pointer-events: none;
 }
 
@@ -126,7 +126,7 @@
 
 @keyframes route-flow-comet {
   to {
-    stroke-dashoffset: -86;
+    stroke-dashoffset: -100;
   }
 }
 

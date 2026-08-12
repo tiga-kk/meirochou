@@ -101,8 +101,9 @@ export function buildRouteOverlaySvg(
     marker.setAttribute("viewBox", "0 0 10 10");
     marker.setAttribute("refX", "8");
     marker.setAttribute("refY", "5");
-    marker.setAttribute("markerWidth", "7");
-    marker.setAttribute("markerHeight", "7");
+    marker.setAttribute("markerWidth", "22");
+    marker.setAttribute("markerHeight", "22");
+    marker.setAttribute("markerUnits", "userSpaceOnUse");
     marker.setAttribute("orient", "auto-start-reverse");
     const arrow = ownerDocument.createElementNS(SVG_NS, "path");
     arrow.setAttribute("class", "route-direction-arrow");
@@ -114,6 +115,7 @@ export function buildRouteOverlaySvg(
 
   const polyline = ownerDocument.createElementNS(SVG_NS, "polyline");
   polyline.setAttribute("class", "route-overlay-line");
+  polyline.setAttribute("pathLength", "100");
   polyline.setAttribute(
     "points",
     route.points.map((point) => `${point.x},${point.y}`).join(" "),
@@ -123,11 +125,13 @@ export function buildRouteOverlaySvg(
   if (kind === "current") {
     const flow = ownerDocument.createElementNS(SVG_NS, "polyline");
     flow.setAttribute("class", "route-flow-comet route-flow-line");
+    flow.setAttribute("pathLength", "100");
     flow.setAttribute("points", polyline.getAttribute("points") || "");
     svg.appendChild(flow);
 
     const direction = ownerDocument.createElementNS(SVG_NS, "polyline");
     direction.setAttribute("class", "route-flow-direction");
+    direction.setAttribute("pathLength", "100");
     direction.setAttribute("points", polyline.getAttribute("points") || "");
     direction.setAttribute("marker-end", "url(#route-direction-arrow)");
     svg.appendChild(direction);

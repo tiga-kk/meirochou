@@ -251,6 +251,9 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
     page.locator('[data-route-kind="current"] .route-goal-marker'),
   ).toHaveText("G");
   await expect(
+    page.locator('[data-route-kind="current"] .route-flow-direction'),
+  ).toBeVisible();
+  await expect(
     page.locator('[data-route-kind="current"] .route-flow-line'),
   ).toHaveCSS("animation-name", "route-flow-comet");
   const routeFlow = page.locator(
@@ -278,6 +281,9 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   ).toBeVisible();
   await expect(
     page.locator('[data-route-kind="current"] .route-goal-marker'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-route-kind="current"] .route-flow-direction'),
   ).toBeVisible();
   const currentSummaryTarget = (
     await page.locator("#target-space-heading").textContent()
