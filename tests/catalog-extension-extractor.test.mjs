@@ -56,6 +56,27 @@ test("uses only the scoped space-box fallback when the primary selector changes"
   assert.equal(extractor.extractSpace(document), "西B02b");
 });
 
+test("extracts space from the classic web catalog infotable", () => {
+  const { document, extractor } = loadExtractor(`
+    <div class="m-circletable m-media">
+      <div class="m-media__image">
+        <img src="https://example.test/catalog.jpg">
+      </div>
+      <div class="m-media__body">
+        <table class="m-infotable">
+          <tr><td class="infotable-space"> 東ア01a </td></tr>
+        </table>
+      </div>
+    </div>
+  `);
+
+  assert.equal(extractor.extractSpace(document), "東ア01a");
+  assert.equal(
+    extractor.extractCatalogImageUrl(document),
+    "https://example.test/catalog.jpg",
+  );
+});
+
 test("returns null for missing space or non-HTTP(S) catalog URLs", () => {
   const missing = loadExtractor(
     '<main id="mainSection"><div class="m-media m-circletable"><div class="m-media__image"><img src="https://example.invalid/catalog.jpg"></div></div></main>',

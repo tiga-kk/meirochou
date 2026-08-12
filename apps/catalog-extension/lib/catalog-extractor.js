@@ -1,6 +1,10 @@
 (() => {
-  const SPACE_SELECTOR =
-    "#mainSection > div.m-media.m-circletable > div.m-media__image > div.space-box > div";
+  const SPACE_SELECTORS = [
+    ".m-circletable .infotable-space",
+    "#mainSection > div.m-media.m-circletable > div.m-media__image > div.space-box > div",
+    ".m-circletable .space-box > *",
+    ".m-circletable .space-box",
+  ];
 
   function normalizeSpace(value) {
     return String(value || "")
@@ -9,22 +13,16 @@
   }
 
   function extractSpace(document) {
-    const primary = document.querySelector(SPACE_SELECTOR);
-    if (primary) return normalizeSpace(primary.textContent);
-
-    const media = document.querySelector(
-      "#mainSection .m-media.m-circletable .m-media__image",
-    );
-    const fallback =
-      media?.querySelector(".space-box > *") ||
-      media?.querySelector(".space-box");
-    return fallback ? normalizeSpace(fallback.textContent) || null : null;
+    for (const selector of SPACE_SELECTORS) {
+      const element = document.querySelector(selector);
+      const space = normalizeSpace(element?.textContent);
+      if (space) return space;
+    }
+    return null;
   }
 
   function extractCatalogImageUrl(document) {
-    const media = document.querySelector(
-      "#mainSection .m-media.m-circletable .m-media__image",
-    );
+    const media = document.querySelector(".m-circletable .m-media__image");
     const image = media?.querySelector("img");
     const raw = image?.currentSrc || image?.src || "";
     if (!raw) return null;
@@ -39,7 +37,7 @@
   }
 
   globalThis.ComiPathCatalogExtractor = Object.freeze({
-    SPACE_SELECTOR,
+    SPACE_SELECTORS,
     extractSpace,
     extractCatalogImageUrl,
   });
