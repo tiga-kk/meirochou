@@ -11,8 +11,10 @@ function sendConfiguredCatalog(payload) {
   return readSettings().then((settings) => sendCatalog(settings, payload));
 }
 
-function sendConfiguredProbe() {
-  return readSettings().then((settings) => sendProbe(settings));
+function sendConfiguredProbe(settings) {
+  return settings
+    ? sendProbe(settings)
+    : readSettings().then((storedSettings) => sendProbe(storedSettings));
 }
 
 function sendTabMessage(tabId, message) {
@@ -54,7 +56,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     try {
       const result =
         message.type === "COMIPATH_PROBE_GAS"
-          ? await sendConfiguredProbe()
+          ? await sendConfiguredProbe(message.payload)
           : await sendConfiguredCatalog(message.payload);
       notifyCatalogSuccess(message.tabId, result);
       sendResponse(result);

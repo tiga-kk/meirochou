@@ -139,6 +139,31 @@ describe("setupSwipeAction", () => {
     expect(element.parentNode).not.toBeNull();
     expect(element.style.transform).toBe("");
   });
+
+  it("can keep the successful exit transform while still resetting failures", async () => {
+    const element = swipeElement();
+    setupSwipeAction(element, () => Promise.resolve(true), {
+      getAllowedDirection: () => "left",
+      resetOnSuccess: false,
+    });
+
+    element.dispatchEvent(touchEvent("touchstart", 100, 100));
+    element.dispatchEvent(touchEvent("touchmove", -100, 100));
+    element.dispatchEvent(touchEvent("touchend", -100, 100));
+    await Promise.resolve();
+    expect(element.style.transform).toBe("translateX(-100%)");
+
+    const failedElement = swipeElement();
+    setupSwipeAction(failedElement, () => Promise.resolve(false), {
+      getAllowedDirection: () => "left",
+      resetOnSuccess: false,
+    });
+    failedElement.dispatchEvent(touchEvent("touchstart", 100, 100));
+    failedElement.dispatchEvent(touchEvent("touchmove", -100, 100));
+    failedElement.dispatchEvent(touchEvent("touchend", -100, 100));
+    await Promise.resolve();
+    expect(failedElement.style.transform).toBe("");
+  });
 });
 
 describe("DomCircleGalleryView purchase feedback", () => {
@@ -160,12 +185,18 @@ describe("DomCircleGalleryView purchase feedback", () => {
     modal.uiManager = { showToast: vi.fn(), updateCounts: vi.fn() };
     const item = document.createElement("div");
     item.dataset.space = "A-01";
+    item.style.transform = "translateX(-100%)";
+    item.style.opacity = "0.6";
+    item.style.transition = "none";
     grid.appendChild(item);
     modal.els.galleryGrid.appendChild(item);
 
     await modal.handleGalleryPurchase({ space: "A-01" }, item);
 
     expect(item.classList.contains("is-purchased-leaving")).toBe(true);
+    expect(item.style.transform).toBe("");
+    expect(item.style.opacity).toBe("");
+    expect(item.style.transition).toBe("");
     expect(item.parentNode).toBe(grid);
     expect(galleryModal.querySelectorAll(".gallery-undo-snackbar")).toHaveLength(1);
     item.dispatchEvent(new Event("transitionend"));

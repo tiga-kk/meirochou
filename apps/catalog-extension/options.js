@@ -13,13 +13,19 @@ chrome.storage.sync.get({ gasUrl: "", sheetName: "" }, (settings) => {
 
 checkConnection.addEventListener("click", () => {
   status.textContent = "接続を確認中…";
-  chrome.runtime.sendMessage({ type: "COMIPATH_PROBE_GAS" }, (response) => {
-    if (chrome.runtime.lastError) {
-      status.textContent = "GASへの接続に失敗しました。";
-      return;
-    }
-    status.textContent = response?.message || "設定を確認してください";
-  });
+  chrome.runtime.sendMessage(
+    {
+      type: "COMIPATH_PROBE_GAS",
+      payload: { gasUrl: gasUrl.value, sheetName: sheetName.value },
+    },
+    (response) => {
+      if (chrome.runtime.lastError) {
+        status.textContent = "GASへの接続に失敗しました。";
+        return;
+      }
+      status.textContent = response?.message || "設定を確認してください";
+    },
+  );
 });
 
 form.addEventListener("submit", (event) => {

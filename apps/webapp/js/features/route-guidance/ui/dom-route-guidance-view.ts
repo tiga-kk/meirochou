@@ -470,6 +470,7 @@ export class DomRouteGuidanceView {
       img.alt = "お品書き";
       img.loading = "lazy";
       img.onload = () => {
+        if (!this.els.tweetEmbed.contains(img)) return;
         this.els.targetDetail?.setAttribute(
           "data-catalog-orientation",
           classifyCatalogOrientation({

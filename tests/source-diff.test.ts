@@ -202,6 +202,39 @@ describe("source-diff", () => {
       expect(nextState.gasOutbox).toEqual(baseState.gasOutbox);
     });
 
+    it("should migrate legacy circleState keys to incoming canonical keys", () => {
+      const stateWithLegacyKey: LocalEventDayState = {
+        ...baseState,
+        circles: [{ ...dummyCircle1, space: "東A 032-A" }],
+        circleStates: { "東A 032-A": "held" },
+      };
+
+      const nextState = applySourceDiff(
+        stateWithLegacyKey,
+        [{ ...dummyCircle1, space: "東A32a" }],
+        "2026-07-21T01:00:00.000Z",
+      );
+
+      expect(nextState.circleStates).toEqual({ 東A32a: "held" });
+      expect(nextState.circleStates["東A 032-A"]).toBeUndefined();
+    });
+
+    it("should preserve the incoming legacy representation when it matches the identity", () => {
+      const stateWithLegacyKey: LocalEventDayState = {
+        ...baseState,
+        circles: [{ ...dummyCircle1, space: "東A 032-A" }],
+        circleStates: { "東A 032-A": "held" },
+      };
+
+      const nextState = applySourceDiff(
+        stateWithLegacyKey,
+        [{ ...dummyCircle1, space: "東A 032-A" }],
+        "2026-07-21T01:00:00.000Z",
+      );
+
+      expect(nextState.circleStates).toEqual({ "東A 032-A": "held" });
+    });
+
     it("should automatically purchase if incoming circle has isSale=x or X", () => {
       // dummyCircle3 is incoming and has isSale: "x" (not in current circleStates)
       // dummyCircle4 is incoming and has isSale: "X" (not in current circleStates)

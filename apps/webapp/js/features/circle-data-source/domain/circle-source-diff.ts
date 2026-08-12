@@ -107,21 +107,37 @@ export function applySourceDiff(
   }
 
   // Preserve and merge circle states
-  const nextCircleStates: Record<string, "purchased" | "held" | "excluded"> = {
-    ...current.circleStates,
-  };
-  const stateKeys = new Map(
-    Object.keys(nextCircleStates).map((space) => [spaceKey(space), space]),
+  const nextCircleStates: Record<string, "purchased" | "held" | "excluded"> = {};
+  const incomingSpaceByIdentity = new Map(
+    incoming.map((circle) => [spaceKey(circle.space), circle.space]),
   );
+  const stateSpaceByIdentity = new Map<string, string>();
+
+  // Keep an existing canonical key when a legacy and canonical key collide.
+  for (const [space, state] of Object.entries(current.circleStates)) {
+    const key = spaceKey(space);
+    if (key === space) {
+      nextCircleStates[key] = state;
+      stateSpaceByIdentity.set(key, key);
+    }
+  }
+  for (const [space, state] of Object.entries(current.circleStates)) {
+    const key = spaceKey(space);
+    if (key === space || stateSpaceByIdentity.has(key)) continue;
+    const target = incomingSpaceByIdentity.get(key) ?? space;
+    if (!(target in nextCircleStates)) {
+      nextCircleStates[target] = state;
+      stateSpaceByIdentity.set(key, target);
+    }
+  }
 
   // Check for auto-purchases (isSale=x or X in incoming)
   for (const inc of incoming) {
     const isSaleFlag = inc.isSale?.toLowerCase() === "x";
     const key = spaceKey(inc.space);
-    const stateSpace = stateKeys.get(key) ?? inc.space;
-    if (isSaleFlag && nextCircleStates[stateSpace] !== "purchased") {
-      nextCircleStates[stateSpace] = "purchased";
-      stateKeys.set(key, stateSpace);
+    const stateKey = stateSpaceByIdentity.get(key) ?? inc.space;
+    if (isSaleFlag && nextCircleStates[stateKey] !== "purchased") {
+      nextCircleStates[stateKey] = "purchased";
     }
   }
 

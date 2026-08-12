@@ -58,4 +58,4 @@ secret、GAS URL、実データは取得・保存・報告していない。
 
 ## Phase 7.3完了判定案
 
-**アプリ実装完了。** `npm run verify`、関連focused検証、CI相当E2Eのbehavior assertionが通過し、残る7件は意図した画面変更または既知のmanagement visual差分のみである。snapshotは更新していない。実GAS、headed browser、private C108 fixture、実機visual/DevTools traceは環境待ちとして分離し、Cloudflare Pages運用設定も別トラックで残す。
+**アプリ実装完了・外部検証待ち。** `npm run verify`、関連focused検証、CI相当E2Eのbehavior assertionが通過している。一方、Task 4の完了条件である同一条件のbefore/after実機DevTools traceは未取得であり、Task 4およびPhase全体を完了扱いにしない。残る7件は意図した画面変更または既知のmanagement visual差分で、snapshotは更新していない。実GAS、headed browser、private C108 fixture、実機visual/DevTools traceは環境待ちとして分離し、Cloudflare Pages運用設定も別トラックで残す。

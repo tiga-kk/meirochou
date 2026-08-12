@@ -601,6 +601,7 @@ export function setupSwipeAction(element, callback, options = {}) {
   let callbackStarted = false;
   let purchaseTriggerDistance = 0;
   let rawDelta = 0;
+  const resetOnSuccess = options.resetOnSuccess ?? true;
   const getAllowedDirection = options.getAllowedDirection || (() => "both");
 
   const reset = () => {
@@ -683,7 +684,9 @@ export function setupSwipeAction(element, callback, options = {}) {
         try {
           const result = callback();
           if (result && typeof result.then === "function") {
-            result.then(reset, reset);
+            result.then((success) => {
+              if (success === false || resetOnSuccess) reset();
+            }, reset);
           } else {
             setTimeout(reset, 500);
           }

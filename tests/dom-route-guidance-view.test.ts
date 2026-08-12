@@ -7,6 +7,7 @@ const elementIds = [
   "target-loading",
   "target-empty",
   "target-content",
+  "next-target",
   "target-space-heading",
   "target-status-label",
   "selected-target-space",
@@ -160,5 +161,37 @@ describe("DomRouteGuidanceView candidate mutation guard", () => {
     expect(
       (document.querySelector("#btn-hold") as HTMLButtonElement).disabled,
     ).toBe(true);
+  });
+});
+
+describe("DomRouteGuidanceView catalog image ownership", () => {
+  beforeEach(() => {
+    document.body.innerHTML = elementIds
+      .map((id) => `<div id="${id}"></div>`)
+      .join("");
+  });
+
+  it("ignores load from an image replaced by a later target", () => {
+    const view = makeView([makeArea("east", ["東"], ["A"], 1)]);
+    view.renderTargetDetails({ space: "東A01", priority: 1, tweet: "https://example.com/old.png" });
+    const oldImage = document.querySelector("#tweet-embed-container img") as HTMLImageElement;
+
+    view.renderTargetDetails({ space: "東A02", priority: 1, tweet: "https://example.com/new.png" });
+    const currentImage = document.querySelector("#tweet-embed-container img") as HTMLImageElement;
+    Object.defineProperties(oldImage, {
+      naturalWidth: { configurable: true, value: 200 },
+      naturalHeight: { configurable: true, value: 100 },
+    });
+    Object.defineProperties(currentImage, {
+      naturalWidth: { configurable: true, value: 100 },
+      naturalHeight: { configurable: true, value: 200 },
+    });
+
+    oldImage.dispatchEvent(new Event("load"));
+    expect(document.querySelector("#next-target")?.getAttribute("data-catalog-orientation")).toBe("none");
+    oldImage.dispatchEvent(new Event("error"));
+    expect(document.querySelector("#tweet-embed-container img")).toBe(currentImage);
+    currentImage.dispatchEvent(new Event("load"));
+    expect(document.querySelector("#next-target")?.getAttribute("data-catalog-orientation")).toBe("portrait");
   });
 });

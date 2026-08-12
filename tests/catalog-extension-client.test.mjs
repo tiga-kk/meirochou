@@ -33,8 +33,8 @@ test("builds the exact upsertCatalog request body", () => {
   );
 });
 
-test("builds the side-effect-free probe request without sheet data", () => {
-  assert.deepEqual(buildProbeRequest(settings), {
+test("builds the side-effect-free probe request with only a GAS URL", () => {
+  assert.deepEqual(buildProbeRequest({ gasUrl: settings.gasUrl }), {
     url: settings.gasUrl,
     body: { action: "probe" },
   });

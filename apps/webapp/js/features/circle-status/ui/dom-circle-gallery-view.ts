@@ -441,6 +441,7 @@ export class DomCircleGalleryView {
         setupSwipeAction(item, () => {
           return this.handleGalleryPurchase(c, item);
         }, {
+          resetOnSuccess: false,
           getAllowedDirection: () => {
             if (item.classList.contains("wide")) return "both";
             const gridRect = this.els.galleryGrid.getBoundingClientRect();
@@ -460,7 +461,7 @@ export class DomCircleGalleryView {
    * ギャラリーからの購入処理
    */
   async handleGalleryPurchase(circle, item = null) {
-    if (!this.dataManager || this.inFlightPurchases.has(circle.space)) return;
+    if (!this.dataManager || this.inFlightPurchases.has(circle.space)) return false;
 
     const space = circle.space;
     this.inFlightPurchases.add(space);
@@ -478,7 +479,7 @@ export class DomCircleGalleryView {
         "error",
       );
       this.inFlightPurchases.delete(space);
-      return;
+      return false;
     }
 
     if (this.uiManager) this.uiManager.showToast(`${space} 購入完了`);
@@ -494,9 +495,13 @@ export class DomCircleGalleryView {
     // メイン画面のカウントも更新
     if (this.uiManager) this.uiManager.updateCounts(this.dataManager);
     this.inFlightPurchases.delete(space);
+    return true;
   }
 
   startGalleryItemExit(item) {
+    item.style.removeProperty("transform");
+    item.style.removeProperty("opacity");
+    item.style.removeProperty("transition");
     item.classList.remove("is-purchasing");
     item.classList.add("is-purchased-leaving");
     const remove = () => {
