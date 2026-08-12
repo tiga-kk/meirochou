@@ -51,11 +51,11 @@ CIコンテナの `npm ci` は moderate 1件 / high 1件のaudit warningを出�
 | 実GAS deployment | 未実施 | 検証用deploymentを使用していない。GAS URLは取得・記録していない。 |
 | GAS credential | 利用不可 | 環境変数・credential fileを読み取って利用する構成ではなく、credentialを探索・記録していない。 |
 | headed browser | 未実施 | `DISPLAY` が空で、ホスト側のheaded browser executableも確認できなかった。CIはheadless Playwright container。 |
-| private C108 fixture | 利用不可 | `RUN_C108_SMOKE=1` 未設定。 |
-| 実機 visual / DevTools trace | 未実施 | 実機とheaded DevTools環境がない。CI失敗時traceは生成されたが、実機確認の代替には数えていない。 |
+| private C108 fixture | 利用可能 | リポジトリ内の `apps/webapp/map-bundles/C108/e456` をChrome MCPで実ブラウザへ読み込み、C108の経路表示とpin 2個を確認。専用の `RUN_C108_SMOKE=1` E2Eは未実行。 |
+| C108 e456 DevTools trace | 実施（改善未確認） | Chrome MCPでbefore/afterを取得。viewport 1280x900、CPU 1x、Fast 4G、pin 2個、同一合成PointerEvent操作5回。物理入力ではないため、体感遅延の原因確定には数えない。 |
 
 secret、GAS URL、実データは取得・保存・報告していない。
 
 ## Phase 7.3完了判定案
 
-**アプリ実装完了・外部検証待ち。** `npm run verify`、関連focused検証、CI相当E2Eのbehavior assertionが通過している。一方、Task 4の完了条件である同一条件のbefore/after実機DevTools traceは未取得であり、Task 4およびPhase全体を完了扱いにしない。残る7件は意図した画面変更または既知のmanagement visual差分で、snapshotは更新していない。実GAS、headed browser、private C108 fixture、実機visual/DevTools traceは環境待ちとして分離し、Cloudflare Pages運用設定も別トラックで残す。
+**アプリ実装完了・外部検証待ち。** `npm run verify`、関連focused検証、CI相当E2Eのbehavior assertionが通過している。Task 4はC108 e456のbefore/after DevTools traceを取得したが、pointermove処理に明確な改善はなく、体感遅延の原因を確定できなかったため追加実装を保留する。残る7件は意図した画面変更または既知のmanagement visual差分で、snapshotは更新していない。実GAS、headed運用、実機visual、Cloudflare Pages運用設定は外部確認待ちとして分離する。

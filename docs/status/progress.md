@@ -6,10 +6,10 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.3（アプリ実装完了・Task 4実機trace待ち）**
-- 現在Task: **Task 4: 地図ドラッグ遅延の計測と最小改善（実機trace待ち）**
-- 次に着手するTask: **なし（Task 4の外部性能検証待ち）**
-- 実装状態: **Task 1〜3、5〜8完了。Task 4は実装・自動検証済みだが、完了条件のbefore/after実機DevTools traceが未取得。実GAS・headed・実機visual・private fixture・Cloudflare運用設定も別途確認待ち**
+- 現在フェーズ: **Phase 7.3（アプリ実装完了・外部確認待ち）**
+- 現在Task: **Task 2: 実GAS接続・catalog POST確認（外部確認待ち）**
+- 次に着手するTask: **実GAS deploymentでのprobe、catalog POST、同一space再送確認**
+- 実装状態: **Task 1〜8の本番実装・自動検証を完了。Task 4はC108 e456のbefore/after DevTools traceを取得したが、改善は確認できず追加実装を保留。実GAS・headed運用、実機visual、Cloudflare運用設定は別途確認待ち**
 - canonical plan: `docs/plans/phase-07-3/README.md`
 - 設計仕様: `docs/specs/2026-08-12-phase-07-3-field-followups-design.md`
 
@@ -37,7 +37,7 @@ Phase 7.3は上記未確認を隠すための再実装ではない。実機で�
 | 1 | サークルスペース表記の正規化 | 完了 | なし |
 | 2 | カタログ拡張→GAS POST経路の診断 | 完了 | Task 1 |
 | 3 | 購入済みピン非表示と候補表示の分離 | 完了 | なし |
-| 4 | 地図ドラッグ遅延の計測と最小改善 | 実機trace待ち | Task 3 |
+| 4 | 地図ドラッグ遅延の計測と最小改善 | 検証済み（改善未確認・追加対応保留） | Task 3 |
 | 5 | 現在経路の方向表示強化 | 完了 | Task 3 |
 | 6 | 目的地カタログのモバイルレイアウト修正 | 完了 | Task 3 |
 | 7 | Gallery購入時の退出表示と完全Undo | 完了 | Task 3 |
@@ -45,7 +45,7 @@ Phase 7.3は上記未確認を隠すための再実装ではない。実機で�
 
 Task 2は自動検証まで完了したが、実GAS deployment、資格情報、headed browserが利用できず、実機probe・catalog POST・同一space再送・Sheet列確認は未確認としてTask 8へ引き継ぐ。Task 3以降を阻止しない。
 
-Task 4はfocused/全体自動検証を通過したが、計画書の完了条件である同一条件のbefore/after実機DevTools traceは未取得である。構造上はdrag中のみcompositor hintを付け、終了時に解除するが、実機性能差を確認するまで完了扱いにしない。
+Task 4はC108 `e456`、viewport 1280x900、CPU 1x、Fast 4G、pin 2個、同一合成PointerEvent操作5回でbefore/after DevTools traceを取得した。pointermove EventDispatch平均はbefore 221.7µs / after 259.7µs、p95は370µs / 439µs、50ms超long taskは7件 / 3件だった。追加変更による明確な遅延改善は確認できず、体感遅延の原因をこの処理時間へ帰属させる証拠もないため、追加実装は行わずTask 4を検証済み・改善未確認として保留する。実機の物理入力ではなく合成PointerEventである点は証拠の限界として記録する。
 
 Task 5は意味的契約・全体自動検証を通過したが、実機visualと新しいsnapshot baselineは未確認としてTask 8へ引き継ぐ。既存snapshotは自動更新していない。
 
@@ -55,7 +55,7 @@ Task 7はGalleryの実DOM購入ボタン・swipeから退出表示と最新1件U
 
 Task 8は`npm run verify`を通過し、CI相当E2Eはbehavior assertionをすべて通過した。残る7件はmanagement、route/catalog、Galleryの意図したvisualまたは既知snapshot差分であり、snapshotは更新していない。旧E2Eの候補preview導線不整合は、現行の「経路を比較」「行き先変更」導線へ更新して解消した。
 
-Phase 7.3のアプリ実装は完了しているが、Task 4の実機DevTools trace未取得のためPhase全体は外部検証待ちとする。CI相当E2Eは52 passed / 7 snapshot failed / 8 private C108 skipped。実GAS deployment・credential、headed browser、実機visual/DevTools trace、private C108 fixtureは環境待ちとして残す。Cloudflare Pagesのmain-only運用設定はアプリPhaseと分離する。
+Phase 7.3のアプリ実装は完了している。CI相当E2Eは52 passed / 7 snapshot failed / 8 private C108 skipped。Task 4は改善未確認・追加対応保留として記録し、体感遅延の原因追及は別課題へ切り離す。実GAS deployment・credential、headed運用、実機visual、Cloudflare Pagesのmain-only運用設定は環境待ちとして残す。
 
 Task 2の実GAS確認だけが外部環境待ちになった場合は、その事実をここへ記録してTask 3以降を進める。Task 8で再確認する。
 
