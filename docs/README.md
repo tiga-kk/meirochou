@@ -42,6 +42,18 @@ Phase 7.2の実装計画は履歴上の計画ブランチで管理されてお�
 
 Phase 7.3のCloudflare設定作業は `docs/plans/phase-07-3/operations-cloudflare-pages-main-only.md` を参照する。アプリ実装とは独立した運用作業である。
 
+## 共通実装原則
+
+- Phase 5D以降で整理したfeature境界を、Phase 7.3と無関係な都合で再構築しない。
+- 新しいFacade、Manager、DI container、UI frameworkなどの横断抽象化は、現在のTaskに実在する複数利用者がない限り追加しない。
+- Route Guidanceの状態は既存Session/NavigationStateの責務を再利用し、同じ意味の第二のstoreを作らない。
+- LocalStorageへcommit済みの購入結果を、GAS配送失敗やcatalog cache失敗だけを理由に取り消さない。Undoや明示的な失敗rollbackはTask文書の契約に従う。
+- 地図とお品書きを主要情報として扱い、補助UIがそれらを不必要に隠さない。
+- animationはCSS/SVGで表現できるものをJavaScriptのframe loopへしない。
+- mobile操作、44px以上の主要touch領域、keyboard focus、safe-area、200% text zoom、`prefers-reduced-motion`への対応を維持する。
+- visual snapshotは意図した画面であることを確認してから更新する。
+- 既存Service Workerの責務を、Phase 7.3の都合だけでfull PWAや別のoffline基盤へ広げない。
+
 ## 文書更新の原則
 
 - 現在状態・次Task・保留事項は `docs/status/progress.md` だけを更新する。
