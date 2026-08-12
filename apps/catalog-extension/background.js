@@ -1,4 +1,4 @@
-import { normalizeSettings, sendCatalog } from "./lib/catalog-client.js";
+import { sendCatalog, sendProbe } from "./lib/catalog-client.js";
 import { sendActiveCatalog } from "./lib/catalog-command.js";
 
 function readSettings() {
@@ -8,9 +8,11 @@ function readSettings() {
 }
 
 function sendConfiguredCatalog(payload) {
-  return readSettings().then((settings) =>
-    sendCatalog(normalizeSettings(settings), payload),
-  );
+  return readSettings().then((settings) => sendCatalog(settings, payload));
+}
+
+function sendConfiguredProbe() {
+  return readSettings().then((settings) => sendProbe(settings));
 }
 
 function sendTabMessage(tabId, message) {
@@ -41,11 +43,19 @@ function setCommandBadge(tabId, result) {
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type !== "COMIPATH_SEND_CATALOG") return false;
+  if (
+    message?.type !== "COMIPATH_SEND_CATALOG" &&
+    message?.type !== "COMIPATH_PROBE_GAS"
+  ) {
+    return false;
+  }
 
   (async () => {
     try {
-      const result = await sendConfiguredCatalog(message.payload);
+      const result =
+        message.type === "COMIPATH_PROBE_GAS"
+          ? await sendConfiguredProbe()
+          : await sendConfiguredCatalog(message.payload);
       notifyCatalogSuccess(message.tabId, result);
       sendResponse(result);
     } catch (error) {

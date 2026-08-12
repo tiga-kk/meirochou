@@ -19,6 +19,10 @@ function doPost(e) {
     return doPostCatalog(data);
   }
 
+  if (data.action === "probe") {
+    return jsonResponse(successResponse({ kind: "probe" }));
+  }
+
   if (data.action === "sale") {
     return doPostSale(data);
   }

@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildCatalogRequest,
+  buildProbeRequest,
   normalizeSettings,
   sendCatalog,
+  sendProbe,
 } from "../apps/catalog-extension/lib/catalog-client.js";
 
 const settings = {
@@ -29,6 +31,13 @@ test("builds the exact upsertCatalog request body", () => {
       },
     },
   );
+});
+
+test("builds the side-effect-free probe request without sheet data", () => {
+  assert.deepEqual(buildProbeRequest(settings), {
+    url: settings.gasUrl,
+    body: { action: "probe" },
+  });
 });
 
 test("does not add a tweet field when the catalog page has no tweet URL", () => {
@@ -96,12 +105,51 @@ test("sends exact JSON and returns a safe success message", async () => {
         account: "https://twitter.com/mignon",
         tweet: "https://example.invalid/catalog.jpg",
       }),
+      redirect: "follow",
     },
   });
-  assert.deepEqual(result, { ok: true, message: "東ア01aを保存しました" });
+  assert.deepEqual(result, {
+    ok: true,
+    status: "success",
+    kind: "catalog",
+    message: "東ア01aを保存しました",
+  });
 });
 
-test("distinguishes network and GAS response errors without exposing raw HTML", async () => {
+test("probe follows redirects and returns the safe probe contract", async () => {
+  let request;
+  const result = await sendProbe(settings, async (url, options) => {
+    request = { url, options };
+    return {
+      ok: true,
+      redirected: true,
+      json: async () => ({ ok: true, status: "success", kind: "probe" }),
+    };
+  });
+
+  assert.equal(request.url, settings.gasUrl);
+  assert.equal(request.options.redirect, "follow");
+  assert.equal(request.options.body, JSON.stringify({ action: "probe" }));
+  assert.deepEqual(result, {
+    ok: true,
+    status: "success",
+    kind: "probe",
+    message: "GAS接続を確認しました",
+  });
+});
+
+test("classifies URL, network, HTTP, non-JSON, and GAS errors without raw details", async () => {
+  assert.deepEqual(
+    await sendProbe({ gasUrl: "not-a-url" }, async () => {
+      throw new Error("should not fetch");
+    }),
+    {
+      ok: false,
+      kind: "invalid-url",
+      message: "GAS Web App URLが不正です。",
+    },
+  );
+
   const network = await sendCatalog(
     settings,
     {
@@ -113,6 +161,7 @@ test("distinguishes network and GAS response errors without exposing raw HTML", 
   );
   assert.deepEqual(network, {
     ok: false,
+    kind: "http",
     message: "GAS通信に失敗しました（HTTP 503）",
   });
 
@@ -128,7 +177,8 @@ test("distinguishes network and GAS response errors without exposing raw HTML", 
   );
   assert.deepEqual(fetchFailure, {
     ok: false,
-    message: "GAS通信に失敗しました（Failed to fetch）",
+    kind: "network",
+    message: "GASへの接続に失敗しました。",
   });
 
   const httpError = await sendCatalog(
@@ -141,7 +191,21 @@ test("distinguishes network and GAS response errors without exposing raw HTML", 
   );
   assert.deepEqual(httpError, {
     ok: false,
+    kind: "http",
     message: "GAS通信に失敗しました（HTTP 403）",
+  });
+
+  const html = await sendProbe(settings, async () => ({
+    ok: true,
+    text: async () => "<html>secret HTML</html>",
+    json: async () => {
+      throw new Error("Unexpected token < in JSON");
+    },
+  }));
+  assert.deepEqual(html, {
+    ok: false,
+    kind: "non-json",
+    message: "GASからJSONではない応答を受け取りました。",
   });
 
   const gasError = await sendCatalog(
@@ -153,8 +217,33 @@ test("distinguishes network and GAS response errors without exposing raw HTML", 
     },
     async () => ({
       ok: true,
-      json: async () => ({ ok: false, message: "bad sheet" }),
+      json: async () => ({
+        ok: false,
+        message: "credential and personal data should not be shown",
+      }),
     }),
   );
-  assert.deepEqual(gasError, { ok: false, message: "bad sheet" });
+  assert.deepEqual(gasError, {
+    ok: false,
+    kind: "gas-error",
+    message: "GAS側で保存できませんでした。",
+  });
+
+  const catalogStatusError = await sendCatalog(
+    settings,
+    {
+      space: "東ア01a",
+      account: "https://twitter.com/mignon",
+      tweet: "https://example.invalid/catalog.jpg",
+    },
+    async () => ({
+      ok: true,
+      json: async () => ({ ok: true, status: "error" }),
+    }),
+  );
+  assert.deepEqual(catalogStatusError, {
+    ok: false,
+    kind: "gas-error",
+    message: "GAS側で保存できませんでした。",
+  });
 });

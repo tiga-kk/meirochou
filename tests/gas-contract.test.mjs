@@ -902,6 +902,20 @@ test("doPost with unknown action returns error response", () => {
   assert.equal(payload.message, "Unknown action.");
 });
 
+test("doPost probe returns the side-effect-free success contract", () => {
+  const { gas, context } = loadGas({
+    Sheet1: [["space"], ["東A01a"]],
+  });
+  const payload = post(context, { action: "probe" });
+
+  assert.deepEqual(payload, {
+    ok: true,
+    status: "success",
+    kind: "probe",
+  });
+  assert.deepEqual(gas.spreadsheet.sheets[0].data, [["space"], ["東A01a"]]);
+});
+
 test("doPost returns a stable safe error for invalid or missing JSON", () => {
   const code = readFileSync(codePath, "utf8");
   const gas = setupGasContext({});
@@ -988,6 +1002,36 @@ test("upsertCatalog matches canonical-equivalent spaces without adding a row", (
     gas.spreadsheet.sheets[0].data[1][1],
     "https://x.com/new-account",
   );
+});
+
+test("repeated canonical-equivalent catalog POST updates one existing row", () => {
+  const { gas, context } = loadGas({
+    Sheet1: [
+      ["space", "account"],
+      ["東A032a", "old"],
+    ],
+  });
+
+  const first = post(context, {
+    action: "upsertCatalog",
+    sheetName: "Sheet1",
+    space: "東A 032-a",
+    account: "https://x.com/first",
+  });
+  const second = post(context, {
+    action: "upsertCatalog",
+    sheetName: "Sheet1",
+    space: "東Ａ３２Ａ",
+    account: "https://x.com/second",
+  });
+
+  assert.equal(first.created, false);
+  assert.equal(second.created, false);
+  assert.equal(gas.spreadsheet.sheets[0].data.length, 2);
+  assert.deepEqual(gas.spreadsheet.sheets[0].data[1], [
+    "東A032a",
+    "https://x.com/second",
+  ]);
 });
 
 test("upsertCatalog updates account without overwriting an existing tweet", () => {
