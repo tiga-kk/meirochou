@@ -125,6 +125,7 @@ test("keeps Manifest V3 permissions and script formats scoped", () => {
     "https://classic-webcatalog.circle.ms/CircleRapid/Cut2*",
     "https://classic-webcatalog.circle.ms/Circle/*",
     "https://script.google.com/*",
+    "https://script.googleusercontent.com/*",
   ]);
   assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
   assert.deepEqual(manifest.commands["send-catalog"], {
@@ -147,6 +148,13 @@ test("keeps Manifest V3 permissions and script formats scoped", () => {
       "utf8",
     ),
     /extractCatalogImageUrl|CachedImage/,
+  );
+  assert.match(
+    readFileSync(
+      new URL("../apps/catalog-extension/content.js", import.meta.url),
+      "utf8",
+    ),
+    /COMIPATH_SHOW_CATALOG_TOAST/,
   );
   assert.doesNotMatch(
     readFileSync(

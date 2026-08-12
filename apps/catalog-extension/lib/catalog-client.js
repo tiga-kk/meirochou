@@ -88,10 +88,19 @@ export async function sendCatalog(settings, payload, fetchImpl = fetch) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request.body),
     });
-  } catch {
-    return { ok: false, message: "GAS通信に失敗しました" };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Failed to fetch";
+    return {
+      ok: false,
+      message: `GAS通信に失敗しました（${detail}）`,
+    };
   }
-  if (!response.ok) return { ok: false, message: "GAS通信に失敗しました" };
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: `GAS通信に失敗しました（HTTP ${response.status}）`,
+    };
+  }
 
   let result;
   try {

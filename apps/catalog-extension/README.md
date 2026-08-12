@@ -13,4 +13,6 @@
 
 ショートカットは `chrome://extensions/shortcuts` で変更できます。macOSではページ上の `Option+S` も受け付けます。ページを開いただけでは送信せず、popupのボタンまたはショートカットを実行したときだけ送信します。
 
+送信に成功すると、カタログページの右下に短時間 `成功` と表示されます。拡張機能を更新したときは `chrome://extensions` でReloadし、カタログページもリロードしてください。
+
 GAS URLとsheet名は拡張の`chrome.storage.sync`だけに保存し、repositoryへ個人URLやtokenを含めません。ページのDOM構造が変わって抽出できない場合は、`lib/catalog-extractor.js`の限定selectorとfixture/testを更新してから確認します。ページ全体の文字列探索や一括crawlは行いません。

@@ -5,6 +5,7 @@
   const accountElement = document.querySelector("#account");
   const sendButton = document.querySelector("#send");
   let payload = null;
+  let activeTabId = null;
 
   function showMessage(text, role = "status") {
     message.textContent = text;
@@ -20,7 +21,7 @@
     sendButton.disabled = true;
     showMessage("送信中…");
     chrome.runtime.sendMessage(
-      { type: "COMIPATH_SEND_CATALOG", payload },
+      { type: "COMIPATH_SEND_CATALOG", payload, tabId: activeTabId },
       (response) => {
         if (chrome.runtime.lastError) {
           showMessage("拡張機能の通信に失敗しました", "alert");
@@ -43,6 +44,7 @@
       showMessage("対応するカタログページを開いてください", "alert");
       return;
     }
+    activeTabId = tabId;
     chrome.tabs.sendMessage(
       tabId,
       { type: "COMIPATH_EXTRACT_CATALOG" },

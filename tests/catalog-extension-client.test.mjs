@@ -109,9 +109,40 @@ test("distinguishes network and GAS response errors without exposing raw HTML", 
       account: "https://twitter.com/mignon",
       tweet: "https://example.invalid/catalog.jpg",
     },
-    async () => ({ ok: false, json: async () => ({}) }),
+    async () => ({ ok: false, status: 503, json: async () => ({}) }),
   );
-  assert.deepEqual(network, { ok: false, message: "GAS通信に失敗しました" });
+  assert.deepEqual(network, {
+    ok: false,
+    message: "GAS通信に失敗しました（HTTP 503）",
+  });
+
+  const fetchFailure = await sendCatalog(
+    settings,
+    {
+      space: "東ア01a",
+      account: "https://twitter.com/mignon",
+    },
+    async () => {
+      throw new Error("Failed to fetch");
+    },
+  );
+  assert.deepEqual(fetchFailure, {
+    ok: false,
+    message: "GAS通信に失敗しました（Failed to fetch）",
+  });
+
+  const httpError = await sendCatalog(
+    settings,
+    {
+      space: "東ア01a",
+      account: "https://twitter.com/mignon",
+    },
+    async () => ({ ok: false, status: 403 }),
+  );
+  assert.deepEqual(httpError, {
+    ok: false,
+    message: "GAS通信に失敗しました（HTTP 403）",
+  });
 
   const gasError = await sendCatalog(
     settings,

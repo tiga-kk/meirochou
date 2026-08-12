@@ -26,6 +26,15 @@ function sendTabMessage(tabId, message) {
   });
 }
 
+// Notify the catalog tab after a successful GAS write.
+function notifyCatalogSuccess(tabId, result) {
+  if (!result.ok || typeof tabId !== "number") return;
+  void sendTabMessage(tabId, {
+    type: "COMIPATH_SHOW_CATALOG_TOAST",
+    text: "成功",
+  }).catch(() => {});
+}
+
 function setCommandBadge(tabId, result) {
   chrome.action.setBadgeText({ tabId, text: result.ok ? "OK" : "!" });
   setTimeout(() => chrome.action.setBadgeText({ tabId, text: "" }), 2000);
@@ -36,7 +45,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   (async () => {
     try {
-      sendResponse(await sendConfiguredCatalog(message.payload));
+      const result = await sendConfiguredCatalog(message.payload);
+      notifyCatalogSuccess(message.tabId, result);
+      sendResponse(result);
     } catch (error) {
       sendResponse({
         ok: false,
@@ -60,6 +71,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendTabMessage,
         sendCatalogPayload: sendConfiguredCatalog,
       });
+      notifyCatalogSuccess(tabId, result);
       setCommandBadge(tabId, result);
       sendResponse(result);
     } catch {
@@ -81,6 +93,7 @@ chrome.commands.onCommand.addListener((command, tab) => {
         sendTabMessage,
         sendCatalogPayload: sendConfiguredCatalog,
       });
+      notifyCatalogSuccess(tab.id, result);
       setCommandBadge(tab.id, result);
     } catch {
       setCommandBadge(tab.id, { ok: false });
