@@ -1,95 +1,47 @@
-# Cloudflare Pages 公開・運用ガイド
+# Cloudflare Pages デプロイ運用
 
-ComiPathの公開Webappは、Cloudflare PagesのGit integrationでGitHubリポジトリを直接ビルドして配信する。Phase 5Aでは架空データの`demo-v1`だけを公開対象とし、実地図やprivate mapは扱わない。
+## 現在の方針
 
-## 構成と非対象
+Cloudflare PagesのGit integrationは、production branchである `main` の自動デプロイだけを使う。feature/docs branchごとの自動preview deploymentは作らない。
 
-Cloudflare Pagesには次の値を設定する。
+GitHub Actions CIはCloudflare Pagesとは独立して維持する。preview deploymentを減らすためにCIを無効化・弱体化しない。
 
-| 項目 | 値 |
-|---|---|
-| Project name | `meirochou` |
-| Production branch | `main` |
-| Framework preset | None / 未選択 |
-| Build command | `npm run build:webapp` |
-| Build output directory | `dist/webapp` |
-| Root directory | 空欄（repository root） |
-| Production環境変数 | `NODE_VERSION=22.14.0` |
-| Preview環境変数 | `NODE_VERSION=22.14.0` |
-| Production custom domain | `meirochou.tiga.moe` |
+## Cloudflare Pages設定
 
-Phase 5AではDirect Upload、Wrangler、Pages Functions、固定staging branch、固定preview custom domain、Cloudflare API token、KV、R2、D1、Web Analytics、PWAを追加しない。デプロイ専用のGitHub Actionsも追加せず、Cloudflare PagesのGit integrationと既存のWebapp CIを分離して運用する。
+Pages projectのBuilds & deploymentsで次を確認する。
 
-## 初回Pages設定
+- Production branch: `main`
+- Production branch automatic deployments: 有効
+- Preview branch deployments: `None`
 
-Cloudflare DashboardのWorkers & PagesからPagesプロジェクトを作り、GitHubの`tiga-kk/meirochou`を接続する。GitHub Appのアクセス範囲を選べる場合は、このリポジトリだけに限定する。
+これにより、通常のbranch pushはGitHub上のCI・レビューだけを行い、Pages preview buildの対象にしない。`main`へ反映された変更はproduction deploymentの対象とする。
 
-設定画面へ上表の値を入力し、最初のproduction deploymentを実行する。`meirochou`というproject nameが利用できない場合は、別名をその場で選ばず、公開URLと運用文書の変更を先に確認する。
+具体的なアカウント側の確認手順は `docs/plans/phase-07-3/operations-cloudflare-pages-main-only.md` を参照する。
 
-初回デプロイ後、`meirochou.pages.dev`でdemoアプリが表示され、JavaScript、イベントmanifest、地図、points、gridの各assetが404にならないことを確認する。
+## Pull Requestの確認
 
-## PreviewとAccess
+PR merge前の必須gateはrepositoryのテスト、型検査、build、必要なE2Eとする。Cloudflare Pages preview URLの存在を必須条件にしない。
 
-Production以外のbranchに対するpreview deploymentを有効にし、Pages project settingsからpreview用のAccess policyを有効にする。
+UI変更でheaded visual確認が必要な場合は、ローカル/CIのPlaywrightまたは明示的な検証環境を使う。preview deploymentがないことを理由にsnapshotやE2Eを省略しない。
 
-Accessで保護する対象は、次のようなpreview hostnameである。
+## Production確認
 
-```text
-<hash>.meirochou.pages.dev
-<branch>.meirochou.pages.dev
-```
+`main`へmerge後は、必要に応じて次を確認する。
 
-Productionの`meirochou.pages.dev`と`meirochou.tiga.moe`は公開のままにする。組み込みのpreview Access policyで要件を満たす限り、個別のZero Trust applicationは作成しない。
+1. GitHub Actionsの必須checkが成功している。
+2. Cloudflare Pagesのproduction deploymentが開始・成功している。
+3. production URLで主要なsmokeを行う。
 
-Previewレスポンスでは`X-Robots-Tag: noindex`も確認する。Access認証が介在するため、確認時は認証後のレスポンスまたはブラウザのNetwork表示を使用する。
+production障害時は原因をGitHub Actions、Cloudflare build、runtime asset、外部GAS等へ分類する。Pages build失敗を無条件にアプリコード不具合と決めつけない。
 
-## Custom domain
+## Preview deploymentの既存履歴
 
-最初のproduction deploymentが成功した後、Pages projectのCustom domainsから`meirochou.tiga.moe`を追加する。
+過去に作成済みのpreview deploymentを削除するかどうかは、今後の自動preview停止とは別のcleanup作業である。既存履歴が残っていても、新しいbranch pushでpreview buildが発生しないことをまず確認する。
 
-Pages projectへ関連付ける前に、DNS画面でCNAMEだけを手動作成しない。`tiga.moe`が同じCloudflare accountのzoneにある場合は、PagesによるDNS recordの作成・検証を利用し、statusがActiveになるまで待つ。
+cleanupで履歴破壊や外部URLの削除が必要な場合は、Cloudflare側の権限と影響を確認してから別作業として行う。
 
-## PR preview gate
+## Secretと権限
 
-PRをmerge可能にする前に、PRへ紐づいたpreviewで次を確認する。
+Cloudflare account token、GAS URL、credentialをrepositoryの文書やコードへ埋め込まない。アカウント設定を変更できない実装担当は推測で代替設定を追加せず、`docs/status/progress.md`へ運用設定待ちとして残す。
 
-1. 未認証のブラウザではAccess loginが表示される。
-2. 許可されたaccountで認証するとdemoアプリが表示される。
-3. `/assets/events/manifest.json`が200を返す。
-4. demoのmap、points、grid、grid metadataが200を返す。
-5. 架空データだけのCSVをimportできる。
-6. 現在位置と対象を選び、route overlayを表示できる。
-7. reload後もLocalStorageの状態が維持される。
-8. ConsoleとNetworkにasset 404、mixed content、CSP errorがない。
-9. Preview responseに`X-Robots-Tag: noindex`がある。
-10. 実イベント、実地図、private mapを選択できない。
-
-GitHub側では既存Webapp CIとmobile Chromium E2Eが成功していることも確認する。Cloudflareのcheck名は実際に安定して表示されるまでrequired checkへ推測で追加しない。
-
-## Production gate
-
-`main`へのmerge後、`meirochou.pages.dev`と`meirochou.tiga.moe`の両方で次を確認する。
-
-- Access loginなしでHTTPS表示できる。
-- merge済みの`main` commitがdeployment sourceになっている。
-- demoアプリ、manifest、map、CSV import、route表示が動作する。
-- reload後もLocalStorageの状態が維持される。
-- ConsoleとNetworkにasset errorがない。
-- 実地図やprivate mapが含まれていない。
-
-## Rollback
-
-Productionに問題がある場合は、Pages projectのDeploymentsから直前の成功済みproduction deploymentを開き、三点メニューのRollbackを実行する。
-
-Preview deploymentはRollback対象にしない。RollbackしてもGitの`main`は変更されないため、repositoryでは別途forward fixまたはrevertを作成する。正常時にはRollbackを実行せず、過去の成功済みdeploymentが選択可能であることだけを確認する。
-
-## 障害の切り分け
-
-| 症状 | 最初の確認 | 対応 |
-|---|---|---|
-| Pages buildが失敗 | build log、Node version、output directory | mergeせず、`npm ci && npm run build:webapp`で再現する |
-| PreviewでAccess loginが出る | preview hostnameか | 正常。許可accountで認証する |
-| Previewが公開されている | preview Access policy | merge前にpolicyを有効化・修正する |
-| Custom domainが開かない | PagesのCustom domains status、その後DNS | Pages associationを直すまでad-hocなrecordを追加しない |
-| Appは開くがassetが404 | `dist/webapp` verifierとrelative URL | DNSではなくrepository buildを修正する |
-| Production regression | 成功済みdeployment一覧 | Rollback後、repository側で修正する |
+Cloudflare設定待ちは、独立して進められるPhase 7.3のアプリ実装を停止させない。
