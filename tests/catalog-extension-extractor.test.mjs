@@ -104,14 +104,21 @@ test("keeps Manifest V3 permissions and script formats scoped", () => {
   assert.equal(manifest.manifest_version, 3);
   assert.deepEqual(manifest.permissions, ["storage", "activeTab"]);
   assert.deepEqual(manifest.host_permissions, [
-    "https://catalog.youyou.co.jp/*",
+    "https://classic-webcatalog.circle.ms/CircleRapid/Cut2*",
     "https://script.google.com/*",
   ]);
   assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
+  assert.deepEqual(manifest.commands["send-catalog"], {
+    suggested_key: { default: "Alt+S", mac: "Alt+S" },
+    description: "現在のカタログをGASへ送信",
+  });
   assert.equal(manifest.background.type, "module");
   assert.deepEqual(manifest.content_scripts[0].js, [
     "lib/catalog-extractor.js",
     "content.js",
+  ]);
+  assert.deepEqual(manifest.content_scripts[0].matches, [
+    "https://classic-webcatalog.circle.ms/CircleRapid/Cut2*",
   ]);
   assert.doesNotMatch(
     readFileSync(

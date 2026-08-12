@@ -5,12 +5,12 @@
   "description": "Send one catalog image URL from the supported catalog page to your GAS sheet.",
   "permissions": ["storage", "activeTab"],
   "host_permissions": [
-    "https://catalog.youyou.co.jp/*",
+    "https://classic-webcatalog.circle.ms/CircleRapid/Cut2*",
     "https://script.google.com/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://catalog.youyou.co.jp/*"],
+      "matches": ["https://classic-webcatalog.circle.ms/CircleRapid/Cut2*"],
       "js": ["lib/catalog-extractor.js", "content.js"],
       "run_at": "document_idle"
     }
@@ -20,5 +20,14 @@
     "type": "module"
   },
   "options_page": "options.html",
-  "action": { "default_popup": "popup.html" }
+  "action": { "default_popup": "popup.html" },
+  "commands": {
+    "send-catalog": {
+      "suggested_key": {
+        "default": "Alt+S",
+        "mac": "Alt+S"
+      },
+      "description": "現在のカタログをGASへ送信"
+    }
+  }
 }
