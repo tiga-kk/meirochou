@@ -603,10 +603,42 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   ).toHaveCSS("stroke-dasharray", "22px, 14px");
   await expect(
     page.locator('[data-route-kind="candidate"] .route-flow-comet'),
-  ).toHaveCount(0);
+  ).toHaveCount(1);
+  await expect(
+    page.locator('[data-route-kind="candidate"] .route-flow-line'),
+  ).toHaveCSS("animation-name", "route-flow-comet");
+  await expect(
+    page.locator('[data-route-kind="candidate"] .route-start-marker'),
+  ).toHaveText("S");
+  await expect(
+    page.locator('[data-route-kind="candidate"] .route-goal-marker'),
+  ).toHaveText("G");
+  await expect(
+    page.locator('[data-route-kind="candidate"] .route-start-marker circle'),
+  ).toHaveCSS("fill", "rgb(0, 76, 140)");
+  const candidateBaseStroke = await page
+    .locator('[data-route-kind="candidate"] .route-overlay-line')
+    .evaluate((element) => getComputedStyle(element).stroke);
+  const candidateCometStroke = await page
+    .locator('[data-route-kind="candidate"] .route-flow-comet')
+    .evaluate((element) => getComputedStyle(element).stroke);
+  expect(candidateCometStroke).not.toBe(candidateBaseStroke);
   await expect(
     page.locator('[data-route-kind="candidate"] .route-flow-direction'),
   ).toHaveCount(0);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(
+    page.locator('[data-route-kind="candidate"] .route-flow-comet'),
+  ).toHaveCSS("animation-name", "none");
+  await expect(
+    page.locator('[data-route-kind="candidate"] .route-overlay-line'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-route-kind="candidate"] .route-start-marker'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-route-kind="candidate"] .route-goal-marker'),
+  ).toBeVisible();
   await expect(page.locator("#btn-purchased")).toBeDisabled();
   await expect(page.locator("#btn-hold")).toBeDisabled();
   await expect(page.locator("#toast")).toBeHidden();

@@ -160,6 +160,14 @@
   stroke-opacity: 0.9;
 }
 
+.route-overlay-candidate .route-flow-comet {
+  stroke: var(--bg-card);
+}
+
+.route-overlay-candidate .route-endpoint circle {
+  fill: var(--primary);
+}
+
 .map-grid {
   position: absolute;
   inset: 0;

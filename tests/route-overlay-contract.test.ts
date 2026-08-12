@@ -122,9 +122,14 @@ test("planRoute and buildRouteOverlaySvg fulfill coordinate contracts with ficti
     "100",
   );
   assert.equal(candidate.querySelector("marker"), null);
-  assert.equal(candidate.querySelector(".route-flow-line"), null);
-  assert.equal(candidate.querySelector(".route-flow-comet"), null);
+  assert.ok(candidate.querySelector(".route-flow-line"));
+  assert.ok(candidate.querySelector(".route-flow-comet"));
   assert.equal(candidate.querySelector(".route-flow-direction"), null);
+  assert.equal(candidate.querySelector(".route-flow-comet")?.getAttribute("pathLength"), "100");
+  assert.equal(candidate.querySelector(".route-start-marker")?.textContent, "S");
+  assert.equal(candidate.querySelector(".route-goal-marker")?.textContent, "G");
+  assert.equal(candidate.querySelector(".route-start-marker")?.getAttribute("transform"), "translate(105 105)");
+  assert.equal(candidate.querySelector(".route-goal-marker")?.getAttribute("transform"), "translate(205 205)");
 });
 
 test("weighted cost stays separate from unweighted pixel length for both route origins", () => {
@@ -203,11 +208,11 @@ test("planRouteFromGridIndex keeps ordered points for current route endpoints an
 
   const candidate = buildRouteOverlaySvg(route, undefined, "candidate");
   assert.ok(candidate);
-  assert.equal(candidate.querySelector(".route-flow-line"), null);
-  assert.equal(candidate.querySelector(".route-flow-comet"), null);
+  assert.ok(candidate.querySelector(".route-flow-line"));
+  assert.ok(candidate.querySelector(".route-flow-comet"));
   assert.equal(candidate.querySelector(".route-flow-direction"), null);
-  assert.equal(candidate.querySelector(".route-start-marker"), null);
-  assert.equal(candidate.querySelector(".route-goal-marker"), null);
+  assert.equal(candidate.querySelector(".route-start-marker")?.textContent, "S");
+  assert.equal(candidate.querySelector(".route-goal-marker")?.textContent, "G");
 
   assert.equal(buildRouteOverlaySvg(null), null);
 });
