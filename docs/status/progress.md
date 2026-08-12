@@ -6,10 +6,10 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.3**
-- 現在Task: **Task 8: 実機受入・回帰検証・終了判定**
-- 次に着手するTask: **Task 8**
-- 実装状態: **Task 1〜7完了、Task 8未着手**
+- 現在フェーズ: **Phase 7.3（アプリ実装完了）**
+- 現在Task: **Task 8: 実機受入・回帰検証・終了判定（完了）**
+- 次に着手するTask: **なし（Phase 7.3完了）**
+- 実装状態: **Task 1〜8完了。実GAS・headed・実機visual・private fixture・Cloudflare運用設定は別途確認待ち**
 - canonical plan: `docs/plans/phase-07-3/README.md`
 - 設計仕様: `docs/specs/2026-08-12-phase-07-3-field-followups-design.md`
 
@@ -41,7 +41,7 @@ Phase 7.3は上記未確認を隠すための再実装ではない。実機で�
 | 5 | 現在経路の方向表示強化 | 完了 | Task 3 |
 | 6 | 目的地カタログのモバイルレイアウト修正 | 完了 | Task 3 |
 | 7 | Gallery購入時の退出表示と完全Undo | 完了 | Task 3 |
-| 8 | 実機受入・回帰検証・終了判定 | 未着手 | Task 1〜7 |
+| 8 | 実機受入・回帰検証・終了判定 | 完了 | Task 1〜7 |
 
 Task 2は自動検証まで完了したが、実GAS deployment、資格情報、headed browserが利用できず、実機probe・catalog POST・同一space再送・Sheet列確認は未確認としてTask 8へ引き継ぐ。Task 3以降を阻止しない。
 
@@ -53,7 +53,9 @@ Task 6は390pxのportraitカタログ一列、200% zoomの横overflowなし、64
 
 Task 7はGalleryの実DOM購入ボタン・swipeから退出表示と最新1件Undo snackbarへ接続し、既存status Undoと逆向きGAS outbox、購入前route session snapshotを一貫して戻すfocused/unit/E2Eと`npm run verify`を通過した。実機visualと実GAS/headed確認はTask 8へ引き継ぐ。
 
-複数Taskが着手可能な場合、WIPがあればそれを優先し、なければ番号が最小の着手可能Taskを選ぶ。したがって次はTask 8が着手可能である。
+Task 8は`npm run verify`を通過し、CI相当E2Eはbehavior assertionをすべて通過した。残る7件はmanagement、route/catalog、Galleryの意図したvisualまたは既知snapshot差分であり、snapshotは更新していない。旧E2Eの候補preview導線不整合は、現行の「経路を比較」「行き先変更」導線へ更新して解消した。
+
+Phase 7.3のアプリ実装は完了とする。CI相当E2Eは52 passed / 7 snapshot failed / 8 private C108 skipped。実GAS deployment・credential、headed browser、実機visual/DevTools trace、private C108 fixtureは環境待ちとして残す。Cloudflare Pagesのmain-only運用設定はアプリPhaseと分離する。
 
 Task 2の実GAS確認だけが外部環境待ちになった場合は、その事実をここへ記録してTask 3以降を進める。Task 8で再確認する。
 
