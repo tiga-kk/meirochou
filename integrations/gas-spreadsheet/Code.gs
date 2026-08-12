@@ -10,7 +10,7 @@ function canonicalizeSpace(value) {
   if (typeof value !== "string") return null;
   var cleaned = value.normalize("NFKC").replace(/\s/g, "");
   var match =
-    /^(?:(.)([A-Za-z\u3041-\u3096\u30A1-\u30FA])-?([0-9]+)(?:-?([A-Za-z]))?|([A-Za-z\u3041-\u3096\u30A1-\u30FA])-?([0-9]+)(?:-?([A-Za-z]))?|(.+?)-?([A-Za-z0-9\u3041-\u3096\u30A1-\u30FA])([0-9]+)(?:-?([A-Za-z]))?)$/.exec(
+    /^(?:(.)([A-Za-z\u3041-\u3096\u30A1-\u30FA])-?([0-9]+)(?:-?([A-Za-z]{1,2}))?|([A-Za-z\u3041-\u3096\u30A1-\u30FA])-?([0-9]+)(?:-?([A-Za-z]{1,2}))?|(.+?)-?([A-Za-z0-9\u3041-\u3096\u30A1-\u30FA])([0-9]+)(?:-?([A-Za-z]{1,2}))?)$/.exec(
       cleaned,
     );
   if (!match) return null;

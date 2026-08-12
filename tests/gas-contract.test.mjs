@@ -134,6 +134,11 @@ test("GAS canonicalizer matches the shared space fixture", () => {
   }
 });
 
+test("GAS canonicalizer rejects side suffixes longer than two ASCII letters", () => {
+  const { context } = loadGas({});
+  assert.equal(context.canonicalizeSpace("東ア01abc"), null);
+});
+
 test("doGet with action=getSheets returns all sheet names and spreadsheet title", () => {
   const code = readFileSync(codePath, "utf8");
   const gas = setupGasContext(
@@ -1002,6 +1007,32 @@ test("upsertCatalog matches canonical-equivalent spaces without adding a row", (
     gas.spreadsheet.sheets[0].data[1][1],
     "https://x.com/new-account",
   );
+});
+
+test("upsertCatalog accepts catalog spaces with multi-letter sides", () => {
+  const { gas, context } = loadGas({
+    Sheet1: [
+      ["space", "account"],
+      ["東ア01ab", "old-account"],
+      ["東ア07ab", "old-account"],
+      ["東ア30ab", "old-account"],
+    ],
+  });
+
+  for (const space of ["東ア01ab", "東ア07ab", "東ア30ab"]) {
+    const payload = post(context, {
+      action: "upsertCatalog",
+      sheetName: "Sheet1",
+      space,
+      account: "https://x.com/new-account",
+    });
+
+    assert.equal(payload.ok, true);
+    assert.equal(payload.created, false);
+    assert.equal(payload.stored.space, space);
+  }
+
+  assert.equal(gas.spreadsheet.sheets[0].data.length, 4);
 });
 
 test("repeated canonical-equivalent catalog POST updates one existing row", () => {

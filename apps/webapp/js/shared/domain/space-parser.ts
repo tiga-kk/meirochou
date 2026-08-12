@@ -20,15 +20,15 @@ interface SpaceParts {
 
 const spaceLabel = "[A-Za-z\\u3041-\\u3096\\u30A1-\\u30FA]";
 const spacePartsPattern = new RegExp(
-  `^(?<prefix>.)(?<label>${spaceLabel})-?(?<number>[0-9]+)(?:-?(?<side>[A-Za-z]))?$`,
+  `^(?<prefix>.)(?<label>${spaceLabel})-?(?<number>[0-9]+)(?:-?(?<side>[A-Za-z]{1,2}))?$`,
   "u",
 );
 const legacySpacePartsPattern = new RegExp(
-  `^(?<label>${spaceLabel})-?(?<number>[0-9]+)(?:-?(?<side>[A-Za-z]))?$`,
+  `^(?<label>${spaceLabel})-?(?<number>[0-9]+)(?:-?(?<side>[A-Za-z]{1,2}))?$`,
   "u",
 );
 const compatibilitySpacePartsPattern =
-  /^(?<prefix>.+?)-?(?<label>[A-Za-z0-9\u3041-\u3096\u30A1-\u30FA])(?<number>[0-9]+)(?:-?(?<side>[A-Za-z]))?$/u;
+  /^(?<prefix>.+?)-?(?<label>[A-Za-z0-9\u3041-\u3096\u30A1-\u30FA])(?<number>[0-9]+)(?:-?(?<side>[A-Za-z]{1,2}))?$/u;
 
 function parseSpaceParts(
   value: unknown,

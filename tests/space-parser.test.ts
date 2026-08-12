@@ -28,4 +28,8 @@ describe("space parser", () => {
   it("uses the same parser for hyphenated legacy inputs", () => {
     expect(parseSpace("東A-032-a")).toEqual(["", "A", 32]);
   });
+
+  it("rejects side suffixes longer than two ASCII letters", () => {
+    expect(canonicalizeSpace("東ア01abc")).toBeNull();
+  });
 });
