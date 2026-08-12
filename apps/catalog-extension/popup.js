@@ -3,7 +3,6 @@
   const result = document.querySelector("#result");
   const spaceElement = document.querySelector("#space");
   const accountElement = document.querySelector("#account");
-  const tweetElement = document.querySelector("#tweet");
   const sendButton = document.querySelector("#send");
   let payload = null;
 
@@ -55,7 +54,6 @@
         payload = response.payload;
         spaceElement.textContent = payload.space;
         accountElement.textContent = payload.account || "未登録";
-        tweetElement.textContent = payload.tweet;
         result.hidden = false;
         sendButton.disabled = false;
         showMessage("内容を確認してから送信してください");

@@ -1,4 +1,7 @@
 function asHttpUrl(value) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return null;
+  }
   let url;
   try {
     url = new URL(value);
@@ -61,7 +64,7 @@ export function buildCatalogRequest(settings, payload) {
   const normalized = normalizeSettings(settings);
   const space = typeof payload?.space === "string" ? payload.space.trim() : "";
   if (!space) throw new Error("スペースを取得できませんでした。");
-  const tweet = asHttpUrl(payload?.tweet || "");
+  const tweet = asHttpUrl(payload?.tweet);
   const account = asAccountUrl(payload?.account);
   const body = {
     action: "upsertCatalog",
@@ -69,7 +72,7 @@ export function buildCatalogRequest(settings, payload) {
     space,
   };
   if (account) body.account = account;
-  body.tweet = tweet;
+  if (tweet) body.tweet = tweet;
   return {
     url: normalized.gasUrl,
     body,

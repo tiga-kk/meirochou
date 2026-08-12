@@ -13,7 +13,6 @@ test("shortcut sends the active tab catalog payload through the existing sender"
         payload: {
           space: "東ア01a",
           account: "https://twitter.com/mignon",
-          tweet: "https://example.test/catalog.jpg",
         },
       };
     },
@@ -31,7 +30,6 @@ test("shortcut sends the active tab catalog payload through the existing sender"
       {
         space: "東ア01a",
         account: "https://twitter.com/mignon",
-        tweet: "https://example.test/catalog.jpg",
       },
     ],
   ]);

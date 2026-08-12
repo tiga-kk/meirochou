@@ -43,7 +43,7 @@ Unknown columns are ignored. Duplicate recognized headers and rows without a `sp
 
 The client uses `GET <local WebApp URL>?action=getSheets` to list sheet names and `GET <local WebApp URL>?sheets=<url-encoded-sheetName>` to fetch one selected sheet. Purchases use a one-way `POST` with a JSON body containing `action: "sale"`, `sheetName`, `space`, and boolean `undo`.
 
-Catalog image URLs use a separate explicit `upsertCatalog` POST:
+Catalog metadata uses a separate explicit `upsertCatalog` POST:
 
 ```json
 {
@@ -55,7 +55,7 @@ Catalog image URLs use a separate explicit `upsertCatalog` POST:
 }
 ```
 
-It updates the supplied `account` and `tweet` cells for an existing unique `space`, or writes `space`, `account`, and `tweet` into a new row. `account` is optional; when supplied, the sheet must have an `account` header. Duplicate spaces and non-HTTP(S) URLs are rejected.
+It updates only the supplied `account` and `tweet` cells for an existing unique `space`, or writes the supplied values into a new row. Both fields are optional; when supplied, the sheet must have the corresponding header. Duplicate spaces and non-HTTP(S) URLs are rejected.
 
 ## Data Synchronization & Queueing
 

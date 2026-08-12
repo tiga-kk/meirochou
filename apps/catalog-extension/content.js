@@ -16,9 +16,8 @@
     if (message?.type !== messageType) return false;
     const extractor = globalThis.ComiPathCatalogExtractor;
     const space = extractor?.extractSpace(document);
-    const tweet = extractor?.extractCatalogImageUrl(document);
     const account = extractor?.extractTwitterUrl(document);
-    if (!space || !tweet) {
+    if (!space) {
       sendResponse({
         ok: false,
         message: "対応するカタログ情報を取得できませんでした",
@@ -27,7 +26,7 @@
     }
     sendResponse({
       ok: true,
-      payload: { space, ...(account ? { account } : {}), tweet },
+      payload: { space, ...(account ? { account } : {}) },
     });
     return false;
   });

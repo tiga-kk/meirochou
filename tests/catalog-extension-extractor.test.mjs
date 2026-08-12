@@ -24,7 +24,7 @@ function loadExtractor(html) {
   };
 }
 
-test("extracts space and catalog image from the primary catalog selector", () => {
+test("extracts space from the primary catalog selector", () => {
   const { document, extractor } = loadExtractor(
     readFileSync(
       new URL("fixtures/catalog-extension/circle-page.html", import.meta.url),
@@ -33,10 +33,6 @@ test("extracts space and catalog image from the primary catalog selector", () =>
   );
 
   assert.equal(extractor.extractSpace(document), "東ア01a");
-  assert.equal(
-    extractor.extractCatalogImageUrl(document),
-    "https://catalog.youyou.co.jp/images/east-01a.jpg",
-  );
   assert.doesNotMatch(extractorSource, /\bexport\b/);
 });
 
@@ -71,10 +67,6 @@ test("extracts space from the classic web catalog infotable", () => {
   `);
 
   assert.equal(extractor.extractSpace(document), "東ア01a");
-  assert.equal(
-    extractor.extractCatalogImageUrl(document),
-    "https://example.test/catalog.jpg",
-  );
 });
 
 test("normalizes the classic day prefix from the space label", () => {
@@ -87,7 +79,7 @@ test("normalizes the classic day prefix from the space label", () => {
   assert.equal(extractor.extractSpace(document), "東ア31ab");
 });
 
-test("extracts the Twitter account separately from the catalog image", () => {
+test("extracts the Twitter account without extracting the catalog image", () => {
   const { document, extractor } = loadExtractor(`
     <div class="m-circletable">
       <div class="m-media__image">
@@ -102,13 +94,10 @@ test("extracts the Twitter account separately from the catalog image", () => {
   `);
 
   assert.equal(
-    extractor.extractCatalogImageUrl(document),
-    "https://classic-webcatalog.circle.ms/Spa/CachedImage/23005658/2/catalog.jpg",
-  );
-  assert.equal(
     extractor.extractTwitterUrl(document),
     "https://twitter.com/mignon",
   );
+  assert.equal("extractCatalogImageUrl" in extractor, false);
 });
 
 test("returns null for missing space or non-HTTP(S) catalog URLs", () => {
@@ -120,33 +109,7 @@ test("returns null for missing space or non-HTTP(S) catalog URLs", () => {
   const invalid = loadExtractor(
     '<main id="mainSection"><div class="m-media m-circletable"><div class="m-media__image"><div class="space-box"><div>東A01a</div></div><img src="javascript:alert(1)"></div></div></main>',
   );
-  assert.equal(
-    invalid.extractor.extractCatalogImageUrl(invalid.document),
-    null,
-  );
-});
-
-test("prefers currentSrc over src inside the scoped media image", () => {
-  const { document, extractor } = loadExtractor(`
-    <main id="mainSection">
-      <div class="m-media m-circletable">
-        <div class="m-media__image">
-          <div class="space-box"><div>東A01a</div></div>
-          <img src="https://example.invalid/fallback.jpg">
-        </div>
-      </div>
-    </main>
-  `);
-  const image = document.querySelector("#mainSection .m-media__image img");
-  Object.defineProperty(image, "currentSrc", {
-    configurable: true,
-    value: "https://example.invalid/current.jpg",
-  });
-
-  assert.equal(
-    extractor.extractCatalogImageUrl(document),
-    "https://example.invalid/current.jpg",
-  );
+  assert.equal(invalid.extractor.extractTwitterUrl(invalid.document), null);
 });
 
 test("keeps Manifest V3 permissions and script formats scoped", () => {
@@ -178,6 +141,13 @@ test("keeps Manifest V3 permissions and script formats scoped", () => {
     "https://classic-webcatalog.circle.ms/CircleRapid/Cut2*",
     "https://classic-webcatalog.circle.ms/Circle/*",
   ]);
+  assert.doesNotMatch(
+    readFileSync(
+      new URL("../apps/catalog-extension/content.js", import.meta.url),
+      "utf8",
+    ),
+    /extractCatalogImageUrl|CachedImage/,
+  );
   assert.doesNotMatch(
     readFileSync(
       new URL("../apps/catalog-extension/content.js", import.meta.url),

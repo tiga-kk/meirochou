@@ -953,6 +953,56 @@ test("upsertCatalog updates account and tweet in the matching row regardless of 
   ]);
 });
 
+test("upsertCatalog updates account without overwriting an existing tweet", () => {
+  const { gas, context } = loadGas({
+    Sheet1: [
+      ["space", "account", "tweet"],
+      ["東A01a", "@old", "https://pbs.twimg.com/old.jpg"],
+    ],
+  });
+
+  const payload = post(context, {
+    action: "upsertCatalog",
+    sheetName: "Sheet1",
+    space: "東A01a",
+    account: "https://x.com/new-account",
+  });
+
+  assert.deepEqual(payload.stored, {
+    sheetName: "Sheet1",
+    space: "東A01a",
+    account: "https://x.com/new-account",
+  });
+  assert.deepEqual(gas.spreadsheet.sheets[0].data[1], [
+    "東A01a",
+    "https://x.com/new-account",
+    "https://pbs.twimg.com/old.jpg",
+  ]);
+});
+
+test("upsertCatalog can create an account-only row without a tweet column", () => {
+  const { gas, context } = loadGas({
+    Sheet1: [["space", "account"]],
+  });
+
+  const payload = post(context, {
+    action: "upsertCatalog",
+    sheetName: "Sheet1",
+    space: "西B02b",
+    account: "https://x.com/new-account",
+  });
+
+  assert.deepEqual(payload.stored, {
+    sheetName: "Sheet1",
+    space: "西B02b",
+    account: "https://x.com/new-account",
+  });
+  assert.deepEqual(gas.spreadsheet.sheets[0].data[1], [
+    "西B02b",
+    "https://x.com/new-account",
+  ]);
+});
+
 test("upsertCatalog creates a new row without overwriting unrelated columns", () => {
   const { gas, context } = loadGas({
     Sheet1: [

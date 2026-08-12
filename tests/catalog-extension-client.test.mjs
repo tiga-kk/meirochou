@@ -31,6 +31,21 @@ test("builds the exact upsertCatalog request body", () => {
   );
 });
 
+test("does not add a tweet field when the catalog page has no tweet URL", () => {
+  assert.deepEqual(
+    buildCatalogRequest(settings, {
+      space: "東ア01a",
+      account: "https://twitter.com/mignon",
+    }).body,
+    {
+      action: "upsertCatalog",
+      sheetName: "day1",
+      space: "東ア01a",
+      account: "https://twitter.com/mignon",
+    },
+  );
+});
+
 test("validates GAS URL and sheet settings", () => {
   assert.deepEqual(normalizeSettings(settings), settings);
   assert.throws(

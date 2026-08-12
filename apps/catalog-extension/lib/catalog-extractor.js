@@ -5,11 +5,6 @@
     ".m-circletable .space-box > *",
     ".m-circletable .space-box",
   ];
-  const IMAGE_SELECTORS = [
-    ".m-circletable .m-media__image img",
-    ".md-circleinfo .circleinfo-cut img",
-    ".circleinfo-cut img",
-  ];
   const TWITTER_SELECTORS = [
     ".md-detailsns .md-twitter a[href]",
     ".md-twitter a[href]",
@@ -31,22 +26,6 @@
       if (space) return space;
     }
     return null;
-  }
-
-  function extractCatalogImageUrl(document) {
-    const image = IMAGE_SELECTORS.map((selector) =>
-      document.querySelector(selector),
-    ).find(Boolean);
-    const raw = image?.currentSrc || image?.src || "";
-    if (!raw) return null;
-    try {
-      const url = new URL(raw, document.baseURI);
-      return url.protocol === "http:" || url.protocol === "https:"
-        ? url.href
-        : null;
-    } catch {
-      return null;
-    }
   }
 
   function extractTwitterUrl(document) {
@@ -74,7 +53,6 @@
   globalThis.ComiPathCatalogExtractor = Object.freeze({
     SPACE_SELECTORS,
     extractSpace,
-    extractCatalogImageUrl,
     extractTwitterUrl,
   });
 })();

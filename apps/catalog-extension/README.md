@@ -1,6 +1,6 @@
 # ComiPath Catalog Sender
 
-対応カタログページの現在のサークルからspace、Twitter/XアカウントURL、お品書き画像URLを読み取り、利用者が明示的に押した時だけ自分のGAS Web Appへ `upsertCatalog` として送信するManifest V3拡張です。
+対応カタログページの現在のサークルからspaceとTwitter/XアカウントURLを読み取り、利用者が明示的に押した時だけ自分のGAS Web Appへ `upsertCatalog` として送信するManifest V3拡張です。
 
 ## 使い方
 

@@ -1,6 +1,4 @@
-/**
- * Webpage POST handler for catalog image URL upserts.
- */
+/** Webpage POST handler for catalog metadata upserts. */
 // biome-ignore lint/correctness/noUnusedVariables: global function exposed to Apps Script environment
 function doPostCatalog(requestData) {
   try {
@@ -14,20 +12,16 @@ function doPostCatalog(requestData) {
       typeof requestData.sheetName !== "string" ||
       !requestData.sheetName.trim() ||
       typeof requestData.space !== "string" ||
-      !requestData.space.trim() ||
-      typeof requestData.tweet !== "string" ||
-      !requestData.tweet.trim()
+      !requestData.space.trim()
     ) {
       return jsonResponse(
-        errorResponse(
-          "Sheet name, space, and tweet are required.",
-          "INVALID_INPUT",
-        ),
+        errorResponse("Sheet name and space are required.", "INVALID_INPUT"),
       );
     }
 
-    const tweet = requestData.tweet.trim();
-    if (!/^https?:\/\/[^/\s]+(?:\/[^\s]*)?$/i.test(tweet)) {
+    const tweet =
+      typeof requestData.tweet === "string" ? requestData.tweet.trim() : "";
+    if (tweet && !/^https?:\/\/[^/\s]+(?:\/[^\s]*)?$/i.test(tweet)) {
       return jsonResponse(
         errorResponse("Tweet must be an HTTP or HTTPS URL.", "INVALID_INPUT"),
       );
@@ -58,7 +52,7 @@ function doPostCatalog(requestData) {
         errorResponse(headerParsed.error, "INVALID_SHEET_DATA"),
       );
     }
-    if (headerParsed.cols.tweet === undefined) {
+    if (tweet && headerParsed.cols.tweet === undefined) {
       return jsonResponse(
         errorResponse(
           `Header 'tweet' is missing in sheet "${sheetName}".`,
@@ -114,7 +108,10 @@ function doPostCatalog(requestData) {
     const created = targetRowIndex === -1;
     const rowNumber = created ? sheet.getLastRow() + 1 : targetRowIndex + 1;
     const spaceColumnNumber = headerParsed.cols.space + 1;
-    const tweetColumnNumber = headerParsed.cols.tweet + 1;
+    const tweetColumnNumber =
+      headerParsed.cols.tweet === undefined
+        ? null
+        : headerParsed.cols.tweet + 1;
     const accountColumnNumber =
       headerParsed.cols.account === undefined
         ? null
@@ -125,10 +122,13 @@ function doPostCatalog(requestData) {
     if (account && accountColumnNumber !== null) {
       sheet.getRange(rowNumber, accountColumnNumber).setValue(account);
     }
-    sheet.getRange(rowNumber, tweetColumnNumber).setValue(tweet);
+    if (tweet && tweetColumnNumber !== null) {
+      sheet.getRange(rowNumber, tweetColumnNumber).setValue(tweet);
+    }
 
-    const stored = { sheetName, space, tweet };
+    const stored = { sheetName, space };
     if (account) stored.account = account;
+    if (tweet) stored.tweet = tweet;
     return jsonResponse(
       successResponse({
         stored,
