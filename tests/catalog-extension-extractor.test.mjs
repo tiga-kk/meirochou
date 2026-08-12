@@ -126,6 +126,7 @@ test("keeps Manifest V3 permissions and script formats scoped", () => {
   assert.deepEqual(manifest.permissions, ["storage", "activeTab"]);
   assert.deepEqual(manifest.host_permissions, [
     "https://classic-webcatalog.circle.ms/CircleRapid/Cut2*",
+    "https://classic-webcatalog.circle.ms/Circle/*",
     "https://script.google.com/*",
   ]);
   assert.equal(manifest.host_permissions.includes("<all_urls>"), false);
@@ -140,6 +141,7 @@ test("keeps Manifest V3 permissions and script formats scoped", () => {
   ]);
   assert.deepEqual(manifest.content_scripts[0].matches, [
     "https://classic-webcatalog.circle.ms/CircleRapid/Cut2*",
+    "https://classic-webcatalog.circle.ms/Circle/*",
   ]);
   assert.doesNotMatch(
     readFileSync(

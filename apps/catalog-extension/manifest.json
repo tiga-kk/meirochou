@@ -6,11 +6,15 @@
   "permissions": ["storage", "activeTab"],
   "host_permissions": [
     "https://classic-webcatalog.circle.ms/CircleRapid/Cut2*",
+    "https://classic-webcatalog.circle.ms/Circle/*",
     "https://script.google.com/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://classic-webcatalog.circle.ms/CircleRapid/Cut2*"],
+      "matches": [
+        "https://classic-webcatalog.circle.ms/CircleRapid/Cut2*",
+        "https://classic-webcatalog.circle.ms/Circle/*"
+      ],
       "js": ["lib/catalog-extractor.js", "content.js"],
       "run_at": "document_idle"
     }
