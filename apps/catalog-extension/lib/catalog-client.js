@@ -22,16 +22,19 @@ function asAccountUrl(value) {
   try {
     url = new URL(String(value).trim());
   } catch {
-    throw clientError("Twitter URLが不正です。", "invalid-input");
+    throw clientError("Twitter/XまたはPixiv URLが不正です。", "invalid-input");
   }
   const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
   if (
     (url.protocol !== "https:" && url.protocol !== "http:") ||
-    (hostname !== "twitter.com" && hostname !== "x.com") ||
-    url.pathname.length <= 1 ||
-    /^\/intent\//i.test(url.pathname)
+    (hostname !== "twitter.com" &&
+      hostname !== "x.com" &&
+      hostname !== "pixiv.net") ||
+    (hostname === "pixiv.net"
+      ? !/^\/users\/[^/]+(?:\/|$)/i.test(url.pathname)
+      : url.pathname.length <= 1 || /^\/intent\//i.test(url.pathname))
   ) {
-    throw clientError("Twitter URLが不正です。", "invalid-input");
+    throw clientError("Twitter/XまたはPixiv URLが不正です。", "invalid-input");
   }
   return url.href;
 }

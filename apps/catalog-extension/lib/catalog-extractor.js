@@ -11,6 +11,9 @@
     'a[href*="twitter.com/"]',
     'a[href*="x.com/"]',
   ];
+  const PIXIV_SELECTORS = [
+    "#mainSection > div.m-media.m-circletable > div.m-media__body.md-circleinfo > div.item > table > tbody > tr:nth-child(3) > td > div > ul > li:nth-child(4) > a[href]",
+  ];
 
   function normalizeSpace(value) {
     return String(value || "")
@@ -50,9 +53,37 @@
     return null;
   }
 
+  function extractPixivUrl(document) {
+    for (const selector of PIXIV_SELECTORS) {
+      const links = document.querySelectorAll(selector);
+      for (const link of links) {
+        try {
+          const url = new URL(link.href, document.baseURI);
+          const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+          if (
+            hostname === "pixiv.net" &&
+            /^\/users\/[^/]+(?:\/|$)/i.test(url.pathname)
+          ) {
+            return url.href;
+          }
+        } catch {
+          // Ignore unrelated or malformed links.
+        }
+      }
+    }
+    return null;
+  }
+
+  function extractAccountUrl(document) {
+    return extractTwitterUrl(document) || extractPixivUrl(document);
+  }
+
   globalThis.ComiPathCatalogExtractor = Object.freeze({
     SPACE_SELECTORS,
+    PIXIV_SELECTORS,
     extractSpace,
     extractTwitterUrl,
+    extractPixivUrl,
+    extractAccountUrl,
   });
 })();

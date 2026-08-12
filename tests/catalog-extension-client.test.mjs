@@ -55,6 +55,53 @@ test("does not add a tweet field when the catalog page has no tweet URL", () => 
   );
 });
 
+test("sends a Pixiv profile URL as the shared account field", async () => {
+  let request;
+  const result = await sendCatalog(
+    settings,
+    {
+      space: "東ア01a",
+      account: "https://www.pixiv.net/users/123",
+    },
+    async (url, options) => {
+      request = { url, options };
+      return {
+        ok: true,
+        json: async () => ({ ok: true, status: "success" }),
+      };
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(request.url, settings.gasUrl);
+  assert.equal(
+    request.options.body,
+    JSON.stringify({
+      action: "upsertCatalog",
+      sheetName: "day1",
+      space: "東ア01a",
+      account: "https://www.pixiv.net/users/123",
+    }),
+  );
+});
+
+test("rejects Pixiv artwork, search, and non-HTTP(S) URLs as accounts", () => {
+  for (const account of [
+    "https://www.pixiv.net/artworks/123",
+    "https://www.pixiv.net/search.php?word=circle",
+    "javascript:alert(1)",
+  ]) {
+    assert.throws(
+      () =>
+        buildCatalogRequest(settings, {
+          space: "東ア01a",
+          account,
+        }),
+      /Twitter\/XまたはPixiv URLが不正です。/,
+    );
+  }
+});
+
 test("validates GAS URL and sheet settings", () => {
   assert.deepEqual(normalizeSettings(settings), settings);
   assert.throws(

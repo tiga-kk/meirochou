@@ -36,7 +36,7 @@
     if (message?.type !== messageType) return false;
     const extractor = globalThis.ComiPathCatalogExtractor;
     const space = extractor?.extractSpace(document);
-    const account = extractor?.extractTwitterUrl(document);
+    const account = extractor?.extractAccountUrl(document);
     if (!space) {
       sendResponse({
         ok: false,

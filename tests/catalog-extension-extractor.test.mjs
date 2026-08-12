@@ -100,6 +100,60 @@ test("extracts the Twitter account without extracting the catalog image", () => 
   assert.equal("extractCatalogImageUrl" in extractor, false);
 });
 
+test("prefers Twitter/X over the scoped Pixiv profile link", () => {
+  const { document, extractor } = loadExtractor(`
+    <main id="mainSection">
+      <div class="m-media m-circletable">
+        <div class="md-detailsns"><a href="https://x.com/mignon">X</a></div>
+        <div class="m-media__body md-circleinfo"><div class="item"><table><tbody>
+          <tr><td></td></tr><tr><td></td></tr>
+          <tr><td><div><ul><li></li><li></li><li></li>
+            <li><a href="https://www.pixiv.net/users/123">Pixiv</a></li>
+          </ul></div></td></tr>
+        </tbody></table></div></div>
+      </div>
+    </main>
+  `);
+
+  assert.equal(extractor.extractAccountUrl(document), "https://x.com/mignon");
+});
+
+test("falls back to the scoped Pixiv profile link when Twitter/X is missing", () => {
+  const { document, extractor } = loadExtractor(`
+    <main id="mainSection">
+      <div class="m-media m-circletable">
+        <div class="m-media__body md-circleinfo"><div class="item"><table><tbody>
+          <tr><td></td></tr><tr><td></td></tr>
+          <tr><td><div><ul><li></li><li></li><li></li>
+            <li><a href="https://www.pixiv.net/users/123">Pixiv</a></li>
+          </ul></div></td></tr>
+        </tbody></table></div></div>
+      </div>
+    </main>
+  `);
+
+  assert.equal(
+    extractor.extractAccountUrl(document),
+    "https://www.pixiv.net/users/123",
+  );
+});
+
+test("returns null when neither Twitter/X nor the scoped Pixiv profile exists", () => {
+  const { document, extractor } = loadExtractor(`
+    <main id="mainSection">
+      <div class="m-media m-circletable">
+        <div class="m-media__body md-circleinfo"><div class="item"><table><tbody>
+          <tr><td></td></tr><tr><td></td></tr><tr><td><div><ul>
+            <li><a href="https://www.pixiv.net/artworks/123">Artwork</a></li>
+          </ul></div></td></tr>
+        </tbody></table></div></div>
+      </div>
+    </main>
+  `);
+
+  assert.equal(extractor.extractAccountUrl(document), null);
+});
+
 test("returns null for missing space or non-HTTP(S) catalog URLs", () => {
   const missing = loadExtractor(
     '<main id="mainSection"><div class="m-media m-circletable"><div class="m-media__image"><img src="https://example.invalid/catalog.jpg"></div></div></main>',
