@@ -390,6 +390,47 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   );
 });
 
+test("小さく描画されたmap-pinも44pxの操作領域と8pxの視認領域を保つ", async ({
+  page,
+}) => {
+  await page.goto("/?demo_ui=1");
+  const pin = page.locator("#navigation-pin-layer .map-pin.todo").first();
+  await expect(pin).toBeVisible();
+  await page.locator("#navigation-map-layer").evaluate((layer) => {
+    (layer as HTMLElement).style.transform = "scale(1)";
+  });
+
+  const metrics = await pin.evaluate((element) => {
+    const pin = element as HTMLElement;
+    pin.style.width = "3px";
+    pin.style.height = "3px";
+    const style = getComputedStyle(pin);
+    const box = pin.getBoundingClientRect();
+    const borderWidth =
+      Number.parseFloat(style.borderLeftWidth) +
+      Number.parseFloat(style.borderRightWidth);
+    const paddingWidth =
+      Number.parseFloat(style.paddingLeft) +
+      Number.parseFloat(style.paddingRight);
+    return {
+      hitboxWidth: box.width,
+      hitboxHeight: box.height,
+      contentWidth: box.width - borderWidth - paddingWidth,
+      contentHeight:
+        box.height -
+        Number.parseFloat(style.borderTopWidth) -
+        Number.parseFloat(style.borderBottomWidth) -
+        Number.parseFloat(style.paddingTop) -
+        Number.parseFloat(style.paddingBottom),
+    };
+  });
+
+  expect(metrics.hitboxWidth).toBeGreaterThanOrEqual(44);
+  expect(metrics.hitboxHeight).toBeGreaterThanOrEqual(44);
+  expect(metrics.contentWidth).toBeGreaterThanOrEqual(8);
+  expect(metrics.contentHeight).toBeGreaterThanOrEqual(8);
+});
+
 test("320px幅・200% zoomでも候補と距離を横スクロールなしで表示する", async ({
   page,
 }) => {
