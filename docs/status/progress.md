@@ -1,85 +1,77 @@
 # 実装進捗
 
-更新日: 2026-08-12
+更新日: 2026-08-13
 
 この文書を、現在フェーズ、現在Task、次に着手するTask、未完了の外部確認の唯一の正本とする。Task文書やREADMEへ進行中のHEAD・次Taskを重複して固定しない。
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.3（アプリ実装完了・外部確認待ち）**
-- 現在Task: **Task 8: 実機visual確認（外部確認待ち）**
-- 次に着手するTask: **390px/200% zoom、現在経路・候補経路、Gallery購入/Undoの実機visual確認**
-- 実装状態: **Task 1〜8の本番実装・自動検証を完了。Task 2のprobe/catalog送信とPixiv fallback、Task 8のtarget catalogとGallery visual、Cloudflare main-only運用設定はユーザー確認済み。同一space再送・Sheet列保持の明示証拠、current/candidate visualは別途確認待ち。一覧以外の購入経路でUndoできない点は残タスク。Task 4はC108 e456のbefore/after DevTools traceを取得したが、改善は確認できず追加実装を保留**
-- canonical plan: `docs/plans/phase-07-3/README.md`
-- 設計仕様: `docs/specs/2026-08-12-phase-07-3-field-followups-design.md`
+- 現在フェーズ: **Phase 7.4（実装計画確定・未着手）**
+- 現在Task: **Task 1: 経路animationのscreen-space診断と確実な修正**
+- 次に着手するTask: **Task 1**
+- canonical plan: `docs/plans/phase-07-4/README.md`
+- 設計仕様: `docs/specs/2026-08-13-phase-07-4-route-visual-nearby-map-and-priority-filter-design.md`
+- animation診断: `docs/reviews/phase-07-4-route-animation-diagnosis.md`
 
-Task開始時の基準コミットは、実装開始直前に指定ブランチの最新リモートHEADから取得する。将来の固定SHAをこの文書へ保存しない。
+Task開始時の基準コミットは、実装開始直前に指定ブランチの最新リモートHEADから取得する。計画作成時のSHAを実装基準として固定しない。
 
-## Phase 7.2 引き継ぎ
+## Phase 7.3からの引き継ぎ
 
-Phase 7.2 Task 1〜7の本番実装は完了している。Task 8は検証作業自体は実施済みだが、受入条件の一部が未確認のためPhase全体を完全完了とはしない。
+Phase 7.3のTask 1〜8の本番実装・自動検証は完了している。次の残件だけをPhase 7.4へ引き継ぐ。
 
-詳細な証拠は `docs/reviews/phase-07-2-field-verification.md` を正本とする。
+| 項目 | Phase 7.4での扱い |
+|---|---|
+| current/candidate routeの実機visual未確認 | Task 1でscreen-space診断からやり直し、Task 9でheaded受入 |
+| candidateへcurrentと同種のloop animationが広がった表示ドリフト | Task 1でcurrentだけmoving cueへ整理 |
+| 一覧以外の購入経路にUndoがない | Task 8 |
+| 同一space再送が既存行更新になる実GAS証拠 | Task 9 |
+| GAS更新時の既存Sheet列保持の実GAS証拠 | Task 9 |
+| map dragの体感遅延 | Task 9で実機再現時のみ証拠取得。証拠なしの追加実装はしない |
 
-| 項目 | 状態 | 備考 |
-|---|---|---|
-| Task 1〜7 | 完了 | mainの本番実装へ反映済み |
-| Task 8 自動検証 | 実施済み | `npm run verify` PASS。E2Eは50 passed、visual差分7、private fixture由来skip 8 |
-| extension → 実GAS headed smoke | 未確認 | headed browser / credential / test deploymentが必要 |
-| visual baselineの実画面確認 | 未確認 | snapshotを自動更新せずPhase 7.3 Task 8へ引き継ぐ |
+Phase 7.3 Task 4では合成PointerEventによる計測で明確な改善を証明できなかった。Phase 7.4ではこの結果を隠さず、今回の新しいmap機能の都合でgesture実装を全面変更しない。
 
-Phase 7.3は上記未確認を隠すための再実装ではない。実機で見つかった新しい要求を修正し、Task 8で持ち越し確認も閉じる。
+## Phase 7.4 新規要求
 
-## Phase 7.3
+ユーザーとの要件対話で次を確定した。
+
+- routeを開始せず開ける独立した「地図」surfaceを追加する。
+- 周辺検索の基準地点は「現在地」または地図上の任意地点から選べる。
+- priorityは既存Gallery同様、完全一致の複数選択とする。
+- 周辺候補はpriority等で絞ってからwalkable grid距離順にし、その後5 / 10 / 15 / 20件で切る。
+- 周辺地図は通常holdを除外し、「保留も表示」のときだけ含める。
+- 経路案内ではholdを常に除外し、priority条件に一致するcircleだけを巡回対象にする。
+- 地図上ではcircle anchorとお品書き画像cardをleader lineで結ぶ。
+- 地図閲覧の検索基準変更はRoute Guidanceの現在地を変更しない。
+
+## Phase 7.4
 
 | Task | 内容 | 状態 | 依存 |
 |---|---|---|---|
-| 1 | サークルスペース表記の正規化 | 完了 | なし |
-| 2 | カタログ拡張→GAS POST経路の診断 | 完了 | Task 1 |
-| 3 | 購入済みピン非表示と候補表示の分離 | 完了 | なし |
-| 4 | 地図ドラッグ遅延の計測と最小改善 | 検証済み（改善未確認・追加対応保留） | Task 3 |
-| 5 | 現在経路の方向表示強化 | 完了 | Task 3 |
-| 6 | 目的地カタログのモバイルレイアウト修正 | 完了 | Task 3 |
-| 7 | Gallery購入時の退出表示と完全Undo | 完了（一覧以外の購入Undoは残タスク） | Task 3 |
-| 8 | 実機受入・回帰検証・終了判定 | 完了 | Task 1〜7 |
+| 1 | 経路animationのscreen-space診断と確実な修正 | 未着手 | なし |
+| 2 | priority判定規則の共通化 | 未着手 | なし |
+| 3 | priority条件を通常の経路案内へ適用 | 未着手 | Task 2 |
+| 4 | 独立した地図閲覧surfaceの追加 | 未着手 | なし |
+| 5 | 任意検索基準地点とgrid origin解決 | 未着手 | Task 4 |
+| 6 | grid距離による周辺サークルランキング | 未着手 | Task 2, 5 |
+| 7 | 地図上のお品書きカード・leader line・重なり回避 | 未着手 | Task 6 |
+| 8 | 一覧以外の購入経路へ最新1件Undoを拡張 | 未着手 | なし |
+| 9 | 総合回帰・実機visual・実GAS残件の終了判定 | 未着手 | Task 1〜8 |
 
-Task 2は自動検証を通過し、ユーザー確認により実GASへのprobe/catalog送信とPixiv fallbackを確認した。同一space再送で既存行を更新すること、およびSheet列保持の明示証拠は未記録としてTask 8へ引き継ぐ。GAS URL・資格情報は保存していない。
+Task 1は過去のanimation試行を踏まえ、CSS定数や`animation-name`だけで完了判定しない。原因分析は`docs/reviews/phase-07-4-route-animation-diagnosis.md`を正本とする。
 
-Task 4はC108 `e456`、viewport 1280x900、CPU 1x、Fast 4G、pin 2個、同一合成PointerEvent操作5回でbefore/after DevTools traceを取得した。pointermove EventDispatch平均はbefore 221.7µs / after 259.7µs、p95は370µs / 439µs、50ms超long taskは7件 / 3件だった。追加変更による明確な遅延改善は確認できず、体感遅延の原因をこの処理時間へ帰属させる証拠もないため、追加実装は行わずTask 4を検証済み・改善未確認として保留する。実機の物理入力ではなく合成PointerEventである点は証拠の限界として記録する。
-
-Task 5は意味的契約・全体自動検証を通過したが、実機visualと新しいsnapshot baselineは未確認としてTask 8へ引き継ぐ。既存snapshotは自動更新していない。
-
-Task 6は390pxのportraitカタログ一列、200% zoomの横overflowなし、640px以上のportrait二列をfocused E2Eで確認し、`npm run verify`も通過した。意図した画像高さ変更による既存visual snapshot差分は更新せず、実機visual確認とともにTask 8へ引き継ぐ。
-
-Task 7はGalleryの実DOM購入ボタン・swipeから退出表示と最新1件Undo snackbarへ接続し、既存status Undoと逆向きGAS outbox、購入前route session snapshotを一貫して戻すfocused/unit/E2Eと`npm run verify`を通過した。Gallery visualはユーザー確認済み。ただし一覧以外の購入経路ではUndoできない点を残タスクとして記録する。
-
-Task 8は`npm run verify`を通過し、CI相当E2Eはbehavior assertionをすべて通過した。残る7件はmanagement、route/catalog、Galleryの意図したvisualまたは既知snapshot差分であり、snapshotは更新していない。旧E2Eの候補preview導線不整合は、現行の「経路を比較」「行き先変更」導線へ更新して解消した。
-
-Phase 7.3のアプリ実装は完了している。CI相当E2Eは52 passed / 7 snapshot failed / 8 private C108 skipped。Task 2のprobe/catalog送信とPixiv fallback、Task 8のtarget catalog（390px/200% zoom）とGallery visual、Cloudflare Pagesのmain-only運用設定はユーザー確認済みだが、同一space再送・Sheet列保持の明示証拠、current/candidate visualは未確認。一覧以外の購入経路でUndoできない点は残タスクとして切り離す。Task 4は改善未確認・追加対応保留として記録し、体感遅延の原因追及は別課題へ切り離す。
-
-Task 2の実GAS確認だけが外部環境待ちになった場合は、その事実をここへ記録してTask 3以降を進める。Task 8で再確認する。
-
-## Cloudflare Pages運用
-
-アプリTaskとは別トラックで次を行う。
-
-| 項目 | 状態 |
-|---|---|
-| production branchを`main`として維持 | ユーザー確認済み |
-| preview branch deploymentsを`None`にする | ユーザー確認済み |
-| feature/docs branchで新規Pages previewが作られないことを確認 | ユーザー確認済み |
-| GitHub Actions CIを維持 | 変更不要 |
-
-手順は `docs/plans/phase-07-3/operations-cloudflare-pages-main-only.md` を参照する。main production deployment継続、preview branch自動deployment停止、GitHub Actions CI維持をユーザー確認済み。Cloudflareアカウント権限がないことをPhase 7.3 Task 1〜8の停止条件にしない。
+Task 4〜7のstandalone mapはRoute Guidance Sessionを第二のmap stateとして複製しない。表示状態だけを独立させ、map assets / routing / zoom計算を再利用する。
 
 ## 進行規則
 
-- 完了済みTaskをやり直さない。
+- 一度に一Taskずつ実装・review・commitする。
+- Task 1を他のvisual変更と同じcommitへ混ぜない。
+- 完了済みPhase 7.3 Taskを再実装しない。
 - 未完了WIPを破棄、stash、resetして再出発しない。
 - 各Taskの基準点は開始直前の最新リモートHEADから取得する。
 - import/fixture/credential/headed browser不足だけを実装REDとして扱わない。
 - 既存失敗と今回の回帰を分離する。
 - snapshotは意味的確認なしに自動更新しない。
-- 外部仕様判断が不要な文書・実装問題は、外部確認待ちと並行して進める。
+- 実GASや実機確認が不能でも、独立して進められるTaskを止めない。
+- 新しい依存関係は現在のTaskを既存標準機能で実装できない場合だけ追加する。
 
 過去フェーズの詳細な履歴はGit履歴、各Phase plan、`docs/reviews/`を参照する。

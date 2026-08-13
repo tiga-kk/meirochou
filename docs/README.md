@@ -5,10 +5,11 @@
 現在の実装判断は、次の順で読む。
 
 1. `docs/status/progress.md` — 現在フェーズ、現在Task、次Task、外部確認待ちの唯一の正本。
-2. `docs/plans/phase-07-3/README.md` — Phase 7.3の実装順、依存関係、共通検証規則。
-3. `docs/plans/phase-07-3/task-XX-*.md` — 着手するTaskの具体的な変更範囲と受入条件。
-4. `docs/specs/2026-08-12-phase-07-3-field-followups-design.md` — Phase 7.3の製品・UX設計仕様。
-5. `docs/reviews/phase-07-2-field-verification.md` — Phase 7.2から持ち越した実機/visual確認の証拠。
+2. `docs/plans/phase-07-4/README.md` — Phase 7.4の実装順、依存関係、共通検証規則。
+3. `docs/plans/phase-07-4/task-XX-*.md` — 着手するTaskの具体的な変更範囲と受入条件。
+4. `docs/specs/2026-08-13-phase-07-4-route-visual-nearby-map-and-priority-filter-design.md` — Phase 7.4の製品・UX設計仕様。
+5. `docs/reviews/phase-07-4-route-animation-diagnosis.md` — 過去のroute animation修正が実機視認性を閉じられなかった原因分析。
+6. `docs/reviews/phase-07-2-field-verification.md` — Phase 7.2から持ち越した実機/visual確認の証拠。
 
 現在状態をTask文書やREADMEから推測せず、必ず `docs/status/progress.md` を優先する。
 
@@ -19,9 +20,10 @@
 - `docs/plans/phase-06-1/` — Phase 6.1 実機UX follow-up。
 - `docs/plans/phase-07/` — Phase 7 オフライン/イベント管理。
 - `docs/plans/phase-07-1/` — Phase 7.1 navigation/motion/management UX。
-- `docs/plans/phase-07-3/` — **現在のPhase 7.3実装計画。**
+- `docs/plans/phase-07-3/` — Phase 7.3 実機follow-up。アプリ実装完了、残件はPhase 7.4へ引き継ぐ。
+- `docs/plans/phase-07-4/` — **現在のPhase 7.4実装計画。**
 
-Phase 7.2の実装計画は履歴上の計画ブランチで管理されており、このブランチの実装判断には `docs/reviews/phase-07-2-field-verification.md` とGit履歴を使う。存在しない相対パスへ依存しない。
+Phase 7.2の実装計画は履歴上の計画ブランチで管理されており、現行の実装判断には `docs/reviews/phase-07-2-field-verification.md` とGit履歴を使う。
 
 ## 設計仕様
 
@@ -30,6 +32,7 @@ Phase 7.2の実装計画は履歴上の計画ブランチで管理されてお�
 - `docs/specs/2026-08-10-phase-07-offline-event-management-and-visual-system-design.md`
 - `docs/specs/2026-08-11-phase-07-1-navigation-motion-and-management-ux-design.md`
 - `docs/specs/2026-08-12-phase-07-3-field-followups-design.md`
+- `docs/specs/2026-08-13-phase-07-4-route-visual-nearby-map-and-priority-filter-design.md`
 
 設計仕様は外部挙動の意図を示す。実装順や現在Taskはplan/progressを優先する。
 
@@ -40,11 +43,11 @@ Phase 7.2の実装計画は履歴上の計画ブランチで管理されてお�
 - `guides/gas-sync.md` — GAS同期。
 - `guides/user-data-management.md` — ユーザーデータ管理。
 
-Phase 7.3のCloudflare設定作業は `docs/plans/phase-07-3/operations-cloudflare-pages-main-only.md` を参照する。アプリ実装とは独立した運用作業である。
+Phase 7.3でCloudflare Pagesのmain-only運用設定はユーザー確認済み。Phase 7.4ではアプリ変更と無関係なCloudflare設定変更を行わない。
 
 ## 共通実装原則
 
-- Phase 5D以降で整理したfeature境界を、Phase 7.3と無関係な都合で再構築しない。
+- Phase 5D以降で整理したfeature境界を、Phase 7.4と無関係な都合で再構築しない。
 - 新しいFacade、Manager、DI container、UI frameworkなどの横断抽象化は、現在のTaskに実在する複数利用者がない限り追加しない。
 - Route Guidanceの状態は既存Session/NavigationStateの責務を再利用し、同じ意味の第二のstoreを作らない。
 - LocalStorageへcommit済みの購入結果を、GAS配送失敗やcatalog cache失敗だけを理由に取り消さない。Undoや明示的な失敗rollbackはTask文書の契約に従う。
@@ -52,7 +55,7 @@ Phase 7.3のCloudflare設定作業は `docs/plans/phase-07-3/operations-cloudfla
 - animationはCSS/SVGで表現できるものをJavaScriptのframe loopへしない。
 - mobile操作、44px以上の主要touch領域、keyboard focus、safe-area、200% text zoom、`prefers-reduced-motion`への対応を維持する。
 - visual snapshotは意図した画面であることを確認してから更新する。
-- 既存Service Workerの責務を、Phase 7.3の都合だけでfull PWAや別のoffline基盤へ広げない。
+- 既存Service Workerの責務を、Phase 7.4の都合だけでfull PWAや別のoffline基盤へ広げない。
 
 ## 文書更新の原則
 
