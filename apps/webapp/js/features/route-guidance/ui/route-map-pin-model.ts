@@ -32,6 +32,12 @@ interface PointsPayload {
     center_y?: unknown;
   }[];
 }
+export interface MapViewportPoint {
+  identifier: string;
+  number: number;
+  x: number;
+  y: number;
+}
 type Padding = number | { x?: number; y?: number };
 type PinState = "todo" | "done" | "hold" | "next" | "selected" | "start";
 
@@ -280,6 +286,81 @@ export function buildMapPointIndex(
     result.set(key, list);
   }
   return result;
+}
+
+export function buildMapViewportPoints(
+  payload: PointsPayload,
+): MapViewportPoint[] {
+  const width = Number(payload.image?.width);
+  const height = Number(payload.image?.height);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return [];
+  return (payload.points ?? []).flatMap((point) => {
+    const identifier = typeof point.identifier === "string" ? point.identifier.trim() : "";
+    const number = Number.parseInt(String(point.number), 10);
+    const x = Number(point.center_x);
+    const y = Number(point.center_y);
+    if (!identifier || !Number.isInteger(number) || number < 0 || !Number.isFinite(x) || !Number.isFinite(y)) return [];
+    return [{ identifier, number, x, y }];
+  });
+}
+
+export function findNearestMapViewportPoint(input: {
+  viewportWidth: number;
+  viewportHeight: number;
+  stageWidth: number;
+  stageHeight: number;
+  imageWidth: number;
+  imageHeight: number;
+  transform: { scale: number; x: number; y: number };
+  points: readonly MapViewportPoint[];
+}): MapViewportPoint | null {
+  if (
+    ![
+      input.viewportWidth,
+      input.viewportHeight,
+      input.stageWidth,
+      input.stageHeight,
+      input.imageWidth,
+      input.imageHeight,
+      input.transform.scale,
+      input.transform.x,
+      input.transform.y,
+    ].every(Number.isFinite) ||
+    input.viewportWidth <= 0 ||
+    input.viewportHeight <= 0 ||
+    input.stageWidth <= 0 ||
+    input.stageHeight <= 0 ||
+    input.imageWidth <= 0 ||
+    input.imageHeight <= 0 ||
+    input.transform.scale <= 0
+  ) return null;
+  const stageX = clamp(
+    (input.viewportWidth / 2 - input.transform.x) / input.transform.scale,
+    0,
+    input.stageWidth,
+  );
+  const stageY = clamp(
+    (input.viewportHeight / 2 - input.transform.y) / input.transform.scale,
+    0,
+    input.stageHeight,
+  );
+  const imageX = (stageX / input.stageWidth) * input.imageWidth;
+  const imageY = (stageY / input.stageHeight) * input.imageHeight;
+  let nearest: MapViewportPoint | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const point of input.points) {
+    if (![point.x, point.y].every(Number.isFinite)) continue;
+    const distance = (point.x - imageX) ** 2 + (point.y - imageY) ** 2;
+    if (
+      distance < nearestDistance ||
+      (distance === nearestDistance &&
+        (!nearest || `${point.identifier}:${point.number}` < `${nearest.identifier}:${nearest.number}`))
+    ) {
+      nearest = point;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
 }
 
 export function getPinPosition(space: string): MapPoint {

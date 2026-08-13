@@ -182,6 +182,9 @@ test("周辺地図のお品書きカードとleader lineから既存拡大表示
 
   const cards = page.locator(".nearby-catalog-card");
   await expect(cards).toHaveCount(2);
+  await expect(page.locator("#nearby-map-center")).toContainText(
+    "表示中心: デモ東",
+  );
   await expect(page.locator("#nearby-map-controls")).toBeVisible();
   const nearbyControls = page.locator("#nearby-map-controls");
   await expect(
@@ -464,6 +467,9 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   await expect(page.locator("#navigation-map-image")).toHaveJSProperty(
     "complete",
     true,
+  );
+  await expect(page.locator("#navigation-map-center")).toContainText(
+    "表示中心: デモ東",
   );
   const pins = page.locator("#navigation-pin-layer .map-pin");
   await expect(pins.first()).toBeVisible();

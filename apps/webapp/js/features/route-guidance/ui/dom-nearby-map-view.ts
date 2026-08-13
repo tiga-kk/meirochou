@@ -19,11 +19,14 @@ import { parseSpace } from "../../../shared/domain/space-parser";
 import {
   buildMapPins,
   buildMapPointIndex,
+  buildMapViewportPoints,
   calculateMapPinSize,
   calculateNativeImageScale,
+  findNearestMapViewportPoint,
   getPinPosition,
   normalizeExternalUrl,
 } from "./route-map-pin-model";
+import type { MapViewportPoint } from "./route-map-pin-model";
 import { layoutNearbyCatalogCards } from "./nearby-catalog-layout";
 
 type NearbyArea = MapArea & {
@@ -122,6 +125,7 @@ export class DomNearbyMapView {
   private opener: HTMLElement | null = null;
   private activeArea: NearbyArea | null = null;
   private activeAssets: RouteMapAssets | null = null;
+  private nearbyViewportPoints: readonly MapViewportPoint[] = [];
   private origin: NearbyMapOrigin | null = null;
   private nearbyCandidates: ReturnType<typeof rankNearbyCircles> = [];
   private selectedPriorities: readonly number[] | null = null;
@@ -132,6 +136,7 @@ export class DomNearbyMapView {
   private tapStart: { pointerId: number; clientX: number; clientY: number } | null = null;
   private renderToken = 0;
   private nearbyMapResizeObserver: ResizeObserver | null = null;
+  private nearbyViewportCenterTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly currentLocationResolver: (() => string | null) | null;
   private readonly onShowCatalog: ((circle: Circle) => void) | null;
   private readonly onSetNextTarget:
@@ -198,6 +203,7 @@ export class DomNearbyMapView {
           </div>
           <svg id="nearby-map-leader-layer" class="nearby-map-leader-layer" aria-hidden="true"></svg>
           <div id="nearby-map-card-layer" class="nearby-map-card-layer"></div>
+          <p id="nearby-map-center" class="map-viewport-center" aria-live="polite">表示中心: ---</p>
         </div>
         <p id="nearby-map-error" class="nearby-map-error" role="status" aria-live="polite"></p>
       </div>`;
@@ -387,6 +393,7 @@ export class DomNearbyMapView {
     if (!area || !this.surface) return;
     this.activeArea = area;
     this.activeAssets = null;
+    this.nearbyViewportPoints = [];
     this.origin = null;
     this.nearbyCandidates = [];
     this.selectedSpace = null;
@@ -404,6 +411,7 @@ export class DomNearbyMapView {
       const assets = await this.assetsLoader.loadMapAssets(area);
       if (token !== this.renderToken) return;
       this.activeAssets = assets;
+      this.nearbyViewportPoints = buildMapViewportPoints(assets.points);
       this.updateNearbyCandidates();
       this.renderPins(assets);
     } catch (error) {
@@ -462,6 +470,39 @@ export class DomNearbyMapView {
     const leaderLayer = this.surface?.querySelector("#nearby-map-leader-layer") as SVGElement | null;
     if (!cardLayer || !leaderLayer || !this.activeAssets || !this.activeArea || !this.origin) return;
     this.renderCatalogCards(cardLayer, leaderLayer, buildMapPointIndex(this.activeAssets.points), transform);
+    this.scheduleNearbyViewportCenterUpdate();
+  }
+
+  private scheduleNearbyViewportCenterUpdate(): void {
+    if (this.nearbyViewportCenterTimer !== null) return;
+    this.nearbyViewportCenterTimer = setTimeout(() => {
+      this.nearbyViewportCenterTimer = null;
+      this.updateNearbyViewportCenter();
+    }, 100);
+  }
+
+  private updateNearbyViewportCenter(): void {
+    const label = this.surface?.querySelector("#nearby-map-center") as HTMLElement | null;
+    const viewport = this.surface?.querySelector("#nearby-map-viewport") as HTMLElement | null;
+    const stage = this.surface?.querySelector("#nearby-map-layer") as HTMLElement | null;
+    const image = this.surface?.querySelector("#nearby-map-image") as HTMLImageElement | null;
+    if (!label || !viewport || !stage || !image?.naturalWidth || !image.naturalHeight || !this.activeArea || !this.activeAssets) {
+      label && (label.textContent = "表示中心: ---");
+      return;
+    }
+    const nearest = findNearestMapViewportPoint({
+      viewportWidth: viewport.clientWidth || viewport.getBoundingClientRect().width,
+      viewportHeight: viewport.clientHeight || viewport.getBoundingClientRect().height,
+      stageWidth: stage.clientWidth || stage.getBoundingClientRect().width,
+      stageHeight: stage.clientHeight || stage.getBoundingClientRect().height,
+      imageWidth: image.naturalWidth,
+      imageHeight: image.naturalHeight,
+      transform: this.zoomHelper?.state ?? { scale: 1, x: 0, y: 0 },
+      points: this.nearbyViewportPoints,
+    });
+    label.textContent = nearest
+      ? `表示中心: ${this.activeArea.name ?? this.activeArea.displayName ?? areaId(this.activeArea)} ${nearest.identifier}${nearest.number}付近`
+      : "表示中心: ---";
   }
 
   private renderCatalogCards(
@@ -633,6 +674,7 @@ export class DomNearbyMapView {
     stage.style.height = `${layout.stageHeight}px`;
     this.zoomHelper?.setMaxScale(calculateNativeImageScale({ imageWidth: image.naturalWidth, renderedWidth: layout.stageWidth }));
     this.zoomHelper?.setLayout({ containerWidth: layout.viewportWidth, containerHeight: layout.viewportHeight, stageWidth: layout.stageWidth, stageHeight: layout.stageHeight, baseX: layout.initialX, baseY: layout.initialY });
+    this.updateNearbyViewportCenter();
   }
 
   private selectOriginAt(clientX: number, clientY: number): void {

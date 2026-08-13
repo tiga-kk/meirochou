@@ -94,6 +94,20 @@
   touch-action: none;
 }
 
+.map-viewport-center {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 4;
+  max-width: calc(100% - 16px);
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+
 .map-transform-layer {
   position: absolute;
   left: 0;

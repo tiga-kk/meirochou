@@ -4,10 +4,12 @@ import { GestureZoomController } from "../../../utils/gesture-zoom-controller.js
 import {
   buildMapPins,
   buildMapPointIndex,
+  buildMapViewportPoints,
   calculateFitTransform,
   calculateMapPinSize,
   calculateMapViewportLayout,
   calculateNativeImageScale,
+  findNearestMapViewportPoint,
   resolveNearestMapPin,
 } from "./route-map-pin-model";
 import { calculateRouteMotionMetrics } from "./route-motion-metrics";
@@ -88,11 +90,13 @@ export class DomRouteMapView {
       navigationMapLayer: document.getElementById("navigation-map-layer"),
       navigationMapImage: document.getElementById("navigation-map-image"),
       pinLayer: document.getElementById("navigation-pin-layer"),
+      viewportCenter: document.getElementById("navigation-map-center"),
       mapLinksContainer: document.getElementById("map-links-container"),
     };
 
     this.zoomHelper = null;
     this.pointIndexCache = new Map();
+    this.viewportPointCache = new Map();
     this.renderToken = 0;
     this.lastNavigationTarget = null;
     this.lastNavigationContext = null;
@@ -100,6 +104,7 @@ export class DomRouteMapView {
     this.navigationMapResizeObserver = null;
     this.currentRouteMotionContext = null;
     this.routeMotionRenderedWidth = 0;
+    this.viewportCenterTimer = null;
 
     this.init();
   }
@@ -129,6 +134,7 @@ export class DomRouteMapView {
           onTransformChange: ({ scale }) => {
             this.applyRouteOverlayStrokeWidth(scale);
             this.applyCurrentRouteMotionMetrics(scale);
+            this.scheduleViewportCenterUpdate();
           },
         },
       );
@@ -267,6 +273,41 @@ export class DomRouteMapView {
     );
   }
 
+  scheduleViewportCenterUpdate() {
+    if (this.viewportCenterTimer !== null) return;
+    this.viewportCenterTimer = setTimeout(() => {
+      this.viewportCenterTimer = null;
+      this.updateViewportCenter();
+    }, 100);
+  }
+
+  updateViewportCenter() {
+    const label = this.els.viewportCenter;
+    if (!label) return;
+    const area = findAreaForSpace(this.lastNavigationTarget?.space || "", this.mapAreaCatalog);
+    const points = area ? this.viewportPointCache.get(area.id) : null;
+    const viewport = this.els.navigationMap;
+    const stage = this.els.navigationMapLayer;
+    const image = this.els.navigationMapImage;
+    if (!area || !points?.length || !viewport || !stage || !image?.naturalWidth || !image.naturalHeight) {
+      label.textContent = "表示中心: ---";
+      return;
+    }
+    const nearest = findNearestMapViewportPoint({
+      viewportWidth: viewport.clientWidth || viewport.getBoundingClientRect().width,
+      viewportHeight: viewport.clientHeight || viewport.getBoundingClientRect().height,
+      stageWidth: stage.clientWidth || stage.getBoundingClientRect().width,
+      stageHeight: stage.clientHeight || stage.getBoundingClientRect().height,
+      imageWidth: image.naturalWidth,
+      imageHeight: image.naturalHeight,
+      transform: this.zoomHelper?.state ?? { scale: 1, x: 0, y: 0 },
+      points,
+    });
+    label.textContent = nearest
+      ? `表示中心: ${area.name ?? area.displayName ?? area.id} ${nearest.identifier}${nearest.number}付近`
+      : "表示中心: ---";
+  }
+
   applyViewportLayout() {
     const viewport = this.els.navigationMap;
     const stage = this.els.navigationMapLayer;
@@ -300,6 +341,7 @@ export class DomRouteMapView {
       baseY: layout.initialY,
     });
     this.updatePinLayerBox();
+    this.updateViewportCenter();
   }
 
   async loadPointIndex(area) {
@@ -317,7 +359,10 @@ export class DomRouteMapView {
         }
         return response.json();
       })
-      .then((payload) => buildMapPointIndex(payload))
+      .then((payload) => {
+        this.viewportPointCache.set(area.id, buildMapViewportPoints(payload));
+        return buildMapPointIndex(payload);
+      })
       .catch((error) => {
         console.warn("Map point index could not be loaded.", error);
         return null;
@@ -553,8 +598,7 @@ export class DomRouteMapView {
 
     if (
       area &&
-      !(cachedPointIndex instanceof Map) &&
-      cachedPointIndex !== null
+      cachedPointIndex === undefined
     ) {
       this.loadPointIndex(area).then((loadedPointIndex) => {
         if (
@@ -565,5 +609,6 @@ export class DomRouteMapView {
         }
       });
     }
+    this.updateViewportCenter();
   }
 }
