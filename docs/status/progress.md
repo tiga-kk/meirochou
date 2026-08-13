@@ -6,9 +6,9 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.4（Task 7完了・Task 8着手可能）**
-- 現在Task: **Task 8: 一覧以外の購入経路へ最新1件Undoを拡張**
-- 次に着手するTask: **Task 8**
+- 現在フェーズ: **Phase 7.4（Task 8完了・Task 9着手可能）**
+- 現在Task: **Task 9: 総合回帰・実機visual・実GAS残件の終了判定**
+- 次に着手するTask: **Task 9**
 - canonical plan: `docs/plans/phase-07-4/README.md`
 - 設計仕様: `docs/specs/2026-08-13-phase-07-4-route-visual-nearby-map-and-priority-filter-design.md`
 - animation診断: `docs/reviews/phase-07-4-route-animation-diagnosis.md`
@@ -23,7 +23,7 @@ Phase 7.3のTask 1〜8の本番実装・自動検証は完了している。次�
 |---|---|
 | current/candidate routeの実機visual未確認 | Task 1でscreen-space診断からやり直し、Task 9でheaded受入 |
 | candidateへcurrentと同種のloop animationが広がった表示ドリフト | Task 1でcurrentだけmoving cueへ整理 |
-| 一覧以外の購入経路にUndoがない | Task 8 |
+| 一覧以外の購入経路にUndoがない | Task 8で解消 |
 | 同一space再送が既存行更新になる実GAS証拠 | Task 9 |
 | GAS更新時の既存Sheet列保持の実GAS証拠 | Task 9 |
 | map dragの体感遅延 | Task 9で実機再現時のみ証拠取得。証拠なしの追加実装はしない |
@@ -54,7 +54,7 @@ Phase 7.3 Task 4では合成PointerEventによる計測で明確な改善を証�
 | 5 | 任意検索基準地点とgrid origin解決 | 完了 | Task 4 |
 | 6 | grid距離による周辺サークルランキング | 完了 | Task 2, 5 |
 | 7 | 地図上のお品書きカード・leader line・重なり回避 | 完了 | Task 6 |
-| 8 | 一覧以外の購入経路へ最新1件Undoを拡張 | 次に着手 | なし |
+| 8 | 一覧以外の購入経路へ最新1件Undoを拡張 | 完了 | なし |
 | 9 | 総合回帰・実機visual・実GAS残件の終了判定 | 未着手 | Task 1〜8 |
 
 Task 1は過去のanimation試行を踏まえ、CSS定数や`animation-name`だけで完了判定しない。原因分析は`docs/reviews/phase-07-4-route-animation-diagnosis.md`を正本とする。
@@ -72,6 +72,10 @@ Task 5で独立地図の検索基準を現在地または選択モード中の�
 Task 6で任意originからのDijkstra距離mapを1回だけ構築し、area・購入済み・hold・priority条件を適用した候補をwalkable grid距離順と件数上限で絞り込むnearby modelを追加した。Route GuidanceのALNSやsessionは変更しない。
 
 Task 7でnearby候補のお品書きカード、leader line、決定的な重なり回避配置を追加した。カードと線は同じmap transform layerで追従し、カードのクリックは既存のお品書き拡大表示だけへ接続する。
+
+Task 8で通常の現在目的地画面の購入にも最新1件Undoを接続した。既存のCircle Status Undo、購入前Route Guidance snapshot、逆向きGAS outboxを再利用し、hold・期限切れ・別操作後はUndoできない。通常画面ではbody、Gallery表示中は既存のGallery modal内へsnackbarを配置し、両方の表示経路を維持した。
+
+Task 8の検証は、購入フロー/完了処理24件、通常購入とGallery UndoのE2E 2件、webapp全体113 files / 777 tests、architecture check、TypeScript typecheck、`git diff --check`がPASSした。
 
 Task 4〜7のstandalone mapはRoute Guidance Sessionを第二のmap stateとして複製しない。表示状態だけを独立させ、map assets / routing / zoom計算を再利用する。
 

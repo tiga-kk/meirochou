@@ -85,6 +85,7 @@ function createSetup(
     currentDestination: null,
   });
   app.ui.showToast = vi.fn();
+  app.ui.showUndoSnackbar = vi.fn();
   app.ui.updateCounts = vi.fn();
   app.ui.updateCurrentLocation = vi.fn();
   app.ui.showNavigation = vi.fn();
@@ -235,6 +236,27 @@ describe("circle-status production integration", () => {
     expect(fixture.app.ui.showToast).toHaveBeenCalledWith("A-01 購入！");
   });
 
+  test("通常画面の購入を最新購入Undoとしてstatus・route・GASへ戻せる", async () => {
+    const fixture = createSetup({
+      type: "gas",
+      gasUrl: "https://example.test/gas",
+      sheetName: "Day1",
+    });
+    const beforePurchase = fixture.app.routeGuidanceSession.getSnapshot();
+
+    await fixture.app.handleAction("purchase");
+
+    expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("purchased");
+    expect(fixture.repository.load(REF)?.gasOutbox).toHaveLength(1);
+    expect(fixture.app.latestPurchaseUndo).not.toBeNull();
+    expect(fixture.app.ui.showUndoSnackbar).toHaveBeenCalledWith("A-01");
+
+    expect(await fixture.app.undoLastPurchase()).toBe(true);
+    expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBeUndefined();
+    expect(fixture.repository.load(REF)?.gasOutbox.at(-1)?.purchased).toBe(false);
+    expect(fixture.app.routeGuidanceSession.getSnapshot()).toEqual(beforePurchase);
+  });
+
   test("undoes the latest gallery purchase with route and GAS meaning intact", async () => {
     const fixture = createSetup({
       type: "gas",
@@ -264,6 +286,44 @@ describe("circle-status production integration", () => {
     expect(await fixture.app.undoLastPurchase()).toBe(false);
     expect(await fixture.app.undoLastPurchase()).toBe(false);
     expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("held");
+  });
+
+  test("通常購入は最新1件だけUndoでき、holdではUndo表示を作らない", async () => {
+    const fixture = createSetup(
+      { type: "csv", fileName: "day1.csv" },
+      new MockStorageAdapter(),
+      [
+        { space: "A-01", priority: 1 },
+        { space: "A-02", priority: 2 },
+      ],
+    );
+
+    await fixture.app.addPurchased("A-01");
+    await fixture.app.addPurchased("A-02");
+    expect(await fixture.app.undoLastPurchase()).toBe(true);
+    expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("purchased");
+    expect(fixture.repository.load(REF)?.circleStates["A-02"]).toBeUndefined();
+    expect(await fixture.app.undoLastPurchase()).toBe(false);
+
+    fixture.app.ui.showUndoSnackbar = vi.fn();
+    await fixture.app.addHold("A-01");
+    expect(fixture.app.ui.showUndoSnackbar).not.toHaveBeenCalled();
+  });
+
+  test("通常購入のUndoは期限切れ後に実行できない", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-08-13T09:00:00.000Z"));
+      const fixture = createSetup({ type: "csv", fileName: "day1.csv" });
+
+      await fixture.app.handleAction("purchase");
+      vi.setSystemTime(new Date("2026-08-13T09:00:05.001Z"));
+
+      expect(await fixture.app.undoLastPurchase()).toBe(false);
+      expect(fixture.repository.load(REF)?.circleStates["A-01"]).toBe("purchased");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("reports local save failure without calling GAS or claiming success", async () => {

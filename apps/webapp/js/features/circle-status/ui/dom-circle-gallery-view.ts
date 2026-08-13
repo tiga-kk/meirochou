@@ -542,7 +542,10 @@ export class DomCircleGalleryView {
       }
     };
     snackbar.appendChild(button);
-    this.els.galleryModal.appendChild(snackbar);
+    const container = this.els.galleryModal && !this.els.galleryModal.classList.contains("hidden")
+      ? this.els.galleryModal
+      : document.body;
+    container.appendChild(snackbar);
     this.undoSnackbar = snackbar;
     this.undoTimer = setTimeout(() => {
       snackbar.remove();

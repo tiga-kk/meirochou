@@ -192,6 +192,10 @@ export class DomRouteGuidanceView {
     this.modalManager.showGallery(scope);
   }
 
+  showUndoSnackbar(space) {
+    this.modalManager.showUndoSnackbar(space);
+  }
+
   // --- Sheet List Delegate Methods ---
 
   renderSheetList(sheets, selectedSheets, _onChangeCallback) {

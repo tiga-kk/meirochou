@@ -116,7 +116,7 @@
 
 .gallery-undo-snackbar {
   position: fixed;
-  z-index: 2100;
+  z-index: 10051;
   left: max(12px, env(safe-area-inset-left));
   right: max(12px, env(safe-area-inset-right));
   bottom: max(12px, env(safe-area-inset-bottom));

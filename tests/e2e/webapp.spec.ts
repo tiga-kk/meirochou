@@ -852,6 +852,41 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   await expect(page.locator('[data-route-kind="candidate"]')).toHaveCount(0);
 });
 
+test("通常画面の購入buttonが最新1件Undoへ到達する", async ({ page }) => {
+  await page.goto("/?demo_ui=1");
+  const heading = page.locator("#target-space-heading");
+  await expect(heading).not.toHaveText("---");
+  const space = (await heading.textContent())?.trim() || "";
+  await page.locator("#btn-purchased").click();
+
+  const snackbar = page.locator(".gallery-undo-snackbar");
+  await expect(snackbar).toBeVisible();
+  await expect(snackbar.getByRole("button", { name: "元に戻す" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate((target) => {
+        const state = JSON.parse(
+          localStorage.getItem("comipath:v1:demo-v1:day1:state") || "null",
+        );
+        return state?.circleStates?.[target];
+      }, space),
+    )
+    .toBe("purchased");
+
+  await snackbar.getByRole("button", { name: "元に戻す" }).click();
+  await expect(heading).toHaveText(space);
+  await expect
+    .poll(() =>
+      page.evaluate((target) => {
+        const state = JSON.parse(
+          localStorage.getItem("comipath:v1:demo-v1:day1:state") || "null",
+        );
+        return state?.circleStates?.[target];
+      }, space),
+    )
+    .not.toBe("purchased");
+});
+
 test("URLがない次地点ではNo Imageを大きく表示する", async ({ page }) => {
   await page.goto("/?demo_ui=1");
   await pinFor(page, "東イ08b").evaluate((button: HTMLButtonElement) =>
