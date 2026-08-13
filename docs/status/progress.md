@@ -6,9 +6,9 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.4（Task 8完了・Task 9着手可能）**
-- 現在Task: **Task 9: 総合回帰・実機visual・実GAS残件の終了判定**
-- 次に着手するTask: **Task 9**
+- 現在フェーズ: **Phase 7.4（Task 9完了・外部確認未確認を記録）**
+- 現在Task: **Phase 7.4終了**
+- 次に着手するTask: **なし（次フェーズ待ち）**
 - canonical plan: `docs/plans/phase-07-4/README.md`
 - 設計仕様: `docs/specs/2026-08-13-phase-07-4-route-visual-nearby-map-and-priority-filter-design.md`
 - animation診断: `docs/reviews/phase-07-4-route-animation-diagnosis.md`
@@ -55,7 +55,7 @@ Phase 7.3 Task 4では合成PointerEventによる計測で明確な改善を証�
 | 6 | grid距離による周辺サークルランキング | 完了 | Task 2, 5 |
 | 7 | 地図上のお品書きカード・leader line・重なり回避 | 完了 | Task 6 |
 | 8 | 一覧以外の購入経路へ最新1件Undoを拡張 | 完了 | なし |
-| 9 | 総合回帰・実機visual・実GAS残件の終了判定 | 未着手 | Task 1〜8 |
+| 9 | 総合回帰・実機visual・実GAS残件の終了判定 | 完了 | Task 1〜8 |
 
 Task 1は過去のanimation試行を踏まえ、CSS定数や`animation-name`だけで完了判定しない。原因分析は`docs/reviews/phase-07-4-route-animation-diagnosis.md`を正本とする。
 
@@ -76,6 +76,10 @@ Task 7でnearby候補のお品書きカード、leader line、決定的な重な
 Task 8で通常の現在目的地画面の購入にも最新1件Undoを接続した。既存のCircle Status Undo、購入前Route Guidance snapshot、逆向きGAS outboxを再利用し、hold・期限切れ・別操作後はUndoできない。通常画面ではbody、Gallery表示中は既存のGallery modal内へsnackbarを配置し、両方の表示経路を維持した。
 
 Task 8の検証は、購入フロー/完了処理24件、通常購入とGallery UndoのE2E 2件、webapp全体113 files / 777 tests、architecture check、TypeScript typecheck、`git diff --check`がPASSした。
+
+Task 9で`npm run verify`、`npm run test:e2e:ci`、public tree audit、priority chipの44px操作領域再検証を行った。自動検証は完了したが、CI相当E2Eには既存またはheaded確認前のvisual snapshot差分7件が残った。headed目視、実機drag、実GAS同一space更新・列保持は環境不足のため未確認として`docs/reviews/phase-07-4-field-verification.md`へ記録し、snapshotは更新していない。
+
+Phase 7.4は、自動検証と未確認事項の記録を含む終了状態とした。外部確認未確認事項を解消するまで、visual受入・実GAS証拠が必要な次フェーズ作業は開始しない。
 
 Task 4〜7のstandalone mapはRoute Guidance Sessionを第二のmap stateとして複製しない。表示状態だけを独立させ、map assets / routing / zoom計算を再利用する。
 
