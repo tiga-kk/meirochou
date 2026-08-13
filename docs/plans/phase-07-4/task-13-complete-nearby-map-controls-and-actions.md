@@ -49,8 +49,8 @@ Task 10〜12と独立して実装できる。Task 15がこのTaskのcard selecti
 4. card DOMを単一button前提から、選択可能container + 明示actionを持てる構造へ変更する。nested buttonを作らない。
 5. card選択は`selectedSpace`をsurface内だけで保持し、選択cardへ`aria-selected`等の状態と前面化用classを付ける。
 6. 「お品書きを見る」は既存`onShowCatalog`へ接続する。
-7. 「目的地にする」用callbackを`DomNearbyMapView` constructorへ追加し、`BrowserApplication`から`handleSetNextTarget(circle)`へ接続する。
-8. 目的地変更成功後のsurface close有無は、既存目的地画面が確認できるよう成功時に閉じる。失敗時は開いたまま既存error/toastを見せる。
+7. 「目的地にする」用callbackを`DomNearbyMapView` constructorへ追加し、`BrowserApplication`から既存`handleSetNextTarget(circle)`へ接続する。surface側が成功/失敗を判定できるよう、既存処理からboolean等の最小の内部結果を返す。routing処理を複製しない。
+8. 目的地変更に成功した場合だけsurfaceを閉じる。現在地未確定など既存の失敗では開いたまま既存error/toastを見せる。成功判定をtoast文言やDOM表示から逆算しない。
 9. filter変更で選択中cardが候補から消えた場合はselectionを解除する。
 
 ## テスト方針
@@ -60,8 +60,8 @@ Task 10〜12と独立して実装できる。Task 15がこのTaskのcard selecti
 - hold off/onが候補へ反映される。
 - card選択でactionが表示される。
 - 「お品書きを見る」が既存catalog表示へ到達する。
-- 「目的地にする」が`handleSetNextTarget`相当の既存manual destination経路へ一度だけ到達する。
-- current position未確定時は既存error契約を維持する。
+- 「目的地にする」が`handleSetNextTarget`相当の既存manual destination経路へ一度だけ到達し、成功時だけsurfaceを閉じる。
+- current position未確定時は既存error契約を維持し、surfaceを閉じない。
 - `tests/nearby-circle-ranking.test.ts`の既存priority / hold / limit回帰が通る。
 
 ## 検証コマンド
@@ -78,6 +78,7 @@ git diff --check
 - 周辺地図だけでpriority・件数・holdを操作できる。
 - cardを選択し、お品書き表示と目的地変更を明示操作できる。
 - manual destination処理を二重実装していない。
+- 目的地変更の成功/失敗を明示的な内部結果で判定し、表示文言へ依存していない。
 - Route Guidance current positionを周辺originで上書きしていない。
 
 ## 予定コミットメッセージ
