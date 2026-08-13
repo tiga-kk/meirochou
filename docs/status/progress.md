@@ -6,9 +6,9 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.4（Task 10完了・Task 11着手可能）**
-- 現在Task: **Task 11: 候補経路の連続表示とズーム連動線幅**
-- 次に着手するTask: **Task 11**
+- 現在フェーズ: **Phase 7.4（Task 11完了・Task 12着手可能）**
+- 現在Task: **Task 12: 経路animationを実描画基準で再診断**
+- 次に着手するTask: **Task 12**
 - canonical plan: `docs/plans/phase-07-4/README.md`
 - 初期設計: `docs/specs/2026-08-13-phase-07-4-route-visual-nearby-map-and-priority-filter-design.md`
 - follow-up設計: `docs/specs/2026-08-13-phase-07-4-human-acceptance-followups-design.md`
@@ -23,6 +23,8 @@ Task 1〜8の実装とTask 9の自動検証記録は履歴上完了している�
 Task 1〜9を未実装へ巻き戻したり、完了commitを書き換えたりしない。追加修正はTask 10以降で行う。
 
 Task 10で44pxの操作領域を維持したまま、pointer位置とpin中心の画面座標から選択候補を最近傍解決する処理を追加した。current/start/purchased等はpointer候補から除外し、keyboard activationは既存buttonを維持した。focused unit 2件、webapp contract 74件、関連E2Eの機能assertion、architecture/typecheck、`git diff --check`がPASSした。visual snapshot 3件は既存差分として更新していない。
+
+Task 11でcandidate経路を連続した青線へ変更し、GestureZoomControllerの描画済みtransform通知を再利用して、通常・candidate経路の線幅をzoomへ追従させた。4pxの可読下限、focused unit 31件、関連E2Eの機能assertion、architecture/typecheck、`git diff --check`がPASSした。visual snapshot 3件は既存差分として更新していない。
 
 ## 人間確認で判明した未解決事項
 
@@ -56,7 +58,7 @@ Task 10で44pxの操作領域を維持したまま、pointer位置とpin中心�
 | 8 | 一覧以外の購入経路へ最新1件Undoを拡張 | 完了（現在地復元不足） | なし |
 | 9 | 初回の総合回帰・外部確認記録 | 完了（終了判定は失効） | Task 1〜8 |
 | 10 | 近接地図ピンの選択曖昧性を解消 | 完了 | なし |
-| 11 | 候補経路の連続表示とズーム連動線幅 | 未着手 | Task 10後推奨 |
+| 11 | 候補経路の連続表示とズーム連動線幅 | 完了 | Task 10後推奨 |
 | 12 | 経路animationを実描画基準で再診断 | 未着手 | Task 11 |
 | 13 | 周辺地図の絞り込みcontrolsとcard actionを接続 | 未着手 | なし |
 | 14 | 独立地図を元の縦横比で初期表示 | 未着手 | Task 13 |
