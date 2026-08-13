@@ -406,6 +406,7 @@ export class BrowserApplication {
       this.routeMapAssetsLoader,
       this.activeEventDayReader,
       () => this.readCurrentSpace(),
+      (circle) => this.ui.showPdfModal(circle),
     );
     this.activeEventDaySession.subscribe(() => {
       if (this.ui) {

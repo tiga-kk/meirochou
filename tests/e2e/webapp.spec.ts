@@ -56,6 +56,75 @@ test("route未開始でもヘッダーの地図を開閉できる", async ({ pag
   await expect(opener).toBeFocused();
 });
 
+test("周辺地図のお品書きカードとleader lineから既存拡大表示を開ける", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const state = {
+      schemaVersion: 2,
+      source: { type: "csv", fileName: "nearby-catalog-e2e.csv" },
+      sourceGeneration: "nearby-catalog-e2e",
+      circles: [
+        {
+          space: "東ア23a",
+          priority: 10,
+          tweet: "https://example.test/nearby-catalog.png",
+        },
+        {
+          space: "東ア31b",
+          priority: 9,
+          tweet: "https://example.test/nearby-catalog.png",
+        },
+      ],
+      circleStates: {},
+      gasOutbox: [],
+      timestamps: {
+        createdAt: "2026-07-25T00:00:00.000Z",
+        updatedAt: "2026-07-25T00:00:00.000Z",
+        sourceUpdatedAt: "2026-07-25T00:00:00.000Z",
+      },
+    };
+    const ref = { eventId: "demo-v1", dayId: "day1" };
+    localStorage.setItem("comipath:v1:index:event-days", JSON.stringify([ref]));
+    localStorage.setItem("comipath:v1:last-opened", JSON.stringify(ref));
+    localStorage.setItem(
+      "comipath:v1:demo-v1:day1:state",
+      JSON.stringify(state),
+    );
+  });
+
+  await page.goto("/");
+  await expect(page.locator("#loc-ewsn")).toHaveValue("demo-east");
+  await expect(page.locator("#loc-label")).toHaveValue("ア");
+  await page.locator("#loc-number").fill("10");
+  await page.getByRole("button", { name: "地図" }).click();
+  await page.getByRole("button", { name: "現在地を使う" }).click();
+
+  const cards = page.locator(".nearby-catalog-card");
+  await expect(cards).toHaveCount(2);
+  const cardSpaces = await cards.evaluateAll((elements) =>
+    elements.map((element) => element.getAttribute("data-space")),
+  );
+  for (let index = 0; index < cardSpaces.length; index += 1) {
+    const space = cardSpaces[index];
+    expect(space).not.toBeNull();
+    await expect(cards.nth(index)).toContainText(space ?? "");
+    await expect(cards.nth(index)).toContainText(/優先度: (?:10|9)/);
+  }
+
+  const leaders = page.locator(".nearby-map-leader");
+  await expect(cards.first()).toBeVisible();
+  await expect(leaders.first()).toBeVisible();
+  await expect(leaders).toHaveCount(cardSpaces.length);
+  const leaderSpaces = await leaders.evaluateAll((elements) =>
+    elements.map((element) => element.getAttribute("data-space")),
+  );
+  expect(leaderSpaces).toEqual(cardSpaces);
+
+  await cards.first().evaluate((element) => (element as HTMLButtonElement).click());
+  await expect(page.locator("#pdf-modal")).toBeVisible();
+});
+
 test("地図の基準地点は選択モード中のtapだけで変更される", async ({ page }) => {
   await page.goto("/");
 

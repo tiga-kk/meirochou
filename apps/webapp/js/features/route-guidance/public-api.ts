@@ -22,6 +22,7 @@ export {
   clientPointToGridSelection,
   type NearbyMapOrigin,
 } from "./ui/dom-nearby-map-view";
+export { layoutNearbyCatalogCards } from "./ui/nearby-catalog-layout";
 export {
   rankNearbyCircles,
   type NearbyCircleArea,

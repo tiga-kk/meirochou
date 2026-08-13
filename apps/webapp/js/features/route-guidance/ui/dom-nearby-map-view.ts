@@ -21,7 +21,10 @@ import {
   calculateMapPinSize,
   calculateMapViewportLayout,
   calculateNativeImageScale,
+  getPinPosition,
+  normalizeExternalUrl,
 } from "./route-map-pin-model";
+import { layoutNearbyCatalogCards } from "./nearby-catalog-layout";
 
 type NearbyArea = MapArea & {
   id: string;
@@ -92,17 +95,20 @@ export class DomNearbyMapView {
   private tapStart: { pointerId: number; clientX: number; clientY: number } | null = null;
   private renderToken = 0;
   private readonly currentLocationResolver: (() => string | null) | null;
+  private readonly onShowCatalog: ((circle: Circle) => void) | null;
 
   constructor(
     mapAreaCatalog: MapAreaCatalog,
     assetsLoader: RouteMapAssetsLoader,
     circleReader: ActiveCircleReader,
     currentLocationResolver: (() => string | null) | null = null,
+    onShowCatalog: ((circle: Circle) => void) | null = null,
   ) {
     this.mapAreaCatalog = mapAreaCatalog;
     this.assetsLoader = assetsLoader;
     this.circleReader = circleReader;
     this.currentLocationResolver = currentLocationResolver;
+    this.onShowCatalog = onShowCatalog;
     this.areas = mapAreaCatalog.getAllMapAreas().filter((area) => Boolean(area.id || area.areaId)) as readonly NearbyArea[];
     this.surface = document.getElementById("nearby-map-surface");
     if (!this.surface) {
@@ -128,7 +134,9 @@ export class DomNearbyMapView {
         <div id="nearby-map-viewport" class="nearby-map-viewport">
             <div id="nearby-map-layer" class="nearby-map-transform-layer">
             <img id="nearby-map-image" class="nearby-map-image" alt="" />
+            <svg id="nearby-map-leader-layer" class="nearby-map-leader-layer" aria-hidden="true"></svg>
             <div id="nearby-map-pin-layer" class="nearby-map-pin-layer"></div>
+            <div id="nearby-map-card-layer" class="nearby-map-card-layer"></div>
             <span id="nearby-map-origin-marker" aria-label="検索基準地点"></span>
           </div>
         </div>
@@ -172,6 +180,7 @@ export class DomNearbyMapView {
     this.surface.querySelector("#nearby-map-image")?.addEventListener("load", () => {
       this.applyViewportLayout();
       this.renderOriginMarker();
+      this.renderPins(this.activeAssets);
     });
   }
 
@@ -267,8 +276,12 @@ export class DomNearbyMapView {
 
   private renderPins(assets: RouteMapAssets | null): void {
     const layer = this.surface?.querySelector("#nearby-map-pin-layer") as HTMLElement | null;
+    const cardLayer = this.surface?.querySelector("#nearby-map-card-layer") as HTMLElement | null;
+    const leaderLayer = this.surface?.querySelector("#nearby-map-leader-layer") as SVGElement | null;
     if (!layer) return;
     layer.replaceChildren();
+    cardLayer?.replaceChildren();
+    leaderLayer?.replaceChildren();
     const area = this.activeArea;
     const points = assets ? buildMapPointIndex(assets.points) : null;
     const circles = this.origin
@@ -297,6 +310,83 @@ export class DomNearbyMapView {
       element.style.width = `${size}px`;
       element.style.height = `${size}px`;
       layer.appendChild(element);
+    }
+    this.renderCatalogCards(cardLayer, leaderLayer, points);
+  }
+
+  private renderCatalogCards(
+    cardLayer: HTMLElement | null,
+    leaderLayer: SVGElement | null,
+    points: Map<string, MapPoint[]> | null,
+  ): void {
+    if (!cardLayer || !leaderLayer || !this.activeAssets || !this.activeArea || !this.origin) return;
+    const anchors = this.nearbyCandidates.map(({ candidate, position }) => ({
+      candidate,
+      position: position ?? points?.get(candidate.space)?.[0] ?? candidate.mapPosition ?? getPinPosition(candidate.space),
+    }));
+    const cards = layoutNearbyCatalogCards({
+      stageWidth: this.surface?.querySelector("#nearby-map-layer")?.clientWidth || 1,
+      stageHeight: this.surface?.querySelector("#nearby-map-layer")?.clientHeight || 1,
+      anchors: anchors.map(({ candidate, position }) => ({ space: candidate.space, position })),
+    });
+    const svgWidth = this.surface?.querySelector("#nearby-map-layer")?.clientWidth || 1;
+    const svgHeight = this.surface?.querySelector("#nearby-map-layer")?.clientHeight || 1;
+    for (const [index, layout] of cards.entries()) {
+      const { candidate, position } = anchors[index];
+      const anchorX = (position.x / 100) * svgWidth;
+      const anchorY = (position.y / 100) * svgHeight;
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      const endX = Math.max(layout.x, Math.min(anchorX, layout.x + layout.width));
+      const endY = Math.max(layout.y, Math.min(anchorY, layout.y + layout.height));
+      line.setAttribute("x1", String(anchorX));
+      line.setAttribute("y1", String(anchorY));
+      line.setAttribute("x2", String(endX));
+      line.setAttribute("y2", String(endY));
+      line.dataset.space = candidate.space;
+      line.classList.add("nearby-map-leader");
+      leaderLayer.appendChild(line);
+
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "nearby-catalog-card";
+      card.dataset.space = candidate.space;
+      card.style.left = `${layout.x}px`;
+      card.style.top = `${layout.y}px`;
+      card.style.width = `${layout.width}px`;
+      card.style.height = `${layout.height}px`;
+      card.setAttribute("aria-label", `${candidate.space} お品書きを表示`);
+      const imageUrl = normalizeExternalUrl(candidate.tweet);
+      card.addEventListener("click", () => this.onShowCatalog?.({ ...candidate, tweet: imageUrl }));
+      const showPlaceholder = () => {
+        card.querySelector("img")?.remove();
+        if (card.querySelector(".no-image-placeholder")) return;
+        const placeholder = document.createElement("span");
+        placeholder.className = "no-image-placeholder";
+        placeholder.innerHTML = '<i class="fa-regular fa-image"></i><span>No Image</span>';
+        card.prepend(placeholder);
+      };
+      if (imageUrl) {
+        const image = document.createElement("img");
+        image.alt = `${candidate.space} お品書き`;
+        image.loading = "lazy";
+        image.src = imageUrl;
+        image.addEventListener("error", showPlaceholder, { once: true });
+        card.appendChild(image);
+      } else {
+        showPlaceholder();
+      }
+      const info = document.createElement("span");
+      info.className = "nearby-catalog-card-info";
+      const priority = candidate.priority === undefined || candidate.priority === null || String(candidate.priority).trim() === ""
+        ? "未設定"
+        : String(candidate.priority);
+      const spaceLabel = document.createElement("strong");
+      spaceLabel.textContent = candidate.space;
+      const priorityLabel = document.createElement("span");
+      priorityLabel.textContent = `優先度: ${priority}`;
+      info.append(spaceLabel, priorityLabel);
+      card.appendChild(info);
+      cardLayer.appendChild(card);
     }
   }
 

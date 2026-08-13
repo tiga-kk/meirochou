@@ -112,7 +112,9 @@
 }
 
 .nearby-map-image,
-.nearby-map-pin-layer {
+.nearby-map-pin-layer,
+.nearby-map-leader-layer,
+.nearby-map-card-layer {
   position: absolute;
   inset: 0;
   display: block;
@@ -127,6 +129,73 @@
 .nearby-map-pin-layer {
   z-index: 1;
   pointer-events: none;
+}
+
+.nearby-map-leader-layer {
+  z-index: 2;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.nearby-map-leader {
+  stroke: #334155;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.nearby-map-card-layer {
+  z-index: 3;
+  pointer-events: none;
+}
+
+.nearby-catalog-card {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 6px;
+  overflow: hidden;
+  border: 2px solid var(--ink, #17202a);
+  border-radius: 6px;
+  background: var(--bg-card, #fff);
+  color: var(--ink, #17202a);
+  text-align: left;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.nearby-catalog-card img,
+.nearby-catalog-card .no-image-placeholder {
+  display: block;
+  width: 100%;
+  height: 78px;
+  min-height: 0;
+  aspect-ratio: auto;
+  object-fit: cover;
+  border: 0;
+}
+
+.nearby-catalog-card .no-image-placeholder {
+  font-size: 0.75rem;
+}
+
+.nearby-catalog-card .no-image-placeholder i {
+  font-size: 1.2rem;
+}
+
+.nearby-catalog-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nearby-catalog-card { transition: none; }
 }
 
 .nearby-map-pin-layer .map-pin {
