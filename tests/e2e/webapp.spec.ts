@@ -122,6 +122,7 @@ test("route未開始でもヘッダーの地図を開閉できる", async ({ pag
   await page.goto("/");
 
   await expect(page.locator("#header-area-title")).not.toHaveText("地図読込中");
+  await expect(page.locator("#header-map-version")).toHaveText("ver demo-v1");
   const opener = page.getByRole("button", { name: "地図" });
   await opener.click();
 

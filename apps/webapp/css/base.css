@@ -64,10 +64,26 @@ header {
 }
 
 .area-copy strong {
-  display: block;
   font-size: 1rem;
   line-height: 1;
   font-weight: 800;
+}
+
+.area-title-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.map-version {
+  display: inline;
+  margin-top: 0;
+  color: var(--text-sub);
+  font-family: var(--font-ui-sans);
+  font-size: 0.65rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .area-copy span {

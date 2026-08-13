@@ -1330,10 +1330,12 @@ test("webapp renders spreadsheet and source-sheet titles in compact labels", () 
   const uiSource = read("apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts");
 
   assert.match(html, /id="spreadsheet-title"/);
+  assert.match(html, /id="header-map-version"/);
   assert.match(html, /id="target-sheet-name"/);
   assert.match(dataManagerSource, /spreadsheetTitle/);
   assert.match(dataManagerSource, /getSpreadsheetTitle/);
   assert.match(uiSource, /updateSpreadsheetTitle/);
+  assert.match(uiSource, /updateMapVersion/);
   assert.match(uiSource, /viewModel\.sheetNameLabel/);
 });
 

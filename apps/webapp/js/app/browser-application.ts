@@ -1220,6 +1220,7 @@ export class BrowserApplication {
       onCancelRoute: () => this.handleCancelRoute(),
       onCloseRouteSelection: () => this.handleCloseRouteSelection(),
     });
+    this.ui.updateMapVersion?.(manifest?.bundleVersion || manifest?.eventId || "");
     this.renderRoutePriorityFilter();
     const nearbyMapButton = this.document.getElementById("btn-open-nearby-map");
     if (nearbyMapButton) {

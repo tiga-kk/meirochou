@@ -52,6 +52,7 @@ export class DomRouteGuidanceView {
       locLabel: document.getElementById("loc-label"),
       headerAreaMark: document.getElementById("header-area-mark"),
       headerAreaTitle: document.getElementById("header-area-title"),
+      headerMapVersion: document.getElementById("header-map-version"),
       locNumber: document.getElementById("loc-number"),
       targetSection: document.getElementById("target-content"),
       candidatePreviewSurface: document.getElementById(
@@ -654,6 +655,17 @@ export class DomRouteGuidanceView {
     this.els.spreadsheetTitle.textContent = normalizedTitle;
     this.els.spreadsheetTitle.title = normalizedTitle;
     this.els.spreadsheetTitle.classList.toggle("hidden", !normalizedTitle);
+  }
+
+  updateMapVersion(version) {
+    if (!this.els.headerMapVersion) return;
+
+    const normalizedVersion = typeof version === "string" ? version.trim() : "";
+    this.els.headerMapVersion.textContent = normalizedVersion
+      ? `ver ${normalizedVersion}`
+      : "";
+    this.els.headerMapVersion.title = normalizedVersion;
+    this.els.headerMapVersion.classList.toggle("hidden", !normalizedVersion);
   }
 
   /**
