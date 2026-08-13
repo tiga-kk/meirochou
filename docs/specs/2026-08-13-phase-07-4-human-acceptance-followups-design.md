@@ -33,7 +33,7 @@ Task 12では次を別々に切り分ける。
 3. その時間変化が実際のrasterized pixelsの差として現れているか。
 4. pixelsが変化していても、人間が方向として認識できるコントラスト・長さ・速度か。
 
-自動受入では`no-preference`を明示したC108経路overlayの同一cropを異なる時刻に取得し、画像bufferが同一でないことを確認する。computed styleだけを証拠にしない。
+自動受入では`no-preference`を明示したC108経路overlayを使い、通常再生でcomputed valueが時間変化することを確認する。その上で同じanimationを異なる二つの位相へ固定して同一cropを取得し、PNGをpixelとして比較する。raw bufferの単純な不一致や`changedPixels > 0`だけを合格条件にせず、微小な描画ノイズを超える意味のある差分量を固定fixtureでassertする。同じ位相を二度比較する負の対照も置く。computed styleだけを証拠にせず、新しい画像比較依存やproductionのテスト専用分岐も追加しない。
 
 `reduce`時はanimationを無効化する既存アクセシビリティ契約を維持する。その場合でも静的な方向cueは残す。
 
