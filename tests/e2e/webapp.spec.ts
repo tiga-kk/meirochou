@@ -30,6 +30,86 @@ async function dispatchTouchSwipe(
   );
 }
 
+async function readRouteCueSignal(page: Page, overlay: Locator) {
+  const box = await overlay.boundingBox();
+  expect(box).not.toBeNull();
+  const samples = await overlay
+    .locator(".route-flow-comet")
+    .evaluate((element) => {
+      const path = element as SVGGeometryElement;
+      const matrix = path.getScreenCTM();
+      if (!matrix) throw new Error("route cue has no screen transform");
+      const totalLength = path.getTotalLength();
+      return Array.from({ length: 41 }, (_, index) => {
+        const point = path.getPointAtLength((totalLength * index) / 40);
+        return {
+          x: matrix.a * point.x + matrix.c * point.y + matrix.e,
+          y: matrix.b * point.x + matrix.d * point.y + matrix.f,
+        };
+      });
+    });
+  const image = await overlay.screenshot();
+  return page.evaluate(
+    async ({ base64, box, samples }) => {
+      const response = await fetch(`data:image/png;base64,${base64}`);
+      const bitmap = await createImageBitmap(await response.blob());
+      const canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("2d canvas is unavailable");
+      context.drawImage(bitmap, 0, 0);
+      const pixels = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+      const scaleX = bitmap.width / box.width;
+      const scaleY = bitmap.height / box.height;
+      const scores = samples.map(({ x, y }) => {
+        const centerX = Math.round((x - box.x) * scaleX);
+        const centerY = Math.round((y - box.y) * scaleY);
+        let score = 0;
+        for (let offsetY = -4; offsetY <= 4; offsetY += 1) {
+          for (let offsetX = -4; offsetX <= 4; offsetX += 1) {
+            const pixelX = centerX + offsetX;
+            const pixelY = centerY + offsetY;
+            if (
+              pixelX < 0 ||
+              pixelY < 0 ||
+              pixelX >= bitmap.width ||
+              pixelY >= bitmap.height
+            )
+              continue;
+            const offset = (pixelY * bitmap.width + pixelX) * 4;
+            if (
+              pixels[offset + 3] > 0 &&
+              pixels[offset] > 220 &&
+              pixels[offset + 1] > 220 &&
+              pixels[offset + 2] > 220
+            ) {
+              score += 1;
+            }
+          }
+        }
+        return score;
+      });
+      return {
+        scores,
+        visibleSampleCount: scores.filter((score) => score > 0).length,
+      };
+    },
+    {
+      base64: image.toString("base64"),
+      box: { x: box?.x ?? 0, y: box?.y ?? 0, width: box?.width ?? 1, height: box?.height ?? 1 },
+      samples,
+    },
+  );
+}
+
+function differenceBetweenSignals(left: number[], right: number[]): number {
+  return left.reduce(
+    (difference, score, index) => difference + Math.abs(score - (right[index] ?? 0)),
+    0,
+  );
+}
+
 test.beforeEach(async ({ context, page }) => {
   await context.route(
     /(?:cdnjs\.cloudflare\.com|platform\.twitter\.com)/,
@@ -385,6 +465,33 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   const routeFlow = page.locator(
     '[data-route-kind="current"] .route-flow-comet',
   );
+  expect(
+    await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches),
+  ).toBe(false);
+  const naturalStart = await routeFlow.evaluate((element) => {
+    const animation = element
+      .getAnimations()
+      .find((candidate) => candidate instanceof CSSAnimation);
+    return {
+      animationCount: element
+        .getAnimations()
+        .filter((candidate) => candidate instanceof CSSAnimation).length,
+      currentTime: animation?.currentTime,
+      duration: animation?.effect?.getComputedTiming().duration,
+    };
+  });
+  expect(naturalStart.animationCount).toBeGreaterThan(0);
+  expect(typeof naturalStart.currentTime).toBe("number");
+  expect(typeof naturalStart.duration).toBe("number");
+  await page.waitForTimeout(180);
+  const naturalEnd = await routeFlow.evaluate((element) => {
+    const animation = element
+      .getAnimations()
+      .find((candidate) => candidate instanceof CSSAnimation);
+    return animation?.currentTime;
+  });
+  expect(naturalEnd).toBeGreaterThan(naturalStart.currentTime ?? 0);
+
   const offsets = [];
   for (let index = 0; index < 3; index += 1) {
     offsets.push(
@@ -395,6 +502,57 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
     await page.waitForTimeout(180);
   }
   expect(new Set(offsets).size).toBeGreaterThan(1);
+
+  const seekAnimation = async (time: number) => {
+    await routeFlow.evaluate((element, animationTime) => {
+      const animation = element
+        .getAnimations()
+        .find((candidate) => candidate instanceof CSSAnimation);
+      if (!animation) throw new Error("production CSSAnimation is missing");
+      animation.pause();
+      animation.currentTime = animationTime;
+    }, time);
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+  };
+  const duration = Number(naturalStart.duration);
+  await seekAnimation(0);
+  const samePhaseA = await readRouteCueSignal(
+    page,
+    page.locator('[data-route-kind="current"]'),
+  );
+  await seekAnimation(0);
+  const samePhaseB = await readRouteCueSignal(
+    page,
+    page.locator('[data-route-kind="current"]'),
+  );
+  await seekAnimation(duration / 4);
+  const laterPhase = await readRouteCueSignal(
+    page,
+    page.locator('[data-route-kind="current"]'),
+  );
+  expect(samePhaseA.visibleSampleCount).toBeGreaterThan(0);
+  expect(laterPhase.visibleSampleCount).toBeGreaterThan(0);
+  const samePhaseDifference = differenceBetweenSignals(
+    samePhaseA.scores,
+    samePhaseB.scores,
+  );
+  const crossPhaseDifference = differenceBetweenSignals(
+    samePhaseA.scores,
+    laterPhase.scores,
+  );
+  expect(crossPhaseDifference).toBeGreaterThan(samePhaseDifference * 3 + 1);
+  const positiveDelta = laterPhase.scores.reduce(
+    (sum, score, index) =>
+      sum + Math.max(0, score - (samePhaseA.scores[index] ?? 0)),
+    0,
+  );
+  const negativeDelta = laterPhase.scores.reduce(
+    (sum, score, index) =>
+      sum + Math.max(0, (samePhaseA.scores[index] ?? 0) - score),
+    0,
+  );
+  expect(positiveDelta).toBeGreaterThan(negativeDelta + 1);
+
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(
     page.locator('[data-route-kind="current"] .route-flow-comet'),

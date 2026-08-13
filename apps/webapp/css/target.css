@@ -143,8 +143,9 @@
   stroke-width: var(--route-flow-stroke-width, 9px);
   vector-effect: non-scaling-stroke;
   stroke-linecap: round;
-  stroke-dasharray: 32 68;
-  animation: route-flow-comet 0.9s linear infinite;
+  stroke-dasharray: var(--route-flow-cue-length, 24)
+    var(--route-flow-gap-length, 76);
+  animation: route-flow-comet var(--route-flow-duration, 600ms) linear infinite;
   pointer-events: none;
 }
 

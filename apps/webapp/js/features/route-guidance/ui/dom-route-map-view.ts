@@ -10,6 +10,7 @@ import {
   calculateNativeImageScale,
   resolveNearestMapPin,
 } from "./route-map-pin-model";
+import { calculateRouteMotionMetrics } from "./route-motion-metrics";
 import { buildRouteOverlaySvg } from "./route-overlay-svg";
 
 function findAreaForSpace(space, mapAreaCatalog) {
@@ -97,6 +98,8 @@ export class DomRouteMapView {
     this.lastNavigationContext = null;
     this.navigationMapImageLoadListenerAttached = false;
     this.navigationMapResizeObserver = null;
+    this.currentRouteMotionContext = null;
+    this.routeMotionRenderedWidth = 0;
 
     this.init();
   }
@@ -123,8 +126,10 @@ export class DomRouteMapView {
         this.els.navigationMapLayer,
         {
           overscrollLimit: 18,
-          onTransformChange: ({ scale }) =>
-            this.applyRouteOverlayStrokeWidth(scale),
+          onTransformChange: ({ scale }) => {
+            this.applyRouteOverlayStrokeWidth(scale);
+            this.applyCurrentRouteMotionMetrics(scale);
+          },
         },
       );
       if (typeof ResizeObserver === "function") {
@@ -188,6 +193,7 @@ export class DomRouteMapView {
   }
 
   resetPinLayerBox() {
+    this.routeMotionRenderedWidth = 0;
     if (!this.els.pinLayer) return;
 
     this.els.pinLayer.style.left = "";
@@ -217,7 +223,9 @@ export class DomRouteMapView {
         renderedWidth: layer.clientWidth,
       }),
     );
+    this.routeMotionRenderedWidth = layer.clientWidth;
     this.applyRouteOverlayStrokeWidth(this.zoomHelper?.state.scale ?? 1);
+    this.applyCurrentRouteMotionMetrics(this.zoomHelper?.state.scale ?? 1);
   }
 
   applyRouteOverlayStrokeWidth(scale) {
@@ -229,6 +237,33 @@ export class DomRouteMapView {
     this.els.pinLayer?.style.setProperty(
       "--route-flow-stroke-width",
       `${Math.max(3, baseWidth * 0.75)}px`,
+    );
+  }
+
+  applyCurrentRouteMotionMetrics(scale) {
+    const context = this.currentRouteMotionContext;
+    const renderedWidth = this.routeMotionRenderedWidth;
+    if (!context || !renderedWidth) return;
+
+    const metrics = calculateRouteMotionMetrics({
+      sourceRouteLengthPx: context.route.physicalPixelLength,
+      imageWidth: context.route.image.width,
+      renderedWidth,
+      zoomScale: scale,
+    });
+    if (!metrics) return;
+
+    context.overlay.style.setProperty(
+      "--route-flow-cue-length",
+      `${metrics.cuePathLengthUnits}`,
+    );
+    context.overlay.style.setProperty(
+      "--route-flow-gap-length",
+      `${metrics.gapPathLengthUnits}`,
+    );
+    context.overlay.style.setProperty(
+      "--route-flow-duration",
+      `${metrics.durationMs}ms`,
     );
   }
 
@@ -249,6 +284,7 @@ export class DomRouteMapView {
       imageWidth: image.naturalWidth,
       imageHeight: image.naturalHeight,
     });
+    this.routeMotionRenderedWidth = layout.stageWidth;
     viewport.style.height = `${layout.viewportHeight}px`;
     stage.style.width = `${layout.stageWidth}px`;
     stage.style.height = `${layout.stageHeight}px`;
@@ -297,7 +333,12 @@ export class DomRouteMapView {
     if (!this.els.pinLayer || !route) return;
 
     const overlay = buildRouteOverlaySvg(route, document, kind);
-    if (overlay) this.els.pinLayer.appendChild(overlay);
+    if (!overlay) return;
+    this.els.pinLayer.appendChild(overlay);
+    if (kind === "current") {
+      this.currentRouteMotionContext = { route, overlay };
+      this.applyCurrentRouteMotionMetrics(this.zoomHelper?.state.scale ?? 1);
+    }
   }
 
   maybeFitRoutes({ currentRoute, selectedRoute, fitMode }) {
@@ -399,6 +440,7 @@ export class DomRouteMapView {
     });
 
     this.els.pinLayer.innerHTML = "";
+    this.currentRouteMotionContext = null;
     this.renderRouteOverlay(currentRoute, "current");
     const candidateRouteVisible =
       selectedTarget?.space &&
