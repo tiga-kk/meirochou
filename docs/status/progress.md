@@ -1,105 +1,52 @@
 # 実装進捗
 
-更新日: 2026-08-13
+更新日: 2026-08-14
 
-この文書を、現在フェーズ、現在Task、次に着手するTask、未完了の外部確認の唯一の正本とする。Task文書やREADMEへ進行中のHEAD・次Taskを重複して固定しない。
+この文書を現在フェーズ・現在Task・次Task・未完了外部確認の正本とする。各Taskの詳細は`docs/plans/phase-07-4/`とreview文書を参照する。
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.4（Task 17完了・Task 18確認中）**
-- 現在Task: **Task 18: 人間受入と回帰検証でPhaseを再終了**
-- 次に着手するTask: **Task 18**
+- 現在フェーズ: **Phase 7.4（Task 18人間受入FAIL・follow-up中）**
+- 現在Task: **Task 19: Android実機でcurrent route animationを診断・修正**
+- 次に着手するTask: **Task 19**
 - canonical plan: `docs/plans/phase-07-4/README.md`
-- 初期設計: `docs/specs/2026-08-13-phase-07-4-route-visual-nearby-map-and-priority-filter-design.md`
-- follow-up設計: `docs/specs/2026-08-13-phase-07-4-human-acceptance-followups-design.md`
-- 人間受入FAIL記録: `docs/reviews/phase-07-4-human-acceptance-failures.md`
+- 人間受入FAIL: `docs/reviews/phase-07-4-human-acceptance-failures.md`
+- 自動/外部検証: `docs/reviews/phase-07-4-field-verification.md`
 
-Task開始時の基準commitは、実装開始直前の指定branchの最新remote HEADから取得する。過去の文書SHAを実装基準として固定しない。
+Task 1〜17の実装履歴は保持する。Task 18の自動再検証では新規回帰を修正した後、`npm run test:e2e:ci`が60 passed / 7既存snapshot failed / 8 skippedとなった。その後の2026-08-14 Android実画面確認で3件が残ったため、Phase終了判定はFAILした。
 
-## Task 1〜9の扱い
+## 未解決事項
 
-Task 1〜8の実装とTask 9の自動検証記録は履歴上完了している。2026-08-13の人間確認でvisual/interaction FAILが判明したため、Task 9の**Phase終了判定だけを失効**させる。
-
-Task 1〜9を未実装へ巻き戻したり、完了commitを書き換えたりしない。追加修正はTask 10以降で行う。
-
-Task 10で44pxの操作領域を維持したまま、pointer位置とpin中心の画面座標から選択候補を最近傍解決する処理を追加した。current/start/purchased等はpointer候補から除外し、keyboard activationは既存buttonを維持した。focused unit 2件、webapp contract 74件、関連E2Eの機能assertion、architecture/typecheck、`git diff --check`がPASSした。visual snapshot 3件は既存差分として更新していない。
-
-Task 11でcandidate経路を連続した青線へ変更し、GestureZoomControllerの描画済みtransform通知を再利用して、通常・candidate経路の線幅をzoomへ追従させた。4pxの可読下限、focused unit 31件、関連E2Eの機能assertion、architecture/typecheck、`git diff --check`がPASSした。visual snapshot 3件は既存差分として更新していない。
-
-Task 12でcurrent routeのcue長・速度をscreen-space計算へ接続し、layout確定時のrendered widthとTask 11のzoom通知だけでCSS custom propertyを更新するようにした。production `CSSAnimation`の自然進行、同一animation instanceをseekしたraster差分、start→goal方向、reduced-motionを関連E2Eで確認した。animation削除・逆方向・透明化のmutationはそれぞれ自然進行・方向・raster assertionでREDになり、復元後のfocused unit 13件、architecture/typecheck、`git diff --check`がPASSした。visual snapshot 2件は既存差分として更新していない。
-
-Task 13で周辺地図へpriority複数選択、5/10/15/20件、保留表示controlsを追加し、既存`setNearbyFilters()`へ接続した。カードを選択可能なcontainerへ変更し、選択状態と「お品書きを見る」「目的地にする」actionを追加した。目的地callbackは`handleSetNextTarget()`の明示boolean結果だけで成功時にsurfaceを閉じ、失敗時は開いたままにした。focused E2E 1件、nearby unit 6件、priority/ranking、architecture/typecheck、`git diff --check`がPASSした。既存visual snapshot 2件は更新していない。
-
-Task 14でstandalone周辺地図のdialog内利用可能領域を測定し、画像全体を元の縦横比のままcontain表示するviewport/stage寸法を`GestureZoomController.setLayout()`へ渡すようにした。dialogのresize時は同じfitを再適用し、候補再描画ではlayout/resetを呼ばない。横長・縦長のfocused unit 2件、関連E2E 2件、architecture/typecheck、`git diff --check`がPASSした。`npm run test:webapp`は786/787件がPASSし、公開境界検査の一時worktree `.git`絶対パス検出だけが既存環境要因で失敗した。
-
-Task 15で周辺カードとleader lineをmap transform layer外のviewport overlayへ移し、zoom/pan時は既存transform通知からscreen-space位置だけを更新するようにした。画面内slotを決定的に探索し、既配置カードとの交差を避け、選択カードを前面化した。leader lineは明色underlayと濃色foregroundの二重線にした。密集5件のlayout unit 3件、関連E2E 1件、architecture/typecheck、`git diff --check`がPASSした。`npm run test:webapp`は787/788件がPASSし、公開境界検査の一時worktree `.git`絶対パス検出だけが既存環境要因で失敗した。
-
-Task 16で購入直前のフォーム値を通常購入・Gallery購入の共通Undo情報へ保存し、Undo後にroute snapshot復元、フォーム更新、`currentStartSpace`復元を行うようにした。保存値がない場合は`arrived-circle.circleSpace`だけをfallbackに使い、それ以外ではフォームへ推測値を書かない。area表示名からselectのarea idへ戻す既存UI更新の不整合も修正した。購入関連unit 23件、指定E2E 5件、architecture/typecheck、`git diff --check`がPASSした。
-
-Task 17で通常経路地図と周辺地図のviewport中心を画像座標へ逆変換し、全地点JSONから最寄りの配置を「表示中心: …付近」として表示するようにした。zoom/pan更新は100msで遅延し、overscrollは画像境界へclampした。中心変換unit 3件、関連map unit 21件、表示確認を含むE2E 5件、architecture/typecheck、`git diff --check`がPASSした。既存スナップショット失敗は基準commitでも再現したため既存失敗として分離し、snapshotは更新していない。
-
-その後の独立レビューで、Task 17変更によりin-flightの`pointIndexCache` Promiseから再描画へ接続されずpinが消える回帰を確認した。元の非`Map`・非`null`判定へ戻し、route overlay contract assertionを追加した。併せて、nearby card/leader lineはtransformごとにDOMを再生成せず既存要素の座標だけを更新する構造へ変更し、選択cardの実寸相当高さを配置計算へ反映した。関連unit 36件、nearby/candidate機能E2E 3件がPASSした。
-
-## 人間確認で判明した未解決事項
-
-| 項目 | 対応Task |
+| 問題 | 対応Task |
 |---|---|
-| 近接する地図pinの44px hit areaが重なり候補を選び分けにくい | Task 10 |
-| 行き先変更candidateの青線が破線で途切れて見える | Task 11 |
-| 拡大時も赤/青経路線が太いままで通路を覆う | Task 11 |
-| current route animationを人間が視認できない | Task 12 |
-| 周辺地図にpriority / 件数 / holdの操作UIがない | Task 13 |
-| 周辺cardを選択して目的地にする操作がない | Task 13, 15 |
-| 周辺cardが重なり、前面化できない | Task 15 |
-| leader lineが細く地図上で追いにくい | Task 15 |
-| standalone mapが固定的な横長viewportで不格好 | Task 14 |
-| 購入Undo後に現在地フォームが空欄になる | Task 16 |
-| 拡大時に現在見ている配置付近が分からない | Task 17 |
+| Android Chrome実機でcurrent route animationが見えない。`prefers-reduced-motion`かproduction描画か未分離 | Task 19 |
+| 通常route map / 独立「地図」で横長mapが小さく操作しづらい | Task 20 |
+| 独立「地図」でお品書きcardがmapを覆う。leader line自体は良好 | Task 21 |
 
-詳細な再現・現行コード根拠は`docs/reviews/phase-07-4-human-acceptance-failures.md`を参照する。
+Task 19ではAndroid実機の`prefers-reduced-motion`、production `CSSAnimation`の存在・進行・可視性を順に確認する。`reduce`ならanimationを強制せず、`no-preference`でも再現する場合だけproduction描画を修正する。
 
-## Phase 7.4
+Task 20では横長mapの全体containを絶対条件にせず、390px程度のphoneで約280pxの地図高さを目安にし、必要なら左右crop + panを許可する。通常route mapと独立mapへ同じ方針を適用する。
 
-| Task | 内容 | 状態 | 依存 |
-|---|---|---|---|
-| 1 | 経路animationのscreen-space診断と修正 | 完了 | なし |
-| 2 | priority判定規則の共通化 | 完了 | なし |
-| 3 | priority条件を通常の経路案内へ適用 | 完了 | Task 2 |
-| 4 | 独立した地図閲覧surfaceの追加 | 完了 | なし |
-| 5 | 任意検索基準地点とgrid origin解決 | 完了 | Task 4 |
-| 6 | grid距離による周辺サークルランキング | 完了 | Task 2, 5 |
-| 7 | 地図上のお品書きカード・leader line・配置 | 完了（人間受入で不足判明） | Task 6 |
-| 8 | 一覧以外の購入経路へ最新1件Undoを拡張 | 完了（現在地復元不足） | なし |
-| 9 | 初回の総合回帰・外部確認記録 | 完了（終了判定は失効） | Task 1〜8 |
-| 10 | 近接地図ピンの選択曖昧性を解消 | 完了 | なし |
-| 11 | 候補経路の連続表示とズーム連動線幅 | 完了 | Task 10後推奨 |
-| 12 | 経路animationを実描画基準で再診断 | 完了 | Task 11 |
-| 13 | 周辺地図の絞り込みcontrolsとcard actionを接続 | 完了 | なし |
-| 14 | 独立地図を元の縦横比で初期表示 | 完了 | Task 13 |
-| 15 | 周辺カードを画面座標で非重複配置 | 完了 | Task 11, 13, 14 |
-| 16 | 購入Undoで現在地入力も復元 | 完了 | なし |
-| 17 | 地図viewport中心の配置位置を常時表示 | 完了 | Task 11, 14 |
-| 18 | 人間受入と回帰検証でPhaseを再終了 | 進行中 | Task 10〜17 |
+Task 21では周辺cardをmap外の下部stripへ移し、leader lineを地図上anchorから外側cardへ維持する。pan/zoom/strip scrollでcard DOMを再生成しない。
 
-## 既存の外部確認残件
+## Task状態
 
-- 実GASで同一space再送が新規行追加ではなく既存行更新になる明示証拠。
-- GAS更新時に対象外の既存Sheet列が保持される明示証拠。
-- Phase 7.3からのmap drag体感遅延はphysical inputで再現できる場合のみ再調査する。証拠なしでgesture実装を書き換えない。
+- Task 1〜17: 完了。Task 12はAndroid実機FAILをTask 19へ、Task 14はwide-map補正をTask 20へ、Task 15はcard外部配置をTask 21へ引き継ぐ。
+- Task 18: **完了（人間受入FAIL）**。
+- Task 19: 未着手。
+- Task 20: 未着手。
+- Task 21: 未着手。
+- Task 22: 未着手。Task 19〜21後の最終人間受入。
 
-これらはTask 18で環境が利用できれば確認する。資格情報や実機が利用不能なら理由付き未確認として残せる。
+## 外部確認残件
+
+- 実GASの同一space更新・既存Sheet列保持。
+- Phase 7.3からのmap drag体感遅延はphysical inputで再現できる場合のみ再調査する。
 
 ## 進行規則
 
 - 一度に一Taskずつ実装・review・commitする。
-- Task 10〜17は各Taskのfocused REDを先に作る。
-- Task 12のanimationはcomputed styleだけで完了判定しない。
-- Task 18はheadless自動テストだけで人間受入済みにしない。
-- Task 18の自動検証は完了したが、headed環境がなく人間受入未確認のためPhase終了にしない。
-- 完了済みTask 1〜9のcommitをrebase/resetで作り直さない。
-- 未完了WIPを破棄、stash、resetして再出発しない。
-- 各Taskの基準点は開始直前の最新remote HEADから取得する。
-- snapshotは意味的・人間visual確認なしに一括更新しない。
-- 新しい依存関係は既存標準機能で要件を満たせない場合だけ追加する。
-
-過去の自動検証結果は`docs/reviews/phase-07-4-field-verification.md`、今回の人間受入FAILは`docs/reviews/phase-07-4-human-acceptance-failures.md`を参照する。
+- Task 19で`prefers-reduced-motion: reduce`を無視しない。
+- Task 21でtransformごとのcard DOM再生成を再導入しない。
+- Task 22はheadless自動検証だけで人間受入済みにしない。
+- snapshotは人間visual確認なしに一括更新しない。
