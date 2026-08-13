@@ -80,4 +80,25 @@ describe("DomNearbyMapView", () => {
     expect(view.isOpen()).toBe(false);
     expect(document.activeElement).toBe(opener);
   });
+
+  it("closes only when the nearby destination callback succeeds", async () => {
+    const view = Object.create(DomNearbyMapView.prototype) as any;
+    const close = vi.fn();
+    const button = document.createElement("button");
+    view.close = close;
+    view.onSetNextTarget = vi.fn(async () => true);
+
+    await view.selectNearbyTarget({ space: "東ア01" }, null, button);
+
+    expect(view.onSetNextTarget).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(button.disabled).toBe(false);
+
+    close.mockReset();
+    view.onSetNextTarget = vi.fn(async () => false);
+    await view.selectNearbyTarget({ space: "東ア02" }, null, button);
+
+    expect(close).not.toHaveBeenCalled();
+    expect(button.disabled).toBe(false);
+  });
 });

@@ -95,6 +95,44 @@
   padding: 0.5rem 0.75rem;
 }
 
+.nearby-map-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nearby-map-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.nearby-map-filter-label,
+.nearby-map-limit-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.nearby-map-priority-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nearby-map-controls .priority-chip,
+.nearby-map-limit {
+  min-height: 44px;
+}
+
+.nearby-map-held-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
 .nearby-map-viewport {
   position: relative;
   min-height: 220px;
@@ -164,6 +202,23 @@
   text-align: left;
   pointer-events: auto;
   cursor: pointer;
+}
+
+.nearby-catalog-card[aria-selected="true"] {
+  z-index: 2;
+  border-color: var(--primary, #1d4ed8);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.25);
+}
+
+.nearby-catalog-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.nearby-catalog-card-actions button {
+  min-height: 44px;
+  padding: 4px 8px;
 }
 
 .nearby-catalog-card img,

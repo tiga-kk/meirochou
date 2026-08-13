@@ -408,6 +408,7 @@ export class BrowserApplication {
       this.activeEventDayReader,
       () => this.readCurrentSpace(),
       (circle) => this.ui.showPdfModal(circle),
+      (circle) => this.handleSetNextTarget(circle),
     );
     this.activeEventDaySession.subscribe(() => {
       if (this.ui) {
@@ -1516,8 +1517,8 @@ export class BrowserApplication {
   /**
    * 手動で目的地を設定
    */
-  async handleSetNextTarget(circle: Circle) {
-    if (!circle) return;
+  async handleSetNextTarget(circle: Circle): Promise<boolean> {
+    if (!circle) return false;
 
     // The dev-only UI fixture intentionally has no production map bundle.
     if (isDevDemoEnabled(this.window.location)) {
@@ -1529,20 +1530,20 @@ export class BrowserApplication {
       circle.space,
       this.wantToBuy,
     );
-    if (result.kind === "ignored" || result.kind === "stale") return;
+    if (result.kind === "ignored" || result.kind === "stale") return false;
     if (result.kind === "missing-position") {
       this.ui.showToast(
         "現在地が確定していないため、目的地を変更できません",
         "error",
       );
-      return;
+      return false;
     }
     if (result.kind === "route-unavailable") {
       this.ui.showToast(
         "経路の再構築に失敗したため、目的地を変更できません",
         "error",
       );
-      return;
+      return false;
     }
     if (result.kind === "failed") {
       if (result.reason === "route-calculation") {
@@ -1561,11 +1562,11 @@ export class BrowserApplication {
         );
         this.ui.showToast("目的地を変更できませんでした", "error");
       }
-      return;
+      return false;
     }
     const currentPosition =
       this.routeGuidanceSession.getSnapshot().navigationState?.currentPosition;
-    if (!currentPosition) return;
+    if (!currentPosition) return false;
     this.currentStartSpace =
       currentPosition.source === "arrived-circle"
         ? currentPosition.circleSpace || ""
@@ -1574,6 +1575,7 @@ export class BrowserApplication {
     this.ui.showNavigation(this.getNavigationContext("current"));
     this.ui.showToast(`目的地を ${circle.space} に設定しました`);
     this.saveNavigationSnapshot();
+    return true;
   }
 
   readCurrentSpace() {
@@ -1598,10 +1600,10 @@ export class BrowserApplication {
   }
 
   /** Legacy gallery target behavior used only by the dev UI fixture. */
-  async handleSetNextTargetDevDemo(circle: Circle) {
+  async handleSetNextTargetDevDemo(circle: Circle): Promise<boolean> {
     this.routeGuidanceController.invalidatePendingDestinationSelection();
     const currentSpace = this.readCurrentSpace();
-    if (!currentSpace) return;
+    if (!currentSpace) return false;
 
     this.ui.showLoading();
     let gridTarget = null;
@@ -1628,6 +1630,7 @@ export class BrowserApplication {
     this.selectionMessage = "";
     this.ui.showNavigation(this.getNavigationContext("current"));
     this.ui.showToast(`目的地を ${circle.space} に設定しました`);
+    return true;
   }
 
   /**

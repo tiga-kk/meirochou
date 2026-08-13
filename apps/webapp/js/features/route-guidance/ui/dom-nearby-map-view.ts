@@ -9,6 +9,7 @@ import type {
   RouteMapAssetsLoader,
 } from "../public-api";
 import { snapStartToWalkableCell } from "../domain/start-selection";
+import { collectCirclePriorities } from "../../../shared/domain/circle-priority-filter";
 import type { GridMeta } from "../domain/routing/grid-route-types";
 import {
   rankNearbyCircles,
@@ -91,11 +92,14 @@ export class DomNearbyMapView {
   private selectedPriorities: readonly number[] | null = null;
   private includeHeld = false;
   private nearbyLimit: NearbyCircleLimit = 5;
+  private selectedSpace: string | null = null;
   private selectionMode = false;
   private tapStart: { pointerId: number; clientX: number; clientY: number } | null = null;
   private renderToken = 0;
   private readonly currentLocationResolver: (() => string | null) | null;
   private readonly onShowCatalog: ((circle: Circle) => void) | null;
+  private readonly onSetNextTarget:
+    ((circle: Circle) => Promise<boolean> | boolean) | null;
 
   constructor(
     mapAreaCatalog: MapAreaCatalog,
@@ -103,12 +107,14 @@ export class DomNearbyMapView {
     circleReader: ActiveCircleReader,
     currentLocationResolver: (() => string | null) | null = null,
     onShowCatalog: ((circle: Circle) => void) | null = null,
+    onSetNextTarget: ((circle: Circle) => Promise<boolean> | boolean) | null = null,
   ) {
     this.mapAreaCatalog = mapAreaCatalog;
     this.assetsLoader = assetsLoader;
     this.circleReader = circleReader;
     this.currentLocationResolver = currentLocationResolver;
     this.onShowCatalog = onShowCatalog;
+    this.onSetNextTarget = onSetNextTarget;
     this.areas = mapAreaCatalog.getAllMapAreas().filter((area) => Boolean(area.id || area.areaId)) as readonly NearbyArea[];
     this.surface = document.getElementById("nearby-map-surface");
     if (!this.surface) {
@@ -130,6 +136,23 @@ export class DomNearbyMapView {
         <div class="nearby-map-origin-controls">
           <button type="button" id="btn-nearby-use-current-location">現在地を使う</button>
           <button type="button" id="btn-nearby-select-origin">基準地点を変更</button>
+        </div>
+        <div id="nearby-map-controls" class="nearby-map-controls" aria-label="周辺地図の絞り込み">
+          <div class="nearby-map-filter-group">
+            <span class="nearby-map-filter-label">優先度</span>
+            <div id="nearby-map-priority-filter" class="nearby-map-priority-filter"></div>
+          </div>
+          <label class="nearby-map-limit-label" for="nearby-map-limit">表示件数</label>
+          <select id="nearby-map-limit" class="nearby-map-limit">
+            <option value="5">5件</option>
+            <option value="10">10件</option>
+            <option value="15">15件</option>
+            <option value="20">20件</option>
+          </select>
+          <label class="nearby-map-held-label">
+            <input type="checkbox" id="nearby-map-include-held" />
+            保留も表示
+          </label>
         </div>
         <div id="nearby-map-viewport" class="nearby-map-viewport">
             <div id="nearby-map-layer" class="nearby-map-transform-layer">
@@ -157,6 +180,7 @@ export class DomNearbyMapView {
     this.surface.addEventListener("click", (event) => {
       if (event.target === this.surface) this.close();
     });
+    this.renderNearbyControls();
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && this.isOpen()) this.close();
     });
@@ -194,6 +218,7 @@ export class DomNearbyMapView {
     this.opener = opener;
     this.surface.classList.remove("hidden");
     this.renderAreaOptions();
+    this.renderNearbyControls();
     const fallback = this.areas.find((area) =>
       this.circleReader.getAllCircles().some((circle) =>
         this.circleReader.getCircleStatus(circle.space) !== "purchased" && areaForSpace(circle.space, [area]),
@@ -226,7 +251,75 @@ export class DomNearbyMapView {
     }
     if (input.includeHeld !== undefined) this.includeHeld = input.includeHeld;
     if (input.limit !== undefined) this.nearbyLimit = input.limit;
+    this.syncNearbyControlState();
     this.updateNearbyCandidates();
+  }
+
+  private renderNearbyControls(): void {
+    const priorityContainer = this.surface?.querySelector(
+      "#nearby-map-priority-filter",
+    );
+    const priorities = collectCirclePriorities(this.circleReader.getAllCircles());
+    if (priorityContainer) {
+      priorityContainer.replaceChildren();
+      const selected = this.selectedPriorities ?? [];
+      const all = document.createElement("button");
+      all.type = "button";
+      all.className = "priority-chip nearby-priority-chip";
+      all.textContent = "すべて";
+      all.setAttribute("aria-pressed", String(selected.length === 0));
+      all.addEventListener("click", () =>
+        this.setNearbyFilters({ selectedPriorities: null }),
+      );
+      priorityContainer.appendChild(all);
+      for (const priority of priorities) {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "priority-chip nearby-priority-chip";
+        chip.textContent = String(priority);
+        chip.setAttribute("aria-pressed", String(selected.includes(priority)));
+        chip.addEventListener("click", () => {
+          const current = this.selectedPriorities ?? [];
+          const next = current.includes(priority)
+            ? current.filter((value) => value !== priority)
+            : [...current, priority];
+          this.setNearbyFilters({
+            selectedPriorities: next.length > 0 ? next : null,
+          });
+        });
+        priorityContainer.appendChild(chip);
+      }
+    }
+    this.syncNearbyControlState();
+  }
+
+  private syncNearbyControlState(): void {
+    const selected = this.selectedPriorities ?? [];
+    this.surface
+      ?.querySelectorAll(".nearby-priority-chip")
+      .forEach((chip) => {
+        const value = chip.textContent === "すべて" ? null : Number(chip.textContent);
+        chip.setAttribute(
+          "aria-pressed",
+          String(value === null ? selected.length === 0 : selected.includes(value)),
+        );
+      });
+    const limit = this.surface?.querySelector("#nearby-map-limit") as HTMLSelectElement | null;
+    if (limit) {
+      limit.value = String(this.nearbyLimit);
+      limit.onchange = () => {
+        this.setNearbyFilters({
+          limit: Number(limit.value) as NearbyCircleLimit,
+        });
+      };
+    }
+    const held = this.surface?.querySelector(
+      "#nearby-map-include-held",
+    ) as HTMLInputElement | null;
+    if (held) {
+      held.checked = this.includeHeld;
+      held.onchange = () => this.setNearbyFilters({ includeHeld: held.checked });
+    }
   }
 
   private renderAreaOptions(): void {
@@ -247,6 +340,7 @@ export class DomNearbyMapView {
     this.activeAssets = null;
     this.origin = null;
     this.nearbyCandidates = [];
+    this.selectedSpace = null;
     this.selectionMode = false;
     this.renderOriginMarker();
     const token = ++this.renderToken;
@@ -346,17 +440,38 @@ export class DomNearbyMapView {
       line.classList.add("nearby-map-leader");
       leaderLayer.appendChild(line);
 
-      const card = document.createElement("button");
-      card.type = "button";
+      const card = document.createElement("article");
       card.className = "nearby-catalog-card";
       card.dataset.space = candidate.space;
+      card.setAttribute("role", "group");
+      card.tabIndex = 0;
+      card.setAttribute("aria-selected", String(this.selectedSpace === candidate.space));
       card.style.left = `${layout.x}px`;
       card.style.top = `${layout.y}px`;
       card.style.width = `${layout.width}px`;
       card.style.height = `${layout.height}px`;
-      card.setAttribute("aria-label", `${candidate.space} お品書きを表示`);
+      card.setAttribute("aria-label", `${candidate.space} 周辺カード`);
+      const selectCard = () => {
+        this.selectedSpace =
+          this.selectedSpace === candidate.space ? null : candidate.space;
+        this.renderPins(this.activeAssets);
+      };
+      card.addEventListener("click", (event) => {
+        if ((event.target as HTMLElement).closest("button")) return;
+        if (event.detail > 0) return;
+        selectCard();
+      });
+      card.addEventListener("pointerdown", (event) => event.stopPropagation());
+      card.addEventListener("pointerup", (event) => {
+        event.stopPropagation();
+        if (!(event.target as HTMLElement).closest("button")) selectCard();
+      });
+      card.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        selectCard();
+      });
       const imageUrl = normalizeExternalUrl(candidate.tweet);
-      card.addEventListener("click", () => this.onShowCatalog?.({ ...candidate, tweet: imageUrl }));
       const showPlaceholder = () => {
         card.querySelector("img")?.remove();
         if (card.querySelector(".no-image-placeholder")) return;
@@ -386,6 +501,25 @@ export class DomNearbyMapView {
       priorityLabel.textContent = `優先度: ${priority}`;
       info.append(spaceLabel, priorityLabel);
       card.appendChild(info);
+      const actions = document.createElement("div");
+      actions.className = "nearby-catalog-card-actions";
+      actions.hidden = this.selectedSpace !== candidate.space;
+      const catalogButton = document.createElement("button");
+      catalogButton.type = "button";
+      catalogButton.textContent = "お品書きを見る";
+      catalogButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.onShowCatalog?.({ ...candidate, tweet: imageUrl });
+      });
+      const targetButton = document.createElement("button");
+      targetButton.type = "button";
+      targetButton.textContent = "目的地にする";
+      targetButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        void this.selectNearbyTarget(candidate, imageUrl, targetButton);
+      });
+      actions.append(catalogButton, targetButton);
+      card.appendChild(actions);
       cardLayer.appendChild(card);
     }
   }
@@ -503,7 +637,31 @@ export class DomNearbyMapView {
       includeHeld: this.includeHeld,
       limit: this.nearbyLimit,
     });
+    if (
+      this.selectedSpace &&
+      !this.nearbyCandidates.some(({ candidate }) => candidate.space === this.selectedSpace)
+    ) {
+      this.selectedSpace = null;
+    }
     this.renderPins(this.activeAssets);
+  }
+
+  private async selectNearbyTarget(
+    candidate: Circle,
+    tweet: string | null,
+    button: HTMLButtonElement,
+  ): Promise<void> {
+    if (!this.onSetNextTarget) return;
+    button.disabled = true;
+    try {
+      const changed = await this.onSetNextTarget({ ...candidate, tweet });
+      if (changed) {
+        this.selectedSpace = null;
+        this.close();
+      }
+    } finally {
+      button.disabled = false;
+    }
   }
 
   private renderOriginMarker(): void {

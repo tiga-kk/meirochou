@@ -182,6 +182,26 @@ test("周辺地図のお品書きカードとleader lineから既存拡大表示
 
   const cards = page.locator(".nearby-catalog-card");
   await expect(cards).toHaveCount(2);
+  await expect(page.locator("#nearby-map-controls")).toBeVisible();
+  const nearbyControls = page.locator("#nearby-map-controls");
+  await expect(
+    nearbyControls.getByRole("button", { name: "10", exact: true }),
+  ).toBeVisible();
+  await expect(
+    nearbyControls.getByRole("button", { name: "9", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator("#nearby-map-limit option")).toHaveCount(4);
+  await expect(page.getByLabel("保留も表示")).toBeVisible();
+  await nearbyControls.getByRole("button", { name: "10", exact: true }).click();
+  await expect(cards).toHaveCount(1);
+  await nearbyControls.getByRole("button", { name: "9", exact: true }).click();
+  await expect(cards).toHaveCount(2);
+  await nearbyControls.getByRole("button", { name: "すべて", exact: true }).click();
+  await expect(cards).toHaveCount(2);
+  await page.locator("#nearby-map-limit").selectOption("10");
+  await expect(page.locator("#nearby-map-limit")).toHaveValue("10");
+  await page.getByLabel("保留も表示").check();
+  await expect(page.getByLabel("保留も表示")).toBeChecked();
   const cardSpaces = await cards.evaluateAll((elements) =>
     elements.map((element) => element.getAttribute("data-space")),
   );
@@ -201,8 +221,22 @@ test("周辺地図のお品書きカードとleader lineから既存拡大表示
   );
   expect(leaderSpaces).toEqual(cardSpaces);
 
-  await cards.first().evaluate((element) => (element as HTMLButtonElement).click());
+  await cards.first().focus();
+  await page.keyboard.press("Enter");
+  await expect(cards.first()).toHaveAttribute("aria-selected", "true");
+  await expect(
+    cards.first().getByRole("button", { name: "お品書きを見る" }),
+  ).toBeVisible();
+  await cards.first()
+    .getByRole("button", { name: "お品書きを見る" })
+    .click({ force: true });
   await expect(page.locator("#pdf-modal")).toBeVisible();
+  await page.locator("#btn-close-pdf").click({ force: true });
+  await cards.first()
+    .getByRole("button", { name: "目的地にする" })
+    .click({ force: true });
+  await expect(page.locator("#nearby-map-surface")).toBeHidden();
+  await expect(page.locator("#toast")).toContainText("目的地を");
 });
 
 test("地図の基準地点は選択モード中のtapだけで変更される", async ({ page }) => {
