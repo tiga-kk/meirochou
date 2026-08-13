@@ -6,9 +6,9 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.4（Task 15完了・Task 16着手可能）**
-- 現在Task: **Task 16: 購入Undoで現在地入力も復元**
-- 次に着手するTask: **Task 16**
+- 現在フェーズ: **Phase 7.4（Task 16完了・Task 17着手可能）**
+- 現在Task: **Task 17: 地図viewport中心の配置位置を常時表示**
+- 次に着手するTask: **Task 17**
 - canonical plan: `docs/plans/phase-07-4/README.md`
 - 初期設計: `docs/specs/2026-08-13-phase-07-4-route-visual-nearby-map-and-priority-filter-design.md`
 - follow-up設計: `docs/specs/2026-08-13-phase-07-4-human-acceptance-followups-design.md`
@@ -33,6 +33,8 @@ Task 13で周辺地図へpriority複数選択、5/10/15/20件、保留表示cont
 Task 14でstandalone周辺地図のdialog内利用可能領域を測定し、画像全体を元の縦横比のままcontain表示するviewport/stage寸法を`GestureZoomController.setLayout()`へ渡すようにした。dialogのresize時は同じfitを再適用し、候補再描画ではlayout/resetを呼ばない。横長・縦長のfocused unit 2件、関連E2E 2件、architecture/typecheck、`git diff --check`がPASSした。`npm run test:webapp`は786/787件がPASSし、公開境界検査の一時worktree `.git`絶対パス検出だけが既存環境要因で失敗した。
 
 Task 15で周辺カードとleader lineをmap transform layer外のviewport overlayへ移し、zoom/pan時は既存transform通知からscreen-space位置だけを更新するようにした。画面内slotを決定的に探索し、既配置カードとの交差を避け、選択カードを前面化した。leader lineは明色underlayと濃色foregroundの二重線にした。密集5件のlayout unit 3件、関連E2E 1件、architecture/typecheck、`git diff --check`がPASSした。`npm run test:webapp`は787/788件がPASSし、公開境界検査の一時worktree `.git`絶対パス検出だけが既存環境要因で失敗した。
+
+Task 16で購入直前のフォーム値を通常購入・Gallery購入の共通Undo情報へ保存し、Undo後にroute snapshot復元、フォーム更新、`currentStartSpace`復元を行うようにした。保存値がない場合は`arrived-circle.circleSpace`だけをfallbackに使い、それ以外ではフォームへ推測値を書かない。area表示名からselectのarea idへ戻す既存UI更新の不整合も修正した。購入関連unit 23件、指定E2E 5件、architecture/typecheck、`git diff --check`がPASSした。
 
 ## 人間確認で判明した未解決事項
 
@@ -71,7 +73,7 @@ Task 15で周辺カードとleader lineをmap transform layer外のviewport over
 | 13 | 周辺地図の絞り込みcontrolsとcard actionを接続 | 完了 | なし |
 | 14 | 独立地図を元の縦横比で初期表示 | 完了 | Task 13 |
 | 15 | 周辺カードを画面座標で非重複配置 | 完了 | Task 11, 13, 14 |
-| 16 | 購入Undoで現在地入力も復元 | 未着手 | なし |
+| 16 | 購入Undoで現在地入力も復元 | 完了 | なし |
 | 17 | 地図viewport中心の配置位置を常時表示 | 未着手 | Task 11, 14 |
 | 18 | 人間受入と回帰検証でPhaseを再終了 | 未着手 | Task 10〜17 |
 
