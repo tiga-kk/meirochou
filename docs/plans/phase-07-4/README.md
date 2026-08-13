@@ -51,7 +51,7 @@ Task開始時の基準commitは、実装開始直前の対象branchの最新remo
 | 12 | 経路animationを実描画基準で再診断 | Task 11 |
 | 13 | 周辺地図の絞り込みcontrolsとcard actionを接続 | なし |
 | 14 | 独立地図を元の縦横比で初期表示 | Task 13 |
-| 15 | 周辺カードを画面座標で非重複配置 | Task 13, 14 |
+| 15 | 周辺カードを画面座標で非重複配置 | Task 11, 13, 14 |
 | 16 | 購入Undoで現在地入力も復元 | なし |
 | 17 | 地図viewport中心の配置位置を常時表示 | Task 11, 14 |
 | 18 | 人間受入と回帰検証でPhaseを再終了 | Task 10〜17 |
@@ -60,7 +60,7 @@ Task 10〜17は一度に一Taskずつ実装する。同じファイルを触るT
 
 Task 12はTask 1の再試行ではなく、Task 1の自動証拠で閉じられなかった「実際に人間へ見えるか」をrasterized pixelsまで下げて診断する。
 
-Task 15ではカードをmap transform layerの外へ出すため、Task 14のviewport geometry確定後に行う。
+Task 15ではカードをmap transform layerの外へ出すため、Task 11のtransform変更通知とTask 14のviewport geometry確定後に行う。
 
 Task 18だけはheadless自動検証だけで完了にしない。
 
