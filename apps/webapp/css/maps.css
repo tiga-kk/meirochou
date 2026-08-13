@@ -135,7 +135,7 @@
 
 .nearby-map-viewport {
   position: relative;
-  min-height: 220px;
+  min-height: 0;
   width: 100%;
   overflow: hidden;
   background: var(--map-paper, #d9d5cc);

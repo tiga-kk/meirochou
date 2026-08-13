@@ -258,6 +258,19 @@ test("地図の基準地点は選択モード中のtapだけで変更される",
     "complete",
     true,
   );
+  const nearbyMapGeometry = await page.evaluate(() => {
+    const image = document.querySelector("#nearby-map-image") as HTMLImageElement;
+    const stage = document.querySelector("#nearby-map-layer") as HTMLElement;
+    const rect = stage.getBoundingClientRect();
+    return {
+      imageRatio: image.naturalWidth / image.naturalHeight,
+      stageRatio: rect.width / rect.height,
+    };
+  });
+  expect(nearbyMapGeometry.stageRatio).toBeCloseTo(
+    nearbyMapGeometry.imageRatio,
+    2,
+  );
 
   const viewportBox = await viewport.boundingBox();
   expect(viewportBox).not.toBeNull();

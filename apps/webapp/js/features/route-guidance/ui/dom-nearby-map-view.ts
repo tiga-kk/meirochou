@@ -20,7 +20,6 @@ import {
   buildMapPins,
   buildMapPointIndex,
   calculateMapPinSize,
-  calculateMapViewportLayout,
   calculateNativeImageScale,
   getPinPosition,
   normalizeExternalUrl,
@@ -42,6 +41,42 @@ export interface NearbyMapOrigin {
   readonly gridIndex: number;
   readonly svgX: number;
   readonly svgY: number;
+}
+
+export interface StandaloneMapViewportLayoutInput {
+  availableWidth: number;
+  availableHeight: number;
+  imageWidth: number;
+  imageHeight: number;
+}
+
+export function calculateStandaloneMapViewportLayout(
+  input: StandaloneMapViewportLayoutInput,
+) {
+  if (
+    ![
+      input.availableWidth,
+      input.availableHeight,
+      input.imageWidth,
+      input.imageHeight,
+    ].every((value) => Number.isFinite(value) && value > 0)
+  ) {
+    return null;
+  }
+  const scale = Math.min(
+    input.availableWidth / input.imageWidth,
+    input.availableHeight / input.imageHeight,
+  );
+  const stageWidth = input.imageWidth * scale;
+  const stageHeight = input.imageHeight * scale;
+  return {
+    viewportWidth: input.availableWidth,
+    viewportHeight: input.availableHeight,
+    stageWidth,
+    stageHeight,
+    initialX: (input.availableWidth - stageWidth) / 2,
+    initialY: (input.availableHeight - stageHeight) / 2,
+  };
 }
 
 export function clientPointToGridSelection(input: {
@@ -96,6 +131,7 @@ export class DomNearbyMapView {
   private selectionMode = false;
   private tapStart: { pointerId: number; clientX: number; clientY: number } | null = null;
   private renderToken = 0;
+  private nearbyMapResizeObserver: ResizeObserver | null = null;
   private readonly currentLocationResolver: (() => string | null) | null;
   private readonly onShowCatalog: ((circle: Circle) => void) | null;
   private readonly onSetNextTarget:
@@ -189,6 +225,16 @@ export class DomNearbyMapView {
       this.surface.querySelector("#nearby-map-layer"),
       { overscrollLimit: 18 },
     );
+    if (typeof ResizeObserver === "function") {
+      const dialog = this.surface.querySelector(".nearby-map-dialog");
+      this.nearbyMapResizeObserver = new ResizeObserver(() => {
+        if (!this.activeAssets) return;
+        this.applyViewportLayout();
+        this.renderOriginMarker();
+        this.renderPins(this.activeAssets);
+      });
+      if (dialog) this.nearbyMapResizeObserver.observe(dialog);
+    }
     const viewport = this.surface.querySelector("#nearby-map-viewport");
     viewport?.addEventListener("pointerdown", (event) => {
       if (!this.selectionMode) return;
@@ -528,18 +574,33 @@ export class DomNearbyMapView {
     const viewport = this.surface?.querySelector("#nearby-map-viewport") as HTMLElement | null;
     const stage = this.surface?.querySelector("#nearby-map-layer") as HTMLElement | null;
     const image = this.surface?.querySelector("#nearby-map-image") as HTMLImageElement | null;
-    if (!viewport || !stage || !image?.naturalWidth || !image.naturalHeight) return;
-    const layout = calculateMapViewportLayout({
-      viewportWidth: viewport.clientWidth || viewport.getBoundingClientRect().width,
-      viewportMaxHeight: 520,
-      minimumInteractiveHeight: 220,
+    const dialog = this.surface?.querySelector(".nearby-map-dialog") as HTMLElement | null;
+    if (!viewport || !stage || !dialog || !image?.naturalWidth || !image.naturalHeight) return;
+    const viewportWidth = viewport.clientWidth || viewport.getBoundingClientRect().width;
+    const dialogStyle = getComputedStyle(dialog);
+    const gap = Number.parseFloat(dialogStyle.rowGap || dialogStyle.gap) || 0;
+    const paddingY =
+      (Number.parseFloat(dialogStyle.paddingTop) || 0) +
+      (Number.parseFloat(dialogStyle.paddingBottom) || 0);
+    const occupiedHeight = [...dialog.children]
+      .filter((child) => child !== viewport)
+      .reduce((total, child) => total + child.getBoundingClientRect().height, 0);
+    const availableHeight =
+      dialog.clientHeight -
+      paddingY -
+      occupiedHeight -
+      Math.max(0, dialog.children.length - 1) * gap;
+    const layout = calculateStandaloneMapViewportLayout({
+      availableWidth: viewportWidth,
+      availableHeight,
       imageWidth: image.naturalWidth,
       imageHeight: image.naturalHeight,
     });
+    if (!layout) return;
     viewport.style.height = `${layout.viewportHeight}px`;
     stage.style.width = `${layout.stageWidth}px`;
     stage.style.height = `${layout.stageHeight}px`;
-    this.zoomHelper?.setMaxScale(calculateNativeImageScale({ imageWidth: image.naturalWidth, renderedWidth: stage.clientWidth }));
+    this.zoomHelper?.setMaxScale(calculateNativeImageScale({ imageWidth: image.naturalWidth, renderedWidth: layout.stageWidth }));
     this.zoomHelper?.setLayout({ containerWidth: layout.viewportWidth, containerHeight: layout.viewportHeight, stageWidth: layout.stageWidth, stageHeight: layout.stageHeight, baseX: layout.initialX, baseY: layout.initialY });
   }
 
