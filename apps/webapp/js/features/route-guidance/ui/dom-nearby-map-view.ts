@@ -193,11 +193,11 @@ export class DomNearbyMapView {
         <div id="nearby-map-viewport" class="nearby-map-viewport">
             <div id="nearby-map-layer" class="nearby-map-transform-layer">
             <img id="nearby-map-image" class="nearby-map-image" alt="" />
-            <svg id="nearby-map-leader-layer" class="nearby-map-leader-layer" aria-hidden="true"></svg>
             <div id="nearby-map-pin-layer" class="nearby-map-pin-layer"></div>
-            <div id="nearby-map-card-layer" class="nearby-map-card-layer"></div>
             <span id="nearby-map-origin-marker" aria-label="検索基準地点"></span>
           </div>
+          <svg id="nearby-map-leader-layer" class="nearby-map-leader-layer" aria-hidden="true"></svg>
+          <div id="nearby-map-card-layer" class="nearby-map-card-layer"></div>
         </div>
         <p id="nearby-map-error" class="nearby-map-error" role="status" aria-live="polite"></p>
       </div>`;
@@ -223,7 +223,10 @@ export class DomNearbyMapView {
     this.zoomHelper = new GestureZoomController(
       this.surface.querySelector("#nearby-map-viewport"),
       this.surface.querySelector("#nearby-map-layer"),
-      { overscrollLimit: 18 },
+      {
+        overscrollLimit: 18,
+        onTransformChange: (transform) => this.renderNearbyOverlay(transform),
+      },
     );
     if (typeof ResizeObserver === "function") {
       const dialog = this.surface.querySelector(".nearby-map-dialog");
@@ -454,37 +457,64 @@ export class DomNearbyMapView {
     this.renderCatalogCards(cardLayer, leaderLayer, points);
   }
 
+  private renderNearbyOverlay(transform = this.zoomHelper?.state ?? { scale: 1, x: 0, y: 0 }): void {
+    const cardLayer = this.surface?.querySelector("#nearby-map-card-layer") as HTMLElement | null;
+    const leaderLayer = this.surface?.querySelector("#nearby-map-leader-layer") as SVGElement | null;
+    if (!cardLayer || !leaderLayer || !this.activeAssets || !this.activeArea || !this.origin) return;
+    this.renderCatalogCards(cardLayer, leaderLayer, buildMapPointIndex(this.activeAssets.points), transform);
+  }
+
   private renderCatalogCards(
     cardLayer: HTMLElement | null,
     leaderLayer: SVGElement | null,
     points: Map<string, MapPoint[]> | null,
+    transform = this.zoomHelper?.state ?? { scale: 1, x: 0, y: 0 },
   ): void {
     if (!cardLayer || !leaderLayer || !this.activeAssets || !this.activeArea || !this.origin) return;
+    cardLayer.replaceChildren();
+    leaderLayer.replaceChildren();
     const anchors = this.nearbyCandidates.map(({ candidate, position }) => ({
       candidate,
       position: position ?? points?.get(candidate.space)?.[0] ?? candidate.mapPosition ?? getPinPosition(candidate.space),
     }));
+    const viewport = this.surface?.querySelector("#nearby-map-viewport") as HTMLElement | null;
+    const viewportWidth = viewport?.clientWidth || viewport?.getBoundingClientRect().width || 1;
+    const viewportHeight = viewport?.clientHeight || viewport?.getBoundingClientRect().height || 1;
+    const stage = this.surface?.querySelector("#nearby-map-layer") as HTMLElement | null;
+    const stageWidth = stage?.clientWidth || stage?.getBoundingClientRect().width || 1;
+    const stageHeight = stage?.clientHeight || stage?.getBoundingClientRect().height || 1;
     const cards = layoutNearbyCatalogCards({
-      stageWidth: this.surface?.querySelector("#nearby-map-layer")?.clientWidth || 1,
-      stageHeight: this.surface?.querySelector("#nearby-map-layer")?.clientHeight || 1,
-      anchors: anchors.map(({ candidate, position }) => ({ space: candidate.space, position })),
+      viewportWidth,
+      viewportHeight,
+      anchors: anchors.map(({ candidate, position }) => ({
+        space: candidate.space,
+        x: transform.x + (position.x / 100) * stageWidth * transform.scale,
+        y: transform.y + (position.y / 100) * stageHeight * transform.scale,
+      })),
     });
-    const svgWidth = this.surface?.querySelector("#nearby-map-layer")?.clientWidth || 1;
-    const svgHeight = this.surface?.querySelector("#nearby-map-layer")?.clientHeight || 1;
+    leaderLayer.setAttribute("viewBox", `0 0 ${viewportWidth} ${viewportHeight}`);
     for (const [index, layout] of cards.entries()) {
       const { candidate, position } = anchors[index];
-      const anchorX = (position.x / 100) * svgWidth;
-      const anchorY = (position.y / 100) * svgHeight;
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      const anchorX = layout.anchor.x;
+      const anchorY = layout.anchor.y;
       const endX = Math.max(layout.x, Math.min(anchorX, layout.x + layout.width));
       const endY = Math.max(layout.y, Math.min(anchorY, layout.y + layout.height));
-      line.setAttribute("x1", String(anchorX));
-      line.setAttribute("y1", String(anchorY));
-      line.setAttribute("x2", String(endX));
-      line.setAttribute("y2", String(endY));
-      line.dataset.space = candidate.space;
-      line.classList.add("nearby-map-leader");
-      leaderLayer.appendChild(line);
+      const visibleEndX = Math.abs(endX - anchorX) < 1
+        ? Math.max(0, Math.min(viewportWidth, endX + (endX <= viewportWidth / 2 ? 1 : -1)))
+        : endX;
+      const visibleEndY = Math.abs(endY - anchorY) < 1
+        ? Math.max(0, Math.min(viewportHeight, endY + (endY <= viewportHeight / 2 ? 1 : -1)))
+        : endY;
+      for (const className of ["nearby-map-leader-underlay", "nearby-map-leader"]) {
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", String(anchorX));
+        line.setAttribute("y1", String(anchorY));
+        line.setAttribute("x2", String(visibleEndX));
+        line.setAttribute("y2", String(visibleEndY));
+        line.dataset.space = candidate.space;
+        line.classList.add(className);
+        leaderLayer.appendChild(line);
+      }
 
       const card = document.createElement("article");
       card.className = "nearby-catalog-card";
@@ -492,6 +522,7 @@ export class DomNearbyMapView {
       card.setAttribute("role", "group");
       card.tabIndex = 0;
       card.setAttribute("aria-selected", String(this.selectedSpace === candidate.space));
+      if (this.selectedSpace === candidate.space) card.classList.add("nearby-catalog-card--selected");
       card.style.left = `${layout.x}px`;
       card.style.top = `${layout.y}px`;
       card.style.width = `${layout.width}px`;

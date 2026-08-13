@@ -175,10 +175,20 @@
   pointer-events: none;
 }
 
+.nearby-map-leader-underlay,
+.nearby-map-leader {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.nearby-map-leader-underlay {
+  stroke: #fff;
+  stroke-width: 8;
+}
+
 .nearby-map-leader {
   stroke: #334155;
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
+  stroke-width: 3;
 }
 
 .nearby-map-card-layer {
@@ -204,8 +214,9 @@
   cursor: pointer;
 }
 
-.nearby-catalog-card[aria-selected="true"] {
-  z-index: 2;
+.nearby-catalog-card[aria-selected="true"],
+.nearby-catalog-card--selected {
+  z-index: 4;
   border-color: var(--primary, #1d4ed8);
   box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.25);
 }

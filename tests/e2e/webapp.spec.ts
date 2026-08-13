@@ -220,9 +220,33 @@ test("周辺地図のお品書きカードとleader lineから既存拡大表示
     elements.map((element) => element.getAttribute("data-space")),
   );
   expect(leaderSpaces).toEqual(cardSpaces);
-
+  const cardRects = await cards.evaluateAll((elements) =>
+    elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+    }),
+  );
+  for (let left = 0; left < cardRects.length; left += 1) {
+    for (let right = left + 1; right < cardRects.length; right += 1) {
+      expect(
+        Math.max(0, Math.min(cardRects[left].right, cardRects[right].right) - Math.max(cardRects[left].left, cardRects[right].left)) *
+          Math.max(0, Math.min(cardRects[left].bottom, cardRects[right].bottom) - Math.max(cardRects[left].top, cardRects[right].top)),
+      ).toBe(0);
+    }
+  }
+  expect(Number.parseFloat(await leaders.first().evaluate((element) => getComputedStyle(element).strokeWidth))).toBeGreaterThan(2);
   await cards.first().focus();
   await page.keyboard.press("Enter");
+  await expect(cards.first()).toHaveAttribute("aria-selected", "true");
+  await expect(cards.first()).toHaveClass(/nearby-catalog-card--selected/);
+  const beforeZoomAnchor = await leaders.first().getAttribute("x1");
+  await page.evaluate(() => {
+    document.getElementById("nearby-map-viewport")?.dispatchEvent(
+      new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -100, clientX: 200, clientY: 300 }),
+    );
+  });
+  await expect.poll(() => page.locator("#nearby-map-layer").getAttribute("style")).toContain("scale(1.1)");
+  await expect.poll(() => leaders.first().getAttribute("x1")).not.toBe(beforeZoomAnchor);
   await expect(cards.first()).toHaveAttribute("aria-selected", "true");
   await expect(
     cards.first().getByRole("button", { name: "お品書きを見る" }),
