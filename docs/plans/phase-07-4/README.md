@@ -2,92 +2,73 @@
 
 ## 目的
 
-Phase 7.3の残件を閉じながら、優先度で巡回対象を限定できる経路案内と、任意地点を基準に近いサークルのお品書きを重ねて表示する独立地図モードを追加する。
+Phase 7.3の残件を閉じながら、優先度で巡回対象を限定できる経路案内と、任意地点を基準に近いサークルを確認できる独立地図モードを整備する。
 
-Task 1〜9の実装・自動検証後、2026-08-13の人間確認でvisual/interaction上の複数FAILが判明したため、Phase 7.4はTask 10以降で再オープンした。Task 1〜9の履歴は保持し、終了判定だけを失効させる。
+Task 1〜9後の2026-08-13人間確認でPhase終了判定を失効し、Task 10〜17で修正した。Task 18の2026-08-14人間再確認でも3件が残ったため、Task 19〜21で追加修正し、Task 22で最終受入する。
 
 ## 正本
 
 - 現在状態: `docs/status/progress.md`
-- 初期設計仕様: `docs/specs/2026-08-13-phase-07-4-route-visual-nearby-map-and-priority-filter-design.md`
-- 人間受入follow-up設計: `docs/specs/2026-08-13-phase-07-4-human-acceptance-followups-design.md`
-- animation初期診断: `docs/reviews/phase-07-4-route-animation-diagnosis.md`
-- 人間受入FAIL記録: `docs/reviews/phase-07-4-human-acceptance-failures.md`
-- 自動/外部検証記録: `docs/reviews/phase-07-4-field-verification.md`
+- 初期設計: `docs/specs/2026-08-13-phase-07-4-route-visual-nearby-map-and-priority-filter-design.md`
+- follow-up設計: `docs/specs/2026-08-13-phase-07-4-human-acceptance-followups-design.md`
+- 人間受入FAIL: `docs/reviews/phase-07-4-human-acceptance-failures.md`
+- 自動/外部検証: `docs/reviews/phase-07-4-field-verification.md`
 
-外部挙動が初期設計とfollow-up設計で競合する場合はfollow-up設計を優先する。
-
-Task開始時の基準commitは、実装開始直前の対象branchの最新remote HEADから取得する。文書中の過去SHAを実装開始SHAとして固定しない。
+過去設計と最新の人間受入結果が競合する場合は、最新の人間受入結果とTask 19〜21を優先する。
 
 ## 共通制約
 
-- 新しい地図library、motion library、state management library、UI frameworkを追加しない。
-- Route GuidanceのDijkstra / ALNS / snapshot契約をUI都合だけで別実装へ置換しない。
+- 新しい地図・motion・state management・UI framework依存を追加しない。
+- Dijkstra / ALNS / snapshot契約をUI都合で別実装へ置換しない。
 - animationのための`setInterval`、毎frameのroute再計算、毎frameのSVG再生成を追加しない。
-- priorityは完全一致の複数選択とし、Gallery・周辺地図・経路案内で意味を一致させる。
-- 周辺の「近い」はwalkable grid距離で判定し、ユークリッド距離を代用しない。
+- `prefers-reduced-motion: reduce`を無視してanimationを強制しない。
+- priorityはGallery・周辺地図・経路案内で同じ完全一致・複数選択規則を使う。
+- 周辺距離はwalkable grid距離を使う。
 - 周辺地図の検索基準地点はRoute Guidanceの現在地を変更しない。
-- 経路案内では保留を巡回対象外とする。
-- お品書き配置のためにphysics simulationや外部layout engineを導入しない。
-- 購入Undoは最新1件だけとし、複数段Undoへ広げない。
-- visual snapshotは人間確認前に一括更新しない。
-- 390px、200% text zoom、keyboard focus、44px主要touch target、safe-area、`prefers-reduced-motion`を維持する。
+- 390px、200% text zoom、keyboard focus、44px主要touch target、safe-areaを維持する。
+- visual snapshotは人間確認なしに一括更新しない。
 
 ## タスク順序
 
-| Task | 内容 | 主な依存 |
+| Task | 内容 | 状態/依存 |
 |---|---|---|
-| 1 | 経路animationのscreen-space診断と修正 | なし |
-| 2 | priority判定規則の共通化 | なし |
-| 3 | priority条件を通常の経路案内へ適用 | Task 2 |
-| 4 | 独立した地図閲覧surfaceの追加 | なし |
-| 5 | 任意検索基準地点とgrid origin解決 | Task 4 |
-| 6 | grid距離による周辺サークルランキング | Task 2, 5 |
-| 7 | 地図上のお品書きカード・leader line・配置 | Task 6 |
-| 8 | 一覧以外の購入経路へ最新1件Undoを拡張 | なし |
-| 9 | 初回の総合回帰・外部確認記録 | Task 1〜8 |
-| 10 | 近接地図ピンの選択曖昧性を解消 | なし |
-| 11 | 候補経路の連続表示とズーム連動線幅 | Task 10後推奨 |
-| 12 | 経路animationを実描画・方向認識基準で再診断 | Task 11 |
-| 13 | 周辺地図の絞り込みcontrolsとcard actionを接続 | なし |
-| 14 | 独立地図を元の縦横比で初期表示 | Task 13 |
-| 15 | 周辺カードを画面座標で非重複配置 | Task 11, 13, 14 |
-| 16 | 購入Undoで現在地入力も復元 | なし |
-| 17 | 地図viewport中心の配置位置を常時表示 | Task 11, 14 |
-| 18 | 人間受入と回帰検証でPhaseを再終了 | Task 10〜17 |
+| 1〜9 | 初期実装・検証 | 履歴上完了、Phase終了判定は失効 |
+| 10 | 近接pin選択曖昧性の解消 | 完了 |
+| 11 | candidate連続線・zoom連動線幅 | 完了 |
+| 12 | current animation再診断 | 完了、Android実機FAIL継続 |
+| 13 | 周辺filter/card action | 完了 |
+| 14 | standalone map aspect ratio | 完了、Task 20でwide-map方針を補正 |
+| 15 | 周辺card/leader配置 | 完了、Task 21でcard位置を変更 |
+| 16 | 購入Undo現在地復元 | 完了 |
+| 17 | viewport中心表示 | 完了 |
+| 18 | 自動回帰 + 人間受入 | 人間受入FAIL |
+| 19 | Android実機current animation診断・修正 | Task 18後 |
+| 20 | 横長mapの初期表示拡大 | Task 18後 |
+| 21 | 周辺cardを地図外へ移動 | Task 20後 |
+| 22 | Android実機を含む最終人間受入 | Task 19〜21後 |
 
-Task 10〜17は一度に一Taskずつ実装する。同じファイルを触るTaskは上表の順で進め、後続Taskが先行Taskの未commit差分を前提にしない。
+Task 18はFAILした検証履歴として保持し、修正をTask 19〜21へ分離する。Phase終了ゲートはTask 22へ移す。
 
-Task 12はTask 1の単純な再試行ではない。Task 1でstroke幅のscreen-space化まで行って自動GREENになった後にも人間受入でanimationを認識できなかったため、production変更前の意味的RED、本番`CSSAnimation`の自然進行、production animationをseekしたraster証拠、animationを一時無効化するmutation proof、screen-spaceのcue長・速度、rendered start→goal方向まで確認する。テストから`strokeDashoffset`やanimation自体を上書きして作った画像差を証拠にしてはならない。
+## Task 19〜21の確定方針
 
-Task 12では現行の`pathLength=100` + 固定dash割合 + 固定durationを最終契約として固定しない。まず既存CSS animationを再利用したscreen-space化を試し、それでもraster motionはあるのにheadedで方向を読めない場合は、同じdash定数調整を繰り返さず非対称なdirection cueへ切り替える。
+Task 19では、Android実機で`prefers-reduced-motion`、production `CSSAnimation`の存在・進行、実際の可視性を順番に確認する。`reduce`が原因ならWeb側で強制せず、`no-preference`でも見えない場合だけproduction描画を修正する。
 
-Task 15ではカードをmap transform layerの外へ出すため、Task 11のtransform変更通知とTask 14のviewport geometry確定後に行う。
+Task 20では横長mapの「初期状態で全体を必ずcontainする」条件を緩和する。aspect ratioは維持し、390px程度のphoneでは約280pxの地図高さを目安に、必要なら左右crop + panを許可する。通常route mapと独立「地図」画面へ同じ方針を適用する。
 
-Task 18だけはheadless自動検証だけで完了にしない。
+Task 21ではお品書きcardをmap viewport外の下部stripへ移す。leader lineは地図上anchorから外側cardまで維持し、pan/zoom/strip scroll時にcard DOMを再生成しない。
 
-## Phase 7.4再受入条件
+## Phase 7.4最終受入条件
 
-- 近接する二つの候補pinを別々に選べる。
-- candidate routeは青い連続実線で、経路が途切れて見えない。
-- current/candidate線は縮小時に読みやすく、拡大時は細くなって通路を覆わない。
-- `no-preference`環境でcurrent moving cueを人間が視認でき、start→goal方向を認識できる。
-- 初期表示と拡大状態の双方でmoving cueの画面上速度・長さが方向認識を失うほど極端に変化しない。
-- `reduce`ではanimationが停止しても静的方向情報が残る。
-- 周辺地図でpriority、5/10/15/20、holdを操作できる。
-- 周辺cardを選択し、お品書き表示と「目的地にする」を実行できる。
-- 5件程度の周辺cardが通常viewportで重ならず、選択cardを前面化できる。
-- leader lineを情報量の多い地図上で追える。
-- standalone mapはarea画像のaspect ratioを保ち、初期状態で全体が見える。
-- 購入Undo後に現在地フォームも購入直前の有効状態へ戻る。
-- 通常route mapとnearby mapの双方で「表示中心: <area> <space>付近」がpan/zoomへ追従する。
-- priority filter、nearby grid距離、Route Guidance、GAS outbox等の既存意味的回帰がない。
-- `npm run verify`
-- `npm run test:e2e:ci`
-- `node scripts/audit-public-tree.mjs`
-- `git diff --check`
-- Task 18の人間visual/interaction受入
+- 近接pinを個別に選択できる。
+- candidate routeは青い連続実線である。
+- zoom時にroute線幅が通路を覆わない。
+- Android Chromeを含む`no-preference`環境でcurrent moving cueとstart→goal方向を人間が視認できる。
+- `reduce`ではmotionを抑制しつつ静的方向情報が残る。
+- 横長mapが通常route/独立mapの双方で指操作しやすい大きさになる。
+- 周辺cardがmapを覆わず、地図外stripで操作できる。
+- leader lineでmap anchorと外側cardの対応を追える。
+- priority / 件数 / hold / card action / Undo / 表示中心に回帰がない。
+- `npm run verify`、`npm run test:e2e:ci`、public tree audit、`git diff --check`を確認する。
+- Task 22の人間visual/interaction受入に合格する。
 
-## Phase終端で残してよい外部事項
-
-実GAS資格情報やphysical deviceが利用できず確認できない事項は、理由付きでfield verification/progressへ「未確認」と記録できる。ただし今回人間が既にFAILを確認したvisual/interaction項目は、環境不足を理由に未確認へ戻して終了してはならない。
+実GAS資格情報が利用できない外部事項だけは理由付き未確認として残せる。今回Android実機で既にFAILしたvisual/interaction項目は、desktop headlessのPASSだけを理由に未確認へ戻して終了してはならない。
