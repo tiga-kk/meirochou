@@ -38,6 +38,8 @@ Task 16で購入直前のフォーム値を通常購入・Gallery購入の共通
 
 Task 17で通常経路地図と周辺地図のviewport中心を画像座標へ逆変換し、全地点JSONから最寄りの配置を「表示中心: …付近」として表示するようにした。zoom/pan更新は100msで遅延し、overscrollは画像境界へclampした。中心変換unit 3件、関連map unit 21件、表示確認を含むE2E 5件、architecture/typecheck、`git diff --check`がPASSした。既存スナップショット失敗は基準commitでも再現したため既存失敗として分離し、snapshotは更新していない。
 
+その後の独立レビューで、Task 17変更によりin-flightの`pointIndexCache` Promiseから再描画へ接続されずpinが消える回帰を確認した。元の非`Map`・非`null`判定へ戻し、route overlay contract assertionを追加した。併せて、nearby card/leader lineはtransformごとにDOMを再生成せず既存要素の座標だけを更新する構造へ変更し、選択cardの実寸相当高さを配置計算へ反映した。関連unit 36件、nearby/candidate機能E2E 3件がPASSした。
+
 ## 人間確認で判明した未解決事項
 
 | 項目 | 対応Task |

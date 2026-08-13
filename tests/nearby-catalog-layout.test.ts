@@ -33,6 +33,22 @@ describe("layoutNearbyCatalogCards", () => {
     expect(cards).toHaveLength(20);
   });
 
+  it("reserves extra height only for the selected card", () => {
+    const cards = layoutNearbyCatalogCards({
+      viewportWidth: 390,
+      viewportHeight: 520,
+      anchors: [
+        { space: "東ア01", x: 190, y: 250 },
+        { space: "東ア02", x: 194, y: 254 },
+      ],
+      cardHeight: 132,
+      cardHeightForSpace: (space) => space === "東ア01" ? 220 : 132,
+    });
+
+    expect(cards[0].height).toBe(220);
+    expect(cards[1].height).toBe(132);
+  });
+
   it("places five dense screen-space cards without overlap", () => {
     const cards = layoutNearbyCatalogCards({
       viewportWidth: 390,

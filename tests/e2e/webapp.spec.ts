@@ -238,10 +238,24 @@ test("周辺地図のお品書きカードとleader lineから既存拡大表示
     }
   }
   expect(Number.parseFloat(await leaders.first().evaluate((element) => getComputedStyle(element).strokeWidth))).toBeGreaterThan(2);
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "200%";
+  });
   await cards.first().focus();
   await page.keyboard.press("Enter");
   await expect(cards.first()).toHaveAttribute("aria-selected", "true");
   await expect(cards.first()).toHaveClass(/nearby-catalog-card--selected/);
+  const selectedCardHandle = await cards.first().elementHandle();
+  const selectedInfoHandle = await cards.first().locator(".nearby-catalog-card-info").elementHandle();
+  const selectedCardBox = await cards.first().boundingBox();
+  expect(selectedCardBox?.height).toBeGreaterThan(132);
+  const selectedCardOverflow = await cards.first().evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(selectedCardOverflow.scrollHeight).toBeLessThanOrEqual(
+    selectedCardOverflow.clientHeight,
+  );
   const beforeZoomAnchor = await leaders.first().getAttribute("x1");
   await page.evaluate(() => {
     document.getElementById("nearby-map-viewport")?.dispatchEvent(
@@ -251,6 +265,8 @@ test("周辺地図のお品書きカードとleader lineから既存拡大表示
   await expect.poll(() => page.locator("#nearby-map-layer").getAttribute("style")).toContain("scale(1.1)");
   await expect.poll(() => leaders.first().getAttribute("x1")).not.toBe(beforeZoomAnchor);
   await expect(cards.first()).toHaveAttribute("aria-selected", "true");
+  expect(await selectedCardHandle?.evaluate((element) => element.isConnected)).toBe(true);
+  expect(await selectedInfoHandle?.evaluate((element) => element.isConnected)).toBe(true);
   await expect(
     cards.first().getByRole("button", { name: "お品書きを見る" }),
   ).toBeVisible();

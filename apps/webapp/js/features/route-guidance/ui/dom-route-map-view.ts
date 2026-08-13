@@ -598,7 +598,8 @@ export class DomRouteMapView {
 
     if (
       area &&
-      cachedPointIndex === undefined
+      !(cachedPointIndex instanceof Map) &&
+      cachedPointIndex !== null
     ) {
       this.loadPointIndex(area).then((loadedPointIndex) => {
         if (

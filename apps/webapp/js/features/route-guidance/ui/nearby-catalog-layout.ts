@@ -20,6 +20,7 @@ export interface NearbyCatalogLayoutInput {
   readonly viewportHeight: number;
   readonly cardWidth?: number;
   readonly cardHeight?: number;
+  readonly cardHeightForSpace?: (space: string) => number;
   readonly gap?: number;
 }
 
@@ -60,13 +61,16 @@ export function layoutNearbyCatalogCards(input: NearbyCatalogLayoutInput): Nearb
   const width = Math.max(1, input.viewportWidth);
   const height = Math.max(1, input.viewportHeight);
   const cardWidth = Math.max(44, input.cardWidth ?? 176);
-  const cardHeight = Math.max(44, input.cardHeight ?? 132);
   const gap = Math.max(4, input.gap ?? 12);
   const placed: Rect[] = [];
   const xSlots = slotPositions(width, cardWidth, gap);
-  const ySlots = slotPositions(height, cardHeight, gap);
 
   return input.anchors.map((anchor, candidateIndex) => {
+    const cardHeight = Math.max(
+      44,
+      input.cardHeightForSpace?.(anchor.space) ?? input.cardHeight ?? 132,
+    );
+    const ySlots = slotPositions(height, cardHeight, gap);
     const anchorX = anchor.x;
     const anchorY = anchor.y;
     const candidates: Rect[] = [];

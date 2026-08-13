@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { describe, expect, it, test } from "vitest";
+import { describe, expect, it, test, vi } from "vitest";
 import {
   planRoute,
   planRouteFromGridIndex,
@@ -282,6 +282,30 @@ function makeRouteMapView() {
 }
 
 describe("route overlay candidate contract", () => {
+  it("keeps an in-flight point index connected to the next map render", () => {
+    const { view } = makeRouteMapView();
+    const inFlight = Promise.resolve(new Map());
+    view.pointIndexCache = new Map([["east", inFlight]]);
+    view.loadPointIndex = vi.fn(() => {
+      view.pointIndexCache.set("east", new Map());
+      return Promise.resolve(new Map());
+    });
+
+    view.renderNavigation({
+      currentTarget: { space: "東A01" },
+      selectedTarget: { space: "東A01" },
+      currentRoute: candidateRoute,
+      selectedRoute: candidateRoute,
+      selectionState: "idle",
+    });
+
+    expect(view.loadPointIndex).toHaveBeenCalledWith({
+      id: "east",
+      prefixes: ["東"],
+      labels: ["A"],
+    });
+  });
+
   it.each(["ready", "comparing"])(
     "keeps the current route and renders a candidate route in %s",
     (selectionState) => {

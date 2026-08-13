@@ -85,7 +85,29 @@ Task 18で再受入した結果を、この文書へ追記して最終終了判�
 
 `npm run verify`はwebapp 795件中794件がPASSした。唯一の失敗は一時worktreeの`.git`に含まれるローカル絶対パスを`tests/public-boundary.test.mjs`が検出した既存環境要因で、同じ検査は対象ツリーを直接監査する`node scripts/audit-public-tree.mjs`ではPASSした。
 
-`npm run test:e2e:ci`は52 passed / 15 failed / 8 skippedだった。失敗は既存snapshot差分、既存navigation resume・管理フロー・候補操作の不安定または既存機能assertion失敗であり、Task 17の専用表示中心確認を含む関連E2Eは通過した。snapshotは更新していない。
+初回の`npm run test:e2e:ci`は52 passed / 15 failed / 8 skippedだった。ここでは「既存」と一括分類せず、15件を次のように再現比較した。
+
+| 初回の失敗 | 分類 | 根拠 |
+|---|---|---|
+| management Flow 1 `settings-shell-source-manager.png` | Task 10以前からのsnapshot差分 | Task 9時点の記録にも同じ差分がある |
+| management Flow 5 `outbox-recovery-panel.png` | Task 10以前からのsnapshot差分 | Task 9時点の記録にも同じ差分がある |
+| management Flow 7 `scoped-deletion-dialog.png` | Task 10以前からのsnapshot差分 | Task 9時点の記録にも同じ差分がある |
+| `navigation-map-catalog.png` | Task 10以前からのsnapshot差分 | Task 9時点の記録にも同じ差分がある。Task 16基準`a2e8211`でも再現 |
+| `navigation-target-portrait-200-percent.png` | Task 10以前からのsnapshot差分 | Task 9時点の記録にも同じ差分がある |
+| `route-comparison.png` | Task 10以前からのsnapshot差分 | Task 9時点の記録にも同じ差分がある |
+| `catalog-gallery.png` | Task 10以前からのsnapshot差分 | Task 9時点の記録にも同じ差分がある |
+| `confirmed route change is saved...` (desktop) | Task 17の回帰 | in-flight `pointIndexCache`を再描画へ接続しない条件変更でpinが消失。条件を復元後PASS |
+| `confirmed route change is saved...` (mobile) | Task 17の回帰 | desktopと同じ原因。条件を復元後PASS |
+| `デモデータで地図・ピン・経路・ボトムシートを表示する` | Task 17の回帰 | `.map-pin.todo`欠落。条件を復元後PASS |
+| `390pxのcurrent経路は実画面線幅を保ちcandidateは静的経路になる` | Task 17の回帰 | pin待機失敗。条件を復元後PASS |
+| `小さく描画されたmap-pinも44pxの操作領域と8pxの視認領域を保つ` | Task 17の回帰 | pin待機失敗。条件を復元後PASS |
+| `320px幅・200% zoomでも候補と距離を横スクロールなしで表示する` | Task 17の回帰 | pin待機失敗。条件を復元後PASS |
+| `390px幅のportraitカタログは一列で横スクロールしない` | Task 17の回帰 | pin待機失敗。条件を復元後PASS |
+| `重なるピンはpointer位置に近い候補を選ぶ` | Task 17の回帰 | pin待機失敗。条件を復元後PASS |
+
+回帰原因は`dom-route-map-view.ts`の`pointIndexCache`判定を、in-flight Promiseも再読込対象として扱う元の条件へ戻すことで修正し、専用unit assertionを追加した。修正後の`npm run test:e2e:ci`は60 passed / 7 failed / 8 skippedで、残る7件は上表の既存snapshot 7件だけだった。snapshotは更新していない。
+
+周辺カードについては、`renderCatalogCards()`を候補・filter変更時だけ実行し、transform通知では既存cardとleader lineの座標・線端点だけを更新するよう修正した。選択カードは実寸相当の220pxを配置計算へ渡し、200% text zoomで内容がclipしないことと、pan/zoom後もcard/info DOMが接続されたままであることをunit/E2Eで確認した。
 
 ### 人間受入・外部確認
 
