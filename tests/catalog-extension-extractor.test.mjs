@@ -107,7 +107,7 @@ test("prefers Twitter/X over the scoped Pixiv profile link", () => {
         <div class="md-detailsns"><a href="https://x.com/mignon">X</a></div>
         <div class="m-media__body md-circleinfo"><div class="item"><table><tbody>
           <tr><td></td></tr><tr><td></td></tr>
-          <tr><td><div><ul><li></li><li></li><li></li>
+          <tr><td><div><ul><li></li><li></li>
             <li><a href="https://www.pixiv.net/users/123">Pixiv</a></li>
           </ul></div></td></tr>
         </tbody></table></div></div>
@@ -125,7 +125,9 @@ test("falls back to the scoped Pixiv profile link when Twitter/X is missing", ()
         <div class="m-media__body md-circleinfo"><div class="item"><table><tbody>
           <tr><td></td></tr><tr><td></td></tr>
           <tr><td><div><ul><li></li><li></li><li></li>
+            <li><a href="https://www.dlsite.com/maniax/circle/123">DLsite</a></li>
             <li><a href="https://www.pixiv.net/users/123">Pixiv</a></li>
+            <li><a href="https://www.pixiv.net/artworks/456">Artwork</a></li>
           </ul></div></td></tr>
         </tbody></table></div></div>
       </div>

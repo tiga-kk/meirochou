@@ -12,7 +12,7 @@
     'a[href*="x.com/"]',
   ];
   const PIXIV_SELECTORS = [
-    "#mainSection > div.m-media.m-circletable > div.m-media__body.md-circleinfo > div.item > table > tbody > tr:nth-child(3) > td > div > ul > li:nth-child(4) > a[href]",
+    "#mainSection > div.m-media.m-circletable > div.m-media__body.md-circleinfo > div.item > table > tbody > tr:nth-child(3) > td > div > ul > li > a[href]",
   ];
 
   function normalizeSpace(value) {
