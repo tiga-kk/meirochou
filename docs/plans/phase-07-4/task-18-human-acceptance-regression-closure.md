@@ -70,6 +70,18 @@ git diff --check
 
 このTaskのvisual終了判定だけは、実画面を見た人間の確認が必要である。実装担当自身のheadless screenshot判定だけで「人間受入済み」と記録しない。
 
+## 2026-08-14 人間受入結果
+
+Task 18の人間確認は**FAIL**。Phase 7.4を終了しない。
+
+残件は次の3件。
+
+1. Android Chrome実機でcurrent route animationをまだ視認できない。`prefers-reduced-motion`等の端末設定原因かproduction描画原因か未分離。
+2. 通常route mapと独立「地図」画面の双方で、横長mapの初期表示が小さく操作しづらい。
+3. 独立「地図」画面のお品書きcardがmap上へ重なり、地図を隠す。leader line自体の視認性は良好。
+
+修正はTask 18内で場当たり的に行わず、Task 19〜21へ分離する。修正後の最終人間受入はTask 22で行う。
+
 ## 受入条件
 
 - `docs/reviews/phase-07-4-human-acceptance-failures.md`の10項目がすべて解消または明示的に再分類されている。
@@ -78,8 +90,10 @@ git diff --check
 - 外部GAS等の実施不能項目だけが理由付き未確認として残る。
 - progressとfield verificationが同じ終了状態を示す。
 
+2026-08-14の人間確認で上記条件を満たさなかったため、Task 18は「受入実施済み・FAIL」として履歴化し、Phase終了ゲートをTask 22へ移す。
+
 ## 予定コミットメッセージ
 
 ```text
-docs(phase-07-4): close human acceptance followups
+docs(phase-07-4): record human acceptance failure
 ```
