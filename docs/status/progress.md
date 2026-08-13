@@ -6,9 +6,9 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.4（Task 12完了・Task 13着手可能）**
-- 現在Task: **Task 13: 周辺地図の絞り込みcontrolsとcard actionを接続**
-- 次に着手するTask: **Task 13**
+- 現在フェーズ: **Phase 7.4（Task 13完了・Task 14着手可能）**
+- 現在Task: **Task 14: 独立地図を元の縦横比で初期表示**
+- 次に着手するTask: **Task 14**
 - canonical plan: `docs/plans/phase-07-4/README.md`
 - 初期設計: `docs/specs/2026-08-13-phase-07-4-route-visual-nearby-map-and-priority-filter-design.md`
 - follow-up設計: `docs/specs/2026-08-13-phase-07-4-human-acceptance-followups-design.md`
@@ -27,6 +27,8 @@ Task 10で44pxの操作領域を維持したまま、pointer位置とpin中心�
 Task 11でcandidate経路を連続した青線へ変更し、GestureZoomControllerの描画済みtransform通知を再利用して、通常・candidate経路の線幅をzoomへ追従させた。4pxの可読下限、focused unit 31件、関連E2Eの機能assertion、architecture/typecheck、`git diff --check`がPASSした。visual snapshot 3件は既存差分として更新していない。
 
 Task 12でcurrent routeのcue長・速度をscreen-space計算へ接続し、layout確定時のrendered widthとTask 11のzoom通知だけでCSS custom propertyを更新するようにした。production `CSSAnimation`の自然進行、同一animation instanceをseekしたraster差分、start→goal方向、reduced-motionを関連E2Eで確認した。animation削除・逆方向・透明化のmutationはそれぞれ自然進行・方向・raster assertionでREDになり、復元後のfocused unit 13件、architecture/typecheck、`git diff --check`がPASSした。visual snapshot 2件は既存差分として更新していない。
+
+Task 13で周辺地図へpriority複数選択、5/10/15/20件、保留表示controlsを追加し、既存`setNearbyFilters()`へ接続した。カードを選択可能なcontainerへ変更し、選択状態と「お品書きを見る」「目的地にする」actionを追加した。目的地callbackは`handleSetNextTarget()`の明示boolean結果だけで成功時にsurfaceを閉じ、失敗時は開いたままにした。focused E2E 1件、nearby unit 6件、priority/ranking、architecture/typecheck、`git diff --check`がPASSした。既存visual snapshot 2件は更新していない。
 
 ## 人間確認で判明した未解決事項
 
@@ -62,7 +64,7 @@ Task 12でcurrent routeのcue長・速度をscreen-space計算へ接続し、lay
 | 10 | 近接地図ピンの選択曖昧性を解消 | 完了 | なし |
 | 11 | 候補経路の連続表示とズーム連動線幅 | 完了 | Task 10後推奨 |
 | 12 | 経路animationを実描画基準で再診断 | 完了 | Task 11 |
-| 13 | 周辺地図の絞り込みcontrolsとcard actionを接続 | 未着手 | なし |
+| 13 | 周辺地図の絞り込みcontrolsとcard actionを接続 | 完了 | なし |
 | 14 | 独立地図を元の縦横比で初期表示 | 未着手 | Task 13 |
 | 15 | 周辺カードを画面座標で非重複配置 | 未着手 | Task 11, 13, 14 |
 | 16 | 購入Undoで現在地入力も復元 | 未着手 | なし |
