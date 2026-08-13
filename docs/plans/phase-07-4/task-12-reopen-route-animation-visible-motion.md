@@ -45,15 +45,16 @@ Task 11完了後のzoom連動線幅を基準にする。
 
 1. Playwrightで`page.emulateMedia({ reducedMotion: "no-preference" })`を明示し、`matchMedia('(prefers-reduced-motion: reduce)')`がfalseであることを証拠に残す。
 2. current moving cueの`strokeDashoffset`が異なる時刻で変化することを確認する。
-3. 同じroute overlayの同一clipを時刻を変えてscreenshotし、PNG bufferが同一でないことを確認する。DOM/computed style変化だけを合格条件にしない。
-4. 2が変化し3が変化しない場合はSVG/CSS rasterization契約を原因として修正する。3も変化する場合は人間視認性を原因としてdash長、コントラスト、速度等を最小調整する。
+3. rasterized motionは、対象animationを異なる二つの位相へ固定して同じroute overlay clipを撮影し、PNGをpixelとして比較する。raw PNG bufferの単純な不一致や`changedPixels > 0`だけを合格条件にせず、微小な描画ノイズを超える意味のある差分量を固定fixtureでassertする。同じ位相を二度比較する負の対照も置く。production codeへテスト専用分岐や新しい画像比較依存は追加しない。
+4. 2が変化しても3の差分条件を満たさない場合はSVG/CSS rasterization契約を原因として修正する。3を満たしてもheadedで方向を認識できない場合は人間視認性を原因としてdash長、コントラスト、速度等を最小調整する。
 5. direction cueが進行方向と逆へ動いていないことを、dash offset符号とordered route pointsで確認する。
 6. `reduce`ではanimationが停止し、base pathと静的方向cueが残ることを再確認する。
-7. C108の実routeでheaded screenshot/動画等の目視用証拠を生成する。ただしTask 18の人間受入が終わるまでPhase完了扱いにはしない。
+7. C108の実routeで通常再生したheaded screenshot/動画等の目視用証拠を生成する。ただしTask 18の人間受入が終わるまでPhase完了扱いにはしない。
 
 ## テスト方針
 
-- no-preferenceでcomputed値とraster pixelsの両方が時間変化する。
+- no-preferenceでcomputed値が時間変化する。
+- 異なる二つのanimation位相でraster pixelsに意味のある差分があり、同一位相の負の対照では同じ条件を満たさない。
 - candidateはmoving cueなし。
 - reduceではmoving cue停止、base/static cueは可視。
 - zoom倍率を変えてもmoving cueがbase pathから消えない。
@@ -68,9 +69,13 @@ npm run check:webapp
 git diff --check
 ```
 
+focused testを`tests/e2e/route-animation.spec.ts`へ分離した場合は、そのfileも明示実行する。
+
 ## 受入条件
 
-- no-preference環境のrasterized overlayが時間で実際に変化する。
+- no-preference環境でanimationが通常再生中に進行する。
+- rasterized overlayの差分が単なるbuffer不一致や微小ノイズではなく、moving cueの画面上変化を証明する。
+- 同一位相の負の対照でpixel差分テスト自体の証明力を確認できる。
 - moving cueがcurrent routeだけに存在する。
 - reduced motion契約を壊していない。
 - Task 18で人間が進行方向を視認できるためのheaded証拠を用意できる。
