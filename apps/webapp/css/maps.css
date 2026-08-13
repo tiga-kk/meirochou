@@ -84,6 +84,17 @@
   max-width: 28rem;
 }
 
+.nearby-map-origin-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nearby-map-origin-controls button {
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+}
+
 .nearby-map-viewport {
   position: relative;
   min-height: 220px;

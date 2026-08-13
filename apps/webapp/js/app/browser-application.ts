@@ -405,6 +405,7 @@ export class BrowserApplication {
       this.routeMapAreaCatalog,
       this.routeMapAssetsLoader,
       this.activeEventDayReader,
+      () => this.readCurrentSpace(),
     );
     this.activeEventDaySession.subscribe(() => {
       if (this.ui) {

@@ -56,6 +56,45 @@ test("route未開始でもヘッダーの地図を開閉できる", async ({ pag
   await expect(opener).toBeFocused();
 });
 
+test("地図の基準地点は選択モード中のtapだけで変更される", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "地図" }).click();
+  const viewport = page.locator("#nearby-map-viewport");
+  const stage = page.locator("#nearby-map-layer");
+  const marker = page.locator("#nearby-map-origin-marker");
+  await expect(page.getByRole("button", { name: "基準地点を変更" })).toHaveCSS(
+    "min-height",
+    "44px",
+  );
+  await expect(page.getByRole("button", { name: "現在地を使う" })).toHaveCSS(
+    "min-height",
+    "44px",
+  );
+  await expect(page.locator("#nearby-map-image")).toHaveJSProperty(
+    "complete",
+    true,
+  );
+
+  const viewportBox = await viewport.boundingBox();
+  expect(viewportBox).not.toBeNull();
+  await viewport.click({ position: { x: 4, y: 4 } });
+  await expect(marker).toBeHidden();
+
+  await page.getByRole("button", { name: "現在地を使う" }).click();
+  await expect(marker).toBeVisible();
+
+  await page.getByRole("button", { name: "基準地点を変更" }).click();
+  const stageBox = await stage.boundingBox();
+  expect(stageBox).not.toBeNull();
+  await page.mouse.click(
+    (stageBox?.x ?? 0) + (stageBox?.width ?? 0) * (4 / 960),
+    (stageBox?.y ?? 0) + (stageBox?.height ?? 0) * (4 / 640),
+  );
+  await expect(marker).toBeVisible();
+  await expect(page.getByText("地図を1回タップして基準地点を選択してください")).toHaveCount(0);
+});
+
 test("初回訪問では空のローカルイベント・日程で起動する", async ({ page }) => {
   await page.goto("/");
 

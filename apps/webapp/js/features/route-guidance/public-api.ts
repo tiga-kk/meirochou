@@ -17,7 +17,11 @@ export * from "./use-cases/route-map-assets-loader";
 export * from "./use-cases/route-optimizer";
 export * from "./use-cases/start-route-guidance";
 export { DomRouteGuidanceView } from "./ui/dom-route-guidance-view";
-export { DomNearbyMapView } from "./ui/dom-nearby-map-view";
+export {
+  DomNearbyMapView,
+  clientPointToGridSelection,
+  type NearbyMapOrigin,
+} from "./ui/dom-nearby-map-view";
 export { RouteItineraryDialog } from "./ui/route-itinerary-dialog";
 export { buildSpaceFromLocation } from "./ui/parse-current-location-form";
 export {
