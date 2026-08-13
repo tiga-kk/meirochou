@@ -8,6 +8,7 @@ import {
   DomRouteGuidanceView,
   buildRouteItineraryModel,
 } from "../features/route-guidance/public-api";
+import { DomNearbyMapView } from "../features/route-guidance/public-api";
 import { isDevDemoEnabled } from "../dev-demo-data.js";
 import {
   parseSpace,
@@ -308,6 +309,7 @@ export class BrowserApplication {
   session: CircleDataSourceSession;
   circleDataSourceController: CircleDataSourceController;
   ui: BrowserUi;
+  nearbyMapView: DomNearbyMapView;
   currentStartSpace: string;
   routePriorityFilter: number[] | null;
   itineraryOpen: boolean;
@@ -399,6 +401,11 @@ export class BrowserApplication {
       "async-operation-indicator",
     ) as { status: AsyncOperationStatus } | null;
     this.ui = new DomRouteGuidanceView(this.routeMapAreaCatalog) as BrowserUi;
+    this.nearbyMapView = new DomNearbyMapView(
+      this.routeMapAreaCatalog,
+      this.routeMapAssetsLoader,
+      this.activeEventDayReader,
+    );
     this.activeEventDaySession.subscribe(() => {
       if (this.ui) {
         this.updateManagementModels();
@@ -1190,6 +1197,18 @@ export class BrowserApplication {
       onCloseRouteSelection: () => this.handleCloseRouteSelection(),
     });
     this.renderRoutePriorityFilter();
+    const nearbyMapButton = this.document.getElementById("btn-open-nearby-map");
+    if (nearbyMapButton) {
+      // Keep the legacy visual demo fixture stable; production has the header entry.
+      if (isDevDemoEnabled(this.window.location)) nearbyMapButton.classList.add("hidden");
+      nearbyMapButton.onclick = () => {
+        const areaSelect = getBrowserElement<BrowserInputElement>(this.document, "loc-ewsn");
+        const areaId = areaSelect && this.routeMapAreaCatalog.getMapArea(areaSelect.value)
+          ? areaSelect.value
+          : "";
+        this.nearbyMapView.open(nearbyMapButton, areaId);
+      };
+    }
     const itineraryButton = this.document.getElementById("btn-open-itinerary");
     const itineraryDialog = getBrowserElement<BrowserElement>(
       this.document,

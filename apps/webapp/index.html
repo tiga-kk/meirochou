@@ -36,6 +36,15 @@
         <button type="button" id="btn-open-gallery" class="header-btn">一覧</button>
         <button
           type="button"
+          id="btn-open-nearby-map"
+          class="header-btn"
+          aria-haspopup="dialog"
+          aria-controls="nearby-map-surface"
+        >
+          地図
+        </button>
+        <button
+          type="button"
           id="btn-open-itinerary"
           class="header-btn"
           aria-haspopup="dialog"
@@ -289,6 +298,8 @@
         </div>
       </div>
     </div>
+
+    <div id="nearby-map-surface" class="nearby-map-surface hidden"></div>
 
     <source-diff-dialog id="source-diff-dialog"></source-diff-dialog>
     <async-operation-indicator id="async-operation-indicator"></async-operation-indicator>

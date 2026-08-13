@@ -38,6 +38,24 @@ test.beforeEach(async ({ context, page }) => {
   await routeDemoEventRegistry(page);
 });
 
+test("route未開始でもヘッダーの地図を開閉できる", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.locator("#header-area-title")).not.toHaveText("地図読込中");
+  const opener = page.getByRole("button", { name: "地図" });
+  await opener.click();
+
+  const surface = page.locator("#nearby-map-surface");
+  await expect(surface).toBeVisible();
+  await expect(surface).toHaveAttribute("role", "dialog");
+  await expect(surface).toHaveAttribute("aria-modal", "true");
+  await expect(page.locator("#nearby-map-area option")).not.toHaveCount(0);
+
+  await page.keyboard.press("Escape");
+  await expect(surface).toBeHidden();
+  await expect(opener).toBeFocused();
+});
+
 test("初回訪問では空のローカルイベント・日程で起動する", async ({ page }) => {
   await page.goto("/");
 
