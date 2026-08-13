@@ -299,6 +299,49 @@ export function getPinPosition(space: string): MapPoint {
   };
 }
 
+export interface MapPinSelectionCandidate {
+  readonly space: string;
+  readonly centerX: number;
+  readonly centerY: number;
+  readonly selectable: boolean;
+}
+
+export function resolveNearestMapPin(input: {
+  clientX: number;
+  clientY: number;
+  candidates: readonly MapPinSelectionCandidate[];
+}): MapPinSelectionCandidate | null {
+  if (!Number.isFinite(input.clientX) || !Number.isFinite(input.clientY)) {
+    return null;
+  }
+
+  let nearest: MapPinSelectionCandidate | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const candidate of input.candidates) {
+    if (
+      !candidate.selectable ||
+      !candidate.space ||
+      !Number.isFinite(candidate.centerX) ||
+      !Number.isFinite(candidate.centerY)
+    ) {
+      continue;
+    }
+    const distance = Math.hypot(
+      candidate.centerX - input.clientX,
+      candidate.centerY - input.clientY,
+    );
+    if (
+      distance < nearestDistance ||
+      (distance === nearestDistance &&
+        (!nearest || candidate.space < nearest.space))
+    ) {
+      nearest = candidate;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
+}
+
 export function buildMapPins(
   circles: Circle[],
   options: BuildMapPinsOptions = {},

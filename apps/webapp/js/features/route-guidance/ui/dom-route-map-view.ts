@@ -8,6 +8,7 @@ import {
   calculateMapPinSize,
   calculateMapViewportLayout,
   calculateNativeImageScale,
+  resolveNearestMapPin,
 } from "./route-map-pin-model";
 import { buildRouteOverlaySvg } from "./route-overlay-svg";
 
@@ -386,6 +387,12 @@ export class DomRouteMapView {
       this.renderRouteOverlay(selectedRoute, "candidate");
     }
 
+    const pinsBySpace = new Map(pins.map((pin) => [pin.space, pin]));
+    const getSelectableButtons = () =>
+      [...this.els.pinLayer.querySelectorAll("button.map-pin")].filter(
+        (button) => pinsBySpace.get(button.dataset.space)?.selectable,
+      );
+
     pins.forEach((pin) => {
       const button = document.createElement("button");
       button.type = "button";
@@ -429,13 +436,47 @@ export class DomRouteMapView {
           ? `${itineraryEntry.index}番、${normalPinLabel}`
           : normalPinLabel,
       );
+      const selectable =
+        Boolean(pin.circle) &&
+        selectionState !== "comparing" &&
+        !["next", "start", "done"].includes(pin.state);
       if (pin.circle && selectionState !== "comparing") {
         button.onclick = (event) => {
           event.stopPropagation();
-          this.uiManager.showCandidatePreview?.(pin.circle, button);
+          let selectedButton = event.currentTarget;
+          if (event.detail > 0) {
+            const candidate = resolveNearestMapPin({
+              clientX: event.clientX,
+              clientY: event.clientY,
+              candidates: getSelectableButtons().map((candidateButton) => {
+                const rect = candidateButton.getBoundingClientRect();
+                return {
+                  space: candidateButton.dataset.space || "",
+                  centerX: rect.left + rect.width / 2,
+                  centerY: rect.top + rect.height / 2,
+                  selectable: true,
+                };
+              }),
+            });
+            const nearestButton = candidate
+              ? getSelectableButtons().find(
+                  (candidateButton) =>
+                    candidateButton.dataset.space === candidate.space,
+                )
+              : null;
+            if (nearestButton) selectedButton = nearestButton;
+          }
+          const selectedPin = pinsBySpace.get(selectedButton?.dataset.space);
+          if (selectedPin?.circle) {
+            this.uiManager.showCandidatePreview?.(
+              selectedPin.circle,
+              selectedButton,
+            );
+          }
         };
       }
       if (selectionState === "comparing" && pin.circle) button.disabled = true;
+      pinsBySpace.set(pin.space, { ...pin, selectable });
       this.els.pinLayer.appendChild(button);
     });
 

@@ -735,6 +735,68 @@ test("同一地点では次目的地ピンを通常ピンより前面に表示�
   expect(nextPinIsTopmost).toBe(true);
 });
 
+test("重なるピンはpointer位置に近い候補を選ぶ", async ({ page }) => {
+  await page.goto("/?demo_ui=1");
+
+  const leftPin = pinFor(page, "東ア31b");
+  const rightPin = pinFor(page, "東ア41a");
+  await expect(leftPin).toBeVisible();
+  await expect(rightPin).toBeVisible();
+
+  await leftPin.evaluate((element) => {
+    element.style.left = "60px";
+    element.style.top = "20px";
+  });
+  await rightPin.evaluate((element) => {
+    element.style.left = "calc(60px + 18px)";
+    element.style.top = "20px";
+  });
+
+  const leftBox = await leftPin.boundingBox();
+  const rightBox = await rightPin.boundingBox();
+  expect(leftBox).not.toBeNull();
+  expect(rightBox).not.toBeNull();
+
+  await rightPin.evaluate(
+    (element, point) =>
+      element.dispatchEvent(
+        new MouseEvent("click", {
+          bubbles: true,
+          clientX: point.x,
+          clientY: point.y,
+          detail: 1,
+        }),
+      ),
+    {
+      x: (leftBox?.x ?? 0) + (leftBox?.width ?? 0) / 2,
+      y: (leftBox?.y ?? 0) + (leftBox?.height ?? 0) / 2,
+    },
+  );
+  await expect(page.locator(".candidate-preview-card")).toContainText(
+    "東ア31b",
+  );
+  await page.getByRole("button", { name: "候補を閉じる" }).click();
+
+  await rightPin.evaluate(
+    (element, point) =>
+      element.dispatchEvent(
+        new MouseEvent("click", {
+          bubbles: true,
+          clientX: point.x,
+          clientY: point.y,
+          detail: 1,
+        }),
+      ),
+    {
+      x: (rightBox?.x ?? 0) + (rightBox?.width ?? 0) / 2,
+      y: (rightBox?.y ?? 0) + (rightBox?.height ?? 0) / 2,
+    },
+  );
+  await expect(page.locator(".candidate-preview-card")).toContainText(
+    "東ア41a",
+  );
+});
+
 test("ピンの候補経路を比較してから目的地を変更する", async ({ page }) => {
   await page.goto("/?demo_ui=1");
 

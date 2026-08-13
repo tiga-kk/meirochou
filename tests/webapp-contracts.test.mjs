@@ -1529,7 +1529,10 @@ test("webapp map pins connect to the independent candidate surface", () => {
   );
 
   assert.match(html, /id="candidate-preview-surface"/);
-  assert.match(mapRenderer, /showCandidatePreview\?\.\(pin\.circle, button\)/);
+  assert.match(
+    mapRenderer,
+    /resolveNearestMapPin[\s\S]*showCandidatePreview\?\.\(\s*selectedPin\.circle,\s*selectedButton\s*,?\s*\)/,
+  );
   assert.doesNotMatch(mapRenderer, /previewTarget\(pin\.circle\)/);
   assert.match(guidanceView, /closeCandidatePreview\(\)/);
   assert.match(guidanceView, /onSelectTarget\?\.\(selected\)/);
