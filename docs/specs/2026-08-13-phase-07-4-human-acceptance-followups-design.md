@@ -26,16 +26,28 @@ pointer/tap位置と候補ピン中心の画面上距離を比較し、操作地
 
 Task 1のheadless検証だけでは人間受入を満たさなかった。人間確認ではcurrent routeのmoving cueを視認できなかったため、Phase 7.4を再オープンする。
 
-Task 12では次を別々に切り分ける。
+Task 12では次を別々に証明する。
 
-1. `prefers-reduced-motion`が実行環境でanimationを無効化していないか。
-2. `stroke-dashoffset`のcomputed valueが時間変化しているか。
-3. その時間変化が実際のrasterized pixelsの差として現れているか。
-4. pixelsが変化していても、人間が方向として認識できるコントラスト・長さ・速度か。
+1. `prefers-reduced-motion`が実行環境でanimationを無効化していないこと。
+2. production stylesheetの`CSSAnimation`がcurrent cueへ実際に接続され、テストからstyleを注入しなくても実時間で進行すること。
+3. production `CSSAnimation`の異なる位相が、同じroute overlay上で意味のあるrasterized pixel差を生むこと。
+4. moving cueの画面上の長さと移動速度が、route全長やzoom倍率へそのまま比例して極端に変化しないこと。
+5. rendered cueの強調位置がordered routeのstart側からgoal側へ進むこと。
+6. pixelsが動いていても、人間が方向として認識できること。
 
-自動受入では`no-preference`を明示したC108経路overlayを使い、通常再生でcomputed valueが時間変化することを確認する。その上で同じanimationを異なる二つの位相へ固定して同一cropを取得し、PNGをpixelとして比較する。raw bufferの単純な不一致や`changedPixels > 0`だけを合格条件にせず、微小な描画ノイズを超える意味のある差分量を固定fixtureでassertする。同じ位相を二度比較する負の対照も置く。computed styleだけを証拠にせず、新しい画像比較依存やproductionのテスト専用分岐も追加しない。
+production変更前に新しいfocused testを実行し、現在実装のvisual/direction契約で意味的にREDになることを必須とする。追加したテストが現在実装のままGREENなら、人間FAILを検出できていないので実装へ進まない。
 
-`reduce`時はanimationを無効化する既存アクセシビリティ契約を維持する。その場合でも静的な方向cueは残す。
+deterministicなraster検証では、production cue要素の`getAnimations()`から取得した同じ`CSSAnimation` instanceをpauseし、`currentTime`だけを異なる位相へseekする。テストから`strokeDashoffset`、inline `animation`、`animation-name`、keyframes、class、本番にないmoving elementを注入して画像差を作ってはならない。animationが本番へ接続されていなければ、この取得段階でREDになる構造にする。
+
+二位相のPNGはraw bufferの単純な不一致や`changedPixels > 0`だけを合格条件にせず、微小な描画ノイズを超える意味のある差分をassertする。同じ位相を二度比較する負の対照も置く。新しい画像比較依存やproduction test hookは追加しない。
+
+GREEN後には、production animation宣言だけを一時的に無効化するmutation checkを行い、主要focused testがFAILすることを確認する。mutation差分はcommitせず、復元後に同じtestがGREENへ戻ることも確認する。これによりanimation本体が未実装・削除済みでもGREENになるテストを禁止する。
+
+現行の`pathLength="100"` + 固定dash割合 + 固定durationは、stroke幅をscreen-space化してもmoving cueの長さ・速度をscreen-spaceで安定させないため、そのまま最終契約にしない。第一候補は既存CSS `stroke-dashoffset`を再利用しつつ、Task 11のzoom stateとroute geometryからcue長・durationを表示パラメータとして更新し、短いroute/長いroute、scale=1/高倍率で極端な視認差が出ないようにする。JavaScript animation loopや毎frame SVG再生成は追加しない。
+
+screen-space化してraster motionを証明してもheadedで方向として読めない場合、dash長・色・durationだけを何度も調整し続けない。その時点でperiodic dashを主cueとして使う仮説を棄却し、一意な先頭を持つpulseやroute順に強調される非対称direction cue等、start→goalの進行を自動テストできるprimitiveへ変更する。
+
+`reduce`時はanimationを無効化する既存アクセシビリティ契約を維持し、base path、S/G、静的方向cueは残す。
 
 ## 周辺地図の操作UI
 
@@ -130,7 +142,8 @@ C108の実画面で少なくとも次を人間が確認する。
 
 - 近接2ピンを意図どおり別々に選べる。
 - candidate blue routeが途切れない。
-- `no-preference`環境でcurrent moving cueが実際に見える。
+- `no-preference`環境でcurrent moving cueが実際に見え、start→goalの方向として認識できる。
+- 初期表示と拡大状態の双方でmoving cueが速すぎる・長すぎる等により方向認識を失わない。
 - 拡大時に赤/青線が通路を覆わない。
 - 周辺地図でpriority・5/10/15/20・holdを操作できる。
 - 5件程度のカードが通常条件で重ならず、選択・前面化・「目的地にする」が動く。

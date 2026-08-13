@@ -48,7 +48,7 @@ Task開始時の基準commitは、実装開始直前の対象branchの最新remo
 | 9 | 初回の総合回帰・外部確認記録 | Task 1〜8 |
 | 10 | 近接地図ピンの選択曖昧性を解消 | なし |
 | 11 | 候補経路の連続表示とズーム連動線幅 | Task 10後推奨 |
-| 12 | 経路animationを実描画基準で再診断 | Task 11 |
+| 12 | 経路animationを実描画・方向認識基準で再診断 | Task 11 |
 | 13 | 周辺地図の絞り込みcontrolsとcard actionを接続 | なし |
 | 14 | 独立地図を元の縦横比で初期表示 | Task 13 |
 | 15 | 周辺カードを画面座標で非重複配置 | Task 11, 13, 14 |
@@ -58,7 +58,9 @@ Task開始時の基準commitは、実装開始直前の対象branchの最新remo
 
 Task 10〜17は一度に一Taskずつ実装する。同じファイルを触るTaskは上表の順で進め、後続Taskが先行Taskの未commit差分を前提にしない。
 
-Task 12はTask 1の再試行ではなく、Task 1の自動証拠で閉じられなかった「実際に人間へ見えるか」をrasterized pixelsまで下げて診断する。
+Task 12はTask 1の単純な再試行ではない。Task 1でstroke幅のscreen-space化まで行って自動GREENになった後にも人間受入でanimationを認識できなかったため、production変更前の意味的RED、本番`CSSAnimation`の自然進行、production animationをseekしたraster証拠、animationを一時無効化するmutation proof、screen-spaceのcue長・速度、rendered start→goal方向まで確認する。テストから`strokeDashoffset`やanimation自体を上書きして作った画像差を証拠にしてはならない。
+
+Task 12では現行の`pathLength=100` + 固定dash割合 + 固定durationを最終契約として固定しない。まず既存CSS animationを再利用したscreen-space化を試し、それでもraster motionはあるのにheadedで方向を読めない場合は、同じdash定数調整を繰り返さず非対称なdirection cueへ切り替える。
 
 Task 15ではカードをmap transform layerの外へ出すため、Task 11のtransform変更通知とTask 14のviewport geometry確定後に行う。
 
@@ -69,7 +71,8 @@ Task 18だけはheadless自動検証だけで完了にしない。
 - 近接する二つの候補pinを別々に選べる。
 - candidate routeは青い連続実線で、経路が途切れて見えない。
 - current/candidate線は縮小時に読みやすく、拡大時は細くなって通路を覆わない。
-- `no-preference`環境でcurrent moving cueを人間が視認できる。
+- `no-preference`環境でcurrent moving cueを人間が視認でき、start→goal方向を認識できる。
+- 初期表示と拡大状態の双方でmoving cueの画面上速度・長さが方向認識を失うほど極端に変化しない。
 - `reduce`ではanimationが停止しても静的方向情報が残る。
 - 周辺地図でpriority、5/10/15/20、holdを操作できる。
 - 周辺cardを選択し、お品書き表示と「目的地にする」を実行できる。
