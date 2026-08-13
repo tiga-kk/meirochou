@@ -27,6 +27,10 @@ export class GestureZoomController {
   constructor(container, img, options = {}) {
     this.container = container;
     this.img = img;
+    this.onTransformChange =
+      typeof options.onTransformChange === "function"
+        ? options.onTransformChange
+        : null;
     this.overscrollLimit = Number.isFinite(options.overscrollLimit)
       ? Math.max(0, options.overscrollLimit)
       : 32;
@@ -160,6 +164,7 @@ export class GestureZoomController {
 
   updateTransform() {
     this.img.style.transform = `translate3d(${this.state.x}px, ${this.state.y}px, 0) scale(${this.state.scale})`;
+    this.onTransformChange?.({ ...this.state });
   }
 
   scheduleTransform() {

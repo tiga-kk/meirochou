@@ -213,6 +213,24 @@ describe("GestureZoomController", () => {
     expect(transformWrites[0]).toContain("translate3d(25px, 15px, 0)");
   });
 
+  it("coalesces transform notifications with the rendered transform", () => {
+    const notifications: Array<{ scale: number; x: number; y: number }> = [];
+    const { container, controller } = createController({
+      onTransformChange: (state: { scale: number; x: number; y: number }) =>
+        notifications.push(state),
+    });
+
+    expect(notifications).toHaveLength(1);
+    container.dispatchEvent(pointerEvent("pointerdown", 1, 10, 10));
+    container.dispatchEvent(pointerEvent("pointermove", 1, 20, 15));
+    container.dispatchEvent(pointerEvent("pointermove", 1, 35, 25));
+
+    expect(notifications).toHaveLength(1);
+    flushRaf();
+    expect(notifications).toHaveLength(2);
+    expect(notifications.at(-1)).toEqual({ scale: 1, x: 25, y: 15 });
+  });
+
   it("keeps direct manipulation active through inertia and clears it on settle", () => {
     const { container, image, controller } = createController();
     controller.setLayout({

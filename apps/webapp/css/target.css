@@ -129,7 +129,7 @@
 .route-overlay-line {
   fill: none;
   stroke: var(--danger);
-  stroke-width: 12;
+  stroke-width: var(--route-overlay-stroke-width, 12px);
   vector-effect: non-scaling-stroke;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -140,7 +140,7 @@
 .route-flow-line {
   fill: none;
   stroke: rgba(255, 255, 255, 0.96);
-  stroke-width: 9;
+  stroke-width: var(--route-flow-stroke-width, 9px);
   vector-effect: non-scaling-stroke;
   stroke-linecap: round;
   stroke-dasharray: 32 68;
@@ -193,7 +193,6 @@
 
 .route-overlay-candidate .route-overlay-line {
   stroke: var(--primary);
-  stroke-dasharray: 22 14;
   stroke-opacity: 0.9;
 }
 

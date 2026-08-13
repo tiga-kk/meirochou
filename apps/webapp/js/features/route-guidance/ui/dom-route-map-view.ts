@@ -61,6 +61,12 @@ function readPixelBox(element) {
   return { left, top, width, height };
 }
 
+export function calculateRouteOverlayStrokeWidth(scale) {
+  const safeScale =
+    Number.isFinite(scale) && scale > 0 ? scale : 1;
+  return Math.max(4, 12 / Math.sqrt(safeScale));
+}
+
 export function getPinSourceSize(state) {
   if (state === "next") return 12;
   if (state === "start") return 10;
@@ -115,7 +121,11 @@ export class DomRouteMapView {
       this.zoomHelper = new GestureZoomController(
         this.els.navigationMap,
         this.els.navigationMapLayer,
-        { overscrollLimit: 18 },
+        {
+          overscrollLimit: 18,
+          onTransformChange: ({ scale }) =>
+            this.applyRouteOverlayStrokeWidth(scale),
+        },
       );
       if (typeof ResizeObserver === "function") {
         this.navigationMapResizeObserver = new ResizeObserver(() => {
@@ -206,6 +216,19 @@ export class DomRouteMapView {
         imageWidth,
         renderedWidth: layer.clientWidth,
       }),
+    );
+    this.applyRouteOverlayStrokeWidth(this.zoomHelper?.state.scale ?? 1);
+  }
+
+  applyRouteOverlayStrokeWidth(scale) {
+    const baseWidth = calculateRouteOverlayStrokeWidth(scale);
+    this.els.pinLayer?.style.setProperty(
+      "--route-overlay-stroke-width",
+      `${baseWidth}px`,
+    );
+    this.els.pinLayer?.style.setProperty(
+      "--route-flow-stroke-width",
+      `${Math.max(3, baseWidth * 0.75)}px`,
     );
   }
 

@@ -862,7 +862,7 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   await expect(page.locator('[data-route-kind="candidate"]')).toBeVisible();
   await expect(
     page.locator('[data-route-kind="candidate"] .route-overlay-line'),
-  ).toHaveCSS("stroke-dasharray", "22px, 14px");
+  ).toHaveCSS("stroke-dasharray", "none");
   await expect(
     page.locator('[data-route-kind="candidate"] .route-flow-comet'),
   ).toHaveCount(0);

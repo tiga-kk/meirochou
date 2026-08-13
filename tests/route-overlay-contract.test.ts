@@ -11,7 +11,10 @@ import type {
   GridMeta,
   PointsPayload,
 } from "../apps/webapp/js/features/route-guidance/domain/routing/grid-route-types";
-import { DomRouteMapView } from "../apps/webapp/js/features/route-guidance/ui/dom-route-map-view";
+import {
+  calculateRouteOverlayStrokeWidth,
+  DomRouteMapView,
+} from "../apps/webapp/js/features/route-guidance/ui/dom-route-map-view";
 import { buildRouteOverlaySvg } from "../apps/webapp/js/features/route-guidance/ui/route-overlay-svg";
 
 const fictionalPoints: PointsPayload = {
@@ -51,15 +54,28 @@ fictionalGridBytes.fill(1);
 test("route cues are distinct and long enough to read on both route overlays", () => {
   const css = readFileSync("apps/webapp/css/target.css", "utf8");
   const cue = css.match(
-    /\.route-flow-comet,[\s\S]*?stroke-width:\s*(\d+);[\s\S]*?stroke-dasharray:\s*([\d.]+)\s+([\d.]+);/,
+    /\.route-flow-comet,[\s\S]*?stroke-width:\s*var\(--route-flow-stroke-width,\s*9px\);[\s\S]*?stroke-dasharray:\s*([\d.]+)\s+([\d.]+);/,
   );
 
   assert.ok(cue);
   assert.match(css, /\.route-overlay-line[\s\S]*?vector-effect:\s*non-scaling-stroke/);
   assert.match(css, /\.route-flow-comet,[\s\S]*?vector-effect:\s*non-scaling-stroke/);
-  assert.ok(Number(cue[2]) >= 28, "moving cue dash must be long enough to follow");
-  assert.notEqual(cue[1], "12", "cue width must differ from the solid base path");
-  assert.notEqual(`${cue[2]} ${cue[3]}`, "22 14", "cue dash must differ from candidate base styling");
+  assert.doesNotMatch(
+    css,
+    /\.route-overlay-candidate \.route-overlay-line[\s\S]*?stroke-dasharray:/,
+  );
+  assert.ok(Number(cue[1]) >= 28, "moving cue dash must be long enough to follow");
+  assert.notEqual(`${cue[1]} ${cue[2]}`, "22 14", "cue dash must differ from candidate base styling");
+});
+
+test("route overlay stroke width follows zoom without dropping below the readable floor", () => {
+  const initial = calculateRouteOverlayStrokeWidth(1);
+  const zoomed = calculateRouteOverlayStrokeWidth(4);
+  const extreme = calculateRouteOverlayStrokeWidth(100);
+
+  assert.ok(initial > zoomed);
+  assert.ok(zoomed >= 4);
+  assert.equal(extreme, 4);
 });
 
 test("planRoute and buildRouteOverlaySvg fulfill coordinate contracts with fictional data", () => {
