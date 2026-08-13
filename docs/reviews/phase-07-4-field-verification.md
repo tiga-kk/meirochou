@@ -64,3 +64,36 @@ CI相当E2Eでは、通常購入Undo、Gallery購入Undo、nearby map card/leade
 したがって、この文書のTask 9時点の「Phase 7.4終了」判断は失効した。自動検証PASS自体は過去の証拠として保持し、Phase 7.4をTask 10〜18で再オープンする。
 
 Task 18で再受入した結果を、この文書へ追記して最終終了判定を更新する。
+
+## Task 18 自動再検証結果（2026-08-13）
+
+### PASS
+
+| command | 結果 |
+|---|---|
+| `npx vitest run --root . tests/map-viewport-center.test.ts tests/nearby-map-aspect-ratio.test.ts tests/nearby-map-origin.test.ts tests/nearby-map-view.test.ts tests/route-map-candidate-preview.test.ts tests/route-map-pin-selection.test.ts tests/route-map-viewport-layout.test.ts` | PASS: 7 files / 21 tests |
+| `npm run test:route-guidance` | PASS: 6 files / 38 tests |
+| `npm run test:phase-05d-regressions` | PASS: 2 files / 4 tests |
+| `npm run check:webapp` | PASS: architecture 168 files / TypeScript typecheck |
+| `npm run build:webapp` | PASS |
+| `npm run verify:webapp:build` | PASS: 26 assets |
+| `npm run verify:gas` | PASS: GAS 38 tests |
+| `npm run test:catalog-extension` | PASS: 24 tests |
+| `node scripts/audit-public-tree.mjs` | PASS |
+| Task 17関連E2E（`--grep "表示中心|地図|ズーム"`） | 5 passed / 1既存snapshot失敗 |
+| `git diff --check` | PASS |
+
+`npm run verify`はwebapp 795件中794件がPASSした。唯一の失敗は一時worktreeの`.git`に含まれるローカル絶対パスを`tests/public-boundary.test.mjs`が検出した既存環境要因で、同じ検査は対象ツリーを直接監査する`node scripts/audit-public-tree.mjs`ではPASSした。
+
+`npm run test:e2e:ci`は52 passed / 15 failed / 8 skippedだった。失敗は既存snapshot差分、既存navigation resume・管理フロー・候補操作の不安定または既存機能assertion失敗であり、Task 17の専用表示中心確認を含む関連E2Eは通過した。snapshotは更新していない。
+
+### 人間受入・外部確認
+
+| 項目 | 結果 |
+|---|---|
+| headedブラウザでTask 10〜17のvisual/interaction確認 | 未確認。`$DISPLAY`/`$WAYLAND_DISPLAY`未設定でX serverがなく、Playwright headed起動が失敗 |
+| current animation、route線幅、nearby card/leader、map aspect、表示中心の人間受入 | 未確認 |
+| 実GASの同一space更新・既存Sheet列保持 | 未確認。credential/test deploymentなし |
+| Phase 7.3からのmap drag遅延 | 未確認。physical input可能な実機なし |
+
+したがって、Task 18の自動検証は完了したが、人間受入が未確認のためPhase 7.4の終了判定は未完了とする。

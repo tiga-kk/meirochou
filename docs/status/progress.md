@@ -6,9 +6,9 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.4（Task 16完了・Task 17着手可能）**
-- 現在Task: **Task 17: 地図viewport中心の配置位置を常時表示**
-- 次に着手するTask: **Task 17**
+- 現在フェーズ: **Phase 7.4（Task 17完了・Task 18確認中）**
+- 現在Task: **Task 18: 人間受入と回帰検証でPhaseを再終了**
+- 次に着手するTask: **Task 18**
 - canonical plan: `docs/plans/phase-07-4/README.md`
 - 初期設計: `docs/specs/2026-08-13-phase-07-4-route-visual-nearby-map-and-priority-filter-design.md`
 - follow-up設計: `docs/specs/2026-08-13-phase-07-4-human-acceptance-followups-design.md`
@@ -35,6 +35,8 @@ Task 14でstandalone周辺地図のdialog内利用可能領域を測定し、画
 Task 15で周辺カードとleader lineをmap transform layer外のviewport overlayへ移し、zoom/pan時は既存transform通知からscreen-space位置だけを更新するようにした。画面内slotを決定的に探索し、既配置カードとの交差を避け、選択カードを前面化した。leader lineは明色underlayと濃色foregroundの二重線にした。密集5件のlayout unit 3件、関連E2E 1件、architecture/typecheck、`git diff --check`がPASSした。`npm run test:webapp`は787/788件がPASSし、公開境界検査の一時worktree `.git`絶対パス検出だけが既存環境要因で失敗した。
 
 Task 16で購入直前のフォーム値を通常購入・Gallery購入の共通Undo情報へ保存し、Undo後にroute snapshot復元、フォーム更新、`currentStartSpace`復元を行うようにした。保存値がない場合は`arrived-circle.circleSpace`だけをfallbackに使い、それ以外ではフォームへ推測値を書かない。area表示名からselectのarea idへ戻す既存UI更新の不整合も修正した。購入関連unit 23件、指定E2E 5件、architecture/typecheck、`git diff --check`がPASSした。
+
+Task 17で通常経路地図と周辺地図のviewport中心を画像座標へ逆変換し、全地点JSONから最寄りの配置を「表示中心: …付近」として表示するようにした。zoom/pan更新は100msで遅延し、overscrollは画像境界へclampした。中心変換unit 3件、関連map unit 21件、表示確認を含むE2E 5件、architecture/typecheck、`git diff --check`がPASSした。既存スナップショット失敗は基準commitでも再現したため既存失敗として分離し、snapshotは更新していない。
 
 ## 人間確認で判明した未解決事項
 
@@ -74,8 +76,8 @@ Task 16で購入直前のフォーム値を通常購入・Gallery購入の共通
 | 14 | 独立地図を元の縦横比で初期表示 | 完了 | Task 13 |
 | 15 | 周辺カードを画面座標で非重複配置 | 完了 | Task 11, 13, 14 |
 | 16 | 購入Undoで現在地入力も復元 | 完了 | なし |
-| 17 | 地図viewport中心の配置位置を常時表示 | 未着手 | Task 11, 14 |
-| 18 | 人間受入と回帰検証でPhaseを再終了 | 未着手 | Task 10〜17 |
+| 17 | 地図viewport中心の配置位置を常時表示 | 完了 | Task 11, 14 |
+| 18 | 人間受入と回帰検証でPhaseを再終了 | 進行中 | Task 10〜17 |
 
 ## 既存の外部確認残件
 
@@ -91,6 +93,7 @@ Task 16で購入直前のフォーム値を通常購入・Gallery購入の共通
 - Task 10〜17は各Taskのfocused REDを先に作る。
 - Task 12のanimationはcomputed styleだけで完了判定しない。
 - Task 18はheadless自動テストだけで人間受入済みにしない。
+- Task 18の自動検証は完了したが、headed環境がなく人間受入未確認のためPhase終了にしない。
 - 完了済みTask 1〜9のcommitをrebase/resetで作り直さない。
 - 未完了WIPを破棄、stash、resetして再出発しない。
 - 各Taskの基準点は開始直前の最新remote HEADから取得する。
