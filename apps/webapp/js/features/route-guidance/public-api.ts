@@ -22,6 +22,12 @@ export {
   clientPointToGridSelection,
   type NearbyMapOrigin,
 } from "./ui/dom-nearby-map-view";
+export {
+  rankNearbyCircles,
+  type NearbyCircleArea,
+  type NearbyCircleLimit,
+  type NearbyCircleRankingInput,
+} from "./ui/nearby-circle-model";
 export { RouteItineraryDialog } from "./ui/route-itinerary-dialog";
 export { buildSpaceFromLocation } from "./ui/parse-current-location-form";
 export {

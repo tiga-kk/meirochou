@@ -10,6 +10,10 @@ import type {
 } from "../public-api";
 import { snapStartToWalkableCell } from "../domain/start-selection";
 import type { GridMeta } from "../domain/routing/grid-route-types";
+import {
+  rankNearbyCircles,
+  type NearbyCircleLimit,
+} from "./nearby-circle-model";
 import { parseSpace } from "../../../shared/domain/space-parser";
 import {
   buildMapPins,
@@ -80,6 +84,10 @@ export class DomNearbyMapView {
   private activeArea: NearbyArea | null = null;
   private activeAssets: RouteMapAssets | null = null;
   private origin: NearbyMapOrigin | null = null;
+  private nearbyCandidates: ReturnType<typeof rankNearbyCircles> = [];
+  private selectedPriorities: readonly number[] | null = null;
+  private includeHeld = false;
+  private nearbyLimit: NearbyCircleLimit = 5;
   private selectionMode = false;
   private tapStart: { pointerId: number; clientX: number; clientY: number } | null = null;
   private renderToken = 0;
@@ -195,6 +203,23 @@ export class DomNearbyMapView {
     this.opener?.focus();
   }
 
+  getNearbyCandidates(): ReturnType<typeof rankNearbyCircles> {
+    return [...this.nearbyCandidates];
+  }
+
+  setNearbyFilters(input: {
+    selectedPriorities?: readonly number[] | null;
+    includeHeld?: boolean;
+    limit?: NearbyCircleLimit;
+  }): void {
+    if (input.selectedPriorities !== undefined) {
+      this.selectedPriorities = input.selectedPriorities;
+    }
+    if (input.includeHeld !== undefined) this.includeHeld = input.includeHeld;
+    if (input.limit !== undefined) this.nearbyLimit = input.limit;
+    this.updateNearbyCandidates();
+  }
+
   private renderAreaOptions(): void {
     const select = this.surface?.querySelector("#nearby-map-area") as HTMLSelectElement | null;
     if (!select) return;
@@ -212,6 +237,7 @@ export class DomNearbyMapView {
     this.activeArea = area;
     this.activeAssets = null;
     this.origin = null;
+    this.nearbyCandidates = [];
     this.selectionMode = false;
     this.renderOriginMarker();
     const token = ++this.renderToken;
@@ -226,12 +252,14 @@ export class DomNearbyMapView {
       const assets = await this.assetsLoader.loadMapAssets(area);
       if (token !== this.renderToken) return;
       this.activeAssets = assets;
+      this.updateNearbyCandidates();
       this.renderPins(assets);
     } catch (error) {
       if (token === this.renderToken) {
         console.warn("Nearby map assets could not be loaded.", error);
         this.setError("地図データを読み込めませんでした");
         this.activeAssets = null;
+        this.nearbyCandidates = [];
         this.renderPins(null);
       }
     }
@@ -243,11 +271,19 @@ export class DomNearbyMapView {
     layer.replaceChildren();
     const area = this.activeArea;
     const points = assets ? buildMapPointIndex(assets.points) : null;
-    const circles = this.circleReader.getAllCircles().filter((circle) => areaForSpace(circle.space, area ? [area] : []) === area);
+    const circles = this.origin
+      ? this.nearbyCandidates.map(({ candidate }) => candidate)
+      : this.circleReader.getAllCircles().filter((circle) => areaForSpace(circle.space, area ? [area] : []) === area);
+    const positionOverrides = new Map(
+      this.nearbyCandidates
+        .filter(({ position }) => position)
+        .map(({ candidate, position }) => [candidate.space, position as MapPoint]),
+    );
     const pins = buildMapPins(circles, {
       purchasedList: circles.filter((circle) => this.circleReader.getCircleStatus(circle.space) === "purchased").map((circle) => circle.space),
       holdList: circles.filter((circle) => this.circleReader.getCircleStatus(circle.space) === "held").map((circle) => circle.space),
       pointIndex: points ?? undefined,
+      positionOverrides,
       requireIndexedPositions: Boolean(area?.assets),
     });
     for (const pin of pins) {
@@ -315,6 +351,7 @@ export class DomNearbyMapView {
     }
     this.origin = snapped;
     this.selectionMode = false;
+    this.updateNearbyCandidates();
     this.renderOriginMarker();
     this.setError("");
   }
@@ -354,8 +391,29 @@ export class DomNearbyMapView {
     }
     this.origin = snapped;
     this.selectionMode = false;
+    this.updateNearbyCandidates();
     this.renderOriginMarker();
     this.setError("");
+  }
+
+  private updateNearbyCandidates(): void {
+    if (!this.origin || !this.activeArea || !this.activeAssets) {
+      this.nearbyCandidates = [];
+      return;
+    }
+    this.nearbyCandidates = rankNearbyCircles({
+      pointsPayload: this.activeAssets.points,
+      gridMeta: this.activeAssets.gridMetadata,
+      gridBytes: this.activeAssets.gridBytes,
+      originGridIndex: this.origin.gridIndex,
+      area: this.activeArea,
+      circles: this.circleReader.getAllCircles(),
+      getCircleStatus: (space) => this.circleReader.getCircleStatus(space),
+      selectedPriorities: this.selectedPriorities,
+      includeHeld: this.includeHeld,
+      limit: this.nearbyLimit,
+    });
+    this.renderPins(this.activeAssets);
   }
 
   private renderOriginMarker(): void {

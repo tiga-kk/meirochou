@@ -35,7 +35,7 @@ interface NormalizedPortal {
   sourcePoint: MapPoint;
 }
 
-interface DistanceMap {
+export interface DistanceMap {
   pointMap: Map<string, OcrPoint[]>;
   spec: GridSpec;
   distances: Float64Array;
@@ -405,14 +405,37 @@ export function buildDistanceMap(
   );
   if (startPortals.length === 0) return null;
 
+  return buildDistanceMapFromIndexes(
+    pointMap,
+    spec,
+    gridBytes,
+    startPortals.map((portal) => portal.index),
+  );
+}
+
+function buildDistanceMapFromIndexes(
+  pointMap: Map<string, OcrPoint[]>,
+  spec: GridSpec,
+  gridBytes: Uint8Array,
+  startIndexes: readonly number[],
+): DistanceMap | null {
+  const validStartIndexes = startIndexes.filter(
+    (index) =>
+      Number.isInteger(index) &&
+      index >= 0 &&
+      index < spec.totalCells &&
+      gridBytes[index] !== GRID_BLOCKED,
+  );
+  if (validStartIndexes.length === 0) return null;
+
   const distances = new Float64Array(spec.totalCells);
   distances.fill(Infinity);
   const heap = new MinHeap();
 
-  startPortals.forEach((portal) => {
-    if (distances[portal.index] > 0) {
-      distances[portal.index] = 0;
-      heap.push({ cost: 0, index: portal.index });
+  validStartIndexes.forEach((index) => {
+    if (distances[index] > 0) {
+      distances[index] = 0;
+      heap.push({ cost: 0, index });
     }
   });
 
@@ -431,6 +454,32 @@ export function buildDistanceMap(
   }
 
   return { pointMap, spec, distances };
+}
+
+export function buildDistanceMapFromGridIndex(
+  pointsPayload: PointsPayload,
+  gridMeta: Partial<GridMeta>,
+  gridBytes: Uint8Array,
+  startGridIndex: number,
+): DistanceMap | null {
+  if (!(gridBytes instanceof Uint8Array)) return null;
+
+  const spec = readGridSpec(pointsPayload, gridMeta);
+  if (!spec || gridBytes.length < spec.totalCells) return null;
+  if (
+    !Number.isInteger(startGridIndex) ||
+    startGridIndex < 0 ||
+    startGridIndex >= spec.totalCells ||
+    gridBytes[startGridIndex] === GRID_BLOCKED
+  )
+    return null;
+
+  return buildDistanceMapFromIndexes(
+    buildPointMap(pointsPayload),
+    spec,
+    gridBytes,
+    [startGridIndex],
+  );
 }
 
 function distanceToPointPortals(
@@ -502,6 +551,18 @@ export function rankCandidatesByGridDistance(
     }));
   }
 
+  return rankCandidatesByDistanceMap(
+    distanceMap,
+    gridBytes,
+    sourceCandidates,
+  );
+}
+
+function rankCandidatesByDistanceMap(
+  distanceMap: DistanceMap,
+  gridBytes: Uint8Array,
+  sourceCandidates: Circle[],
+): RankedCandidate[] {
   return sourceCandidates
     .map((candidate, originalIndex) => {
       const points = distanceMap.pointMap.get(spaceKey(candidate?.space)) || [];
@@ -523,6 +584,29 @@ export function rankCandidatesByGridDistance(
       if (a.distance !== b.distance) return a.distance - b.distance;
       return a.originalIndex - b.originalIndex;
     });
+}
+
+export function rankCandidatesByGridDistanceFromGridIndex(
+  pointsPayload: PointsPayload,
+  gridMeta: Partial<GridMeta>,
+  gridBytes: Uint8Array,
+  startGridIndex: number,
+  candidates: Circle[],
+): RankedCandidate[] {
+  const sourceCandidates = Array.isArray(candidates) ? candidates : [];
+  const distanceMap = buildDistanceMapFromGridIndex(
+    pointsPayload,
+    gridMeta,
+    gridBytes,
+    startGridIndex,
+  );
+  if (!distanceMap) {
+    return sourceCandidates.map((candidate) => ({
+      candidate,
+      distance: Infinity,
+    }));
+  }
+  return rankCandidatesByDistanceMap(distanceMap, gridBytes, sourceCandidates);
 }
 
 export function planRoute(

@@ -6,9 +6,9 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.4（Task 5完了・Task 6着手可能）**
-- 現在Task: **Task 6: grid距離による周辺サークルランキング**
-- 次に着手するTask: **Task 6**
+- 現在フェーズ: **Phase 7.4（Task 6完了・Task 7着手可能）**
+- 現在Task: **Task 7: 地図上のお品書きカード・leader line・重なり回避**
+- 次に着手するTask: **Task 7**
 - canonical plan: `docs/plans/phase-07-4/README.md`
 - 設計仕様: `docs/specs/2026-08-13-phase-07-4-route-visual-nearby-map-and-priority-filter-design.md`
 - animation診断: `docs/reviews/phase-07-4-route-animation-diagnosis.md`
@@ -52,8 +52,8 @@ Phase 7.3 Task 4では合成PointerEventによる計測で明確な改善を証�
 | 3 | priority条件を通常の経路案内へ適用 | 完了 | Task 2 |
 | 4 | 独立した地図閲覧surfaceの追加 | 完了 | なし |
 | 5 | 任意検索基準地点とgrid origin解決 | 完了 | Task 4 |
-| 6 | grid距離による周辺サークルランキング | 次に着手 | Task 2, 5 |
-| 7 | 地図上のお品書きカード・leader line・重なり回避 | 未着手 | Task 6 |
+| 6 | grid距離による周辺サークルランキング | 完了 | Task 2, 5 |
+| 7 | 地図上のお品書きカード・leader line・重なり回避 | 次に着手 | Task 6 |
 | 8 | 一覧以外の購入経路へ最新1件Undoを拡張 | 未着手 | なし |
 | 9 | 総合回帰・実機visual・実GAS残件の終了判定 | 未着手 | Task 1〜8 |
 
@@ -68,6 +68,8 @@ Task 3でpriority条件を通常の経路案内と開発用デモ経路の候補
 Task 4でRoute Guidanceとは別の独立地図surfaceを追加した。ヘッダーからarea選択・地図asset表示・zoom操作を開け、Escapeとfocus returnに対応する。閲覧中はRoute Guidance Session、snapshot、current targetを変更しない。
 
 Task 5で独立地図の検索基準を現在地または選択モード中の任意tapから解決できるようにした。画像座標をgridへ変換し、blocked cellは既存のwalkable補正を再利用する。通常tapやpan終了ではoriginを変更せず、originは地図surface内だけで保持する。
+
+Task 6で任意originからのDijkstra距離mapを1回だけ構築し、area・購入済み・hold・priority条件を適用した候補をwalkable grid距離順と件数上限で絞り込むnearby modelを追加した。Route GuidanceのALNSやsessionは変更しない。
 
 Task 4〜7のstandalone mapはRoute Guidance Sessionを第二のmap stateとして複製しない。表示状態だけを独立させ、map assets / routing / zoom計算を再利用する。
 
