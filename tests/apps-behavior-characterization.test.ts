@@ -53,6 +53,80 @@ function createGasState(): LocalEventDayState {
 }
 
 describe("apps public behavior characterization", () => {
+  it("passes only selected priorities to a normal route search", async () => {
+    const { app } = createProductionAppFixture();
+    app.activeEventDaySession.setActiveEventDay(REF, {
+      ...createEmptyEventDayState(
+        { type: "csv", fileName: "circles.csv" },
+        "generation-1",
+        NOW,
+      ),
+      circles: [
+        { space: "E1-09", priority: 9 },
+        { space: "E1-10", priority: 10 },
+        { space: "E1-08", priority: 8 },
+        { space: "E1-NA" },
+      ],
+    });
+    const start = vi
+      .spyOn(app.routeGuidanceController, "startFromCurrentLocation")
+      .mockResolvedValue();
+    app.ui.showLoading = vi.fn();
+    app.ui.showNavigation = vi.fn();
+    app.ui.showToast = vi.fn();
+    app.setRoutePriorityFilter([10, 9]);
+
+    await app.searchNext("E1-10");
+
+    expect(start).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pendingCircles: [
+          { space: "E1-09", priority: 9 },
+          { space: "E1-10", priority: 10 },
+        ],
+      }),
+    );
+  });
+
+  it("does not start route guidance when the priority filter has no matches", async () => {
+    const { app } = createProductionAppFixture();
+    app.activeEventDaySession.setActiveEventDay(REF, {
+      ...createEmptyEventDayState(
+        { type: "csv", fileName: "circles.csv" },
+        "generation-1",
+        NOW,
+      ),
+      circles: [{ space: "E1-09", priority: 9 }],
+    });
+    const start = vi.spyOn(
+      app.routeGuidanceController,
+      "startFromCurrentLocation",
+    );
+    app.ui.showLoading = vi.fn();
+    app.ui.showNavigation = vi.fn();
+    app.ui.showToast = vi.fn();
+    app.setRoutePriorityFilter([10]);
+
+    await app.searchNext("E1-09");
+
+    expect(start).not.toHaveBeenCalled();
+    expect(app.ui.showToast).toHaveBeenCalledWith(
+      "この条件に一致する巡回対象はありません",
+      "warning",
+    );
+  });
+
+  it("keeps the active route unchanged when only the priority chip changes", () => {
+    const { app } = createProductionAppFixture();
+    const snapshot = app.routeGuidanceSession.getSnapshot();
+    const replaceSnapshot = vi.spyOn(app.routeGuidanceSession, "replaceSnapshot");
+
+    app.setRoutePriorityFilter([10]);
+
+    expect(replaceSnapshot).not.toHaveBeenCalled();
+    expect(app.routeGuidanceSession.getSnapshot()).toBe(snapshot);
+  });
+
   it("requires non-route dependencies assembled outside the browser binder", () => {
     expect(() => new BrowserApplication()).toThrow(
       "BrowserApplication requires assembled dependencies",

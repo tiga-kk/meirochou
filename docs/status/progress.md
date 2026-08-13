@@ -6,9 +6,9 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.4（Task 2完了・Task 3着手可能）**
-- 現在Task: **Task 3: priority条件を通常の経路案内へ適用**
-- 次に着手するTask: **Task 3**
+- 現在フェーズ: **Phase 7.4（Task 3完了・Task 4着手可能）**
+- 現在Task: **Task 4: 独立した地図閲覧surfaceの追加**
+- 次に着手するTask: **Task 4**
 - canonical plan: `docs/plans/phase-07-4/README.md`
 - 設計仕様: `docs/specs/2026-08-13-phase-07-4-route-visual-nearby-map-and-priority-filter-design.md`
 - animation診断: `docs/reviews/phase-07-4-route-animation-diagnosis.md`
@@ -49,8 +49,8 @@ Phase 7.3 Task 4では合成PointerEventによる計測で明確な改善を証�
 |---|---|---|---|
 | 1 | 経路animationのscreen-space診断と確実な修正 | 完了 | なし |
 | 2 | priority判定規則の共通化 | 完了 | なし |
-| 3 | priority条件を通常の経路案内へ適用 | 次に着手 | Task 2 |
-| 4 | 独立した地図閲覧surfaceの追加 | 未着手 | なし |
+| 3 | priority条件を通常の経路案内へ適用 | 完了 | Task 2 |
+| 4 | 独立した地図閲覧surfaceの追加 | 次に着手 | なし |
 | 5 | 任意検索基準地点とgrid origin解決 | 未着手 | Task 4 |
 | 6 | grid距離による周辺サークルランキング | 未着手 | Task 2, 5 |
 | 7 | 地図上のお品書きカード・leader line・重なり回避 | 未着手 | Task 6 |
@@ -62,6 +62,8 @@ Task 1は過去のanimation試行を踏まえ、CSS定数や`animation-name`だ�
 Task 1の自動検証は完了した。390pxのscreen-space線幅、currentだけのmoving cue、candidateの静的表示、reduced-motion、全体回帰を確認済み。headed browserでの目視確認とsnapshot更新は、表示環境が利用可能になった後にPhase 7.4のvisual確認として行う。
 
 Task 2でpriorityの正規化、重複除去・降順収集、未選択/複数完全一致を`shared/domain`へ共通化し、Galleryの既存公開関数は委譲へ移行した。
+
+Task 3でpriority条件を通常の経路案内と開発用デモ経路の候補入力へ適用した。選択状態は画面内だけで保持し、現在のRoute Guidance SessionやLocalStorageは変更しない。候補が0件の場合は案内を開始せず、既存ナビゲーションを保持して通知する。
 
 Task 4〜7のstandalone mapはRoute Guidance Sessionを第二のmap stateとして複製しない。表示状態だけを独立させ、map assets / routing / zoom計算を再利用する。
 

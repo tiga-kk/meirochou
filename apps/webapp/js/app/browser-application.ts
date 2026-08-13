@@ -75,6 +75,10 @@ import {
   type EventDayManagementRow,
 } from "../shared/ui/event-day-management-view-model";
 import { bindBrowserEvents } from "./bind-browser-events";
+import {
+  collectCirclePriorities,
+  filterCirclesByPriority,
+} from "../shared/domain/circle-priority-filter";
 
 /** Validates an event/day reference at the browser event boundary. */
 function isEventDayRef(value: unknown): value is EventDayRef {
@@ -305,6 +309,7 @@ export class BrowserApplication {
   circleDataSourceController: CircleDataSourceController;
   ui: BrowserUi;
   currentStartSpace: string;
+  routePriorityFilter: number[] | null;
   itineraryOpen: boolean;
   selectionMessage: string;
   transitionToken: number;
@@ -398,6 +403,7 @@ export class BrowserApplication {
       if (this.ui) {
         this.updateManagementModels();
         this.ui.updateCounts?.(this);
+        this.renderRoutePriorityFilter();
       }
     });
     baseSession.subscribe((snapshot) => {
@@ -406,6 +412,7 @@ export class BrowserApplication {
         this.updateManagementModels();
     });
     this.currentStartSpace = "";
+    this.routePriorityFilter = null;
     this.itineraryOpen = false;
     this.selectionMessage = "";
     this.currentManifest = null;
@@ -695,6 +702,55 @@ export class BrowserApplication {
 
   getUnvisited() {
     return [...this.activeEventDayReader.getPendingCircles()];
+  }
+
+  setRoutePriorityFilter(selectedPriorities: readonly number[] | null): void {
+    this.routePriorityFilter =
+      selectedPriorities && selectedPriorities.length > 0
+        ? [...selectedPriorities]
+        : null;
+    this.renderRoutePriorityFilter();
+  }
+
+  private getRouteGuidanceCandidates(
+    selectedPriorities = this.routePriorityFilter,
+  ) {
+    return filterCirclesByPriority(
+      this.getUnvisited(),
+      selectedPriorities,
+    );
+  }
+
+  private renderRoutePriorityFilter(): void {
+    const container = this.document.getElementById("route-priority-filter");
+    if (!container) return;
+    const priorities = collectCirclePriorities(this.getUnvisited());
+    const selected = this.routePriorityFilter ?? [];
+    container.replaceChildren();
+    const all = this.document.createElement("button");
+    all.type = "button";
+    all.className = "priority-chip";
+    all.textContent = "すべて";
+    all.setAttribute("aria-pressed", String(selected.length === 0));
+    all.addEventListener("click", () => this.setRoutePriorityFilter(null));
+    container.appendChild(all);
+    for (const priority of priorities) {
+      const chip = this.document.createElement("button");
+      chip.type = "button";
+      chip.className = "priority-chip";
+      chip.textContent = String(priority);
+      chip.setAttribute(
+        "aria-pressed",
+        String(selected.includes(priority)),
+      );
+      chip.addEventListener("click", () => {
+        const next = selected.includes(priority)
+          ? selected.filter((value) => value !== priority)
+          : [...selected, priority];
+        this.setRoutePriorityFilter(next);
+      });
+      container.appendChild(chip);
+    }
   }
 
   /** Delegates event/day opening to the assembled validated transition. */
@@ -1133,6 +1189,7 @@ export class BrowserApplication {
       onCancelRoute: () => this.handleCancelRoute(),
       onCloseRouteSelection: () => this.handleCloseRouteSelection(),
     });
+    this.renderRoutePriorityFilter();
     const itineraryButton = this.document.getElementById("btn-open-itinerary");
     const itineraryDialog = getBrowserElement<BrowserElement>(
       this.document,
@@ -1645,6 +1702,7 @@ export class BrowserApplication {
 
     const currentSpace = startSpace || this.readCurrentSpace();
     if (!currentSpace) return Promise.resolve();
+    const selectedPriorities = this.routePriorityFilter;
 
     this.routeGuidanceController.invalidatePendingDestinationSelection();
     this.ui.showLoading();
@@ -1653,13 +1711,23 @@ export class BrowserApplication {
     return new Promise<void>((resolve) =>
       this.scheduleTimeout(
         async () => {
-          const allCandidates = this.getUnvisited();
-          if (allCandidates.length === 0) {
+          const unfilteredCandidates = this.getUnvisited();
+          if (unfilteredCandidates.length === 0) {
             this.clearNavigationSnapshot();
             this.resetNavigationRuntimeState();
             this.ui.showTarget(null);
             if (notifyComplete)
               this.ui.showToast("全てのサークルを回りました！");
+            resolve();
+            return;
+          }
+          const allCandidates = this.getRouteGuidanceCandidates(selectedPriorities);
+          if (allCandidates.length === 0) {
+            this.ui.showNavigation(this.getNavigationContext("preserve"));
+            this.ui.showToast(
+              "この条件に一致する巡回対象はありません",
+              "warning",
+            );
             resolve();
             return;
           }
@@ -1728,6 +1796,7 @@ export class BrowserApplication {
 
     const currentSpace = startSpace || this.readCurrentSpace();
     if (!currentSpace) return Promise.resolve();
+    const selectedPriorities = this.routePriorityFilter;
 
     this.routeGuidanceController.invalidatePendingDestinationSelection();
     this.ui.showLoading();
@@ -1735,8 +1804,8 @@ export class BrowserApplication {
     return new Promise<void>((resolve) =>
       this.scheduleTimeout(
         async () => {
-          const candidates = this.getUnvisited();
-          if (candidates.length === 0) {
+          const allCandidates = this.getUnvisited();
+          if (allCandidates.length === 0) {
             this.replaceRouteGuidanceSnapshot({
               currentDestination: null,
               currentRoute: null,
@@ -1746,6 +1815,16 @@ export class BrowserApplication {
             this.ui.showTarget(null);
             if (notifyComplete)
               this.ui.showToast("全てのサークルを回りました！");
+            resolve();
+            return;
+          }
+          const candidates = this.getRouteGuidanceCandidates(selectedPriorities);
+          if (candidates.length === 0) {
+            this.ui.showNavigation(this.getNavigationContext("preserve"));
+            this.ui.showToast(
+              "この条件に一致する巡回対象はありません",
+              "warning",
+            );
             resolve();
             return;
           }

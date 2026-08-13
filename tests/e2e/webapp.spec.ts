@@ -390,6 +390,22 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   );
 });
 
+test("巡回対象priority chipで通常検索の対象を絞り込める", async ({ page }) => {
+  await page.goto("/?demo_ui=1");
+
+  await expect(page.locator("#route-priority-filter .priority-chip")).toHaveCount(4);
+  const priorityChip = page.getByRole("button", { name: "9", exact: true });
+  await expect(priorityChip).toHaveCSS("min-height", "44px");
+  await priorityChip.click();
+  await expect(
+    priorityChip,
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.locator("#btn-search").click();
+
+  await expect(page.locator("#target-space-heading")).toHaveText("東ア31b");
+  await expect(page.locator("#target-space-heading")).not.toHaveText("東ア23a");
+});
+
 test("390pxのcurrent経路は実画面線幅を保ちcandidateは静的経路になる", async ({
   page,
 }) => {

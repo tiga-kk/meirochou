@@ -25,6 +25,40 @@
   white-space: nowrap;
 }
 
+.route-priority-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.route-priority-filter-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.priority-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.priority-chip {
+  min-height: 44px;
+  padding: 4px 10px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.priority-chip[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--bg-card);
+}
+
 #next-target {
   border: 2px solid var(--ink);
   position: relative;
