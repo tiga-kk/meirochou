@@ -13,7 +13,7 @@
 
 ## 前提と依存関係
 
-Task 13のcard selection/action契約、Task 14のstandalone viewport geometryが完了していること。
+Task 11のzoom transform通知、Task 13のcard selection/action契約、Task 14のstandalone viewport geometryが完了していること。
 
 ## 読むべき文書と既存実装
 
@@ -47,7 +47,7 @@ Task 13のcard selection/action契約、Task 14のstandalone viewport geometry�
 7. 選択cardへ高いz-indexを与える。非選択cardのDOM順は前面化の意味に使わない。
 8. leader lineはmap anchorのviewport座標からcard境界の最近点へ引く。
 9. lineは太い明色underlay + 濃色foreground等の高コントラスト二重線にし、画面上で追える幅にする。
-10. pan/zoom中は既存zoom transform通知からcard/lineの位置だけ更新し、nearby Dijkstraやcandidate rankingを再実行しない。
+10. pan/zoom中はTask 11で追加するzoom transform通知からcard/lineの位置だけ更新し、nearby Dijkstraやcandidate rankingを再実行しない。
 
 ## テスト方針
 
