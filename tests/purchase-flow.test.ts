@@ -326,6 +326,121 @@ describe("circle-status production integration", () => {
     }
   });
 
+  test("購入前の現在地フォームを通常購入のUndoで復元する", async () => {
+    const fixture = createSetup(
+      { type: "csv", fileName: "day1.csv" },
+      new MockStorageAdapter(),
+      [{ space: "AA1", priority: 1 }],
+    );
+    fixture.app.routeMapAreaCatalog.replaceMapAreas([
+      { id: "area-a", prefixes: ["A"], labels: ["A"] },
+    ]);
+    document.body.innerHTML = `
+      <select id="loc-ewsn"><option value="area-a">A</option></select>
+      <select id="loc-label"><option value="A">A</option><option value="B">B</option></select>
+      <input id="loc-number" value="1" />
+    `;
+    fixture.app.routeGuidanceSession.replaceSnapshot({
+      ...fixture.app.routeGuidanceSession.getSnapshot(),
+      selectedDestination: { space: "AA1" },
+    });
+
+    await fixture.app.handleAction("purchase");
+    (document.getElementById("loc-label") as HTMLSelectElement).value = "B";
+    (document.getElementById("loc-number") as HTMLInputElement).value = "2";
+
+    expect(await fixture.app.undoLastPurchase()).toBe(true);
+    expect(fixture.app.ui.updateCurrentLocation).toHaveBeenCalledWith("AA1");
+  });
+
+  test("Gallery購入でも購入前の現在地フォームをUndoで復元する", async () => {
+    const fixture = createSetup(
+      { type: "csv", fileName: "day1.csv" },
+      new MockStorageAdapter(),
+      [{ space: "AA1", priority: 1 }],
+    );
+    fixture.app.routeMapAreaCatalog.replaceMapAreas([
+      { id: "area-a", prefixes: ["A"], labels: ["A"] },
+    ]);
+    document.body.innerHTML = `
+      <select id="loc-ewsn"><option value="area-a">A</option></select>
+      <select id="loc-label"><option value="A">A</option><option value="B">B</option></select>
+      <input id="loc-number" value="1" />
+    `;
+    await fixture.app.addPurchased("AA1");
+    (document.getElementById("loc-label") as HTMLSelectElement).value = "B";
+    (document.getElementById("loc-number") as HTMLInputElement).value = "2";
+
+    expect(await fixture.app.undoLastPurchase()).toBe(true);
+    expect(fixture.app.ui.updateCurrentLocation).toHaveBeenCalledWith("AA1");
+  });
+
+  test("フォーム値がないUndoはarrived-circleのsnapshotだけをfallbackにする", async () => {
+    const fixture = createSetup(
+      { type: "csv", fileName: "day1.csv" },
+      new MockStorageAdapter(),
+      [{ space: "AA1", priority: 1 }],
+    );
+    document.body.innerHTML = "";
+    fixture.app.routeGuidanceSession.replaceSnapshot({
+      ...fixture.app.routeGuidanceSession.getSnapshot(),
+      navigationState: {
+        stage: "idle",
+        areaId: "area-a",
+        currentPosition: {
+          areaId: "area-a",
+          gridIndex: 0,
+          svgX: 0,
+          svgY: 0,
+          source: "arrived-circle",
+          circleSpace: "AA1",
+        },
+        targetSpace: null,
+        lockedFirstLeg: null,
+        provisionalOrder: [],
+        bestOrder: [],
+      },
+      selectedDestination: { space: "AA1" },
+    });
+
+    await fixture.app.addPurchased("AA1");
+    expect(await fixture.app.undoLastPurchase()).toBe(true);
+    expect(fixture.app.ui.updateCurrentLocation).toHaveBeenCalledWith("AA1");
+  });
+
+  test("復元値もfallbackもないUndoはフォームへ推測値を書かない", async () => {
+    const fixture = createSetup(
+      { type: "csv", fileName: "day1.csv" },
+      new MockStorageAdapter(),
+      [{ space: "AA1", priority: 1 }],
+    );
+    document.body.innerHTML = "";
+    fixture.app.routeGuidanceSession.replaceSnapshot({
+      ...fixture.app.routeGuidanceSession.getSnapshot(),
+      navigationState: {
+        stage: "navigating",
+        areaId: "area-a",
+        currentPosition: {
+          areaId: "area-a",
+          gridIndex: 0,
+          svgX: 0,
+          svgY: 0,
+          source: "manual-start",
+        },
+        targetSpace: "AA1",
+        lockedFirstLeg: { from: { type: "start", areaId: "area-a", gridIndex: 0 }, toSpace: "AA1" },
+        provisionalOrder: ["AA1"],
+        bestOrder: ["AA1"],
+      },
+      selectedDestination: { space: "AA1" },
+    });
+
+    await fixture.app.addPurchased("AA1");
+    fixture.app.ui.updateCurrentLocation.mockClear();
+    expect(await fixture.app.undoLastPurchase()).toBe(true);
+    expect(fixture.app.ui.updateCurrentLocation).not.toHaveBeenCalled();
+  });
+
   test("reports local save failure without calling GAS or claiming success", async () => {
     const fixture = createSetup({ type: "csv", fileName: "day1.csv" });
     fixture.adapter.failWrites = true;

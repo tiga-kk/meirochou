@@ -696,7 +696,10 @@ export class DomRouteGuidanceView {
       space,
       this.mapAreaCatalog.getAllMapAreas(),
     );
-    this.els.locEwsn.value = ewsn;
+    const area = this.mapAreaCatalog
+      .getAllMapAreas()
+      .find((candidate) => (candidate.name ?? candidate.displayName) === ewsn);
+    this.els.locEwsn.value = area?.areaId ?? ewsn;
     this.updateLabelOptions(true);
     this.els.locLabel.value = label;
 

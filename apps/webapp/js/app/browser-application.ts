@@ -154,6 +154,7 @@ type BrowserUi = Omit<DomRouteGuidanceView, "toggleSettings"> & {
 
 interface LatestPurchaseUndo {
   readonly space: string;
+  readonly currentLocationSpace: string | null;
   readonly token: CircleStatusUndoToken;
   readonly routeSnapshot: RouteGuidanceSessionSnapshot;
 }
@@ -785,6 +786,7 @@ export class BrowserApplication {
   async addPurchased(space: string) {
     if (!this.activeRef || !this.activeState) throw new Error("No event/day is open");
     const routeSnapshot = this.routeGuidanceSession.getSnapshot();
+    const currentLocationSpace = this.readCurrentSpace();
     const result = await this.completeCircleVisit({
       eventDay: this.activeRef,
       circleSpace: space,
@@ -814,7 +816,7 @@ export class BrowserApplication {
         "error",
       );
     }
-    this.rememberPurchaseUndo(space, result, routeSnapshot);
+    this.rememberPurchaseUndo(space, result, routeSnapshot, currentLocationSpace);
     return result.statusResult.state;
   }
 
@@ -832,6 +834,13 @@ export class BrowserApplication {
     if (!this.circleStatusController.undo()) return false;
 
     this.routeGuidanceSession.replaceSnapshot(purchase.routeSnapshot);
+    const restoredLocationSpace =
+      purchase.currentLocationSpace ??
+      (purchase.routeSnapshot.navigationState?.currentPosition?.source === "arrived-circle"
+        ? purchase.routeSnapshot.navigationState.currentPosition.circleSpace ?? null
+        : null);
+    this.currentStartSpace = restoredLocationSpace ?? "";
+    if (restoredLocationSpace) this.ui.updateCurrentLocation(restoredLocationSpace);
     this.ui.updateCounts(this);
     this.updateManagementModels();
     this.ui.showNavigation(this.getNavigationContext("preserve"));
@@ -843,10 +852,11 @@ export class BrowserApplication {
     space: string,
     result: CompleteCircleVisitResult,
     routeSnapshot: RouteGuidanceSessionSnapshot,
+    currentLocationSpace: string | null,
   ): boolean {
     const token = result.statusResult.undoToken;
     if (!token) return false;
-    this.latestPurchaseUndo = { space, token, routeSnapshot };
+    this.latestPurchaseUndo = { space, currentLocationSpace, token, routeSnapshot };
     return true;
   }
 
@@ -1969,6 +1979,7 @@ export class BrowserApplication {
 
     const space = actionTarget.space;
     const routeSnapshot = guidanceSnapshot;
+    const currentLocationSpace = type === "purchase" ? this.readCurrentSpace() : null;
     let visitResult;
     try {
       visitResult = await this.completeCircleVisit({
@@ -1990,7 +2001,7 @@ export class BrowserApplication {
     this.updateManagementModels();
     if (isDevDemoEnabled(this.window.location)) {
       void this.handleDevDemoAction(space);
-      if (type === "purchase" && this.rememberPurchaseUndo(space, visitResult, routeSnapshot))
+      if (type === "purchase" && this.rememberPurchaseUndo(space, visitResult, routeSnapshot, currentLocationSpace))
         this.ui.showUndoSnackbar(space);
       return;
     }
@@ -2003,7 +2014,7 @@ export class BrowserApplication {
       this.routeGuidanceController.removePurchasedSpaceFromOrder(space);
       this.ui.showNavigation(this.getNavigationContext("preserve"));
       this.saveNavigationSnapshot();
-      if (this.rememberPurchaseUndo(space, visitResult, routeSnapshot))
+      if (this.rememberPurchaseUndo(space, visitResult, routeSnapshot, currentLocationSpace))
         this.ui.showUndoSnackbar(space);
       return;
     }
@@ -2011,7 +2022,7 @@ export class BrowserApplication {
       this.ui.showNavigation(this.getNavigationContext("current"));
       this.saveNavigationSnapshot();
       if (type === "purchase")
-        if (this.rememberPurchaseUndo(space, visitResult, routeSnapshot))
+        if (this.rememberPurchaseUndo(space, visitResult, routeSnapshot, currentLocationSpace))
           this.ui.showUndoSnackbar(space);
       return;
     }
@@ -2021,7 +2032,7 @@ export class BrowserApplication {
       if (type === "purchase") this.saveNavigationSnapshot();
       else this.clearNavigationSnapshot(this.activeRef);
       if (type === "purchase")
-        if (this.rememberPurchaseUndo(space, visitResult, routeSnapshot))
+        if (this.rememberPurchaseUndo(space, visitResult, routeSnapshot, currentLocationSpace))
           this.ui.showUndoSnackbar(space);
       return;
     }
@@ -2035,7 +2046,7 @@ export class BrowserApplication {
       );
     }
     if (type === "purchase")
-      if (this.rememberPurchaseUndo(space, visitResult, routeSnapshot))
+      if (this.rememberPurchaseUndo(space, visitResult, routeSnapshot, currentLocationSpace))
         this.ui.showUndoSnackbar(space);
   }
 

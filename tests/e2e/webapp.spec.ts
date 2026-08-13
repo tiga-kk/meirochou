@@ -1147,7 +1147,24 @@ test("通常画面の購入buttonが最新1件Undoへ到達する", async ({ pag
   await page.goto("/?demo_ui=1");
   const heading = page.locator("#target-space-heading");
   await expect(heading).not.toHaveText("---");
+  await expect(page.locator("#loc-label option")).not.toHaveCount(0);
+  await page.locator("#loc-label").evaluate((element) => {
+    const select = element as HTMLSelectElement;
+    select.value = [...select.options].find((option) => option.textContent === "ア")?.value ?? "";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.locator("#loc-number").evaluate((element) => {
+    const input = element as HTMLInputElement;
+    input.value = "1";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
   const space = (await heading.textContent())?.trim() || "";
+  const currentLocationBeforeUndo = await Promise.all([
+    page.locator("#loc-ewsn").inputValue(),
+    page.locator("#loc-label").inputValue(),
+    page.locator("#loc-number").inputValue(),
+  ]);
   await page.locator("#btn-purchased").click();
 
   const snackbar = page.locator(".gallery-undo-snackbar");
@@ -1166,6 +1183,9 @@ test("通常画面の購入buttonが最新1件Undoへ到達する", async ({ pag
 
   await snackbar.getByRole("button", { name: "元に戻す" }).click();
   await expect(heading).toHaveText(space);
+  await expect(page.locator("#loc-ewsn")).toHaveValue(currentLocationBeforeUndo[0]);
+  await expect(page.locator("#loc-label")).toHaveValue(currentLocationBeforeUndo[1]);
+  await expect(page.locator("#loc-number")).toHaveValue(currentLocationBeforeUndo[2]);
   await expect
     .poll(() =>
       page.evaluate((target) => {
@@ -1501,9 +1521,26 @@ test("一覧の左右スワイプが外側方向の購入と端末保存へ到�
 test("Galleryの購入buttonが退出表示と完全Undoへ到達する", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/?demo_ui=1");
+  await expect(page.locator("#loc-label option")).not.toHaveCount(0);
+  await page.locator("#loc-label").evaluate((element) => {
+    const select = element as HTMLSelectElement;
+    select.value = [...select.options].find((option) => option.textContent === "ア")?.value ?? "";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.locator("#loc-number").evaluate((element) => {
+    const input = element as HTMLInputElement;
+    input.value = "1";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
   await page.locator("#btn-open-gallery").click();
 
   const space = "東ア31b";
+  const currentLocationBeforeUndo = await Promise.all([
+    page.locator("#loc-ewsn").inputValue(),
+    page.locator("#loc-label").inputValue(),
+    page.locator("#loc-number").inputValue(),
+  ]);
   const card = page.locator(`.gallery-item[data-space="${space}"]`);
   await expect(card).toBeVisible();
   await expect
@@ -1563,6 +1600,9 @@ test("Galleryの購入buttonが退出表示と完全Undoへ到達する", async 
 
   await snackbar.getByRole("button", { name: "元に戻す" }).click();
   await expect(card).toBeVisible();
+  await expect(page.locator("#loc-ewsn")).toHaveValue(currentLocationBeforeUndo[0]);
+  await expect(page.locator("#loc-label")).toHaveValue(currentLocationBeforeUndo[1]);
+  await expect(page.locator("#loc-number")).toHaveValue(currentLocationBeforeUndo[2]);
   await expect
     .poll(() =>
       page.evaluate(() => {
