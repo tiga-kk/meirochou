@@ -22,6 +22,7 @@ Task 10〜12と独立して実装できる。Task 15がこのTaskのcard selecti
 - `apps/webapp/js/shared/domain/circle-priority-filter.ts`
 - `apps/webapp/js/app/browser-application.ts`
 - `apps/webapp/css/maps.css`
+- `tests/nearby-circle-ranking.test.ts`
 
 ## 対象ファイル
 
@@ -30,8 +31,11 @@ Task 10〜12と独立して実装できる。Task 15がこのTaskのcard selecti
 - `apps/webapp/js/features/route-guidance/ui/dom-nearby-map-view.ts`
 - `apps/webapp/js/app/browser-application.ts`
 - `apps/webapp/css/maps.css`
-- `tests/nearby-circle-model.test.ts`
 - `tests/e2e/webapp.spec.ts`
+
+### 既存回帰テスト
+
+- `tests/nearby-circle-ranking.test.ts`。既存のpriority / hold / limit規則で十分な場合は、このTaskの都合だけで変更しない。
 
 ### 削除
 
@@ -58,11 +62,12 @@ Task 10〜12と独立して実装できる。Task 15がこのTaskのcard selecti
 - 「お品書きを見る」が既存catalog表示へ到達する。
 - 「目的地にする」が`handleSetNextTarget`相当の既存manual destination経路へ一度だけ到達する。
 - current position未確定時は既存error契約を維持する。
+- `tests/nearby-circle-ranking.test.ts`の既存priority / hold / limit回帰が通る。
 
 ## 検証コマンド
 
 ```bash
-npx vitest run --root . tests/nearby-circle-model.test.ts
+npx vitest run --root . tests/nearby-circle-ranking.test.ts
 npx playwright test tests/e2e/webapp.spec.ts --grep "周辺|地図|優先度|目的地"
 npm run check:webapp
 git diff --check
