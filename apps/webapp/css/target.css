@@ -95,6 +95,7 @@
   fill: none;
   stroke: var(--danger);
   stroke-width: 12;
+  vector-effect: non-scaling-stroke;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-opacity: 0.78;
@@ -105,6 +106,7 @@
   fill: none;
   stroke: rgba(255, 255, 255, 0.96);
   stroke-width: 9;
+  vector-effect: non-scaling-stroke;
   stroke-linecap: round;
   stroke-dasharray: 32 68;
   animation: route-flow-comet 0.9s linear infinite;
@@ -158,10 +160,6 @@
   stroke: var(--primary);
   stroke-dasharray: 22 14;
   stroke-opacity: 0.9;
-}
-
-.route-overlay-candidate .route-flow-comet {
-  stroke: var(--bg-card);
 }
 
 .route-overlay-candidate .route-endpoint circle {

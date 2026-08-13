@@ -29,7 +29,7 @@ function createFallbackOverlay(
       return null;
     },
   };
-  const flow = { getAttribute: () => null };
+  const flow = kind === "current" ? { getAttribute: () => null } : null;
   const direction = {
     getAttribute(name: string) {
       return name === "marker-end" ? "url(#route-direction-arrow)" : null;
@@ -122,11 +122,13 @@ export function buildRouteOverlaySvg(
   );
   svg.appendChild(polyline);
 
-  const flow = ownerDocument.createElementNS(SVG_NS, "polyline");
-  flow.setAttribute("class", "route-flow-comet route-flow-line");
-  flow.setAttribute("pathLength", "100");
-  flow.setAttribute("points", polyline.getAttribute("points") || "");
-  svg.appendChild(flow);
+  if (kind === "current") {
+    const flow = ownerDocument.createElementNS(SVG_NS, "polyline");
+    flow.setAttribute("class", "route-flow-comet route-flow-line");
+    flow.setAttribute("pathLength", "100");
+    flow.setAttribute("points", polyline.getAttribute("points") || "");
+    svg.appendChild(flow);
+  }
 
   if (kind === "current") {
     const direction = ownerDocument.createElementNS(SVG_NS, "polyline");

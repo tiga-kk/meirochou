@@ -55,11 +55,11 @@ test("route cues are distinct and long enough to read on both route overlays", (
   );
 
   assert.ok(cue);
-  assert.ok(Number(cue[1]) >= 8, "moving cue must remain visible after map scaling");
+  assert.match(css, /\.route-overlay-line[\s\S]*?vector-effect:\s*non-scaling-stroke/);
+  assert.match(css, /\.route-flow-comet,[\s\S]*?vector-effect:\s*non-scaling-stroke/);
   assert.ok(Number(cue[2]) >= 28, "moving cue dash must be long enough to follow");
   assert.notEqual(cue[1], "12", "cue width must differ from the solid base path");
   assert.notEqual(`${cue[2]} ${cue[3]}`, "22 14", "cue dash must differ from candidate base styling");
-  assert.match(css, /\.route-overlay-candidate \.route-flow-comet[\s\S]*?stroke:/);
 });
 
 test("planRoute and buildRouteOverlaySvg fulfill coordinate contracts with fictional data", () => {
@@ -137,10 +137,9 @@ test("planRoute and buildRouteOverlaySvg fulfill coordinate contracts with ficti
     "100",
   );
   assert.equal(candidate.querySelector("marker"), null);
-  assert.ok(candidate.querySelector(".route-flow-line"));
-  assert.ok(candidate.querySelector(".route-flow-comet"));
+  assert.equal(candidate.querySelector(".route-flow-line"), null);
+  assert.equal(candidate.querySelector(".route-flow-comet"), null);
   assert.equal(candidate.querySelector(".route-flow-direction"), null);
-  assert.equal(candidate.querySelector(".route-flow-comet")?.getAttribute("pathLength"), "100");
   assert.equal(candidate.querySelector(".route-start-marker")?.textContent, "S");
   assert.equal(candidate.querySelector(".route-goal-marker")?.textContent, "G");
   assert.equal(candidate.querySelector(".route-start-marker")?.getAttribute("transform"), "translate(105 105)");
@@ -223,8 +222,8 @@ test("planRouteFromGridIndex keeps ordered points for current route endpoints an
 
   const candidate = buildRouteOverlaySvg(route, undefined, "candidate");
   assert.ok(candidate);
-  assert.ok(candidate.querySelector(".route-flow-line"));
-  assert.ok(candidate.querySelector(".route-flow-comet"));
+  assert.equal(candidate.querySelector(".route-flow-line"), null);
+  assert.equal(candidate.querySelector(".route-flow-comet"), null);
   assert.equal(candidate.querySelector(".route-flow-direction"), null);
   assert.equal(candidate.querySelector(".route-start-marker")?.textContent, "S");
   assert.equal(candidate.querySelector(".route-goal-marker")?.textContent, "G");

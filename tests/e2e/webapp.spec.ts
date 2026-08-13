@@ -390,6 +390,64 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   );
 });
 
+test("390pxのcurrent経路は実画面線幅を保ちcandidateは静的経路になる", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?demo_ui=1");
+
+  const screenStrokeWidth = async (selector: string) =>
+    page.locator(selector).evaluate((element) => {
+      const svg = element.ownerSVGElement;
+      const ctm = (element as SVGGeometryElement).getScreenCTM();
+      const style = getComputedStyle(element);
+      const stage = document.getElementById("navigation-map-layer");
+      if (!svg || !ctm || !stage) return { screenWidth: 0, viewBoxWidth: 0, stageWidth: 0 };
+      const strokeWidth = Number.parseFloat(
+        style.getPropertyValue("stroke-width"),
+      );
+      const scale = Math.hypot(ctm.a, ctm.b);
+      return {
+        screenWidth:
+          style.getPropertyValue("vector-effect") === "non-scaling-stroke"
+            ? strokeWidth
+            : strokeWidth * scale,
+        viewBoxWidth: svg.viewBox.baseVal.width,
+        stageWidth: stage.getBoundingClientRect().width,
+      };
+    });
+
+  await expect(
+    page.locator('[data-route-kind="current"] .route-overlay-line'),
+  ).toBeVisible();
+  const currentBaseMetrics = await screenStrokeWidth(
+    '[data-route-kind="current"] .route-overlay-line',
+  );
+  const currentFlowMetrics = await screenStrokeWidth(
+    '[data-route-kind="current"] .route-flow-comet',
+  );
+  expect(currentBaseMetrics.viewBoxWidth).toBeGreaterThan(0);
+  expect(currentBaseMetrics.stageWidth).toBeGreaterThan(0);
+  expect(currentBaseMetrics.screenWidth).toBeGreaterThanOrEqual(3);
+  expect(currentFlowMetrics.screenWidth).toBeGreaterThanOrEqual(3);
+
+  const candidatePin = page.locator('.map-pin[data-space="東ア31b"]');
+  await candidatePin.evaluate((button: HTMLButtonElement) => button.click());
+  await page
+    .locator(".candidate-preview-card")
+    .getByRole("button", { name: "経路を比較" })
+    .click();
+  await expect(
+    page.locator('[data-route-kind="candidate"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-route-kind="candidate"] .route-overlay-line'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-route-kind="candidate"] .route-flow-comet'),
+  ).toHaveCount(0);
+});
+
 test("小さく描画されたmap-pinも44pxの操作領域と8pxの視認領域を保つ", async ({
   page,
 }) => {
@@ -603,16 +661,7 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   ).toHaveCSS("stroke-dasharray", "22px, 14px");
   await expect(
     page.locator('[data-route-kind="candidate"] .route-flow-comet'),
-  ).toHaveCount(1);
-  await expect(
-    page.locator('[data-route-kind="candidate"] .route-flow-comet'),
-  ).toHaveCSS("stroke-width", "9px");
-  await expect(
-    page.locator('[data-route-kind="candidate"] .route-flow-comet'),
-  ).toHaveCSS("stroke-dasharray", "32px, 68px");
-  await expect(
-    page.locator('[data-route-kind="candidate"] .route-flow-line'),
-  ).toHaveCSS("animation-name", "route-flow-comet");
+  ).toHaveCount(0);
   await expect(
     page.locator('[data-route-kind="candidate"] .route-start-marker'),
   ).toHaveText("S");
@@ -622,20 +671,10 @@ test("ピンの候補経路を比較してから目的地を変更する", async
   await expect(
     page.locator('[data-route-kind="candidate"] .route-start-marker circle'),
   ).toHaveCSS("fill", "rgb(0, 76, 140)");
-  const candidateBaseStroke = await page
-    .locator('[data-route-kind="candidate"] .route-overlay-line')
-    .evaluate((element) => getComputedStyle(element).stroke);
-  const candidateCometStroke = await page
-    .locator('[data-route-kind="candidate"] .route-flow-comet')
-    .evaluate((element) => getComputedStyle(element).stroke);
-  expect(candidateCometStroke).not.toBe(candidateBaseStroke);
   await expect(
     page.locator('[data-route-kind="candidate"] .route-flow-direction'),
   ).toHaveCount(0);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect(
-    page.locator('[data-route-kind="candidate"] .route-flow-comet'),
-  ).toHaveCSS("animation-name", "none");
   await expect(
     page.locator('[data-route-kind="candidate"] .route-overlay-line'),
   ).toBeVisible();
