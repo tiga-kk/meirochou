@@ -19,7 +19,7 @@
     return String(value || "")
       .replace(/[\s\u3000]+/g, "")
       .trim()
-      .replace(/^(?:[1-4]日|[月火水木金土日])[-‐‑‒–—―ー−]+/u, "");
+      .replace(/^(?:[1-4]日|日)[-‐‑‒–—―ー−]+/u, "");
   }
 
   function extractSpace(document) {
