@@ -14,6 +14,7 @@
 - 最新人間受入記録: `docs/reviews/phase-07-4-second-human-acceptance-failures.md`
 - レビュー指摘対応: 経路motionのgesture後resumeを`cfffd85`、nearby workspaceのJS/CSS mode統一を`e494ecb`で修正。
 - 人間確認前に作成されたsnapshot-only 3コミットの対象10枚は`0c7b476`で更新前へ復元済み。Task 27の人間visual確認までbaselineを更新しない。
+- 最終自動gate: `node scripts/audit-public-tree.mjs` と `git diff --check` はPASS。GitHub Actions `31769523375`（`193659f`）はunit/type/build/map assetsがPASS、mobile E2Eは復元済み7 visual baseline差分でFAIL（62 passed / 8 skipped）。
 
 Task開始時の基準commitは、実装開始直前の対象branch最新remote HEADから取得する。文書中の過去SHAを実装開始点として固定しない。
 
