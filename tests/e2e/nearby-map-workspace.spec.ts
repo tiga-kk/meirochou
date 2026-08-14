@@ -16,17 +16,21 @@ test("keeps the 920px workspace in one CSS mode", async ({ page }) => {
   const layout = await page.locator("#nearby-map-workspace").evaluate((workspace) => {
     const map = workspace.querySelector("#nearby-map-viewport")?.getBoundingClientRect();
     const panel = workspace.querySelector("#nearby-map-catalog-panel")?.getBoundingClientRect();
+    const workspaceRect = workspace.getBoundingClientRect();
     return {
       mode: workspace.getAttribute("data-mode"),
-      columns: getComputedStyle(workspace).gridTemplateColumns,
+      display: getComputedStyle(workspace).display,
       map,
       panel,
+      workspaceRect,
     };
   });
 
   expect(layout.mode).toBe("medium");
-  expect(layout.columns.split(" ")).toHaveLength(1);
-  expect(layout.panel?.top).toBeGreaterThanOrEqual((layout.map?.bottom ?? 0) - 1);
+  expect(layout.display).toBe("block");
+  expect(layout.map?.top).toBeGreaterThanOrEqual(layout.workspaceRect.top);
+  expect(layout.map?.bottom).toBeLessThanOrEqual(layout.workspaceRect.bottom);
+  expect(layout.panel?.width).toBeCloseTo(layout.workspaceRect.width, 0);
 });
 
 test("uses the JS-selected panel width at 1024px", async ({ page }) => {
@@ -35,17 +39,17 @@ test("uses the JS-selected panel width at 1024px", async ({ page }) => {
   const layout = await page.locator("#nearby-map-workspace").evaluate((workspace) => {
     const map = workspace.querySelector("#nearby-map-viewport")?.getBoundingClientRect();
     const panel = workspace.querySelector("#nearby-map-catalog-panel")?.getBoundingClientRect();
-    const workspaceWidth = workspace.clientWidth;
-    const expectedPanelWidth = Math.min(340, Math.max(280, Math.round(workspaceWidth * 0.31)));
+    const workspaceRect = workspace.getBoundingClientRect();
     return {
       mode: workspace.getAttribute("data-mode"),
-      expectedPanelWidth,
       map,
       panel,
+      workspaceRect,
     };
   });
 
   expect(layout.mode).toBe("wide");
-  expect(layout.panel?.width).toBeCloseTo(layout.expectedPanelWidth, 0);
-  expect(layout.panel?.left).toBeGreaterThanOrEqual(layout.map?.right ?? 0);
+  expect(layout.panel?.width).toBeCloseTo(layout.workspaceRect.width, 0);
+  expect(layout.map?.left).toBeGreaterThanOrEqual(layout.workspaceRect.left);
+  expect(layout.map?.right).toBeLessThanOrEqual(layout.workspaceRect.right);
 });

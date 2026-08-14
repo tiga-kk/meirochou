@@ -17,6 +17,8 @@ import {
   rankNearbyCircles,
 } from "./nearby-circle-model";
 import { calculateMapStageLayout } from "./map-stage-layout";
+import { paginateNearbyCatalog } from "./nearby-catalog-pagination";
+import { buildNearbyPerimeterLayout } from "./nearby-catalog-perimeter-layout";
 import { calculateNearbyMapWorkspaceLayout } from "./nearby-map-workspace-layout";
 import type { MapViewportPoint } from "./route-map-pin-model";
 import {
@@ -123,6 +125,7 @@ export class DomNearbyMapView {
   private includeHeld = false;
   private nearbyLimit: NearbyCircleLimit = 5;
   private controlsExpanded = false;
+  private pageIndex = 0;
   private selectedSpace: string | null = null;
   private selectionMode = false;
   private tapStart: { pointerId: number; clientX: number; clientY: number } | null = null;
@@ -193,6 +196,11 @@ export class DomNearbyMapView {
             保留も表示
           </label>
         </div>
+        <div id="nearby-selection-toolbar" class="nearby-selection-toolbar" hidden aria-live="polite">
+          <span id="nearby-selection-label"></span>
+          <button type="button" id="btn-nearby-view-selected">お品書きを見る</button>
+          <button type="button" id="btn-nearby-set-selected">目的地にする</button>
+        </div>
         <div id="nearby-map-workspace" class="nearby-map-workspace">
           <div id="nearby-map-viewport" class="nearby-map-viewport">
             <div id="nearby-map-layer" class="nearby-map-transform-layer">
@@ -204,6 +212,11 @@ export class DomNearbyMapView {
           </div>
           <section id="nearby-map-catalog-panel" class="nearby-map-catalog-panel" aria-label="周辺お品書き">
             <div id="nearby-map-card-layer" class="nearby-map-card-layer"></div>
+            <nav id="nearby-map-pagination" class="nearby-map-pagination" aria-label="周辺お品書きのページ移動" hidden>
+              <button type="button" id="btn-nearby-page-previous" disabled>前へ</button>
+              <span id="nearby-map-page-label"></span>
+              <button type="button" id="btn-nearby-page-next" disabled>次へ</button>
+            </nav>
           </section>
           <svg id="nearby-map-leader-layer" class="nearby-map-leader-layer" aria-hidden="true"></svg>
         </div>
@@ -213,6 +226,27 @@ export class DomNearbyMapView {
     this.surface.querySelector("#btn-close-nearby-map")?.addEventListener("click", () => this.close());
     this.surface.querySelector("#btn-nearby-toggle-controls")?.addEventListener("click", () => {
       this.setControlsExpanded(!this.controlsExpanded);
+    });
+    this.surface.querySelector("#btn-nearby-page-previous")?.addEventListener("click", () => {
+      this.setPageIndex(this.pageIndex - 1);
+    });
+    this.surface.querySelector("#btn-nearby-page-next")?.addEventListener("click", () => {
+      this.setPageIndex(this.pageIndex + 1);
+    });
+    this.surface.querySelector("#btn-nearby-view-selected")?.addEventListener("click", (event) => {
+      const candidate = this.getSelectedCandidate();
+      if (!candidate) return;
+      const button = event.currentTarget as HTMLButtonElement;
+      this.onShowCatalog?.({ ...candidate, tweet: normalizeExternalUrl(candidate.tweet) }, button);
+    });
+    this.surface.querySelector("#btn-nearby-set-selected")?.addEventListener("click", (event) => {
+      const candidate = this.getSelectedCandidate();
+      if (!candidate) return;
+      void this.selectNearbyTarget(
+        candidate,
+        normalizeExternalUrl(candidate.tweet),
+        event.currentTarget as HTMLButtonElement,
+      );
     });
     this.surface.querySelector("#nearby-map-area")?.addEventListener("change", (event) => {
       void this.selectArea((event.target as HTMLSelectElement).value);
@@ -312,9 +346,16 @@ export class DomNearbyMapView {
   }): void {
     if (input.selectedPriorities !== undefined) {
       this.selectedPriorities = input.selectedPriorities;
+      this.pageIndex = 0;
     }
-    if (input.includeHeld !== undefined) this.includeHeld = input.includeHeld;
-    if (input.limit !== undefined) this.nearbyLimit = input.limit;
+    if (input.includeHeld !== undefined) {
+      this.includeHeld = input.includeHeld;
+      this.pageIndex = 0;
+    }
+    if (input.limit !== undefined) {
+      this.nearbyLimit = input.limit;
+      this.pageIndex = 0;
+    }
     this.syncNearbyControlState();
     this.updateNearbyCandidates();
   }
@@ -426,6 +467,7 @@ export class DomNearbyMapView {
     const area = this.areas.find((candidate) => areaId(candidate) === id);
     if (!area || !this.surface) return;
     this.activeArea = area;
+    this.pageIndex = 0;
     this.updateFilterSummary();
     this.activeAssets = null;
     this.nearbyViewportPoints = [];
@@ -545,13 +587,34 @@ export class DomNearbyMapView {
     if (!cardLayer || !leaderLayer || !this.activeAssets || !this.activeArea || !this.origin) return;
     cardLayer.replaceChildren();
     leaderLayer.replaceChildren();
-    const anchors = this.nearbyCandidates.map(({ candidate, position }) => ({
+    const page = paginateNearbyCatalog(this.nearbyCandidates, this.pageIndex);
+    this.pageIndex = page.pageIndex;
+    this.syncCatalogPagination(page);
+    const workspace = this.surface?.querySelector("#nearby-map-workspace") as HTMLElement | null;
+    const workspaceWidth = workspace?.clientWidth || workspace?.getBoundingClientRect().width || 0;
+    const workspaceHeight = workspace?.clientHeight || workspace?.getBoundingClientRect().height || 0;
+    const perimeter = workspace && workspaceWidth > 0 && workspaceHeight > 0
+      ? buildNearbyPerimeterLayout({
+          workspaceWidth,
+          workspaceHeight,
+          itemCount: page.items.length,
+          mode: (workspace.dataset.mode as "narrow" | "medium" | "wide") || "narrow",
+        })
+      : null;
+    const anchors = page.items.map(({ candidate, position }, index) => ({
       candidate,
       position: position ?? this.nearbyPointIndex?.get(candidate.space)?.[0] ?? candidate.mapPosition ?? getPinPosition(candidate.space),
+      slot: perimeter?.slots[index] ?? null,
     }));
-    for (const { candidate } of anchors) {
+    for (const { candidate, slot } of anchors) {
       const card = document.createElement("article");
       card.className = "nearby-catalog-card";
+      if (slot) {
+        card.style.left = `${slot.x}px`;
+        card.style.top = `${slot.y}px`;
+        card.style.width = `${slot.width}px`;
+        card.style.height = `${slot.height}px`;
+      }
       card.dataset.space = candidate.space;
       card.setAttribute("role", "group");
       card.tabIndex = 0;
@@ -613,28 +676,45 @@ export class DomNearbyMapView {
       priorityLabel.textContent = `優先度: ${priority}`;
       info.append(spaceLabel, priorityLabel);
       card.appendChild(info);
-      const actions = document.createElement("div");
-      actions.className = "nearby-catalog-card-actions";
-      actions.hidden = this.selectedSpace !== candidate.space;
-      const catalogButton = document.createElement("button");
-      catalogButton.type = "button";
-      catalogButton.textContent = "お品書きを見る";
-      catalogButton.addEventListener("click", (event) => {
-        event.stopPropagation();
-        this.onShowCatalog?.({ ...candidate, tweet: imageUrl }, catalogButton);
-      });
-      const targetButton = document.createElement("button");
-      targetButton.type = "button";
-      targetButton.textContent = "目的地にする";
-      targetButton.addEventListener("click", (event) => {
-        event.stopPropagation();
-        void this.selectNearbyTarget(candidate, imageUrl, targetButton);
-      });
-      actions.append(catalogButton, targetButton);
-      card.appendChild(actions);
       cardLayer.appendChild(card);
     }
+    this.syncSelectionToolbar();
     this.updateCatalogOverlay();
+  }
+
+  private getSelectedCandidate(): Circle | null {
+    return this.nearbyCandidates.find(
+      ({ candidate }) => candidate.space === this.selectedSpace,
+    )?.candidate ?? null;
+  }
+
+  private syncSelectionToolbar(): void {
+    const toolbar = this.surface?.querySelector("#nearby-selection-toolbar") as HTMLElement | null;
+    const label = this.surface?.querySelector("#nearby-selection-label");
+    const candidate = this.getSelectedCandidate();
+    if (!toolbar || !label) return;
+    toolbar.hidden = !candidate;
+    label.textContent = candidate ? `${candidate.space}を選択中` : "";
+  }
+
+  private syncCatalogPagination(page: ReturnType<typeof paginateNearbyCatalog>): void {
+    const pagination = this.surface?.querySelector("#nearby-map-pagination") as HTMLElement | null;
+    const previous = this.surface?.querySelector("#btn-nearby-page-previous") as HTMLButtonElement | null;
+    const next = this.surface?.querySelector("#btn-nearby-page-next") as HTMLButtonElement | null;
+    const label = this.surface?.querySelector("#nearby-map-page-label");
+    if (!pagination || !previous || !next || !label) return;
+    pagination.hidden = page.pageCount <= 1;
+    previous.disabled = page.pageIndex <= 0;
+    next.disabled = page.pageIndex >= page.pageCount - 1;
+    label.textContent = page.total ? `${page.startNumber}–${page.endNumber} / ${page.total}` : "";
+  }
+
+  private setPageIndex(pageIndex: number): void {
+    this.pageIndex = pageIndex;
+    if (this.activeAssets) {
+      this.renderPins(this.activeAssets);
+      this.applyViewportLayout();
+    }
   }
 
   private updateCatalogOverlay(): void {
@@ -735,9 +815,44 @@ export class DomNearbyMapView {
     workspace.style.setProperty("--nearby-map-height", `${layout.mapHeight}px`);
     workspace.style.setProperty("--nearby-panel-width", `${layout.panelWidth}px`);
     workspace.style.setProperty("--nearby-panel-height", `${layout.panelHeight}px`);
+    const page = paginateNearbyCatalog(this.nearbyCandidates, this.pageIndex);
+    this.pageIndex = page.pageIndex;
+    const perimeter = buildNearbyPerimeterLayout({
+      workspaceWidth,
+      workspaceHeight,
+      itemCount: page.items.length,
+      mode: layout.mode,
+    });
+    workspace.dataset.cardLayout = "perimeter";
+    workspace.style.setProperty("--nearby-map-x", `${perimeter.mapRect.x}px`);
+    workspace.style.setProperty("--nearby-map-y", `${perimeter.mapRect.y}px`);
+    workspace.style.setProperty("--nearby-map-width", `${perimeter.mapRect.width}px`);
+    workspace.style.setProperty("--nearby-map-height", `${perimeter.mapRect.height}px`);
+    viewport.style.position = "absolute";
+    viewport.style.left = `${perimeter.mapRect.x}px`;
+    viewport.style.top = `${perimeter.mapRect.y}px`;
+    const catalogPanel = this.surface?.querySelector("#nearby-map-catalog-panel") as HTMLElement | null;
+    if (catalogPanel) {
+      catalogPanel.style.position = "absolute";
+      catalogPanel.style.inset = "0";
+      catalogPanel.style.width = "100%";
+      catalogPanel.style.height = "100%";
+      catalogPanel.style.overflowX = "hidden";
+      catalogPanel.style.overflowY = "visible";
+      catalogPanel.style.background = "transparent";
+      catalogPanel.style.pointerEvents = "none";
+    }
+    const cardLayer = this.surface?.querySelector("#nearby-map-card-layer") as HTMLElement | null;
+    if (cardLayer) {
+      cardLayer.style.position = "absolute";
+      cardLayer.style.inset = "0";
+      cardLayer.style.display = "block";
+      cardLayer.style.padding = "0";
+      cardLayer.style.pointerEvents = "none";
+    }
     const mapLayout = calculateStandaloneMapViewportLayout({
-      availableWidth: layout.mapWidth,
-      availableHeight: layout.mapHeight,
+      availableWidth: perimeter.mapRect.width,
+      availableHeight: perimeter.mapRect.height,
       imageWidth: image.naturalWidth,
       imageHeight: image.naturalHeight,
       scaleMode: layout.initialMapScaleMode,
@@ -784,6 +899,7 @@ export class DomNearbyMapView {
       return;
     }
     this.origin = snapped;
+    this.pageIndex = 0;
     this.selectionMode = false;
     this.updateNearbyCandidates();
     this.renderOriginMarker();
@@ -824,6 +940,7 @@ export class DomNearbyMapView {
       return;
     }
     this.origin = snapped;
+    this.pageIndex = 0;
     this.selectionMode = false;
     this.updateNearbyCandidates();
     this.renderOriginMarker();
@@ -853,6 +970,7 @@ export class DomNearbyMapView {
     ) {
       this.selectedSpace = null;
     }
+    this.applyViewportLayout();
     this.renderPins(this.activeAssets);
   }
 

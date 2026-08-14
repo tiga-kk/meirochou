@@ -216,10 +216,13 @@ test("周辺地図のお品書きカードとleader lineから既存拡大表示
   const beforeDetailTransform = await page.locator("#nearby-map-layer").getAttribute("style");
   expect(await selectedCardHandle?.evaluate((element) => element.isConnected)).toBe(true);
   expect(await selectedInfoHandle?.evaluate((element) => element.isConnected)).toBe(true);
+  const selectionToolbar = page.locator("#nearby-selection-toolbar");
+  await expect(selectionToolbar).toBeVisible();
+  await expect(cards.first().getByRole("button")).toHaveCount(0);
   await expect(
-    cards.first().getByRole("button", { name: "お品書きを見る" }),
+    selectionToolbar.getByRole("button", { name: "お品書きを見る" }),
   ).toBeVisible();
-  await cards.first()
+  await selectionToolbar
     .getByRole("button", { name: "お品書きを見る" })
     .click({ force: true });
   await expect(page.locator("#pdf-modal")).toBeVisible();
@@ -239,7 +242,7 @@ test("周辺地図のお品書きカードとleader lineから既存拡大表示
   await expect
     .poll(() => page.evaluate(() => (document.activeElement as HTMLElement | null)?.textContent))
     .toContain("お品書きを見る");
-  await page.getByRole("button", { name: "お品書きを見る" }).first().click({ force: true });
+  await selectionToolbar.getByRole("button", { name: "お品書きを見る" }).click({ force: true });
   await expect(page.locator("#pdf-modal")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.locator("#pdf-modal")).toBeHidden();
@@ -251,11 +254,92 @@ test("周辺地図のお品書きカードとleader lineから既存拡大表示
   await page.getByRole("button", { name: "条件" }).click();
   await page.getByRole("button", { name: "現在地を使う" }).click();
   await expect(cards).toHaveCount(2);
-  await cards.first()
+  await cards.first().focus();
+  await page.keyboard.press("Enter");
+  await expect(selectionToolbar).toBeVisible();
+  await selectionToolbar
     .getByRole("button", { name: "目的地にする" })
     .click({ force: true });
   await expect(page.locator("#nearby-map-surface")).toBeHidden();
   await expect(page.locator("#toast")).toContainText("目的地を");
+});
+
+test("周辺お品書きの15件と20件を10件単位で切り替えられる", async ({ page }) => {
+  const circles = Array.from({ length: 20 }, (_, index) => ({
+    space: `東ア${50 + index}a`,
+    priority: index + 1,
+    tweet: "",
+  }));
+  await page.addInitScript((state) => {
+    const ref = { eventId: "demo-v1", dayId: "day1" };
+    localStorage.setItem("comipath:v1:index:event-days", JSON.stringify([ref]));
+    localStorage.setItem("comipath:v1:last-opened", JSON.stringify(ref));
+    localStorage.setItem("comipath:v1:demo-v1:day1:state", JSON.stringify(state));
+  }, {
+    schemaVersion: 2,
+    source: { type: "csv", fileName: "nearby-pagination-e2e.csv" },
+    sourceGeneration: "nearby-pagination-e2e",
+    circles,
+    circleStates: {},
+    gasOutbox: [],
+    timestamps: {
+      createdAt: "2026-07-25T00:00:00.000Z",
+      updatedAt: "2026-07-25T00:00:00.000Z",
+      sourceUpdatedAt: "2026-07-25T00:00:00.000Z",
+    },
+  });
+  await page.route("**/assets/maps/demo-v1/demo-east/points.json", async (route) => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    const template = payload.points[0];
+    payload.points.push(
+      ...circles.map((circle, index) => ({
+        ...template,
+        id: `pagination-${index}`,
+        number: String(50 + index),
+      })),
+    );
+    await route.fulfill({ response, json: payload });
+  });
+
+  await page.goto("/");
+  await page.locator("#loc-number").fill("10");
+  await page.getByRole("button", { name: "地図" }).click();
+  await page.getByRole("button", { name: "条件" }).click();
+  await page.getByRole("button", { name: "現在地を使う" }).click();
+  const cards = page.locator(".nearby-catalog-card");
+  await expect(cards).toHaveCount(5);
+  await page.locator("#nearby-map-limit").selectOption("20");
+  await expect(cards).toHaveCount(10);
+  const firstPageGeometry = await page.evaluate(() => {
+    const map = document.querySelector("#nearby-map-viewport")?.getBoundingClientRect();
+    const cards = [...document.querySelectorAll(".nearby-catalog-card")].map((card) => card.getBoundingClientRect());
+    const overlap = (left: DOMRect, right: DOMRect) =>
+      Math.max(0, Math.min(left.right, right.right) - Math.max(left.left, right.left)) *
+      Math.max(0, Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top));
+    return {
+      map,
+      cardMapOverlap: map ? cards.map((card) => overlap(card, map)) : [],
+      cardOverlap: cards.flatMap((left, index) => cards.slice(index + 1).map((right) => overlap(left, right))),
+    };
+  });
+  expect(firstPageGeometry.cardMapOverlap.every((value) => value === 0)).toBe(true);
+  expect(firstPageGeometry.cardOverlap.every((value) => value === 0)).toBe(true);
+
+  await page.locator("#nearby-map-limit").selectOption("15");
+  await expect(cards).toHaveCount(10);
+  await expect(page.locator("#nearby-map-pagination")).toBeVisible();
+  await expect(page.locator("#nearby-map-page-label")).toHaveText("1–10 / 15");
+  await page.locator("#btn-nearby-page-next").click();
+  await expect(cards).toHaveCount(5);
+  await expect(page.locator("#nearby-map-page-label")).toHaveText("11–15 / 15");
+
+  await page.locator("#nearby-map-limit").selectOption("20");
+  await expect(cards).toHaveCount(10);
+  await expect(page.locator("#nearby-map-page-label")).toHaveText("1–10 / 20");
+  await page.locator("#btn-nearby-page-next").click();
+  await expect(cards).toHaveCount(10);
+  await expect(page.locator("#nearby-map-page-label")).toHaveText("11–20 / 20");
 });
 
 test("地図の基準地点は選択モード中のtapだけで変更される", async ({ page }) => {

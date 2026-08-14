@@ -76,6 +76,10 @@
   overflow: hidden;
 }
 
+.nearby-map-workspace[data-card-layout="perimeter"] {
+  display: block;
+}
+
 .nearby-map-header {
   display: flex;
   align-items: center;
@@ -154,6 +158,36 @@
   gap: 8px;
 }
 
+.nearby-selection-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--primary);
+  background: var(--panel);
+}
+
+.nearby-selection-toolbar[hidden] {
+  display: none;
+}
+
+.nearby-selection-toolbar span {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 800;
+}
+
+.nearby-selection-toolbar button {
+  min-height: 44px;
+  padding: 4px 10px;
+  border: 1px solid var(--ink);
+  background: var(--bg-card);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+}
+
 .nearby-map-filter-group {
   display: flex;
   align-items: center;
@@ -204,6 +238,20 @@
   overflow-y: auto;
   background: var(--bg-card, #fff);
   overscroll-behavior: contain;
+}
+
+.nearby-map-workspace[data-card-layout="perimeter"] .nearby-map-catalog-panel {
+  overflow-x: hidden;
+  overflow-y: visible;
+  pointer-events: none;
+}
+
+.nearby-map-workspace[data-card-layout="perimeter"] .nearby-map-card-layer {
+  position: absolute;
+  inset: 0;
+  display: block;
+  padding: 0;
+  pointer-events: none;
 }
 
 .nearby-map-transform-layer {
@@ -288,9 +336,42 @@
   cursor: pointer;
 }
 
+.nearby-map-workspace[data-card-layout="perimeter"] .nearby-catalog-card {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.nearby-map-pagination {
+  position: absolute;
+  left: var(--nearby-map-x, 0px);
+  right: var(--nearby-map-x, 0px);
+  bottom: 8px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.nearby-map-pagination[hidden] {
+  display: none;
+}
+
+.nearby-map-pagination button {
+  min-height: 44px;
+  padding: 4px 10px;
+  border: 1px solid var(--ink);
+  background: var(--bg-card);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+}
+
 .nearby-catalog-card[aria-selected="true"],
 .nearby-catalog-card--selected {
   z-index: 4;
+  min-height: 136px;
   border-color: var(--primary, #1d4ed8);
   box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.25);
 }
