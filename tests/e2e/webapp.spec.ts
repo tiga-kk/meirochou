@@ -428,6 +428,42 @@ test("使い方をheaderから開き、本文を拡大表示して閉じられ�
   await expect(guideButton).toBeFocused();
 });
 
+test("経路画面はmap-firstで詳細開閉時も地図状態を保持する", async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 644, height: 886 },
+    { width: 1024, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/?demo_ui=1");
+    await expect(page.locator("#target-content")).toBeVisible();
+
+    const mapBox = await page.locator("#navigation-map").boundingBox();
+    expect(mapBox?.height).toBeGreaterThan(520);
+    await expect(page.locator("#target-detail")).toBeHidden();
+    await expect(page.locator("#btn-purchased")).toBeVisible();
+    await expect(page.locator("#btn-hold")).toBeVisible();
+    await expect(page.locator("#btn-purchased")).toHaveCSS(
+      "min-height",
+      "44px",
+    );
+    await expect(page.locator("#btn-hold")).toHaveCSS("min-height", "44px");
+
+    const transform = await page
+      .locator("#navigation-map-layer")
+      .getAttribute("style");
+    await page.locator("#btn-toggle-target-detail").click();
+    await expect(page.locator("#target-detail")).toBeVisible();
+    expect(
+      await page.locator("#navigation-map-layer").getAttribute("style"),
+    ).toBe(transform);
+    await page.locator("#btn-toggle-target-detail").click();
+    await expect(page.locator("#target-detail")).toBeHidden();
+  }
+});
+
 test("デモデータで地図・ピン・経路・ボトムシートを表示する", async ({
   page,
 }) => {
@@ -565,6 +601,12 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   await pinFor(page, "東ア23a").evaluate((button: HTMLButtonElement) =>
     button.click(),
   );
+  if (
+    (await page.locator("#btn-toggle-target-detail").getAttribute("aria-expanded")) ===
+    "false"
+  ) {
+    await page.locator("#btn-toggle-target-detail").click();
+  }
   const catalog = page.locator("#tweet-embed-container img");
   await expect(catalog).toBeVisible();
   await expect(page.locator("#next-target")).toHaveAttribute(

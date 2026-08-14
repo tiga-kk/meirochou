@@ -59,6 +59,8 @@ export class DomRouteGuidanceView {
         "candidate-preview-surface",
       ),
       targetDetail: document.getElementById("next-target"),
+      targetDetailPanel: document.getElementById("target-detail"),
+      toggleTargetDetail: document.getElementById("btn-toggle-target-detail"),
       targetEmpty: document.getElementById("target-empty"),
       targetLoading: document.getElementById("target-loading"),
       heading: document.getElementById("target-space-heading"),
@@ -111,6 +113,21 @@ export class DomRouteGuidanceView {
 
     this.notificationView = new DomUserNotificationView(this.els.toast, 3000);
     this.customSelects = {};
+    this.setTargetDetailExpanded(false);
+    this.els.toggleTargetDetail?.addEventListener("click", () => {
+      this.setTargetDetailExpanded(!this.detailExpanded);
+    });
+  }
+
+  setTargetDetailExpanded(expanded) {
+    this.detailExpanded = Boolean(expanded);
+    if (this.els.targetDetailPanel) {
+      this.els.targetDetailPanel.hidden = !this.detailExpanded;
+    }
+    this.els.toggleTargetDetail?.setAttribute(
+      "aria-expanded",
+      String(this.detailExpanded),
+    );
   }
 
   /**
@@ -314,6 +331,7 @@ export class DomRouteGuidanceView {
     });
     const detailTarget = selectedTarget || currentTarget;
     const isPreview = detailTarget.space !== currentTarget.space;
+    if (isPreview) this.setTargetDetailExpanded(true);
     const detailRoute = isPreview ? state.selectedRoute : currentRoute;
     const detailArea = this.mapAreaCatalog.findMapAreaForCircleSpace(
       detailTarget.space,

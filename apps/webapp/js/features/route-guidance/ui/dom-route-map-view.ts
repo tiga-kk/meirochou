@@ -7,11 +7,11 @@ import {
   buildMapViewportPoints,
   calculateFitTransform,
   calculateMapPinSize,
-  calculateMapViewportLayout,
   calculateNativeImageScale,
   findNearestMapViewportPoint,
   resolveNearestMapPin,
 } from "./route-map-pin-model";
+import { calculateMapStageLayout } from "./map-stage-layout";
 import { buildRouteOverlaySvg } from "./route-overlay-svg";
 import {
   normalizeRouteMotionPreference,
@@ -350,16 +350,17 @@ export class DomRouteMapView {
 
     const viewportWidth =
       viewport.clientWidth || viewport.getBoundingClientRect().width;
-    if (!viewportWidth) return;
-    const layout = calculateMapViewportLayout({
+    const viewportHeight =
+      viewport.clientHeight || viewport.getBoundingClientRect().height;
+    if (!viewportWidth || !viewportHeight) return;
+    const layout = calculateMapStageLayout({
       viewportWidth,
-      viewportMaxHeight: 520,
-      minimumInteractiveHeight: 220,
+      viewportHeight,
       imageWidth: image.naturalWidth,
       imageHeight: image.naturalHeight,
     });
+    if (!layout) return;
     this.routeMotionRenderedWidth = layout.stageWidth;
-    viewport.style.height = `${layout.viewportHeight}px`;
     stage.style.width = `${layout.stageWidth}px`;
     stage.style.height = `${layout.stageHeight}px`;
     stage.style.left = "0";

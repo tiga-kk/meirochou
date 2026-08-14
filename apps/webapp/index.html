@@ -150,80 +150,94 @@
             aria-live="polite"
           ></div>
 
-          <div class="target-bottom-sheet">
-            <div class="target-detail-layout">
-              <div id="tweet-embed-container" class="tweet-preview"></div>
-              <div class="target-detail-meta">
-                <span class="target-label" id="target-status-label">お品書き</span>
-                <span id="target-sheet-name" class="target-sheet-name hidden"></span>
-                <div class="target-meta-grid">
-                  <span id="target-priority">優先度 -</span>
-                  <span id="sub-target-space">次 -</span>
-                </div>
-                <a
-                  id="target-tweet-link"
-                  href="#"
-                  target="_blank"
-                  class="tweet-link"
-                >
-                  <i class="fa-brands fa-twitter"></i> Link
-                </a>
-                <div id="route-selection-controls" class="route-selection-controls hidden">
-                  <div class="candidate-selection-label">変更候補</div>
-                  <div class="candidate-selection-summary">
-                    <strong id="selected-target-space" class="selected-target-space">---</strong>
-                    <span id="target-dist" class="candidate-selection-distance">距離 -</span>
-                  </div>
-                  <div class="candidate-selection-actions">
-                    <button type="button" id="btn-preview-route" class="btn btn-primary" disabled>
-                      <i class="fa-solid fa-route"></i> 経路を比較
-                    </button>
-                    <button type="button" id="btn-close-route-selection" class="btn btn-secondary">
-                      閉じる
-                    </button>
-                  </div>
-                  <p id="route-selection-message" class="route-selection-message" aria-live="polite"></p>
-                </div>
-              </div>
-              <div class="target-detail-actions">
-                <div id="target-map-container" class="map-embed-container hidden">
-                  <!-- 著作権保護のため一時無効化中 -->
-                </div>
-                <div class="action-grid">
-                  <button type="button" id="btn-purchased" class="btn btn-success">
-                    <i class="fa-solid fa-check"></i> 購入済
-                  </button>
-                  <button type="button" id="btn-hold" class="btn btn-warning">
-                    <i class="fa-solid fa-pause"></i> 保留
-                  </button>
-                </div>
-              </div>
+          <div class="target-action-bar">
+            <div class="action-grid">
+              <button type="button" id="btn-purchased" class="btn btn-success">
+                <i class="fa-solid fa-check"></i> 購入済
+              </button>
+              <button type="button" id="btn-hold" class="btn btn-warning">
+                <i class="fa-solid fa-pause"></i> 保留
+              </button>
             </div>
-
-            <section
-              id="route-change-confirmation"
-              class="route-change-confirmation hidden"
-              aria-labelledby="route-change-title"
+            <button
+              type="button"
+              id="btn-toggle-target-detail"
+              class="btn btn-secondary target-detail-toggle"
+              aria-controls="target-detail"
+              aria-expanded="false"
             >
-              <h3 id="route-change-title">経路を変更しますか？</h3>
-              <div class="route-comparison-summary">
-                <div>
-                  <span>現在</span>
-                  <strong id="route-change-current">---</strong>
-                  <small id="route-change-current-distance">距離 -</small>
+              詳細
+            </button>
+          </div>
+
+          <div class="target-bottom-sheet">
+            <div id="target-detail" hidden>
+              <div class="target-detail-layout">
+                <div id="tweet-embed-container" class="tweet-preview"></div>
+                <div class="target-detail-meta">
+                  <span class="target-label" id="target-status-label">お品書き</span>
+                  <span id="target-sheet-name" class="target-sheet-name hidden"></span>
+                  <div class="target-meta-grid">
+                    <span id="target-priority">優先度 -</span>
+                    <span id="sub-target-space">次 -</span>
+                  </div>
+                  <a
+                    id="target-tweet-link"
+                    href="#"
+                    target="_blank"
+                    class="tweet-link"
+                  >
+                    <i class="fa-brands fa-twitter"></i> Link
+                  </a>
+                  <div id="route-selection-controls" class="route-selection-controls hidden">
+                    <div class="candidate-selection-label">変更候補</div>
+                    <div class="candidate-selection-summary">
+                      <strong id="selected-target-space" class="selected-target-space">---</strong>
+                      <span id="target-dist" class="candidate-selection-distance">距離 -</span>
+                    </div>
+                    <div class="candidate-selection-actions">
+                      <button type="button" id="btn-preview-route" class="btn btn-primary" disabled>
+                        <i class="fa-solid fa-route"></i> 経路を比較
+                      </button>
+                      <button type="button" id="btn-close-route-selection" class="btn btn-secondary">
+                        閉じる
+                      </button>
+                    </div>
+                    <p id="route-selection-message" class="route-selection-message" aria-live="polite"></p>
+                  </div>
                 </div>
-                <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
-                <div>
-                  <span>候補</span>
-                  <strong id="route-change-candidate">---</strong>
-                  <small id="route-change-candidate-distance">距離 -</small>
+                <div class="target-detail-actions">
+                  <div id="target-map-container" class="map-embed-container hidden">
+                    <!-- 著作権保護のため一時無効化中 -->
+                  </div>
                 </div>
               </div>
-              <div class="route-confirmation-actions">
-                <button type="button" id="btn-cancel-route-change" class="btn btn-secondary">戻る</button>
-                <button type="button" id="btn-confirm-route-change" class="btn btn-primary">この地点に変更</button>
-              </div>
-            </section>
+
+              <section
+                id="route-change-confirmation"
+                class="route-change-confirmation hidden"
+                aria-labelledby="route-change-title"
+              >
+                <h3 id="route-change-title">経路を変更しますか？</h3>
+                <div class="route-comparison-summary">
+                  <div>
+                    <span>現在</span>
+                    <strong id="route-change-current">---</strong>
+                    <small id="route-change-current-distance">距離 -</small>
+                  </div>
+                  <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                  <div>
+                    <span>候補</span>
+                    <strong id="route-change-candidate">---</strong>
+                    <small id="route-change-candidate-distance">距離 -</small>
+                  </div>
+                </div>
+                <div class="route-confirmation-actions">
+                  <button type="button" id="btn-cancel-route-change" class="btn btn-secondary">戻る</button>
+                  <button type="button" id="btn-confirm-route-change" class="btn btn-primary">この地点に変更</button>
+                </div>
+              </section>
+            </div>
           </div>
         </div>
 

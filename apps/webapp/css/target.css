@@ -7,7 +7,7 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin: 0;
 }
 
@@ -29,8 +29,8 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 4px;
+  margin-top: 6px;
 }
 
 .route-priority-filter-label {
@@ -86,8 +86,7 @@
 }
 
 .navigation-map {
-  min-height: 220px;
-  max-height: 520px;
+  height: clamp(360px, 72dvh, 760px);
   position: relative;
   overflow: hidden;
   background: #d9d5cc;
@@ -572,6 +571,24 @@
   border-top: 3px solid var(--ink);
   background: #fff;
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+.target-action-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(88px, 1fr);
+  gap: 8px;
+  align-items: stretch;
+  padding: 8px 12px;
+  border-top: 1px solid var(--ink);
+  background: var(--bg-card);
+}
+
+.target-action-bar .action-grid {
+  margin-top: 0;
+}
+
+.target-detail-toggle {
+  min-height: 44px;
 }
 
 .target-detail-layout {
