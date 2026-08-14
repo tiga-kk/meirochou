@@ -21,6 +21,8 @@ import {
   createRouteMotionController,
   sampleRouteGeometry,
 } from "./route-motion-controller";
+import { buildOptimizationPreviewPoints } from "./optimization-preview-model";
+import { parseSpace } from "../../../shared/domain/space-parser";
 
 function findAreaForSpace(space, mapAreaCatalog) {
   if (!space || typeof space !== "string") return null;
@@ -117,6 +119,11 @@ export class DomRouteMapView {
     this.routeMotionVisibilityListenerAttached = false;
     this.routeMotionRenderedWidth = 0;
     this.viewportCenterTimer = null;
+    this.latestOptimizationPreview = null;
+    this.optimizationPreviewPointIndex = new Map();
+    this.optimizationPreviewGestureActive = false;
+    this.optimizationPreviewUpdateCount = 0;
+    this.optimizationPreviewJobId = null;
 
     this.init();
   }
@@ -148,8 +155,10 @@ export class DomRouteMapView {
             this.applyRouteMotionSpeed(scale);
             this.scheduleViewportCenterUpdate();
           },
-          onGestureActivityChange: (active) =>
-            this.routeMotionController?.setGestureActive(active),
+          onGestureActivityChange: (active) => {
+            this.routeMotionController?.setGestureActive(active);
+            this.setOptimizationPreviewGestureActive(active);
+          },
         },
       );
       if (typeof ResizeObserver === "function") {
@@ -289,6 +298,82 @@ export class DomRouteMapView {
       (160 * route.image.width) /
         Math.max(1, this.routeMotionRenderedWidth * scale),
     );
+  }
+
+  showOptimizationPreview(preview) {
+    if (!preview) return;
+    if (this.optimizationPreviewJobId !== preview.jobId) {
+      this.optimizationPreviewJobId = preview.jobId;
+      this.optimizationPreviewUpdateCount = 0;
+    }
+    this.optimizationPreviewUpdateCount += 1;
+    this.latestOptimizationPreview = preview;
+    if (!this.optimizationPreviewGestureActive) this.renderOptimizationPreview();
+  }
+
+  clearOptimizationPreview() {
+    this.latestOptimizationPreview = null;
+    this.optimizationPreviewJobId = null;
+    this.optimizationPreviewUpdateCount = 0;
+    this.els.pinLayer?.querySelector(".optimization-preview-overlay")?.remove();
+    this.els.navigationMap?.querySelector(".optimization-preview-status")?.remove();
+  }
+
+  setOptimizationPreviewGestureActive(active) {
+    this.optimizationPreviewGestureActive = Boolean(active);
+    if (!this.optimizationPreviewGestureActive && this.latestOptimizationPreview) {
+      this.renderOptimizationPreview();
+    }
+  }
+
+  renderOptimizationPreview() {
+    const preview = this.latestOptimizationPreview;
+    const pinLayer = this.els.pinLayer;
+    const navigationMap = this.els.navigationMap;
+    if (!preview || !pinLayer || !navigationMap) return;
+    const image = this.lastNavigationContext?.currentRoute?.image ?? {
+      width: this.els.navigationMapImage?.naturalWidth,
+      height: this.els.navigationMapImage?.naturalHeight,
+    };
+    const points = buildOptimizationPreviewPoints({
+      currentPosition: this.lastNavigationContext?.currentPosition ?? null,
+      bestOrder: preview.bestOrder,
+      pointIndex: this.optimizationPreviewPointIndex,
+    });
+    let overlay = pinLayer.querySelector(".optimization-preview-overlay");
+    if (points.length < 2 || !image?.width || !image?.height) {
+      overlay?.remove();
+      this.renderOptimizationPreviewStatus(preview, navigationMap);
+      return;
+    }
+    if (!overlay) {
+      overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      overlay.setAttribute("class", "optimization-preview-overlay");
+      overlay.setAttribute("aria-hidden", "true");
+      const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+      polyline.setAttribute("class", "optimization-preview-route");
+      overlay.appendChild(polyline);
+      pinLayer.appendChild(overlay);
+    }
+    overlay.setAttribute("viewBox", `0 0 ${image.width} ${image.height}`);
+    overlay.setAttribute("preserveAspectRatio", "none");
+    overlay.querySelector("polyline")?.setAttribute(
+      "points",
+      points.map((point) => `${point.x},${point.y}`).join(" "),
+    );
+    this.renderOptimizationPreviewStatus(preview, navigationMap);
+  }
+
+  renderOptimizationPreviewStatus(preview, navigationMap) {
+    let status = navigationMap.querySelector(".optimization-preview-status");
+    if (!status) {
+      status = document.createElement("div");
+      status.className = "optimization-preview-status";
+      status.setAttribute("role", "status");
+      status.setAttribute("aria-live", "polite");
+      navigationMap.appendChild(status);
+    }
+    status.textContent = `探索中 ${Math.round(preview.elapsedMs)} / ${preview.searchTimeLimitMs}ms・best更新 ${this.optimizationPreviewUpdateCount}`;
   }
 
   applyRouteMotionPreference() {
@@ -512,6 +597,10 @@ export class DomRouteMapView {
     const cachedPointIndex = area ? this.pointIndexCache.get(area.id) : null;
     const pointIndex =
       cachedPointIndex instanceof Map ? cachedPointIndex : null;
+    const imageWidth =
+      this.els.navigationMapImage?.naturalWidth || currentRoute?.image?.width || 0;
+    const imageHeight =
+      this.els.navigationMapImage?.naturalHeight || currentRoute?.image?.height || 0;
     const startSpaceForMap = getRouteStartSpaceForMap(
       startSpace,
       currentTarget?.space || "",
@@ -527,6 +616,24 @@ export class DomRouteMapView {
     if (selectedRoute?.targetPosition && selectedTarget?.space) {
       positionOverrides.set(selectedTarget.space, selectedRoute.targetPosition);
     }
+
+    this.optimizationPreviewPointIndex = new Map(
+      circles.flatMap((circle) => {
+        const [, label, number] = parseSpace(circle?.space ?? "");
+        const anchors = pointIndex?.get(`${label}:${number}`);
+        return anchors
+          ? [
+              [
+                circle.space,
+                anchors.map((anchor) => ({
+                  center_x: (anchor.x / 100) * imageWidth,
+                  center_y: (anchor.y / 100) * imageHeight,
+                })),
+              ] as const,
+            ]
+          : [];
+      }),
+    );
 
     const pins = buildMapPins(circles, {
       currentTargetSpace: currentTarget?.space,
@@ -668,5 +775,11 @@ export class DomRouteMapView {
       });
     }
     this.updateViewportCenter();
+    if (
+      this.latestOptimizationPreview &&
+      !this.optimizationPreviewGestureActive
+    ) {
+      this.renderOptimizationPreview();
+    }
   }
 }

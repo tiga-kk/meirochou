@@ -57,6 +57,123 @@ test("route未開始でもヘッダーの地図を開閉できる", async ({ pag
   await expect(opener).toBeFocused();
 });
 
+test("ALNS progressは青紫previewだけを更新しcomplete後に消える", async ({ page }) => {
+  await page.route("**/assets/maps/demo-v1/manifest.json", async (route) => {
+    const response = await route.fetch();
+    const manifest = await response.json();
+    await route.fulfill({
+      response,
+      body: JSON.stringify({ ...manifest, bundleVersion: "demo-v1" }),
+    });
+  });
+  await page.addInitScript(() => {
+    const state = {
+      schemaVersion: 2,
+      source: { type: "csv", fileName: "preview.csv" },
+      sourceGeneration: "preview-generation",
+      circles: [
+        { space: "東ア23a", priority: 10 },
+        { space: "東ア31b", priority: 10 },
+        { space: "東ア41a", priority: 10 },
+      ],
+      circleStates: {},
+      gasOutbox: [],
+      timestamps: {
+        createdAt: "2026-08-14T00:00:00.000Z",
+        updatedAt: "2026-08-14T00:00:00.000Z",
+        sourceUpdatedAt: "2026-08-14T00:00:00.000Z",
+      },
+    };
+    const snapshot = {
+      schemaVersion: 1,
+      eventId: "demo-v1",
+      dayId: "day1",
+      areaId: "demo-east",
+      bundleVersion: "demo-v1",
+      matrixRef: "preview-matrix",
+      navState: {
+        stage: "navigating",
+        areaId: "demo-east",
+        currentPosition: {
+          areaId: "demo-east",
+          gridIndex: 4812,
+          svgX: 96,
+          svgY: 320,
+          source: "manual-start",
+        },
+        targetSpace: "東ア23a",
+        lockedFirstLeg: {
+          from: { type: "start", areaId: "demo-east", gridIndex: 4812 },
+          toSpace: "東ア23a",
+        },
+        provisionalOrder: ["東ア23a", "東ア31b", "東ア41a"],
+        bestOrder: ["東ア23a", "東ア31b", "東ア41a"],
+      },
+      optimizationTimeLimitMs: 10000,
+      savedAt: "2026-08-14T00:00:00.000Z",
+    };
+    localStorage.setItem("comipath:v1:index:event-days", JSON.stringify([{ eventId: "demo-v1", dayId: "day1" }]));
+    localStorage.setItem("comipath:v1:last-opened", JSON.stringify({ eventId: "demo-v1", dayId: "day1" }));
+    localStorage.setItem("comipath:v1:demo-v1:day1:state", JSON.stringify(state));
+    localStorage.setItem("comipath:nav-snapshot:demo-v1:day1", JSON.stringify(snapshot));
+    localStorage.setItem("comipath:matrix:preview-matrix", JSON.stringify({
+      schemaVersion: 1,
+      cacheKey: "preview-matrix",
+      areaId: "demo-east",
+      spaces: ["東ア23a", "東ア31b", "東ア41a"],
+      size: 3,
+      distances: [0, 10, 20, 10, 0, 10, 20, 10, 0],
+      createdAt: "2026-08-14T00:00:00.000Z",
+    }));
+    class PreviewWorker {
+      onmessage = null;
+      postMessage(message) {
+        if (message.type !== "start") return;
+        if (message.problem) {
+          const routes = [
+            ["東ア23a", "東ア31b", "東ア41a"],
+            ["東ア23a", "東ア41a", "東ア31b"],
+            ["東ア23a", "東ア31b", "東ア41a"],
+          ];
+          routes.forEach((route, index) => setTimeout(() => this.onmessage?.({ data: {
+            type: "progress", stage: "time-decayed-alns", jobId: message.jobId,
+            elapsedMs: (index + 1) * 250, searchTimeLimitMs: 10000,
+            best: { score: index + 1, route, completionTimesSec: [10, 20, 30], elapsedMs: (index + 1) * 250, optimizationProfileVersion: "v1" },
+          } }), index * 80));
+          setTimeout(() => this.onmessage?.({ data: {
+            type: "complete", stage: "time-decayed-alns", jobId: message.jobId,
+            best: { score: 4, route: routes[1], completionTimesSec: [10, 20, 30], elapsedMs: 1000, optimizationProfileVersion: "v1" },
+          } }), 280);
+          return;
+        }
+        const size = message.input.endpoints.length;
+        const distances = Array.from({ length: size * size }, (_, index) => index % (size + 1) === 0 ? 0 : 10);
+        setTimeout(() => this.onmessage?.({ data: {
+          type: "complete", jobId: message.jobId,
+          matrix: { schemaVersion: 1, cacheKey: message.input.cacheKey, areaId: message.input.areaId, spaces: message.input.endpoints.map((endpoint) => endpoint.space), size, distances, createdAt: new Date().toISOString() },
+        } }), 0);
+      }
+      terminate() {}
+    }
+    window.Worker = PreviewWorker;
+  });
+  await page.goto("/");
+  await page.evaluate(() => {
+    (window as typeof window & { previewPoints?: string[] }).previewPoints = [];
+    const observer = new MutationObserver(() => {
+      const points = document.querySelector(".optimization-preview-route")?.getAttribute("points");
+      if (points) (window as typeof window & { previewPoints?: string[] }).previewPoints?.push(points);
+    });
+    observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ["points"] });
+  });
+  await page.locator("#navigation-resume-dialog button.btn-primary").click();
+  await expect(page.locator(".optimization-preview-status")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => new Set((window as typeof window & { previewPoints?: string[] }).previewPoints ?? []).size)).toBeGreaterThan(1);
+  await expect(page.locator('[data-route-kind="current"]')).toHaveCount(1);
+  await expect.poll(() => page.locator(".optimization-preview-overlay").count()).toBe(0);
+  await expect(page.locator('[data-route-kind="current"]')).toHaveCount(1);
+});
+
 test("周辺地図のお品書きカードとleader lineから既存拡大表示を開ける", async ({
   page,
 }) => {

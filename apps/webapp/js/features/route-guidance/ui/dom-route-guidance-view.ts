@@ -438,6 +438,18 @@ export class DomRouteGuidanceView {
     this.showNavigation({ currentTarget: target, startSpace, nextTarget });
   }
 
+  showOptimizationPreview(preview) {
+    this.mapRenderer?.showOptimizationPreview(preview);
+  }
+
+  clearOptimizationPreview() {
+    this.mapRenderer?.clearOptimizationPreview();
+  }
+
+  setOptimizationPreviewGestureActive(active) {
+    this.mapRenderer?.setOptimizationPreviewGestureActive(active);
+  }
+
   renderTargetDetails(
     target,
     startSpace = "",

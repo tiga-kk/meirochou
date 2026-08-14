@@ -20,7 +20,10 @@ import type {
 import type { NavigationSnapshot } from "./route-guidance-snapshot-repository";
 import type { RouteMapAssetsLoader } from "./route-map-assets-loader";
 import { parseSpace } from "../../../shared/domain/space-parser";
-import type { RouteOptimizationCallbacks } from "./route-optimization-preview";
+import type {
+  RouteOptimizationCallbacks,
+  RouteOptimizationFeedback,
+} from "./route-optimization-preview";
 
 export interface ResumeRouteGuidanceInput {
   readonly eventDay: EventDayRef;
@@ -168,6 +171,7 @@ export class ResumeRouteGuidanceUseCase {
     private runtimeController: RouteGuidanceRuntimePort,
     private assetsLoader: RouteMapAssetsLoader,
     private mapAreaCatalog?: MapAreaCatalog,
+    private optimizationFeedback?: RouteOptimizationFeedback,
   ) {}
 
   async execute(
@@ -248,10 +252,14 @@ export class ResumeRouteGuidanceUseCase {
           nextNavState,
           resumeResult.optimizationTimeLimitMs,
         );
+        this.optimizationFeedback?.onClear();
       };
       const callbacks = Object.assign(commitNavigationState, {
-        onPreview: () => undefined,
+        onPreview: (preview: Parameters<RouteOptimizationCallbacks["onPreview"]>[0]) =>
+          this.optimizationFeedback?.onPreview(preview),
         onCommit: commitNavigationState,
+        onCancel: () => this.optimizationFeedback?.onClear(),
+        onError: () => this.optimizationFeedback?.onClear(),
       });
       navState = this.runtimeController.launchAlnsOptimization(
         {

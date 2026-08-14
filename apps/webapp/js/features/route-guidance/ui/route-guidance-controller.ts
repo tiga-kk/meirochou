@@ -28,7 +28,10 @@ import type {
   PrepareRouteOptimizationInput,
   PrepareRouteOptimizationUseCase,
 } from "../use-cases/prepare-route-optimization";
-import type { RouteOptimizationCallbacks } from "../use-cases/route-optimization-preview";
+import type {
+  RouteOptimizationCallbacks,
+  RouteOptimizationFeedback,
+} from "../use-cases/route-optimization-preview";
 import type { NavigationState } from "../domain/route-guidance-types";
 
 export interface RouteGuidanceControllerDependencies {
@@ -42,6 +45,7 @@ export interface RouteGuidanceControllerDependencies {
   navigationRuntimeController: RouteGuidanceRuntimePort;
   navigationOperations?: RouteGuidanceNavigationOperations;
   prepareOptimization?: PrepareRouteOptimizationUseCase;
+  optimizationFeedback?: RouteOptimizationFeedback;
 }
 
 export interface InitializeResumeStartupInput {
@@ -205,6 +209,7 @@ export class RouteGuidanceController {
   private invalidateOptimization(): void {
     this.optimizationRequest += 1;
     this.deps.navigationRuntimeController?.invalidateActiveOptimization?.();
+    this.deps.optimizationFeedback?.onClear();
   }
 
   private async prepareAndLaunchOptimization(
@@ -230,15 +235,20 @@ export class RouteGuidanceController {
           initialSolutions: [],
         },
         {
-          onPreview: () => undefined,
+          onPreview: (preview) => this.deps.optimizationFeedback?.onPreview(preview),
           onCommit: (nextNavState) => {
             if (request !== this.optimizationRequest) return;
             const snapshot = this.deps.session!.getSnapshot();
             if (snapshot.navigationState?.targetSpace !== nextNavState.targetSpace) return;
             this.deps.session!.replaceSnapshot({ ...snapshot, navigationState: nextNavState });
             this.saveSnapshot(input.eventDay, input.bundleVersion);
+            this.deps.optimizationFeedback?.onClear();
           },
-          onError: (code) => console.warn("Route optimization failed", code),
+          onCancel: () => this.deps.optimizationFeedback?.onClear(),
+          onError: (code) => {
+            this.deps.optimizationFeedback?.onClear();
+            console.warn("Route optimization failed", code);
+          },
         } satisfies RouteOptimizationCallbacks,
       );
       const snapshot = this.deps.session!.getSnapshot();

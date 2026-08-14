@@ -70,6 +70,7 @@ import { RouteGuidanceNavigationOperations } from "../features/route-guidance/us
 import { createRouteGuidanceSession } from "../features/route-guidance/use-cases/route-guidance-session";
 import { StartRouteGuidanceUseCase } from "../features/route-guidance/use-cases/start-route-guidance";
 import { PrepareRouteOptimizationUseCase } from "../features/route-guidance/use-cases/prepare-route-optimization";
+import type { RouteOptimizationPreview } from "../features/route-guidance/use-cases/route-optimization-preview";
 import type { MapBundleManifest } from "../features/event-day/domain/event-day-contracts";
 import type { MapBundleManifestV1 } from "../features/event-day/domain/application-contract-types";
 import { StorageService } from "../state/storage-service";
@@ -299,6 +300,11 @@ export function assembleComiPathApplication(
       ? { workerFactory: options.createAlnsWorker }
       : {}),
   });
+  const optimizationFeedback = {
+    onPreview: (preview: RouteOptimizationPreview) =>
+      browserRuntime?.ui.showOptimizationPreview(preview),
+    onClear: () => browserRuntime?.ui.clearOptimizationPreview(),
+  };
   const routeGuidanceController = new RouteGuidanceController({
     startGuidance: new StartRouteGuidanceUseCase(
       routeGuidanceSession,
@@ -311,6 +317,7 @@ export function assembleComiPathApplication(
       navigationRuntimeController,
       routeMapAssetsLoader,
       routeMapAreaCatalog,
+      optimizationFeedback,
     ),
     changeDestination: new ChangeDestinationUseCase(
       routeGuidanceSession,
@@ -335,6 +342,7 @@ export function assembleComiPathApplication(
       routeMapAssetsLoader,
       distanceMatrixController,
     ),
+    optimizationFeedback,
   });
 
   const deleteLocalDataUseCase = new DeleteLocalDataUseCase(

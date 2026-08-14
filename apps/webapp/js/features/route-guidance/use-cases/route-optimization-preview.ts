@@ -15,3 +15,8 @@ export interface RouteOptimizationCallbacks {
   onCancel?(): void;
   onError?(code: string): void;
 }
+
+export interface RouteOptimizationFeedback {
+  onPreview(preview: RouteOptimizationPreview): void;
+  onClear(): void;
+}

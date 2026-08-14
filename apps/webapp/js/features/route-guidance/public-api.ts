@@ -18,6 +18,7 @@ export * from "./use-cases/route-optimizer";
 export * from "./use-cases/start-route-guidance";
 export * from "./use-cases/prepare-route-optimization";
 export * from "./use-cases/route-optimization-preview";
+export * from "./ui/optimization-preview-model";
 export { DomRouteGuidanceView } from "./ui/dom-route-guidance-view";
 export {
   DomNearbyMapView,

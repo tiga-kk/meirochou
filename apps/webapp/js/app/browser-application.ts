@@ -1401,6 +1401,7 @@ export class BrowserApplication {
       selectedRoute: snapshot.selectedRoute,
       startSpace: this.currentStartSpace,
       nextTarget: this.getNextTarget(snapshot),
+      currentPosition: snapshot.navigationState?.currentPosition ?? null,
       selectionState: snapshot.selectionStatus,
       selectionMessage: this.selectionMessage,
       itineraryEntries: this.itineraryOpen
