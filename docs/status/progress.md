@@ -6,9 +6,9 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.5（Task 3完了、Task 4着手可能）**
-- 現在Task: **Task 4: 周辺cardをperimeter配置し10件単位paginationを追加**
-- 次に着手するTask: **Task 4**
+- 現在フェーズ: **Phase 7.5（Task 4完了、Task 5着手可能）**
+- 現在Task: **Task 5: map関連UIのinteraction polish**
+- 次に着手するTask: **Task 5**
 - canonical plan: `docs/plans/phase-07-5/README.md`
 - 設計: `docs/specs/2026-08-14-phase-07-5-map-first-ui-and-alns-visualization-design.md`
 - planning basis: `docs/reviews/phase-07-5-planning-basis.md`
@@ -49,7 +49,7 @@ Phase 7.5では既存worker群を接続し、progressをephemeral preview、comp
 | 1 | 共通map-first stage geometryを確立 | **完了（ee6bf27）** | Phase 7.4 |
 | 2 | 経路画面をmap-first surfaceへ再構成 | **完了（c70cf32）** | Task 1 |
 | 3 | 独立地図の補助controlsをcompact drawer化 | **完了（f637fbf）** | Task 1 |
-| 4 | 周辺cardをperimeter配置し10件単位paginationを追加 | 未着手 | Task 3 |
+| 4 | 周辺cardをperimeter配置し10件単位paginationを追加 | **完了（a2016c3）** | Task 3 |
 | 5 | map関連UIのinteraction polish | 未着手 | Task 2〜4 |
 | 6 | fresh start ALNSとpreview-only progress contractをproduction接続 | 未着手 | Task 1 |
 | 7 | ALNS best orderを地図上でlive preview | 未着手 | Task 6、Task 2 |
@@ -94,3 +94,11 @@ Phase 7.5では既存worker群を接続し、progressをephemeral preview、comp
 - area・priority・件数・保留の状態からcompact summaryを生成し、drawerの開閉や再openでfilter stateをリセットしない。
 - drawerの開閉後に`applyViewportLayout()`を呼び、collapsed時のworkspace高を再取得する。
 - focused verification: nearby Vitest 4 files / 13 tests passed、nearby mobile E2E（drawer、workspace geometry、filter、origin）passed、`npm run check:webapp` passed、`npm run build:webapp` passed、`git diff --check` passed。
+
+## Task 4完了記録
+
+- `paginateNearbyCatalog()`を追加し、5/10件は全件、15/20件は1〜10 / 11〜末尾へ分割するページ制御を追加。
+- `buildNearbyPerimeterLayout()`でnarrow/mediumは上下、wideは四辺へcard slotを配置し、mapRectとcardの非重複を維持。
+- page/filter/area/origin変更時はpageを先頭へ戻し、pan/zoomではcard DOMを再生成せずleader geometryだけを更新する既存経路を維持。
+- selected cardの操作はcard内から`nearby-selection-toolbar`へ分離し、画像の自然aspect ratioを維持。
+- focused verification: Task 4 Vitest 5 files / 19 tests passed、mobile nearby E2E 3 tests passed、desktop workspace E2E 2 tests passed、`npm run check:webapp` passed、`npm run build:webapp` passed、`git diff --check` passed。
