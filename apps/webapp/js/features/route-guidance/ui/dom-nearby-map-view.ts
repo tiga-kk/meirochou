@@ -597,7 +597,11 @@ export class DomNearbyMapView {
         image.alt = `${candidate.space} お品書き`;
         image.loading = "lazy";
         image.src = imageUrl;
-        image.addEventListener("error", showPlaceholder, { once: true });
+        image.addEventListener("load", () => this.updateCatalogOverlay(), { once: true });
+        image.addEventListener("error", () => {
+          showPlaceholder();
+          this.updateCatalogOverlay();
+        }, { once: true });
         card.appendChild(image);
       } else {
         showPlaceholder();

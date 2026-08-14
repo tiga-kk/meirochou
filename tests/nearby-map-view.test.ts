@@ -115,4 +115,32 @@ describe("DomNearbyMapView", () => {
     expect(close).not.toHaveBeenCalled();
     expect(button.disabled).toBe(false);
   });
+
+  it("recalculates leader geometry after catalog image load and error", () => {
+    const view = Object.create(DomNearbyMapView.prototype) as any;
+    const cardLayer = document.createElement("div");
+    const leaderLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const updateCatalogOverlay = vi.fn();
+    view.activeAssets = { points: { image: { width: 100, height: 100 }, points: [] } };
+    view.activeArea = { id: "east" };
+    view.origin = { gridIndex: 0, svgX: 0, svgY: 0 };
+    view.nearbyCandidates = [{
+      candidate: { space: "東ア01", tweet: "https://example.test/catalog.png" },
+      position: { x: 50, y: 50 },
+    }];
+    view.nearbyPointIndex = new Map();
+    view.selectedSpace = null;
+    view.updateCatalogOverlay = updateCatalogOverlay;
+
+    view.renderCatalogCards(cardLayer, leaderLayer);
+    updateCatalogOverlay.mockClear();
+    const image = cardLayer.querySelector("img") as HTMLImageElement;
+    image.dispatchEvent(new Event("load"));
+    expect(updateCatalogOverlay).toHaveBeenCalledTimes(1);
+
+    updateCatalogOverlay.mockClear();
+    image.dispatchEvent(new Event("error"));
+    expect(cardLayer.querySelector(".no-image-placeholder")).not.toBeNull();
+    expect(updateCatalogOverlay).toHaveBeenCalledTimes(1);
+  });
 });
