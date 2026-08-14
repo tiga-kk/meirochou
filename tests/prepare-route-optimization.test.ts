@@ -64,4 +64,54 @@ describe("PrepareRouteOptimizationUseCase", () => {
     ]);
     expect(result.matrixRef).toBe("matrix-key");
   });
+
+  test("restores a cache hit to the pending circle order", async () => {
+    const useCase = new PrepareRouteOptimizationUseCase(
+      { getMapArea: () => ({ areaId: "east" }) } as any,
+      {
+        loadMapAssets: vi.fn(async () => ({
+          points: {
+            image: { width: 100, height: 100 },
+            points: [
+              { identifier: "ア", number: 1, center_x: 10, center_y: 10, portals: [{ col: 0, row: 0 }] },
+              { identifier: "ア", number: 2, center_x: 20, center_y: 10, portals: [{ col: 1, row: 0 }] },
+            ],
+          },
+          gridMetadata: { cols: 2, rows: 1, cell_size: 10 },
+          gridBytes: new Uint8Array([1, 1]),
+        })),
+      } as any,
+      {
+        start: vi.fn(async () => ({
+          schemaVersion: 1 as const,
+          cacheKey: "matrix-key",
+          areaId: "east",
+          spaces: ["東ア02", "東ア01"],
+          size: 2,
+          distances: [0, 20, 10, 0],
+          createdAt: "2026-08-14T00:00:00Z",
+        })),
+      } as any,
+    );
+
+    const result = await useCase.execute({
+      eventDay: { eventId: "event", dayId: "day" },
+      bundleVersion: "bundle-1",
+      areaId: "east",
+      currentPosition: {
+        areaId: "east",
+        gridIndex: 0,
+        svgX: 10,
+        svgY: 10,
+        source: "manual-start",
+      },
+      pendingCircles: [
+        { space: "東ア01", priority: 10 },
+        { space: "東ア02", priority: 10 },
+      ],
+      searchTimeLimitMs: 5000,
+    });
+
+    expect(result.distanceMatrix).toEqual([0, 10, 20, 0]);
+  });
 });

@@ -47,6 +47,19 @@ function findPortalIndex(assets: Awaited<ReturnType<RouteMapAssetsLoader["loadMa
   return portal.row * assets.gridMetadata.cols + portal.col;
 }
 
+function reorderDistanceMatrix(
+  matrix: StoredDistanceMatrix,
+  spaces: readonly string[],
+): readonly number[] {
+  const indexes = spaces.map((space) => matrix.spaces.indexOf(space));
+  if (indexes.some((index) => index < 0)) {
+    throw new Error("Distance matrix does not contain every pending circle");
+  }
+  return indexes.flatMap((row) =>
+    indexes.map((column) => matrix.distances[row * matrix.size + column]),
+  );
+}
+
 export class PrepareRouteOptimizationUseCase {
   constructor(
     private readonly mapAreaCatalog: MapAreaCatalog,
@@ -106,7 +119,10 @@ export class PrepareRouteOptimizationUseCase {
       matrixRef: matrix.cacheKey,
       pendingCircles: input.pendingCircles,
       startDistanceToCircles,
-      distanceMatrix: matrix.distances,
+      distanceMatrix: reorderDistanceMatrix(
+        matrix,
+        input.pendingCircles.map((circle) => circle.space),
+      ),
       searchTimeLimitMs: input.searchTimeLimitMs,
     };
   }

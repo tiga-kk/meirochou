@@ -192,6 +192,13 @@ describe("ResumeRouteGuidanceUseCase", () => {
       null,
     );
     expect(runtimeController.setMatrixRef).toHaveBeenCalledWith("matrix-east-v1");
+    expect(runtimeController.saveSnapshot).toHaveBeenCalledWith(
+      "c108",
+      "day1",
+      expect.objectContaining({
+        navState: expect.objectContaining({ optimizationGeneration: 1 }),
+      }),
+    );
   });
 
   it("ignores stale ALNS progress after the destination was changed manually", async () => {

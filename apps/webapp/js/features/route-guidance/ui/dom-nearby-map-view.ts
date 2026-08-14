@@ -599,6 +599,8 @@ export class DomNearbyMapView {
           workspaceHeight,
           itemCount: page.items.length,
           mode: (workspace.dataset.mode as "narrow" | "medium" | "wide") || "narrow",
+          paginationHeight: page.pageCount > 1 ? 60 : 0,
+          minimumCardHeight: this.selectedSpace ? 136 : 112,
         })
       : null;
     const anchors = page.items.map(({ candidate, position }, index) => ({
@@ -614,6 +616,9 @@ export class DomNearbyMapView {
         card.style.top = `${slot.y}px`;
         card.style.width = `${slot.width}px`;
         card.style.height = `${slot.height}px`;
+        if (!this.selectedSpace && slot.height < 44) {
+          card.style.minHeight = `${slot.height}px`;
+        }
       }
       card.dataset.space = candidate.space;
       card.setAttribute("role", "group");
@@ -838,6 +843,8 @@ export class DomNearbyMapView {
       workspaceHeight,
       itemCount: page.items.length,
       mode: layout.mode,
+      paginationHeight: page.pageCount > 1 ? 60 : 0,
+      minimumCardHeight: this.selectedSpace ? 136 : 112,
     });
     workspace.dataset.cardLayout = "perimeter";
     workspace.style.setProperty("--nearby-map-x", `${perimeter.mapRect.x}px`);

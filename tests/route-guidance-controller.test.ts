@@ -169,6 +169,7 @@ describe("RouteGuidanceController", () => {
     const pendingCircles = [
       { space: "東A01a", priority: 10 },
       { space: "東A02b", priority: 10 },
+      { space: "西A01a", priority: 10 },
     ];
     const startGuidance = {
       execute: vi.fn(async () => {
@@ -224,6 +225,10 @@ describe("RouteGuidanceController", () => {
       session,
       navigationRuntimeController: runtime as any,
       prepareOptimization: prepareOptimization as any,
+      mapAreaCatalog: new InMemoryMapAreaCatalog([
+        { areaId: "east", circleSpaces: ["東A01a", "東A02b"] },
+        { areaId: "west", circleSpaces: ["西A01a"] },
+      ]),
     });
 
     await controller.startFromCurrentLocation({
@@ -235,12 +240,29 @@ describe("RouteGuidanceController", () => {
     await vi.waitFor(() => expect(runtime.launchAlnsOptimization).toHaveBeenCalledOnce());
 
     expect(prepareOptimization.execute).toHaveBeenCalledWith(expect.objectContaining({
-      pendingCircles,
+      pendingCircles: pendingCircles.slice(0, 2),
     }));
     expect(runtime.launchAlnsOptimization).toHaveBeenCalledWith(
-      expect.objectContaining({ pendingCircles }),
+      expect.objectContaining({ pendingCircles: pendingCircles.slice(0, 2) }),
       expect.objectContaining({ onPreview: expect.any(Function), onCommit: expect.any(Function) }),
     );
+  });
+
+  it("exposes optimization invalidation for event-day transitions", () => {
+    const invalidateActiveOptimization = vi.fn();
+    const controller = new RouteGuidanceController({
+      startGuidance: {} as any,
+      resumeGuidance: {} as any,
+      changeDestination: {} as any,
+      finishCircle: {} as any,
+      navigationRuntimeController: {
+        invalidateActiveOptimization,
+      } as any,
+    });
+
+    controller.invalidateActiveOptimization();
+
+    expect(invalidateActiveOptimization).toHaveBeenCalledOnce();
   });
 
   it("delegates the finish input and result without rebuilding guidance", async () => {

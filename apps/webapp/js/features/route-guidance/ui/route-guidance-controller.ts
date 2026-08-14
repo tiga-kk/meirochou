@@ -33,6 +33,7 @@ import type {
   RouteOptimizationFeedback,
 } from "../use-cases/route-optimization-preview";
 import type { NavigationState } from "../domain/route-guidance-types";
+import type { MapAreaCatalog } from "../domain/map-area";
 
 export interface RouteGuidanceControllerDependencies {
   startGuidance: StartRouteGuidanceUseCase;
@@ -45,6 +46,7 @@ export interface RouteGuidanceControllerDependencies {
   navigationRuntimeController: RouteGuidanceRuntimePort;
   navigationOperations?: RouteGuidanceNavigationOperations;
   prepareOptimization?: PrepareRouteOptimizationUseCase;
+  mapAreaCatalog?: MapAreaCatalog;
   optimizationFeedback?: RouteOptimizationFeedback;
 }
 
@@ -102,13 +104,24 @@ export class RouteGuidanceController {
     const request = ++this.optimizationRequest;
     const started = this.deps.session.getSnapshot();
     const navState = started.navigationState;
-    if (!navState?.currentPosition || input.pendingCircles.length === 0) return;
+    const areaId = navState?.areaId ?? navState?.currentPosition?.areaId;
+    const currentArea = areaId
+      ? this.deps.mapAreaCatalog?.getMapArea(areaId)
+      : null;
+    const pendingCircles = currentArea
+      ? input.pendingCircles.filter(
+          (circle) =>
+            this.deps.mapAreaCatalog?.findMapAreaForCircleSpace(circle.space)
+              ?.areaId === areaId,
+        )
+      : input.pendingCircles;
+    if (!navState?.currentPosition || pendingCircles.length === 0) return;
     void this.prepareAndLaunchOptimization(request, {
       eventDay: input.eventDay,
       bundleVersion: input.bundleVersion,
-      areaId: navState.areaId ?? navState.currentPosition.areaId,
+      areaId: areaId ?? navState.currentPosition.areaId,
       currentPosition: navState.currentPosition,
-      pendingCircles: input.pendingCircles as unknown as PrepareRouteOptimizationInput["pendingCircles"],
+      pendingCircles: pendingCircles as unknown as PrepareRouteOptimizationInput["pendingCircles"],
       searchTimeLimitMs: this.optimizationTimeLimitMs,
       navState,
     });
@@ -204,6 +217,10 @@ export class RouteGuidanceController {
     this.deps.navigationRuntimeController.setPendingResumeSnapshot(null);
     this.deps.navigationRuntimeController.setMatrixRef(null);
     this.reset();
+  }
+
+  invalidateActiveOptimization(): void {
+    this.invalidateOptimization();
   }
 
   private invalidateOptimization(): void {

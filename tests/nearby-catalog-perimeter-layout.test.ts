@@ -40,4 +40,29 @@ describe("buildNearbyPerimeterLayout", () => {
     );
     expect(layout.slots.every((slot) => area(slot, layout.mapRect) === 0)).toBe(true);
   });
+
+  it("reserves the pager area below the bottom cards", () => {
+    const layout = buildNearbyPerimeterLayout({
+      workspaceWidth: 390,
+      workspaceHeight: 844,
+      itemCount: 10,
+      mode: "narrow",
+      paginationHeight: 60,
+    });
+
+    expect(Math.max(...layout.slots.map((slot) => slot.y + slot.height))).toBeLessThanOrEqual(784);
+  });
+
+  it("gives selected cards enough perimeter height without entering the map", () => {
+    const layout = buildNearbyPerimeterLayout({
+      workspaceWidth: 390,
+      workspaceHeight: 844,
+      itemCount: 10,
+      mode: "narrow",
+      minimumCardHeight: 136,
+    });
+
+    expect(Math.min(...layout.slots.map((slot) => slot.height))).toBeGreaterThanOrEqual(136);
+    expect(layout.slots.every((slot) => area(slot, layout.mapRect) === 0)).toBe(true);
+  });
 });

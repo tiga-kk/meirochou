@@ -119,9 +119,16 @@ export class DomRouteGuidanceView {
       this.setTargetDetailExpanded(!this.detailExpanded);
     });
     this.targetDetailEscape = (event) => {
-      if (event.key !== "Escape" || !this.detailExpanded) return;
+      if (event.key !== "Escape") return;
+      if (this.candidatePreviewEscape) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        this.candidatePreviewEscape(event);
+        return;
+      }
+      if (!this.detailExpanded) return;
       event.preventDefault();
-      event.stopImmediatePropagation();
+      event.stopPropagation();
       this.setTargetDetailExpanded(false);
       this.els.toggleTargetDetail?.focus();
     };

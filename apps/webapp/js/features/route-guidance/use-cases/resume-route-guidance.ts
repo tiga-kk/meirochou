@@ -292,6 +292,11 @@ export class ResumeRouteGuidanceUseCase {
       selectedRoute: route,
       selectionStatus: "idle",
     });
+    this.persistSnapshot(
+      snapshot,
+      navState,
+      resumeResult.optimizationTimeLimitMs,
+    );
 
     return {
       kind: "resumed",

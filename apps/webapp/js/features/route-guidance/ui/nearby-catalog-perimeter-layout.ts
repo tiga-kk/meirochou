@@ -20,9 +20,21 @@ function positive(value: number): number {
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-function bandSize(width: number, height: number, mode: "narrow" | "medium" | "wide"): number {
+function bandSize(
+  width: number,
+  height: number,
+  mode: "narrow" | "medium" | "wide",
+  minimumCardHeight: number,
+): number {
   const fraction = mode === "medium" ? 0.16 : 0.18;
-  return Math.min(180, Math.max(112, Math.round(Math.min(width, height) * fraction)));
+  return Math.min(
+    180,
+    Math.max(
+      112,
+      minimumCardHeight,
+      Math.round(Math.min(width, height) * fraction),
+    ),
+  );
 }
 
 function edgeSlots(
@@ -62,6 +74,8 @@ export function buildNearbyPerimeterLayout(input: {
   workspaceHeight: number;
   itemCount: number;
   mode: "narrow" | "medium" | "wide";
+  paginationHeight?: number;
+  minimumCardHeight?: number;
 }): {
   readonly mapRect: Rect;
   readonly slots: readonly PerimeterSlot[];
@@ -72,7 +86,20 @@ export function buildNearbyPerimeterLayout(input: {
   if (!width || !height) return { mapRect: { x: 0, y: 0, width, height }, slots: [] };
   if (count === 0) return { mapRect: { x: 0, y: 0, width, height }, slots: [] };
 
-  const band = Math.min(bandSize(width, height, input.mode), Math.floor(Math.min(width, height) / 2));
+  const paginationHeight = Math.min(
+    height,
+    positive(input.paginationHeight ?? 0),
+  );
+  const contentHeight = Math.max(1, height - paginationHeight);
+  const band = Math.min(
+    bandSize(
+      width,
+      contentHeight,
+      input.mode,
+      positive(input.minimumCardHeight ?? 112),
+    ),
+    Math.floor(Math.min(width, contentHeight) / 2),
+  );
   if (input.mode === "wide") {
     const insetX = Math.min(band, Math.floor(width / 3));
     const insetY = Math.min(band, Math.floor(height / 3));
@@ -80,7 +107,7 @@ export function buildNearbyPerimeterLayout(input: {
       x: insetX,
       y: insetY,
       width: Math.max(1, width - insetX * 2),
-      height: Math.max(1, height - insetY * 2),
+      height: Math.max(1, contentHeight - insetY * 2),
     };
     const base = Math.floor(count / 4);
     const remainder = count % 4;
@@ -100,7 +127,7 @@ export function buildNearbyPerimeterLayout(input: {
     x: 0,
     y: topCount ? band : 0,
     width,
-    height: Math.max(1, height - band * (topCount && bottomCount ? 2 : 1)),
+    height: Math.max(1, contentHeight - band * (topCount && bottomCount ? 2 : 1)),
   };
   return {
     mapRect,

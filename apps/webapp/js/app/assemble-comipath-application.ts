@@ -513,6 +513,9 @@ export function assembleComiPathApplication(
                   areas: [],
                 },
           collaborators: {
+            beforeSwitch: async () => {
+              routeGuidanceController.invalidateActiveOptimization();
+            },
             afterSwitch: async (newRef, manifest, state) => {
               runtimeMapAreaCatalog.replaceMapAreas(manifest.areas);
               browserRuntime.currentManifest = manifest;
