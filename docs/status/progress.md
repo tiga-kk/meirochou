@@ -6,9 +6,9 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.5（Task 7完了、Task 8着手）**
+- 現在フェーズ: **Phase 7.5（Task 7完了、Task 8 blocked）**
 - 現在Task: **Task 8: 統合回帰・実機/人間受入でPhaseを閉じる**
-- 次に着手するTask: **Task 8**
+- 次に着手するTask: **Task 8の自動FAIL整理と実機/人間受入**
 - canonical plan: `docs/plans/phase-07-5/README.md`
 - 設計: `docs/specs/2026-08-14-phase-07-5-map-first-ui-and-alns-visualization-design.md`
 - planning basis: `docs/reviews/phase-07-5-planning-basis.md`
@@ -53,7 +53,7 @@ Phase 7.5では既存worker群を接続し、progressをephemeral preview、comp
 | 5 | map関連UIのinteraction polish | **完了（d671a23）** | Task 2〜4 |
 | 6 | fresh start ALNSとpreview-only progress contractをproduction接続 | **完了（d0c0e69）** | Task 1 |
 | 7 | ALNS best orderを地図上でlive preview | **完了（a0092b5）** | Task 6、Task 2 |
-| 8 | 統合回帰・実機/人間受入 | 着手 | Task 1〜7 |
+| 8 | 統合回帰・実機/人間受入 | **blocked（自動gate FAIL・人間受入未実施）** | Task 1〜7 |
 
 ## 既存の外部確認残件
 
@@ -125,3 +125,11 @@ Phase 7.5では既存worker群を接続し、progressをephemeral preview、comp
 - previewの地図点は既存points JSONと`parseSpace`を再利用して解決し、drag/pinch中はDOM更新を保留して操作終了時に最新previewへ追従する。manual destination、購入/保留、reset、cancel/errorでもpreviewをclearする。
 - focused verification: preview model / route map contract / runtime controllerの3 files・12 tests passed、新規ALNS preview mobile E2E passed、`npm run check:webapp` passed、`npm run build:webapp` passed、`git diff --check` passed。
 - 指定mobile E2E全体は35件中27 passed / 8 failed。8件はTask 5時点から継続しているmap-first visual baselineまたはcatalog表示前提の既存失敗で、新規preview E2Eの失敗ではない。visual snapshotは人間確認前のため更新していない。
+
+## Task 8 blocked記録
+
+- focused verificationは指定10 files / 38 testsがpassed、`node scripts/audit-public-tree.mjs`と`git diff --check`もpassedした。
+- `npm run verify`は836 passed / 2 failedで終了した。失敗は`tests/route-map-candidate-preview.test.ts`のEscape経路と、worktreeの`.git`ファイルに含まれるローカル絶対パスを検出する`tests/public-boundary.test.mjs`。後者は直接実行したpublic tree auditではpassedした。
+- `npm run test:e2e:ci`は終了コード1、62 passed / 9 failed / 8 skipped（managementの1件はretry成功）。失敗には既存visual baseline差分に加え、`navigation-resume`の期待snapshot世代、candidate Escape、catalog表示前提が含まれる。Task 8の計画に従い、このTask内で場当たり的な修正やsnapshot更新は行わない。
+- 390px級Motorola Androidでのheaded実機操作、ALNS preview中のdrag/pinch、visual snapshotの人間承認は未実施である。
+- 詳細な証拠と再開条件は`docs/reviews/phase-07-5-field-verification.md`に記録した。上記FAILまたは人間確認未実施のため、Phase 7.5の完了判定には進めない。
