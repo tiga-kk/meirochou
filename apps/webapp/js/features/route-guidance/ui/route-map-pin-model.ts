@@ -1,4 +1,5 @@
 import type { Circle, MapPoint } from "../../event-day/public-api";
+import { calculateMapStageLayout } from "./map-stage-layout";
 
 interface ImageBox {
   left: number;
@@ -107,36 +108,27 @@ export function calculateMapViewportLayout(
 ): MapViewportLayout {
   const naturalHeight =
     (input.viewportWidth * input.imageHeight) / input.imageWidth;
-  if (naturalHeight < input.minimumInteractiveHeight) {
-    const stageHeight = input.minimumInteractiveHeight;
-    const stageWidth = (stageHeight * input.imageWidth) / input.imageHeight;
+  const viewportHeight = Math.min(
+    input.viewportMaxHeight,
+    Math.max(input.minimumInteractiveHeight, naturalHeight),
+  );
+  const stage = calculateMapStageLayout({
+    viewportWidth: input.viewportWidth,
+    viewportHeight,
+    imageWidth: input.imageWidth,
+    imageHeight: input.imageHeight,
+  });
+  if (!stage) {
     return {
       viewportWidth: input.viewportWidth,
-      viewportHeight: stageHeight,
-      stageWidth,
-      stageHeight,
-      initialX: (input.viewportWidth - stageWidth) / 2,
-      initialY: 0,
-    };
-  }
-  if (naturalHeight <= input.viewportMaxHeight) {
-    return {
-      viewportWidth: input.viewportWidth,
-      viewportHeight: naturalHeight,
+      viewportHeight,
       stageWidth: input.viewportWidth,
-      stageHeight: naturalHeight,
+      stageHeight: viewportHeight,
       initialX: 0,
       initialY: 0,
     };
   }
-  return {
-    viewportWidth: input.viewportWidth,
-    viewportHeight: input.viewportMaxHeight,
-    stageWidth: input.viewportWidth,
-    stageHeight: naturalHeight,
-    initialX: 0,
-    initialY: (input.viewportMaxHeight - naturalHeight) / 2,
-  };
+  return stage;
 }
 
 export function calculateMapPinSize(input: {

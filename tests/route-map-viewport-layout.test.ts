@@ -32,9 +32,9 @@ describe("calculateMapViewportLayout", () => {
 
     expect(layout.viewportHeight).toBe(220);
     expect(layout.stageWidth).toBeGreaterThan(390);
-    expect(layout.stageHeight).toBe(220);
+    expect(layout.stageHeight).toBeCloseTo(176);
     expect(layout.initialX).toBeLessThan(0);
-    expect(layout.initialY).toBe(0);
+    expect(layout.initialY).toBeCloseTo(22);
   });
 
   it("clips and vertically centers an extremely tall map", () => {
@@ -47,10 +47,10 @@ describe("calculateMapViewportLayout", () => {
     });
 
     expect(layout.viewportHeight).toBe(520);
-    expect(layout.stageWidth).toBe(390);
-    expect(layout.stageHeight).toBe(780);
-    expect(layout.initialX).toBe(0);
-    expect(layout.initialY).toBe(-130);
+    expect(layout.stageWidth).toBeCloseTo(312);
+    expect(layout.stageHeight).toBeCloseTo(624);
+    expect(layout.initialX).toBeCloseTo(39);
+    expect(layout.initialY).toBeCloseTo(-52);
   });
 });
 

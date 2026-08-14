@@ -16,6 +16,7 @@ import {
   type NearbyCircleLimit,
   rankNearbyCircles,
 } from "./nearby-circle-model";
+import { calculateMapStageLayout } from "./map-stage-layout";
 import { calculateNearbyMapWorkspaceLayout } from "./nearby-map-workspace-layout";
 import type { MapViewportPoint } from "./route-map-pin-model";
 import {
@@ -59,39 +60,16 @@ export interface StandaloneMapViewportLayoutInput {
 export function calculateStandaloneMapViewportLayout(
   input: StandaloneMapViewportLayoutInput,
 ) {
-  if (
-    ![
-      input.availableWidth,
-      input.availableHeight,
-      input.imageWidth,
-      input.imageHeight,
-    ].every((value) => Number.isFinite(value) && value > 0)
-  ) {
-    return null;
-  }
-  const containScale = Math.min(
-    input.availableWidth / input.imageWidth,
-    input.availableHeight / input.imageHeight,
-  );
-  const scale = input.scaleMode === "bounded-cover"
-    ? Math.max(
-        containScale,
-        0.8 * Math.max(
-          input.availableWidth / input.imageWidth,
-          input.availableHeight / input.imageHeight,
-        ),
-      )
-    : containScale;
-  const stageWidth = input.imageWidth * scale;
-  const stageHeight = input.imageHeight * scale;
-  return {
+  const layout = calculateMapStageLayout({
     viewportWidth: input.availableWidth,
     viewportHeight: input.availableHeight,
-    stageWidth,
-    stageHeight,
-    initialX: (input.availableWidth - stageWidth) / 2,
-    initialY: (input.availableHeight - stageHeight) / 2,
-  };
+    imageWidth: input.imageWidth,
+    imageHeight: input.imageHeight,
+    minimumShortSideOccupancy: input.scaleMode === "bounded-cover" ? 0.8 : 0,
+  });
+  if (!layout) return null;
+  const { mode: _mode, ...viewportLayout } = layout;
+  return viewportLayout;
 }
 
 export function clientPointToGridSelection(input: {

@@ -40,3 +40,8 @@ export {
   buildRouteItineraryModel,
   type RouteItineraryEntry,
 } from "./ui/route-itinerary-model";
+export {
+  calculateMapStageLayout,
+  type MapStageLayout,
+  type MapStageLayoutInput,
+} from "./ui/map-stage-layout";
