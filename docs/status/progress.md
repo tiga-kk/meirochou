@@ -6,9 +6,9 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.5（Task 2完了、Task 3着手可能）**
-- 現在Task: **Task 3: 独立地図の補助controlsをcompact drawer化**
-- 次に着手するTask: **Task 3**
+- 現在フェーズ: **Phase 7.5（Task 3完了、Task 4着手可能）**
+- 現在Task: **Task 4: 周辺cardをperimeter配置し10件単位paginationを追加**
+- 次に着手するTask: **Task 4**
 - canonical plan: `docs/plans/phase-07-5/README.md`
 - 設計: `docs/specs/2026-08-14-phase-07-5-map-first-ui-and-alns-visualization-design.md`
 - planning basis: `docs/reviews/phase-07-5-planning-basis.md`
@@ -48,7 +48,7 @@ Phase 7.5では既存worker群を接続し、progressをephemeral preview、comp
 |---|---|---|---|
 | 1 | 共通map-first stage geometryを確立 | **完了（ee6bf27）** | Phase 7.4 |
 | 2 | 経路画面をmap-first surfaceへ再構成 | **完了（c70cf32）** | Task 1 |
-| 3 | 独立地図の補助controlsをcompact drawer化 | 未着手 | Task 1 |
+| 3 | 独立地図の補助controlsをcompact drawer化 | **完了（f637fbf）** | Task 1 |
 | 4 | 周辺cardをperimeter配置し10件単位paginationを追加 | 未着手 | Task 3 |
 | 5 | map関連UIのinteraction polish | 未着手 | Task 2〜4 |
 | 6 | fresh start ALNSとpreview-only progress contractをproduction接続 | 未着手 | Task 1 |
@@ -87,3 +87,10 @@ Phase 7.5では既存worker群を接続し、progressをephemeral preview、comp
 - navigation mapの高さ上限を除去し、CSSの実測`clientWidth/clientHeight`を共通`calculateMapStageLayout()`へ渡す構成へ変更。
 - focused verification: route map first Vitest 2 tests、関連route Vitest 14 tests、390/644/1024px Playwright geometry test passed、`npm run check:webapp` passed、`npm run build:webapp` passed、`git diff --check` passed。
 - 既存visual snapshotは人間確認前のため更新していない。旧baselineとの差分はTask 8の人間visual確認後に扱う。
+
+## Task 3完了記録
+
+- 独立地図のarea/origin/filter controlsを`条件`drawerへまとめ、open直後はcollapsedにした。
+- area・priority・件数・保留の状態からcompact summaryを生成し、drawerの開閉や再openでfilter stateをリセットしない。
+- drawerの開閉後に`applyViewportLayout()`を呼び、collapsed時のworkspace高を再取得する。
+- focused verification: nearby Vitest 4 files / 13 tests passed、nearby mobile E2E（drawer、workspace geometry、filter、origin）passed、`npm run check:webapp` passed、`npm run build:webapp` passed、`git diff --check` passed。
