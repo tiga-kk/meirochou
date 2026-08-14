@@ -704,7 +704,6 @@ export class DomNearbyMapView {
     const image = this.surface?.querySelector("#nearby-map-image") as HTMLImageElement | null;
     const dialog = this.surface?.querySelector(".nearby-map-dialog") as HTMLElement | null;
     const workspace = this.surface?.querySelector("#nearby-map-workspace") as HTMLElement | null;
-    const catalogPanel = this.surface?.querySelector("#nearby-map-catalog-panel") as HTMLElement | null;
     if (!viewport || !stage || !dialog || !workspace || !image?.naturalWidth || !image.naturalHeight) return;
     const workspaceWidth = workspace.clientWidth || workspace.getBoundingClientRect().width;
     const workspaceHeight = workspace.clientHeight || workspace.getBoundingClientRect().height;
@@ -719,10 +718,8 @@ export class DomNearbyMapView {
     workspace.style.setProperty("--nearby-card-columns", String(layout.cardColumns));
     workspace.style.setProperty("--nearby-map-width", `${layout.mapWidth}px`);
     workspace.style.setProperty("--nearby-map-height", `${layout.mapHeight}px`);
-    if (catalogPanel) {
-      catalogPanel.style.setProperty("--nearby-panel-width", `${layout.panelWidth}px`);
-      catalogPanel.style.setProperty("--nearby-panel-height", `${layout.panelHeight}px`);
-    }
+    workspace.style.setProperty("--nearby-panel-width", `${layout.panelWidth}px`);
+    workspace.style.setProperty("--nearby-panel-height", `${layout.panelHeight}px`);
     const mapLayout = calculateStandaloneMapViewportLayout({
       availableWidth: layout.mapWidth,
       availableHeight: layout.mapHeight,

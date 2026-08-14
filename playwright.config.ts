@@ -27,11 +27,13 @@ export default defineConfig({
         "**/c108-map-browser-smoke.spec.ts",
         "**/navigation-keyboard.spec.ts",
         "**/navigation-resume.spec.ts",
+        "**/nearby-map-workspace.spec.ts",
       ],
       use: { ...devices["Desktop Chrome"] },
     },
     {
       name: "mobile-chromium",
+      testIgnore: ["**/nearby-map-workspace.spec.ts"],
       use: { ...devices["Pixel 5"] },
     },
   ],
