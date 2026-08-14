@@ -5,15 +5,12 @@
 現在の実装判断は、次の順で読む。
 
 1. `docs/status/progress.md` — 現在フェーズ、現在Task、次Task、外部確認待ちの唯一の正本。
-2. `docs/plans/phase-07-4/README.md` — Phase 7.4の実装順、依存関係、共通検証規則。
-3. `docs/plans/phase-07-4/task-XX-*.md` — 着手するTaskの具体的な変更範囲と受入条件。
-4. `docs/specs/2026-08-13-phase-07-4-human-acceptance-followups-design.md` — Task 1〜9後の人間確認を反映した追加UX仕様。初期Phase 7.4仕様と競合する場合はこちらを優先する。
-5. `docs/specs/2026-08-13-phase-07-4-route-visual-nearby-map-and-priority-filter-design.md` — Phase 7.4初期の製品・UX設計仕様。
-6. `docs/reviews/phase-07-4-human-acceptance-failures.md` — Task 9後の人間受入FAILと現行コード上の根拠。
-7. `docs/reviews/phase-07-4-route-animation-diagnosis.md` — 過去のroute animation修正が実機視認性を閉じられなかった原因分析。
-8. `docs/reviews/phase-07-4-field-verification.md` — 自動検証・外部確認と、その後の人間確認による終了判定失効記録。
+2. `docs/plans/phase-07-5/README.md` — Phase 7.5の実装順、依存関係、共通検証規則。
+3. `docs/plans/phase-07-5/task-XX-*.md` — 着手するTaskの具体的な変更範囲と受入条件。
+4. `docs/specs/2026-08-14-phase-07-5-map-first-ui-and-alns-visualization-design.md` — map-first UIとALNS live previewの製品・技術設計。
+5. `docs/reviews/phase-07-5-planning-basis.md` — Phase開始時の現行コード事実と過剰実装防止。
 
-現在状態をTask文書やreviewから推測せず、必ず`docs/status/progress.md`を優先する。
+現在状態を過去PhaseのTask/reviewから推測せず、必ず`docs/status/progress.md`を優先する。
 
 ## 実装計画
 
@@ -23,16 +20,18 @@
 - `docs/plans/phase-07/` — Phase 7 オフライン/イベント管理。
 - `docs/plans/phase-07-1/` — Phase 7.1 navigation/motion/management UX。
 - `docs/plans/phase-07-3/` — Phase 7.3 実機follow-up。
-- `docs/plans/phase-07-4/` — **現在のPhase 7.4実装計画。Task 10以降で人間受入FAILを修正中。**
+- `docs/plans/phase-07-4/` — Phase 7.4 経路motion・周辺地図・人間受入follow-up。完了履歴。
+- `docs/plans/phase-07-5/` — **現在のPhase。map-first UI polish・周辺card perimeter・ALNS live preview。**
 
 ## 共通実装原則
 
 - Phase 5D以降で整理したfeature境界を、現在Taskと無関係な都合で再構築しない。
 - 新しいFacade、Manager、DI container、UI framework等の横断抽象化は、現在要件に実在する複数利用者がない限り追加しない。
-- Route Guidanceの状態は既存Session/NavigationStateの責務を再利用し、同じ意味の第二のstoreを作らない。
+- Route Guidanceの正式状態は既存Session/NavigationStateを使い、同じ意味の第二storeを作らない。
+- optimization previewのような一時表示は正式NavigationState/LocalStorageへ混ぜない。
 - LocalStorageへcommit済みの購入結果を、GAS配送失敗やcatalog cache失敗だけを理由に取り消さない。
 - 地図とお品書きを主要情報として扱い、補助UIが不必要に隠さない。
-- animationはCSS/SVGで表現できるものをJavaScript frame loopへしない。
+- map viewportのclipを外すのではなく、viewport自体を適切に大きくする。
 - mobile操作、44px以上の主要touch領域、keyboard focus、safe-area、200% text zoom、`prefers-reduced-motion`を維持する。
 - visual snapshotは意図した画面であることを人間確認してから更新する。
 

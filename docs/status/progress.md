@@ -6,97 +6,70 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.4（第二回人間受入FAILにより再オープン）**
-- 現在Task: **Task 27: 経路motion・地図workspaceの最終人間受入**
-- 次に着手するTask: **Task 27**
-- canonical plan: `docs/plans/phase-07-4/README.md`
-- 最新設計: `docs/specs/2026-08-14-phase-07-4-motion-and-map-workspace-redesign.md`
-- 最新人間受入記録: `docs/reviews/phase-07-4-second-human-acceptance-failures.md`
-- レビュー指摘対応: 経路motionのgesture後resumeを`cfffd85`、nearby workspaceのJS/CSS mode統一を`e494ecb`で修正。
-- 人間確認前に作成されたsnapshot-only 3コミットの対象10枚は`0c7b476`で復元後、人間確認済みの状態を`6d564c2`でbaselineへ反映。
-- Task 27のMotorola Android実機確認、地図操作後のmotion再開、workspace/detail表示、visual差分確認は人間確認済み。GitHub Actions `31776783328`（`ca1d2f6`）もgreen。
-- `node scripts/audit-public-tree.mjs` と `git diff --check` はPASS。最終CIはunit/type/build/map assets PASS、mobile E2E 68 passed / 8 skipped（1 flaky retry後成功）。
+- 現在フェーズ: **Phase 7.5（実装計画確定・未着手）**
+- 現在Task: **Task 1: 共通map-first stage geometryを確立**
+- 次に着手するTask: **Task 1**
+- canonical plan: `docs/plans/phase-07-5/README.md`
+- 設計: `docs/specs/2026-08-14-phase-07-5-map-first-ui-and-alns-visualization-design.md`
+- planning basis: `docs/reviews/phase-07-5-planning-basis.md`
 
-Task開始時の基準commitは、実装開始直前の対象branch最新remote HEADから取得する。文書中の過去SHAを実装開始点として固定しない。
+Task開始時の基準commitは、実装開始直前の対象branch最新remote HEADから取得する。文書中の計画開始SHAを実装開始点として固定しない。
 
-## 履歴の扱い
+## 直前Phase
 
-Task 1〜18の実装・検証履歴は保持する。第二回人間確認で改善済みと判断された近接pin、candidate青線、priority/件数/hold、目的地action、購入Undo、leader line、表示中心等を未実装へ巻き戻さない。
+Phase 7.4 Task 27はMotorola Android実機確認とGitHub Actions greenまで完了した。Phase 7.4のmotion設定、5個cue、nearby ranking/filter/origin、catalog detail layer、Undo等は完了履歴として保持し、Phase 7.5で作り直さない。
 
-Task 19〜22は2026-08-14の第二回実機確認より前に作成した**未実装の暫定計画**である。実機結果によって前提が変わったため、実装せずTask 23〜27へ置換する。後続sessionはTask 19〜22を実装開始点にしない。
+## Phase 7.5で解決すること
 
-## 第二回人間確認で確定した残件
+### Map-first UI
 
-### 経路アニメーション
+- route/nearby両方の地図を大きくする。
+- `overflow: hidden`は維持し、viewport面積とstage初期scaleを改善する。
+- route detailとnearby filter controlsを通常時にcompact化する。
+- map関連buttonのpressed/selected/disabled/busy/focusを整理する。
 
-Motorola Androidで`Animator 再生時間スケール=0x`のときcurrent route motionが見えず、この設定だけを1xにするとmotionが見えることを確認した。同時にmap pan/dragが重くなり、通常Androidアプリのanimationも復活した。
+### 周辺お品書き
 
-利用者にOS全体を1xへ変更させる運用は採用しない。アプリ内`system / always / off`設定と、5個程度・約160px/sの軽量moving cueへ再設計する。gesture中はmap操作を優先する。
+- cardは地図へ重ねず周囲へ配置する。
+- 5/10件は全件同時表示。
+- 15件は1〜10 / 11〜15。
+- 20件は1〜10 / 11〜20。
+- card画像は自然aspect ratioを維持する。
 
-### 独立「地図」画面
+### ALNS live preview
 
-第二回確認画面では上部・左右の余白に対してmapが小さい。card非重複とleader lineは改善したが、お品書きが横一列stripのため5件でも水平slideが必要で、画像aspectも一律に見える。`お品書きを見る`のdetailはnearby mapの背面へ入り、一度mapを閉じないと見られない。
+現行workerにはprogress messageがあるが、progressが正式bestOrderへ直接反映される。またfresh startではALNS/distance matrix workerのproduction wiringがない。
 
-地図をfull-height workspaceの主役にし、narrow/mediumでは折り返しgrid、wideではright side panelを使う。cardはmap外で自然aspect ratioを保つ。既存catalog detailをnearby mapより前面へ表示し、map stateを維持する。
+Phase 7.5では既存worker群を接続し、progressをephemeral preview、completeを正式commitへ分離する。探索中は青〜紫の巡回順previewを250ms以上の間隔で更新し、complete後は既存赤current exact routeへ戻る。
 
-詳細は`docs/specs/2026-08-14-phase-07-4-motion-and-map-workspace-redesign.md`を正本とする。
-
-## Phase 7.4 後続Task
+## Task一覧
 
 | Task | 内容 | 状態 | 依存 |
 |---|---|---|---|
-| 1〜18 | 初期実装・第一回follow-up | 完了履歴 | 各Task参照 |
-| 19〜22 | 第二回確認前の暫定案 | 置換済み・実装禁止 | - |
-| 23 | 経路アニメーション設定をアプリ内へ追加 | **完了（6935717）** | Task 18 |
-| 24 | 軽量な複数経路cueへ置換 | **完了（b76be21）** | Task 23 |
-| 25 | 独立地図をレスポンシブなworkspaceへ再設計 | **完了** | Task 24後推奨 |
-| 26 | お品書き詳細を地図より前面に表示 | **完了** | Task 25 |
-| 27 | 経路motion・地図workspaceの最終人間受入 | **完了（人間確認・CI green）** | Task 23〜26 |
+| 1 | 共通map-first stage geometryを確立 | **未着手** | Phase 7.4 |
+| 2 | 経路画面をmap-first surfaceへ再構成 | 未着手 | Task 1 |
+| 3 | 独立地図の補助controlsをcompact drawer化 | 未着手 | Task 1 |
+| 4 | 周辺cardをperimeter配置し10件単位paginationを追加 | 未着手 | Task 3 |
+| 5 | map関連UIのinteraction polish | 未着手 | Task 2〜4 |
+| 6 | fresh start ALNSとpreview-only progress contractをproduction接続 | 未着手 | Task 1 |
+| 7 | ALNS best orderを地図上でlive preview | 未着手 | Task 6、Task 2 |
+| 8 | 統合回帰・実機/人間受入 | 未着手 | Task 1〜7 |
 
 ## 既存の外部確認残件
 
 - 実GASで同一space再送が既存行更新になる明示証拠。
 - GAS更新時に対象外の既存Sheet列が保持される明示証拠。
 
-これらは今回のanimation/map workspace follow-upとは独立しており、Task 23〜27の実装範囲へ混ぜない。資格情報がないことを理由にTask 23〜26を止めない。
+これらはPhase 7.5のmap/UI/ALNS要件と独立しており、資格情報がないことを理由にTask 1〜7を止めない。
 
 ## 進行規則
 
 - 一度に一Taskだけ実装・review・commitする。
-- 各Taskはfocused REDを先に作る。
-- Task 23〜24でOS Animator設定を変更する処理を作らない。
-- Task 24はframeごとのroute再計算、SVG再生成、cue DOM再生成を禁止する。
-- Task 25はcardをmap上へ戻したり水平一列stripへ戻したりしない。
-- Task 26はcatalog viewerを二重実装しない。
-- Task 27はheadless自動テストだけで完了判定しない。Motorola実機のAnimator=0とmap操作、実画面workspace/detailを人間が確認する。
-- snapshotは人間visual確認なしに一括更新しない。
-- 未完了WIPを破棄、resetして過去Taskから再出発しない。
-
-## Task 23完了記録
-
-- `system / always / off`の三値設定、local state永続化、`prefers-reduced-motion`連動を実装。
-- 既存route motionの描画方式はTask 24まで維持。OS Animator設定の変更処理は追加していない。
-- focused verification: route motion/settings/contract tests passed、`npm run check:webapp` passed、`npm run test:webapp` 118 files / 804 tests passed、`npm run build:webapp` passed。
-
-## Task 24完了記録
-
-- current routeのfull-path dash animationを廃止し、5個の白いcueを単一rAF controllerで更新する方式へ置換。
-- gesture drag/pinch/慣性中はcue更新を停止し、`system/always/off`とdocument visibilityへ接続。
-- focused verification: 5 files / 111 tests passed、`npm run check:webapp` passed、`npm run test:webapp` 119 files / 807 tests passed、`npm run build:webapp` passed。
-- gesture開始前から動作中の経路がgesture終了後に自動resumeする回帰testを追加し、focused testで確認済み。
-- targeted Playwrightは機能assertionを通過。map表示変更に伴う既存snapshot 2件は人間visual確認待ちで更新していない。
-
-## Task 25完了記録
-
-- 独立地図をfull-height workspaceへ再構成し、narrow/mediumは上下grid、wideは右catalog panelへ配置。
-- カードをmap外の折り返しgridへ移し、横一列stripを廃止。画像は自然aspect ratioを基本にし、leader SVGはworkspace全体を基準に更新。
-- narrow/medium/wideとbounded-cover判定を純粋なgeometry helperへ分離し、pan/zoom時は既存card DOMを再生成せずleader端点だけ更新。
-- CSSのwide/medium切替をJSの`data-mode`へ統一し、panel geometry用custom propertyをworkspaceへ設定。920px/1024pxの実DOM geometry testをDesktop Chromeで追加。
-- focused verification: workspace/view/aspect/catalog tests passed、`npm run check:webapp` passed、`npm run build:webapp` passed、対象E2Eの機能assertion passed。既存snapshot 1件は人間visual確認待ちで更新していない。
-
-## Task 26完了記録
-
-- 既存`DomCircleGalleryView.showPdfModal()`を再利用し、nearby mapから押下buttonをreturn focus先として渡すdetail layerを実装。
-- `catalog detail > nearby map`のnamed layerをCSS custom propertyで固定し、detail表示中のEscapeはdetailだけを閉じ、次のEscapeでnearby mapを閉じる契約を追加。
-- detail開閉後もnearby map、selected card、zoom stateを保持し、閉じた後は元の「お品書きを見る」buttonへfocusを返す。
-- focused verification: circle/detail/dialog/view tests 11件 passed、対象E2E passed、`npm run check:webapp` passed、`npm run test:webapp` passed、`npm run build:webapp` passed。
+- 各Taskは意味のあるfocused REDから開始する。
+- Task 1〜5でroute/ranking/business stateを変更しない。
+- Task 4でcardをmap viewport内へ戻さない。
+- Task 6でALNS評価関数/operatorを変更しない。
+- Task 6〜7でprogressをLocalStorageへ永続化しない。
+- Task 7でprogressごとにDijkstraやSVG全再生成を行わない。
+- Task 8はheadless testだけで終了しない。
+- visual snapshotは人間visual確認前に一括更新しない。
