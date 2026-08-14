@@ -273,3 +273,33 @@ test("settings shell exposes the approved ALNS search-time choices", async () =>
   expect(events).toHaveLength(1);
   expect(events[0].detail).toEqual({ searchTimeLimitMs: 15000 });
 });
+
+test("settings shell exposes the route motion preference choices", async () => {
+  const element = new ComipathSettings();
+  element.eventDayManagementRows = [selectedManagementRow];
+  const events: CustomEvent[] = [];
+  element.addEventListener("route-motion-preference-change", (event) => {
+    events.push(event as CustomEvent);
+  });
+
+  document.body.appendChild(element);
+  await element.updateComplete;
+
+  const select = element.querySelector<HTMLSelectElement>(
+    "#route-motion-preference",
+  );
+  expect(select).not.toBeNull();
+  if (!select) throw new Error("route motion preference select is missing");
+  expect([...select.options].map((option) => option.value)).toEqual([
+    "system",
+    "always",
+    "off",
+  ]);
+  expect(select.value).toBe("system");
+
+  select.value = "always";
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+
+  expect(events).toHaveLength(1);
+  expect(events[0].detail).toEqual({ preference: "always" });
+});

@@ -189,6 +189,10 @@ export class DomRouteGuidanceView {
     this.modalManager.showPdfModal(source);
   }
 
+  setRouteMotionPreference(preference) {
+    this.mapRenderer.setRouteMotionPreference(preference);
+  }
+
   showGallery(scope) {
     this.modalManager.showGallery(scope);
   }

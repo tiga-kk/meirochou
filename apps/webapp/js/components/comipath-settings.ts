@@ -5,6 +5,10 @@ import {
   type AlnsSearchTimeLimitMs,
   DEFAULT_SEARCH_TIME_LIMIT_MS,
 } from "../features/route-guidance/domain/optimization/time-decayed-objective";
+import {
+  normalizeRouteMotionPreference,
+  type RouteMotionPreference,
+} from "../features/route-guidance/ui/route-motion-preference";
 import type { EventDayManagementRow } from "../shared/ui/event-day-management-view-model";
 import { dispatchManagementEvent } from "../shared/ui/management-events";
 import type {
@@ -40,6 +44,7 @@ export class ComipathSettings extends LitElement {
     deleteOptions: { attribute: false },
     deleteDialogModel: { attribute: false },
     optimizationTimeLimitMs: { type: Number },
+    routeMotionPreference: { attribute: false },
     busy: { type: Boolean },
     errorMessage: { type: String },
   };
@@ -56,6 +61,7 @@ export class ComipathSettings extends LitElement {
   declare deleteOptions: readonly DeleteOptionViewModel[];
   declare deleteDialogModel: StorageDeleteDialogModel | null;
   declare optimizationTimeLimitMs: AlnsSearchTimeLimitMs;
+  declare routeMotionPreference: RouteMotionPreference;
   declare busy: boolean;
   declare errorMessage: string;
 
@@ -84,6 +90,7 @@ export class ComipathSettings extends LitElement {
     this.deleteOptions = [];
     this.deleteDialogModel = null;
     this.optimizationTimeLimitMs = DEFAULT_SEARCH_TIME_LIMIT_MS;
+    this.routeMotionPreference = "system";
     this.busy = false;
     this.errorMessage = "";
   }
@@ -325,6 +332,30 @@ export class ComipathSettings extends LitElement {
                   ?selected=${limit === this.optimizationTimeLimitMs}
                 >${limit / 1000}秒</option>`,
             )}
+          </select>
+        </section>
+        <section class="route-motion-settings" aria-labelledby="route-motion-settings-title">
+          <h3 id="route-motion-settings-title">表示</h3>
+          <label for="route-motion-preference">経路アニメーション</label>
+          <select
+            id="route-motion-preference"
+            .value=${this.routeMotionPreference}
+            @change=${(event: Event) => {
+              this.routeMotionPreference = normalizeRouteMotionPreference(
+                (event.currentTarget as HTMLSelectElement).value,
+              );
+              this.dispatchEvent(
+                new CustomEvent("route-motion-preference-change", {
+                  bubbles: true,
+                  composed: true,
+                  detail: { preference: this.routeMotionPreference },
+                }),
+              );
+            }}
+          >
+            <option value="system">端末設定に従う</option>
+            <option value="always">常に表示</option>
+            <option value="off">表示しない</option>
           </select>
         </section>
         <section class="storage-delete-options" aria-labelledby="storage-delete-title">

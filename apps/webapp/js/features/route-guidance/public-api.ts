@@ -32,6 +32,11 @@ export {
 export { RouteItineraryDialog } from "./ui/route-itinerary-dialog";
 export { buildSpaceFromLocation } from "./ui/parse-current-location-form";
 export {
+  normalizeRouteMotionPreference,
+  resolveRouteMotionEnabled,
+  type RouteMotionPreference,
+} from "./ui/route-motion-preference";
+export {
   buildRouteItineraryModel,
   type RouteItineraryEntry,
 } from "./ui/route-itinerary-model";

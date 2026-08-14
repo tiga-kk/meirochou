@@ -3,6 +3,7 @@ interface RouteGuidanceEventApplication {
   handleResumeConfirm(): void;
   handleResumeResetStart(): void;
   handleOptimizationTimeLimitChange(detail: unknown): void;
+  handleRouteMotionPreferenceChange(detail: unknown): void;
 }
 
 export function bindRouteGuidanceEvents(
@@ -34,6 +35,12 @@ export function bindRouteGuidanceEvents(
 
   listen(settings, "optimization-time-limit-change", (event) => {
     application.handleOptimizationTimeLimitChange(
+      (event as CustomEvent<unknown>).detail,
+    );
+  });
+
+  listen(settings, "route-motion-preference-change", (event) => {
+    application.handleRouteMotionPreferenceChange(
       (event as CustomEvent<unknown>).detail,
     );
   });

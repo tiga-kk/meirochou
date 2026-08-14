@@ -1554,3 +1554,34 @@ test("webapp navigation map load listener is guarded across repeated init calls"
     /this\.navigationMapImageLoadListenerAttached\s*=\s*true/,
   );
 });
+
+test("webapp wires route motion preference through storage, settings, and map view", () => {
+  const preferenceSource = read(
+    "apps/webapp/js/features/route-guidance/ui/route-motion-preference.ts",
+  );
+  const stateSource = read("apps/webapp/js/data/local-state-adapters.ts");
+  const settingsSource = read("apps/webapp/js/components/comipath-settings.ts");
+  const appSource = read("apps/webapp/js/app/browser-application.ts");
+  const guidanceSource = read(
+    "apps/webapp/js/features/route-guidance/ui/dom-route-guidance-view.ts",
+  );
+  const mapSource = read(
+    "apps/webapp/js/features/route-guidance/ui/dom-route-map-view.ts",
+  );
+  const eventsSource = read("apps/webapp/js/app/bind-route-guidance-events.ts");
+
+  assert.match(preferenceSource, /export type RouteMotionPreference/);
+  assert.match(preferenceSource, /normalizeRouteMotionPreference/);
+  assert.match(preferenceSource, /resolveRouteMotionEnabled/);
+  assert.match(stateSource, /export function readRouteMotionPreference/);
+  assert.match(stateSource, /export function writeRouteMotionPreference/);
+  assert.match(settingsSource, /route-motion-preference/);
+  assert.match(settingsSource, /route-motion-preference-change/);
+  assert.match(appSource, /readRouteMotionPreference\(\)/);
+  assert.match(appSource, /writeRouteMotionPreference\(/);
+  assert.match(appSource, /setRouteMotionPreference\(/);
+  assert.match(guidanceSource, /setRouteMotionPreference\(/);
+  assert.match(mapSource, /setRouteMotionPreference\(/);
+  assert.match(mapSource, /prefers-reduced-motion/);
+  assert.match(eventsSource, /route-motion-preference-change/);
+});

@@ -4,6 +4,18 @@ import type {
   CircleRecord,
   HistoryEntry,
 } from "../features/event-day/domain/application-contract-types";
+import { StorageService } from "../state/storage-service";
+import {
+  normalizeRouteMotionPreference,
+  type RouteMotionPreference,
+} from "../features/route-guidance/ui/route-motion-preference";
+
+const ROUTE_MOTION_PREFERENCE_KEY = "meirochou.route-motion-preference";
+
+interface RouteMotionPreferenceStorage {
+  getString(key: string, fallback?: string): string;
+  setString(key: string, value: string): void;
+}
 
 export interface DecodeResult<T> {
   readonly value: T;
@@ -184,4 +196,30 @@ export function extractLegacyCircleRows(value: unknown): DecodeResult<unknown> {
     value: [],
     issues: ["legacy comiketData.wantToBuy must be an array"],
   };
+}
+
+export function readRouteMotionPreference(
+  storage: RouteMotionPreferenceStorage = new StorageService(),
+): RouteMotionPreference {
+  try {
+    return normalizeRouteMotionPreference(
+      storage.getString(ROUTE_MOTION_PREFERENCE_KEY, "system"),
+    );
+  } catch {
+    return "system";
+  }
+}
+
+export function writeRouteMotionPreference(
+  value: RouteMotionPreference,
+  storage: RouteMotionPreferenceStorage = new StorageService(),
+): void {
+  try {
+    storage.setString(
+      ROUTE_MOTION_PREFERENCE_KEY,
+      normalizeRouteMotionPreference(value),
+    );
+  } catch {
+    // Storage failures must not prevent route guidance from starting.
+  }
 }

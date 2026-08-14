@@ -7,6 +7,8 @@ import type { AsyncOperationStatus } from "../components/async-operation-indicat
 import {
   DomRouteGuidanceView,
   buildRouteItineraryModel,
+  normalizeRouteMotionPreference,
+  type RouteMotionPreference,
 } from "../features/route-guidance/public-api";
 import { DomNearbyMapView } from "../features/route-guidance/public-api";
 import { isDevDemoEnabled } from "../dev-demo-data.js";
@@ -80,6 +82,10 @@ import {
   collectCirclePriorities,
   filterCirclesByPriority,
 } from "../shared/domain/circle-priority-filter";
+import {
+  readRouteMotionPreference,
+  writeRouteMotionPreference,
+} from "../data/local-state-adapters";
 
 /** Validates an event/day reference at the browser event boundary. */
 function isEventDayRef(value: unknown): value is EventDayRef {
@@ -314,6 +320,7 @@ export class BrowserApplication {
   nearbyMapView: DomNearbyMapView;
   currentStartSpace: string;
   routePriorityFilter: number[] | null;
+  routeMotionPreference: RouteMotionPreference;
   itineraryOpen: boolean;
   selectionMessage: string;
   transitionToken: number;
@@ -425,6 +432,7 @@ export class BrowserApplication {
     });
     this.currentStartSpace = "";
     this.routePriorityFilter = null;
+    this.routeMotionPreference = readRouteMotionPreference();
     this.itineraryOpen = false;
     this.selectionMessage = "";
     this.currentManifest = null;
@@ -668,6 +676,19 @@ export class BrowserApplication {
     if (this.routeGuidanceSession.getSnapshot().navigationState) {
       this.saveNavigationSnapshot();
     }
+  }
+
+  handleRouteMotionPreferenceChange(detail: unknown): void {
+    const value =
+      typeof detail === "object" && detail !== null && "preference" in detail
+        ? (detail as { readonly preference?: unknown }).preference
+        : undefined;
+    this.routeMotionPreference = normalizeRouteMotionPreference(value);
+    writeRouteMotionPreference(this.routeMotionPreference);
+    this.ui.setRouteMotionPreference(this.routeMotionPreference);
+    this.ui.updateSettingsState({
+      routeMotionPreference: this.routeMotionPreference,
+    });
   }
 
   scheduleTimeout(callback: () => void, delay: number, onCancel?: () => void) {
@@ -1219,6 +1240,10 @@ export class BrowserApplication {
       onConfirmRoute: () => this.handleConfirmRoute(),
       onCancelRoute: () => this.handleCancelRoute(),
       onCloseRouteSelection: () => this.handleCloseRouteSelection(),
+    });
+    this.ui.setRouteMotionPreference(this.routeMotionPreference);
+    this.ui.updateSettingsState({
+      routeMotionPreference: this.routeMotionPreference,
     });
     this.ui.updateMapVersion?.(manifest?.bundleVersion || manifest?.eventId || "");
     this.renderRoutePriorityFilter();

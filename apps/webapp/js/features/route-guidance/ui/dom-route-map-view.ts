@@ -14,6 +14,10 @@ import {
 } from "./route-map-pin-model";
 import { calculateRouteMotionMetrics } from "./route-motion-metrics";
 import { buildRouteOverlaySvg } from "./route-overlay-svg";
+import {
+  normalizeRouteMotionPreference,
+  resolveRouteMotionEnabled,
+} from "./route-motion-preference";
 
 function findAreaForSpace(space, mapAreaCatalog) {
   if (!space || typeof space !== "string") return null;
@@ -103,6 +107,9 @@ export class DomRouteMapView {
     this.navigationMapImageLoadListenerAttached = false;
     this.navigationMapResizeObserver = null;
     this.currentRouteMotionContext = null;
+    this.routeMotionPreference = "system";
+    this.routeMotionMediaQueryList = null;
+    this.routeMotionMediaQueryListenerAttached = false;
     this.routeMotionRenderedWidth = 0;
     this.viewportCenterTimer = null;
 
@@ -144,6 +151,21 @@ export class DomRouteMapView {
         });
         this.navigationMapResizeObserver.observe(this.els.navigationMap);
       }
+    }
+
+    if (
+      !this.routeMotionMediaQueryListenerAttached &&
+      typeof globalThis.matchMedia === "function"
+    ) {
+      this.routeMotionMediaQueryList = globalThis.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      );
+      this.routeMotionMediaQueryList.addEventListener?.("change", () => {
+        if (this.routeMotionPreference === "system") {
+          this.applyRouteMotionPreference();
+        }
+      });
+      this.routeMotionMediaQueryListenerAttached = true;
     }
 
     if (
@@ -273,6 +295,34 @@ export class DomRouteMapView {
     );
   }
 
+  setRouteMotionPreference(preference) {
+    this.routeMotionPreference = normalizeRouteMotionPreference(preference);
+    this.applyRouteMotionPreference();
+  }
+
+  applyRouteMotionPreference() {
+    const enabled = resolveRouteMotionEnabled({
+      preference: this.routeMotionPreference,
+      prefersReducedMotion: this.routeMotionMediaQueryList?.matches ?? false,
+    });
+    this.els.navigationMap?.setAttribute(
+      "data-route-motion",
+      enabled ? "on" : "off",
+    );
+    const flow = this.currentRouteMotionContext?.overlay.querySelector(
+      ".route-flow-comet",
+    );
+    if (!flow?.style) return;
+    if (this.routeMotionPreference === "always") {
+      flow.style.animation =
+        "route-flow-comet var(--route-flow-duration, 600ms) linear infinite";
+    } else if (!enabled) {
+      flow.style.animation = "none";
+    } else {
+      flow.style.removeProperty("animation");
+    }
+  }
+
   scheduleViewportCenterUpdate() {
     if (this.viewportCenterTimer !== null) return;
     this.viewportCenterTimer = setTimeout(() => {
@@ -383,6 +433,7 @@ export class DomRouteMapView {
     if (kind === "current") {
       this.currentRouteMotionContext = { route, overlay };
       this.applyCurrentRouteMotionMetrics(this.zoomHelper?.state.scale ?? 1);
+      this.applyRouteMotionPreference();
     }
   }
 
