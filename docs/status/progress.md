@@ -7,8 +7,8 @@
 ## 現在状態
 
 - 現在フェーズ: **Phase 7.4（第二回人間受入FAILにより再オープン）**
-- 現在Task: **Task 24: 軽量な複数経路cueへ置換**
-- 次に着手するTask: **Task 24**
+- 現在Task: **Task 25: 独立地図をレスポンシブなworkspaceへ再設計**
+- 次に着手するTask: **Task 25**
 - canonical plan: `docs/plans/phase-07-4/README.md`
 - 最新設計: `docs/specs/2026-08-14-phase-07-4-motion-and-map-workspace-redesign.md`
 - 最新人間受入記録: `docs/reviews/phase-07-4-second-human-acceptance-failures.md`
@@ -44,8 +44,8 @@ Motorola Androidで`Animator 再生時間スケール=0x`のときcurrent route 
 | 1〜18 | 初期実装・第一回follow-up | 完了履歴 | 各Task参照 |
 | 19〜22 | 第二回確認前の暫定案 | 置換済み・実装禁止 | - |
 | 23 | 経路アニメーション設定をアプリ内へ追加 | **完了（6935717）** | Task 18 |
-| 24 | 軽量な複数経路cueへ置換 | **未着手 / 次Task** | Task 23 |
-| 25 | 独立地図をレスポンシブなworkspaceへ再設計 | 未着手 | Task 24後推奨 |
+| 24 | 軽量な複数経路cueへ置換 | **完了（b76be21）** | Task 23 |
+| 25 | 独立地図をレスポンシブなworkspaceへ再設計 | **未着手 / 現在Task** | Task 24後推奨 |
 | 26 | お品書き詳細を地図より前面に表示 | 未着手 | Task 25 |
 | 27 | 経路motion・地図workspaceの最終人間受入 | 未着手 | Task 23〜26 |
 
@@ -73,3 +73,10 @@ Motorola Androidで`Animator 再生時間スケール=0x`のときcurrent route 
 - `system / always / off`の三値設定、local state永続化、`prefers-reduced-motion`連動を実装。
 - 既存route motionの描画方式はTask 24まで維持。OS Animator設定の変更処理は追加していない。
 - focused verification: route motion/settings/contract tests passed、`npm run check:webapp` passed、`npm run test:webapp` 118 files / 804 tests passed、`npm run build:webapp` passed。
+
+## Task 24完了記録
+
+- current routeのfull-path dash animationを廃止し、5個の白いcueを単一rAF controllerで更新する方式へ置換。
+- gesture drag/pinch/慣性中はcue更新を停止し、`system/always/off`とdocument visibilityへ接続。
+- focused verification: 5 files / 111 tests passed、`npm run check:webapp` passed、`npm run test:webapp` 119 files / 807 tests passed、`npm run build:webapp` passed。
+- targeted Playwrightは機能assertionを通過。map表示変更に伴う既存snapshot 2件は人間visual確認待ちで更新していない。
