@@ -595,6 +595,7 @@ test("デモデータで地図・ピン・経路・ボトムシートを表示�
   await pinFor(page, "東ア31b").evaluate((button: HTMLButtonElement) =>
     button.click(),
   );
+  await page.getByRole("button", { name: "経路を比較" }).click();
   const portraitCatalog = page.locator("#tweet-embed-container img");
   await expect(portraitCatalog).toHaveCSS("object-fit", "contain");
   await expect(page.locator("#next-target")).toHaveAttribute(
