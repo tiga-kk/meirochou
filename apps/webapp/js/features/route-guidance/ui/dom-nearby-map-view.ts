@@ -621,6 +621,8 @@ export class DomNearbyMapView {
       card.setAttribute("aria-selected", String(this.selectedSpace === candidate.space));
       if (this.selectedSpace === candidate.space) card.classList.add("nearby-catalog-card--selected");
       card.setAttribute("aria-label", `${candidate.space} 周辺カード`);
+      let pointerStart: { x: number; y: number } | null = null;
+      let suppressClick = false;
       const selectCard = () => {
         this.selectedSpace =
           this.selectedSpace === candidate.space ? null : candidate.space;
@@ -629,13 +631,27 @@ export class DomNearbyMapView {
       };
       card.addEventListener("click", (event) => {
         if ((event.target as HTMLElement).closest("button")) return;
+        if (suppressClick) {
+          suppressClick = false;
+          return;
+        }
         if (event.detail > 0) return;
         selectCard();
       });
-      card.addEventListener("pointerdown", (event) => event.stopPropagation());
+      card.addEventListener("pointerdown", (event) => {
+        event.stopPropagation();
+        pointerStart = { x: event.clientX, y: event.clientY };
+      });
       card.addEventListener("pointerup", (event) => {
         event.stopPropagation();
-        if (!(event.target as HTMLElement).closest("button")) selectCard();
+        const start = pointerStart;
+        pointerStart = null;
+        if ((event.target as HTMLElement).closest("button")) return;
+        if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8) {
+          suppressClick = true;
+          return;
+        }
+        selectCard();
       });
       card.addEventListener("keydown", (event) => {
         if (event.key !== "Enter" && event.key !== " ") return;
@@ -981,6 +997,7 @@ export class DomNearbyMapView {
   ): Promise<void> {
     if (!this.onSetNextTarget) return;
     button.disabled = true;
+    button.setAttribute("aria-busy", "true");
     try {
       const changed = await this.onSetNextTarget({ ...candidate, tweet });
       if (changed) {
@@ -989,6 +1006,7 @@ export class DomNearbyMapView {
       }
     } finally {
       button.disabled = false;
+      button.removeAttribute("aria-busy");
     }
   }
 

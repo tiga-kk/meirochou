@@ -591,6 +591,44 @@
   min-height: 44px;
 }
 
+.target-action-bar .btn:hover,
+.candidate-selection-actions .btn:hover,
+.route-confirmation-actions .btn:hover {
+  filter: brightness(1.08);
+}
+
+.target-action-bar .btn:active,
+.candidate-selection-actions .btn:active,
+.route-confirmation-actions .btn:active {
+  transform: translate(1px, 1px);
+}
+
+.target-action-bar .btn:focus-visible,
+.candidate-selection-actions .btn:focus-visible,
+.route-confirmation-actions .btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.target-action-bar .btn:disabled,
+.candidate-selection-actions .btn:disabled,
+.route-confirmation-actions .btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.target-action-bar .btn[aria-busy="true"] {
+  cursor: wait;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .target-action-bar .btn,
+  .candidate-selection-actions .btn,
+  .route-confirmation-actions .btn {
+    transition: none;
+  }
+}
+
 .target-detail-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

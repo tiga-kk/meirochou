@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { describe, expect, it, vi } from "vitest";
+import { bindCircleStatusEvents } from "../apps/webapp/js/app/bind-circle-status-events";
 import { DomNearbyMapView } from "../apps/webapp/js/features/route-guidance/ui/dom-nearby-map-view";
 
 const areas = [
@@ -52,6 +53,33 @@ function createView() {
 }
 
 describe("DomNearbyMapView", () => {
+  it("does not dispatch purchase twice while the async action is pending", async () => {
+    document.body.innerHTML = '<button id="btn-purchased">購入済</button>';
+    let resolveAction!: () => void;
+    const action = vi.fn(
+      () => new Promise<void>((resolve) => { resolveAction = resolve; }),
+    );
+    const application = {
+      ui: { statsRenderer: null },
+      handleAction: action,
+      handleReset: vi.fn(),
+      handleResetHold: vi.fn(),
+    };
+    const cleanup = bindCircleStatusEvents(application, document);
+    const button = document.getElementById("btn-purchased") as HTMLButtonElement;
+
+    button.click();
+    button.click();
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute("aria-busy")).toBe("true");
+
+    resolveAction();
+    await vi.waitFor(() => expect(button.disabled).toBe(false));
+    expect(button.hasAttribute("aria-busy")).toBe(false);
+    cleanup();
+  });
+
   it("opens with compact conditions collapsed and a filter summary", async () => {
     renderDom();
     const opener = document.getElementById("open-map") as HTMLButtonElement;
@@ -138,6 +166,33 @@ describe("DomNearbyMapView", () => {
 
     expect(close).not.toHaveBeenCalled();
     expect(button.disabled).toBe(false);
+  });
+
+  it("keeps a dragged catalog card from becoming a selection click", () => {
+    const view = Object.create(DomNearbyMapView.prototype) as any;
+    const cardLayer = document.createElement("div");
+    const leaderLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    view.activeAssets = { points: { image: { width: 100, height: 100 }, points: [] } };
+    view.activeArea = { id: "east" };
+    view.origin = { gridIndex: 0, svgX: 0, svgY: 0 };
+    view.nearbyCandidates = [{
+      candidate: { space: "東ア01", tweet: "" },
+      position: { x: 50, y: 50 },
+    }];
+    view.nearbyPointIndex = new Map();
+    view.selectedSpace = null;
+    view.renderPins = vi.fn();
+    view.applyViewportLayout = vi.fn();
+    view.updateCatalogOverlay = vi.fn();
+
+    view.renderCatalogCards(cardLayer, leaderLayer);
+    const card = cardLayer.querySelector(".nearby-catalog-card") as HTMLElement;
+    card.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: 10, clientY: 10 }));
+    card.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: 30, clientY: 10 }));
+    card.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+
+    expect(view.selectedSpace).toBeNull();
+    expect(view.renderPins).not.toHaveBeenCalled();
   });
 
   it("recalculates leader geometry after catalog image load and error", () => {

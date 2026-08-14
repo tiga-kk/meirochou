@@ -21,12 +21,25 @@ export function bindCircleStatusEvents(
     removers.push(() => target.removeEventListener("click", listener));
   };
 
-  listen("btn-purchased", () => {
-    void application.handleAction("purchase");
-  });
-  listen("btn-hold", () => {
-    void application.handleAction("hold");
-  });
+  const listenAsyncAction = (id: string, action: "purchase" | "hold") => {
+    let pending = false;
+    listen(id, (event) => {
+      const button = event.currentTarget as HTMLButtonElement | null;
+      if (pending || !button) return;
+      pending = true;
+      const wasDisabled = button.disabled;
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+      Promise.resolve(application.handleAction(action)).catch(() => {}).finally(() => {
+        pending = false;
+        button.disabled = wasDisabled;
+        button.removeAttribute("aria-busy");
+      });
+    });
+  };
+
+  listenAsyncAction("btn-purchased", "purchase");
+  listenAsyncAction("btn-hold", "hold");
   listen("btn-reset-all", () => {
     application.handleReset();
   });

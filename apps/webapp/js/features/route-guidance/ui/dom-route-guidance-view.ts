@@ -39,6 +39,7 @@ export class DomRouteGuidanceView {
     this.candidatePreviewTarget = null;
     this.candidatePreviewOutsideClick = null;
     this.candidatePreviewEscape = null;
+    this.targetDetailEscape = null;
     this.statsRenderer = new DomCircleProgressView(this, mapAreaCatalog);
     this.modalManager = new DomCircleGalleryView(mapAreaCatalog);
     this.mapRenderer = new DomRouteMapView(this, mapAreaCatalog);
@@ -117,6 +118,14 @@ export class DomRouteGuidanceView {
     this.els.toggleTargetDetail?.addEventListener("click", () => {
       this.setTargetDetailExpanded(!this.detailExpanded);
     });
+    this.targetDetailEscape = (event) => {
+      if (event.key !== "Escape" || !this.detailExpanded) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      this.setTargetDetailExpanded(false);
+      this.els.toggleTargetDetail?.focus();
+    };
+    document.addEventListener("keydown", this.targetDetailEscape);
   }
 
   setTargetDetailExpanded(expanded) {

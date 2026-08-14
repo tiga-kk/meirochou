@@ -117,6 +117,10 @@ test("周辺地図のお品書きカードとleader lineから既存拡大表示
 
   const cards = page.locator(".nearby-catalog-card");
   await expect(cards).toHaveCount(2);
+  await cards.first().dispatchEvent("pointerdown", { clientX: 100, clientY: 100 });
+  await cards.first().dispatchEvent("pointerup", { clientX: 120, clientY: 100 });
+  await cards.first().dispatchEvent("click", { detail: 1 });
+  await expect(cards.first()).toHaveAttribute("aria-selected", "false");
   await expect(page.locator("#nearby-map-center")).toContainText(
     "表示中心: デモ東",
   );
@@ -559,8 +563,9 @@ test("経路画面はmap-firstで詳細開閉時も地図状態を保持する",
     expect(
       await page.locator("#navigation-map-layer").getAttribute("style"),
     ).toBe(transform);
-    await page.locator("#btn-toggle-target-detail").click();
+    await page.keyboard.press("Escape");
     await expect(page.locator("#target-detail")).toBeHidden();
+    await expect(page.locator("#btn-toggle-target-detail")).toBeFocused();
   }
 });
 

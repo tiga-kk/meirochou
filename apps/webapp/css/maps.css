@@ -120,6 +120,42 @@
   cursor: pointer;
 }
 
+.nearby-map-toggle-controls:hover,
+.nearby-map-origin-controls button:hover,
+.nearby-selection-toolbar button:hover,
+.nearby-map-pagination button:hover {
+  background: var(--panel);
+}
+
+.nearby-map-toggle-controls:active,
+.nearby-map-origin-controls button:active,
+.nearby-selection-toolbar button:active,
+.nearby-map-pagination button:active {
+  transform: translate(1px, 1px);
+}
+
+.nearby-map-toggle-controls:focus-visible,
+.nearby-map-origin-controls button:focus-visible,
+.nearby-selection-toolbar button:focus-visible,
+.nearby-map-pagination button:focus-visible,
+.nearby-map-controls select:focus-visible,
+.nearby-map-controls input:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.nearby-map-toggle-controls:disabled,
+.nearby-map-origin-controls button:disabled,
+.nearby-selection-toolbar button:disabled,
+.nearby-map-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.nearby-selection-toolbar button[aria-busy="true"] {
+  cursor: wait;
+}
+
 .nearby-map-area-label {
   font-weight: 700;
 }
@@ -417,7 +453,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .nearby-catalog-card { transition: none; }
+  .nearby-catalog-card,
+  .nearby-map-toggle-controls,
+  .nearby-map-origin-controls button,
+  .nearby-selection-toolbar button,
+  .nearby-map-pagination button {
+    transition: none;
+  }
 }
 
 .nearby-map-pin-layer .map-pin {
