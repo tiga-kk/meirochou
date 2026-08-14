@@ -1,33 +1,34 @@
 // @ts-nocheck
 
+import { collectCirclePriorities } from "../../../shared/domain/circle-priority-filter";
+import { parseSpace } from "../../../shared/domain/space-parser";
 import { GestureZoomController } from "../../../utils/gesture-zoom-controller.js";
 import type { Circle, MapPoint } from "../../event-day/public-api";
+import type { GridMeta } from "../domain/routing/grid-route-types";
+import { snapStartToWalkableCell } from "../domain/start-selection";
 import type {
   MapArea,
   MapAreaCatalog,
   RouteMapAssets,
   RouteMapAssetsLoader,
 } from "../public-api";
-import { snapStartToWalkableCell } from "../domain/start-selection";
-import { collectCirclePriorities } from "../../../shared/domain/circle-priority-filter";
-import type { GridMeta } from "../domain/routing/grid-route-types";
 import {
-  rankNearbyCircles,
   type NearbyCircleLimit,
+  rankNearbyCircles,
 } from "./nearby-circle-model";
-import { parseSpace } from "../../../shared/domain/space-parser";
+import { calculateNearbyMapWorkspaceLayout } from "./nearby-map-workspace-layout";
+import type { MapViewportPoint } from "./route-map-pin-model";
 import {
   buildMapPins,
   buildMapPointIndex,
   buildMapViewportPoints,
   calculateMapPinSize,
   calculateNativeImageScale,
+  calculateMinimumInteractiveMapHeight,
   findNearestMapViewportPoint,
   getPinPosition,
   normalizeExternalUrl,
 } from "./route-map-pin-model";
-import type { MapViewportPoint } from "./route-map-pin-model";
-import { layoutNearbyCatalogCards } from "./nearby-catalog-layout";
 
 type NearbyArea = MapArea & {
   id: string;
@@ -51,6 +52,7 @@ export interface StandaloneMapViewportLayoutInput {
   availableHeight: number;
   imageWidth: number;
   imageHeight: number;
+  scaleMode?: "contain" | "bounded-cover";
 }
 
 export function calculateStandaloneMapViewportLayout(
@@ -66,12 +68,39 @@ export function calculateStandaloneMapViewportLayout(
   ) {
     return null;
   }
-  const scale = Math.min(
+  const containScale = Math.min(
     input.availableWidth / input.imageWidth,
     input.availableHeight / input.imageHeight,
   );
+  const scale = input.scaleMode === "bounded-cover"
+    ? Math.max(
+        containScale,
+        0.8 * Math.max(
+          input.availableWidth / input.imageWidth,
+          input.availableHeight / input.imageHeight,
+        ),
+      )
+    : containScale;
   const stageWidth = input.imageWidth * scale;
   const stageHeight = input.imageHeight * scale;
+  const minimumHeight = Math.min(
+    input.availableHeight,
+    calculateMinimumInteractiveMapHeight(input.availableWidth),
+  );
+  const naturalHeight =
+    (input.availableWidth * input.imageHeight) / input.imageWidth;
+  if (naturalHeight < minimumHeight) {
+    const stageHeight = minimumHeight;
+    const stageWidth = (stageHeight * input.imageWidth) / input.imageHeight;
+    return {
+      viewportWidth: input.availableWidth,
+      viewportHeight: stageHeight,
+      stageWidth,
+      stageHeight,
+      initialX: (input.availableWidth - stageWidth) / 2,
+      initialY: 0,
+    };
+  }
   return {
     viewportWidth: input.availableWidth,
     viewportHeight: input.availableHeight,
@@ -196,15 +225,19 @@ export class DomNearbyMapView {
             保留も表示
           </label>
         </div>
-        <div id="nearby-map-viewport" class="nearby-map-viewport">
+        <div id="nearby-map-workspace" class="nearby-map-workspace">
+          <div id="nearby-map-viewport" class="nearby-map-viewport">
             <div id="nearby-map-layer" class="nearby-map-transform-layer">
             <img id="nearby-map-image" class="nearby-map-image" alt="" />
             <div id="nearby-map-pin-layer" class="nearby-map-pin-layer"></div>
             <span id="nearby-map-origin-marker" aria-label="検索基準地点"></span>
           </div>
-          <svg id="nearby-map-leader-layer" class="nearby-map-leader-layer" aria-hidden="true"></svg>
-          <div id="nearby-map-card-layer" class="nearby-map-card-layer"></div>
           <p id="nearby-map-center" class="map-viewport-center" aria-live="polite">表示中心: ---</p>
+          </div>
+          <section id="nearby-map-catalog-panel" class="nearby-map-catalog-panel" aria-label="周辺お品書き">
+            <div id="nearby-map-card-layer" class="nearby-map-card-layer"></div>
+          </section>
+          <svg id="nearby-map-leader-layer" class="nearby-map-leader-layer" aria-hidden="true"></svg>
         </div>
         <p id="nearby-map-error" class="nearby-map-error" role="status" aria-live="polite"></p>
       </div>`;
@@ -232,7 +265,7 @@ export class DomNearbyMapView {
       this.surface.querySelector("#nearby-map-layer"),
       {
         overscrollLimit: 18,
-        onTransformChange: (transform) => this.renderNearbyOverlay(transform),
+        onTransformChange: () => this.renderNearbyOverlay(),
       },
     );
     if (typeof ResizeObserver === "function") {
@@ -257,6 +290,9 @@ export class DomNearbyMapView {
       if (Math.hypot(event.clientX - start.clientX, event.clientY - start.clientY) > 8) return;
       this.selectOriginAt(event.clientX, event.clientY);
     });
+    this.surface
+      .querySelector("#nearby-map-catalog-panel")
+      ?.addEventListener("scroll", () => this.updateCatalogOverlay());
     this.surface.querySelector("#nearby-map-image")?.addEventListener("load", () => {
       this.applyViewportLayout();
       this.renderOriginMarker();
@@ -467,8 +503,8 @@ export class DomNearbyMapView {
     this.renderCatalogCards(cardLayer, leaderLayer);
   }
 
-  private renderNearbyOverlay(transform = this.zoomHelper?.state ?? { scale: 1, x: 0, y: 0 }): void {
-    this.updateCatalogOverlay(transform);
+  private renderNearbyOverlay(): void {
+    this.updateCatalogOverlay();
     this.scheduleNearbyViewportCenterUpdate();
   }
 
@@ -528,6 +564,7 @@ export class DomNearbyMapView {
         this.selectedSpace =
           this.selectedSpace === candidate.space ? null : candidate.space;
         this.renderPins(this.activeAssets);
+        this.applyViewportLayout();
       };
       card.addEventListener("click", (event) => {
         if ((event.target as HTMLElement).closest("button")) return;
@@ -598,33 +635,24 @@ export class DomNearbyMapView {
     this.updateCatalogOverlay();
   }
 
-  private updateCatalogOverlay(
-    transform = this.zoomHelper?.state ?? { scale: 1, x: 0, y: 0 },
-  ): void {
+  private updateCatalogOverlay(): void {
     const cardLayer = this.surface?.querySelector("#nearby-map-card-layer") as HTMLElement | null;
     const leaderLayer = this.surface?.querySelector("#nearby-map-leader-layer") as SVGElement | null;
-    if (!cardLayer || !leaderLayer || !this.activeArea || !this.origin) return;
+    const workspace = this.surface?.querySelector("#nearby-map-workspace") as HTMLElement | null;
+    if (!cardLayer || !leaderLayer || !workspace || !this.activeArea || !this.origin) return;
     const viewport = this.surface?.querySelector("#nearby-map-viewport") as HTMLElement | null;
-    const viewportWidth = viewport?.clientWidth || viewport?.getBoundingClientRect().width || 1;
-    const viewportHeight = viewport?.clientHeight || viewport?.getBoundingClientRect().height || 1;
+    const catalogPanel = this.surface?.querySelector("#nearby-map-catalog-panel") as HTMLElement | null;
+    const workspaceRect = workspace.getBoundingClientRect();
+    const workspaceWidth = workspace.clientWidth || workspaceRect.width || 1;
+    const workspaceHeight = workspace.clientHeight || workspaceRect.height || 1;
     const stage = this.surface?.querySelector("#nearby-map-layer") as HTMLElement | null;
-    const stageWidth = stage?.clientWidth || stage?.getBoundingClientRect().width || 1;
-    const stageHeight = stage?.clientHeight || stage?.getBoundingClientRect().height || 1;
+    if (!viewport || !stage) return;
+    const stageRect = stage.getBoundingClientRect();
+    const panelRect = catalogPanel?.getBoundingClientRect() ?? null;
     const anchors = this.nearbyCandidates.map(({ candidate, position }) => ({
       candidate,
       position: position ?? this.nearbyPointIndex?.get(candidate.space)?.[0] ?? candidate.mapPosition ?? getPinPosition(candidate.space),
     }));
-    const cards = layoutNearbyCatalogCards({
-      viewportWidth,
-      viewportHeight,
-      cardHeight: 132,
-      cardHeightForSpace: (space) => space === this.selectedSpace ? 220 : 132,
-      anchors: anchors.map(({ candidate, position }) => ({
-        space: candidate.space,
-        x: transform.x + (position.x / 100) * stageWidth * transform.scale,
-        y: transform.y + (position.y / 100) * stageHeight * transform.scale,
-      })),
-    });
     const cardBySpace = new Map(
       [...cardLayer.querySelectorAll<HTMLElement>(".nearby-catalog-card")]
         .map((card) => [card.dataset.space, card] as const),
@@ -636,26 +664,34 @@ export class DomNearbyMapView {
         : "nearby-map-leader-underlay";
       lineByKey.set(`${line.dataset.space}:${className}`, line);
     });
-    leaderLayer.setAttribute("viewBox", `0 0 ${viewportWidth} ${viewportHeight}`);
-    for (const [index, layout] of cards.entries()) {
-      const { candidate } = anchors[index];
+    leaderLayer.setAttribute("viewBox", `0 0 ${workspaceWidth} ${workspaceHeight}`);
+    for (const { candidate, position } of anchors) {
       const card = cardBySpace.get(candidate.space);
-      if (card) {
-        card.style.left = `${layout.x}px`;
-        card.style.top = `${layout.y}px`;
-        card.style.width = `${layout.width}px`;
-        card.style.height = `${layout.height}px`;
-      }
-      const anchorX = layout.anchor.x;
-      const anchorY = layout.anchor.y;
-      const endX = Math.max(layout.x, Math.min(anchorX, layout.x + layout.width));
-      const endY = Math.max(layout.y, Math.min(anchorY, layout.y + layout.height));
+      if (!card) continue;
+      const cardRect = card.getBoundingClientRect();
+      const cardX = cardRect.left - workspaceRect.left;
+      const cardY = cardRect.top - workspaceRect.top;
+      const cardWidth = cardRect.width;
+      const cardHeight = cardRect.height;
+      const anchorX = stageRect.left - workspaceRect.left + (position.x / 100) * stageRect.width;
+      const anchorY = stageRect.top - workspaceRect.top + (position.y / 100) * stageRect.height;
+      const endX = Math.max(cardX, Math.min(anchorX, cardX + cardWidth));
+      const endY = Math.max(cardY, Math.min(anchorY, cardY + cardHeight));
       const visibleEndX = Math.abs(endX - anchorX) < 1
-        ? Math.max(0, Math.min(viewportWidth, endX + (endX <= viewportWidth / 2 ? 1 : -1)))
+        ? endX + (endX <= workspaceWidth / 2 ? 1 : -1)
         : endX;
       const visibleEndY = Math.abs(endY - anchorY) < 1
-        ? Math.max(0, Math.min(viewportHeight, endY + (endY <= viewportHeight / 2 ? 1 : -1)))
+        ? endY + (endY <= workspaceHeight / 2 ? 1 : -1)
         : endY;
+      const hasCardRect = cardWidth > 0 && cardHeight > 0;
+      const hasPanelRect = Boolean(panelRect?.width && panelRect.height);
+      const visible = hasCardRect &&
+        (!hasPanelRect || (
+          cardRect.right > panelRect.left &&
+          cardRect.left < panelRect.right &&
+          cardRect.bottom > panelRect.top &&
+          cardRect.top < panelRect.bottom
+        ));
       for (const className of ["nearby-map-leader-underlay", "nearby-map-leader"]) {
         const key = `${candidate.space}:${className}`;
         let line = lineByKey.get(key);
@@ -670,6 +706,7 @@ export class DomNearbyMapView {
         line.setAttribute("y1", String(anchorY));
         line.setAttribute("x2", String(visibleEndX));
         line.setAttribute("y2", String(visibleEndY));
+        line.hidden = !visible;
       }
     }
   }
@@ -679,34 +716,42 @@ export class DomNearbyMapView {
     const stage = this.surface?.querySelector("#nearby-map-layer") as HTMLElement | null;
     const image = this.surface?.querySelector("#nearby-map-image") as HTMLImageElement | null;
     const dialog = this.surface?.querySelector(".nearby-map-dialog") as HTMLElement | null;
-    if (!viewport || !stage || !dialog || !image?.naturalWidth || !image.naturalHeight) return;
-    const viewportWidth = viewport.clientWidth || viewport.getBoundingClientRect().width;
-    const dialogStyle = getComputedStyle(dialog);
-    const gap = Number.parseFloat(dialogStyle.rowGap || dialogStyle.gap) || 0;
-    const paddingY =
-      (Number.parseFloat(dialogStyle.paddingTop) || 0) +
-      (Number.parseFloat(dialogStyle.paddingBottom) || 0);
-    const occupiedHeight = [...dialog.children]
-      .filter((child) => child !== viewport)
-      .reduce((total, child) => total + child.getBoundingClientRect().height, 0);
-    const availableHeight =
-      dialog.clientHeight -
-      paddingY -
-      occupiedHeight -
-      Math.max(0, dialog.children.length - 1) * gap;
-    const layout = calculateStandaloneMapViewportLayout({
-      availableWidth: viewportWidth,
-      availableHeight,
+    const workspace = this.surface?.querySelector("#nearby-map-workspace") as HTMLElement | null;
+    const catalogPanel = this.surface?.querySelector("#nearby-map-catalog-panel") as HTMLElement | null;
+    if (!viewport || !stage || !dialog || !workspace || !image?.naturalWidth || !image.naturalHeight) return;
+    const workspaceWidth = workspace.clientWidth || workspace.getBoundingClientRect().width;
+    const workspaceHeight = workspace.clientHeight || workspace.getBoundingClientRect().height;
+    const layout = calculateNearbyMapWorkspaceLayout({
+      viewportWidth: workspaceWidth,
+      viewportHeight: workspaceHeight,
+      controlsHeight: 0,
       imageWidth: image.naturalWidth,
       imageHeight: image.naturalHeight,
     });
-    if (!layout) return;
-    viewport.style.height = `${layout.viewportHeight}px`;
-    stage.style.width = `${layout.stageWidth}px`;
-    stage.style.height = `${layout.stageHeight}px`;
-    this.zoomHelper?.setMaxScale(calculateNativeImageScale({ imageWidth: image.naturalWidth, renderedWidth: layout.stageWidth }));
-    this.zoomHelper?.setLayout({ containerWidth: layout.viewportWidth, containerHeight: layout.viewportHeight, stageWidth: layout.stageWidth, stageHeight: layout.stageHeight, baseX: layout.initialX, baseY: layout.initialY });
+    workspace.dataset.mode = layout.mode;
+    workspace.style.setProperty("--nearby-card-columns", String(layout.cardColumns));
+    workspace.style.setProperty("--nearby-map-width", `${layout.mapWidth}px`);
+    workspace.style.setProperty("--nearby-map-height", `${layout.mapHeight}px`);
+    if (catalogPanel) {
+      catalogPanel.style.setProperty("--nearby-panel-width", `${layout.panelWidth}px`);
+      catalogPanel.style.setProperty("--nearby-panel-height", `${layout.panelHeight}px`);
+    }
+    const mapLayout = calculateStandaloneMapViewportLayout({
+      availableWidth: layout.mapWidth,
+      availableHeight: layout.mapHeight,
+      imageWidth: image.naturalWidth,
+      imageHeight: image.naturalHeight,
+      scaleMode: layout.initialMapScaleMode,
+    });
+    if (!mapLayout) return;
+    viewport.style.width = `${mapLayout.viewportWidth}px`;
+    viewport.style.height = `${mapLayout.viewportHeight}px`;
+    stage.style.width = `${mapLayout.stageWidth}px`;
+    stage.style.height = `${mapLayout.stageHeight}px`;
+    this.zoomHelper?.setMaxScale(calculateNativeImageScale({ imageWidth: image.naturalWidth, renderedWidth: mapLayout.stageWidth }));
+    this.zoomHelper?.setLayout({ containerWidth: mapLayout.viewportWidth, containerHeight: mapLayout.viewportHeight, stageWidth: mapLayout.stageWidth, stageHeight: mapLayout.stageHeight, baseX: mapLayout.initialX, baseY: mapLayout.initialY });
     this.updateNearbyViewportCenter();
+    this.updateCatalogOverlay();
   }
 
   private selectOriginAt(clientX: number, clientY: number): void {

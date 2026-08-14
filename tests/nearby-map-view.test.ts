@@ -52,6 +52,20 @@ function createView() {
 }
 
 describe("DomNearbyMapView", () => {
+  it("keeps the catalog panel and leader layer outside the map viewport", () => {
+    renderDom();
+    createView();
+
+    const viewport = document.getElementById("nearby-map-viewport");
+    const cardLayer = document.getElementById("nearby-map-card-layer");
+    const leaderLayer = document.getElementById("nearby-map-leader-layer");
+
+    expect(viewport?.contains(cardLayer)).toBe(false);
+    expect(viewport?.contains(leaderLayer)).toBe(false);
+    expect(cardLayer?.closest("#nearby-map-catalog-panel")).not.toBeNull();
+    expect(leaderLayer?.closest("#nearby-map-workspace")).not.toBeNull();
+  });
+
   it("opens without route guidance, selects the current form area, and changes assets", async () => {
     renderDom();
     const opener = document.getElementById("open-map") as HTMLButtonElement;

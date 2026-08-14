@@ -7,8 +7,8 @@
 ## 現在状態
 
 - 現在フェーズ: **Phase 7.4（第二回人間受入FAILにより再オープン）**
-- 現在Task: **Task 25: 独立地図をレスポンシブなworkspaceへ再設計**
-- 次に着手するTask: **Task 25**
+- 現在Task: **Task 26: お品書き詳細を地図より前面に表示**
+- 次に着手するTask: **Task 26**
 - canonical plan: `docs/plans/phase-07-4/README.md`
 - 最新設計: `docs/specs/2026-08-14-phase-07-4-motion-and-map-workspace-redesign.md`
 - 最新人間受入記録: `docs/reviews/phase-07-4-second-human-acceptance-failures.md`
@@ -45,7 +45,7 @@ Motorola Androidで`Animator 再生時間スケール=0x`のときcurrent route 
 | 19〜22 | 第二回確認前の暫定案 | 置換済み・実装禁止 | - |
 | 23 | 経路アニメーション設定をアプリ内へ追加 | **完了（6935717）** | Task 18 |
 | 24 | 軽量な複数経路cueへ置換 | **完了（b76be21）** | Task 23 |
-| 25 | 独立地図をレスポンシブなworkspaceへ再設計 | **未着手 / 現在Task** | Task 24後推奨 |
+| 25 | 独立地図をレスポンシブなworkspaceへ再設計 | **完了** | Task 24後推奨 |
 | 26 | お品書き詳細を地図より前面に表示 | 未着手 | Task 25 |
 | 27 | 経路motion・地図workspaceの最終人間受入 | 未着手 | Task 23〜26 |
 
@@ -80,3 +80,10 @@ Motorola Androidで`Animator 再生時間スケール=0x`のときcurrent route 
 - gesture drag/pinch/慣性中はcue更新を停止し、`system/always/off`とdocument visibilityへ接続。
 - focused verification: 5 files / 111 tests passed、`npm run check:webapp` passed、`npm run test:webapp` 119 files / 807 tests passed、`npm run build:webapp` passed。
 - targeted Playwrightは機能assertionを通過。map表示変更に伴う既存snapshot 2件は人間visual確認待ちで更新していない。
+
+## Task 25完了記録
+
+- 独立地図をfull-height workspaceへ再構成し、narrow/mediumは上下grid、wideは右catalog panelへ配置。
+- カードをmap外の折り返しgridへ移し、横一列stripを廃止。画像は自然aspect ratioを基本にし、leader SVGはworkspace全体を基準に更新。
+- narrow/medium/wideとbounded-cover判定を純粋なgeometry helperへ分離し、pan/zoom時は既存card DOMを再生成せずleader端点だけ更新。
+- focused verification: workspace/view/aspect/catalog tests passed、`npm run check:webapp` passed、`npm run build:webapp` passed、対象E2Eの機能assertion passed。既存snapshot 1件は人間visual確認待ちで更新していない。

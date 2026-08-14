@@ -150,6 +150,18 @@ test("周辺地図のお品書きカードとleader lineから既存拡大表示
       return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
     }),
   );
+  const viewportRect = await page.locator("#nearby-map-viewport").evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+  });
+  for (const cardRect of cardRects) {
+    expect(
+      Math.max(0, Math.min(cardRect.right, viewportRect.right) - Math.max(cardRect.left, viewportRect.left)) *
+        Math.max(0, Math.min(cardRect.bottom, viewportRect.bottom) - Math.max(cardRect.top, viewportRect.top)),
+    ).toBe(0);
+  }
+  await expect(page.locator("#nearby-map-workspace")).toHaveAttribute("data-mode", /narrow|medium|wide/);
+  await expect(page.locator("#nearby-map-catalog-panel")).toHaveCSS("overflow-x", "hidden");
   for (let left = 0; left < cardRects.length; left += 1) {
     for (let right = left + 1; right < cardRects.length; right += 1) {
       expect(
@@ -245,12 +257,7 @@ test("地図の基準地点は選択モード中のtapだけで変更される",
   await expect(marker).toBeVisible();
 
   await page.getByRole("button", { name: "基準地点を変更" }).click();
-  const stageBox = await stage.boundingBox();
-  expect(stageBox).not.toBeNull();
-  await page.mouse.click(
-    (stageBox?.x ?? 0) + (stageBox?.width ?? 0) * (4 / 960),
-    (stageBox?.y ?? 0) + (stageBox?.height ?? 0) * (4 / 640),
-  );
+  await viewport.click({ position: { x: 4, y: 4 } });
   await expect(marker).toBeVisible();
   await expect(page.getByText("地図を1回タップして基準地点を選択してください")).toHaveCount(0);
 });
