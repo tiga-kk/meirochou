@@ -41,6 +41,8 @@ interface ActiveCircleReader {
   getCircleStatus(space: string): string;
 }
 
+type ShowCatalogFromNearbyMap = (circle: Circle, opener: HTMLElement) => void;
+
 export interface NearbyMapOrigin {
   readonly gridIndex: number;
   readonly svgX: number;
@@ -168,7 +170,7 @@ export class DomNearbyMapView {
   private nearbyMapResizeObserver: ResizeObserver | null = null;
   private nearbyViewportCenterTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly currentLocationResolver: (() => string | null) | null;
-  private readonly onShowCatalog: ((circle: Circle) => void) | null;
+  private readonly onShowCatalog: ShowCatalogFromNearbyMap | null;
   private readonly onSetNextTarget:
     ((circle: Circle) => Promise<boolean> | boolean) | null;
 
@@ -177,7 +179,7 @@ export class DomNearbyMapView {
     assetsLoader: RouteMapAssetsLoader,
     circleReader: ActiveCircleReader,
     currentLocationResolver: (() => string | null) | null = null,
-    onShowCatalog: ((circle: Circle) => void) | null = null,
+    onShowCatalog: ShowCatalogFromNearbyMap | null = null,
     onSetNextTarget: ((circle: Circle) => Promise<boolean> | boolean) | null = null,
   ) {
     this.mapAreaCatalog = mapAreaCatalog;
@@ -619,7 +621,7 @@ export class DomNearbyMapView {
       catalogButton.textContent = "お品書きを見る";
       catalogButton.addEventListener("click", (event) => {
         event.stopPropagation();
-        this.onShowCatalog?.({ ...candidate, tweet: imageUrl });
+        this.onShowCatalog?.({ ...candidate, tweet: imageUrl }, catalogButton);
       });
       const targetButton = document.createElement("button");
       targetButton.type = "button";

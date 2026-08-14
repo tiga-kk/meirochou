@@ -10,6 +10,7 @@ import {
   setupResizableMap,
   setupSwipeAction,
 } from "../../../utils/gesture-zoom-controller.js";
+import { DialogFocusController } from "../../../ui/dialog-focus";
 
 /**
  * モーダル管理クラス
@@ -45,6 +46,13 @@ export class DomCircleGalleryView {
     this.uiManager = null;
     this.dataManager = null;
     this.mapAreaCatalog = mapAreaCatalog;
+    this.pdfFocusController = this.els.pdfModal
+      ? new DialogFocusController(this.els.pdfModal, {
+          onEscape: () => this.hidePdfModal(),
+        })
+      : null;
+    this.els.pdfModal?.setAttribute("role", "dialog");
+    this.els.pdfModal?.setAttribute("aria-modal", "true");
 
     // Gallery state
     this.currentTargets = [];
@@ -211,7 +219,7 @@ export class DomCircleGalleryView {
    * PDF(画像)モーダルを表示
    * @param {string|Object} source - 画像URL または サークルデータオブジェクト
    */
-  showPdfModal(source) {
+  showPdfModal(source, options = {}) {
     if (!this.els.pdfModal || !this.els.pdfImage) return;
 
     let url = "";
@@ -229,6 +237,7 @@ export class DomCircleGalleryView {
     }
 
     this.els.pdfModal.classList.remove("hidden");
+    this.pdfFocusController?.activate(options.returnFocus ?? null);
     this.els.pdfImage.src = url;
     if (this.els.pdfImage.resetZoom) {
       this.els.pdfImage.resetZoom();
@@ -243,6 +252,7 @@ export class DomCircleGalleryView {
     this.els.pdfModal.classList.add("hidden");
     this.els.pdfImage.src = "";
     this.currentCircle = null;
+    this.pdfFocusController?.deactivate();
   }
 
   /** ギャラリーモーダルを指定スコープで表示 */

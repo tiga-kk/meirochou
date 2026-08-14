@@ -41,7 +41,7 @@
 .nearby-map-surface {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  z-index: var(--layer-nearby-map);
   display: flex;
   align-items: stretch;
   justify-content: center;

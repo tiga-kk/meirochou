@@ -22,6 +22,8 @@
     sans-serif;
   --font-mono: "SFMono-Regular", Menlo, Monaco, "Osaka-Mono", monospace;
   --button-shadow: inset -1px -1px #777, inset 1px 1px #fff;
+  --layer-nearby-map: 10000;
+  --layer-catalog-detail: 10020;
 }
 
 * {

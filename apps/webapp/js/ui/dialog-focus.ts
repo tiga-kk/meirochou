@@ -59,6 +59,7 @@ export class DialogFocusController {
       if (this.onEscapeCallback) {
         this.onEscapeCallback();
       }
+      e.stopPropagation();
       return;
     }
 
@@ -115,7 +116,7 @@ export class DialogFocusController {
       bg.setAttribute("inert", "");
     }
 
-    window.addEventListener("keydown", this.handleKeyDown);
+    window.addEventListener("keydown", this.handleKeyDown, true);
 
     // Initial focus
     const focusables = this.getFocusableElements();
@@ -131,7 +132,7 @@ export class DialogFocusController {
   }
 
   deactivate(): void {
-    window.removeEventListener("keydown", this.handleKeyDown);
+    window.removeEventListener("keydown", this.handleKeyDown, true);
 
     for (const bg of this.backgroundTargets) {
       if (this.backgroundInertState.get(bg)) {

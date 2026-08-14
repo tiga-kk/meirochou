@@ -2,6 +2,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { CircleDetailDialog } from "../apps/webapp/js/components/circle-detail-dialog";
 import type { CircleRecord } from "../apps/webapp/js/features/event-day/domain/application-contract-types";
+import { DomCircleGalleryView } from "../apps/webapp/js/features/circle-status/ui/dom-circle-gallery-view";
 
 describe("Phase 5C Task 3: Circle Detail Dialog Component", () => {
   const sampleCircle: CircleRecord = {
@@ -145,5 +146,26 @@ describe("Phase 5C Task 3: Circle Detail Dialog Component", () => {
 
     dialog.remove();
     triggerBtn.remove();
+  });
+
+  test("returns focus from the shared catalog image modal and closes on Escape", () => {
+    document.body.innerHTML = `
+      <button id="catalog-opener">お品書きを見る</button>
+      <div id="pdf-modal" class="pdf-modal hidden">
+        <button id="btn-close-pdf" type="button">閉じる</button>
+        <div id="modal-image-container"><img id="pdf-modal-image" alt="" /></div>
+        <button id="btn-set-target" type="button"></button>
+      </div>`;
+    const opener = document.getElementById("catalog-opener") as HTMLButtonElement;
+    const view = new DomCircleGalleryView({ getAllMapAreas: () => [] });
+    view.init({}, {});
+
+    opener.focus();
+    view.showPdfModal({ space: "東ア01", tweet: "https://example.test/catalog.png" });
+    expect(document.activeElement?.id).toBe("btn-close-pdf");
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(document.getElementById("pdf-modal")?.classList.contains("hidden")).toBe(true);
+    expect(document.activeElement).toBe(opener);
   });
 });

@@ -198,6 +198,8 @@ test("周辺地図のお品書きカードとleader lineから既存拡大表示
   await expect.poll(() => page.locator("#nearby-map-layer").getAttribute("style")).toContain("scale(1.1)");
   await expect.poll(() => leaders.first().getAttribute("x1")).not.toBe(beforeZoomAnchor);
   await expect(cards.first()).toHaveAttribute("aria-selected", "true");
+  await page.waitForTimeout(100);
+  const beforeDetailTransform = await page.locator("#nearby-map-layer").getAttribute("style");
   expect(await selectedCardHandle?.evaluate((element) => element.isConnected)).toBe(true);
   expect(await selectedInfoHandle?.evaluate((element) => element.isConnected)).toBe(true);
   await expect(
@@ -207,7 +209,33 @@ test("周辺地図のお品書きカードとleader lineから既存拡大表示
     .getByRole("button", { name: "お品書きを見る" })
     .click({ force: true });
   await expect(page.locator("#pdf-modal")).toBeVisible();
+  await expect(page.locator("#nearby-map-surface")).toBeVisible();
+  await expect
+    .poll(() => page.locator("#pdf-modal").evaluate((element) => Number.parseInt(getComputedStyle(element).zIndex, 10)))
+    .toBeGreaterThan(
+      await page.locator("#nearby-map-surface").evaluate((element) => Number.parseInt(getComputedStyle(element).zIndex, 10)),
+    );
   await page.locator("#btn-close-pdf").click({ force: true });
+  await expect(page.locator("#nearby-map-surface")).toBeVisible();
+  await expect(cards.first()).toHaveClass(/nearby-catalog-card--selected/);
+  await expect(page.locator("#nearby-map-layer")).toHaveAttribute("style", /scale\(1\.1\)/);
+  expect(await page.locator("#nearby-map-layer").getAttribute("style")).toContain(
+    beforeDetailTransform?.match(/scale\([^)]*\)/)?.[0] ?? "scale(1.1)",
+  );
+  await expect
+    .poll(() => page.evaluate(() => (document.activeElement as HTMLElement | null)?.textContent))
+    .toContain("お品書きを見る");
+  await page.getByRole("button", { name: "お品書きを見る" }).first().click({ force: true });
+  await expect(page.locator("#pdf-modal")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#pdf-modal")).toBeHidden();
+  await expect(page.locator("#nearby-map-surface")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#nearby-map-surface")).toBeHidden();
+  await page.getByRole("button", { name: "地図" }).click();
+  await expect(page.locator("#nearby-map-surface")).toBeVisible();
+  await page.getByRole("button", { name: "現在地を使う" }).click();
+  await expect(cards).toHaveCount(2);
   await cards.first()
     .getByRole("button", { name: "目的地にする" })
     .click({ force: true });

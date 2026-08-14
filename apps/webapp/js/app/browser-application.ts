@@ -415,7 +415,7 @@ export class BrowserApplication {
       this.routeMapAssetsLoader,
       this.activeEventDayReader,
       () => this.readCurrentSpace(),
-      (circle) => this.ui.showPdfModal(circle),
+      (circle, opener) => this.ui.showPdfModal(circle, { returnFocus: opener }),
       (circle) => this.handleSetNextTarget(circle),
     );
     this.activeEventDaySession.subscribe(() => {

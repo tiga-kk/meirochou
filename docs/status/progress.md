@@ -7,8 +7,8 @@
 ## 現在状態
 
 - 現在フェーズ: **Phase 7.4（第二回人間受入FAILにより再オープン）**
-- 現在Task: **Task 26: お品書き詳細を地図より前面に表示**
-- 次に着手するTask: **Task 26**
+- 現在Task: **Task 27: 経路motion・地図workspaceの最終人間受入**
+- 次に着手するTask: **Task 27**
 - canonical plan: `docs/plans/phase-07-4/README.md`
 - 最新設計: `docs/specs/2026-08-14-phase-07-4-motion-and-map-workspace-redesign.md`
 - 最新人間受入記録: `docs/reviews/phase-07-4-second-human-acceptance-failures.md`
@@ -46,7 +46,7 @@ Motorola Androidで`Animator 再生時間スケール=0x`のときcurrent route 
 | 23 | 経路アニメーション設定をアプリ内へ追加 | **完了（6935717）** | Task 18 |
 | 24 | 軽量な複数経路cueへ置換 | **完了（b76be21）** | Task 23 |
 | 25 | 独立地図をレスポンシブなworkspaceへ再設計 | **完了** | Task 24後推奨 |
-| 26 | お品書き詳細を地図より前面に表示 | 未着手 | Task 25 |
+| 26 | お品書き詳細を地図より前面に表示 | **完了** | Task 25 |
 | 27 | 経路motion・地図workspaceの最終人間受入 | 未着手 | Task 23〜26 |
 
 ## 既存の外部確認残件
@@ -87,3 +87,10 @@ Motorola Androidで`Animator 再生時間スケール=0x`のときcurrent route 
 - カードをmap外の折り返しgridへ移し、横一列stripを廃止。画像は自然aspect ratioを基本にし、leader SVGはworkspace全体を基準に更新。
 - narrow/medium/wideとbounded-cover判定を純粋なgeometry helperへ分離し、pan/zoom時は既存card DOMを再生成せずleader端点だけ更新。
 - focused verification: workspace/view/aspect/catalog tests passed、`npm run check:webapp` passed、`npm run build:webapp` passed、対象E2Eの機能assertion passed。既存snapshot 1件は人間visual確認待ちで更新していない。
+
+## Task 26完了記録
+
+- 既存`DomCircleGalleryView.showPdfModal()`を再利用し、nearby mapから押下buttonをreturn focus先として渡すdetail layerを実装。
+- `catalog detail > nearby map`のnamed layerをCSS custom propertyで固定し、detail表示中のEscapeはdetailだけを閉じ、次のEscapeでnearby mapを閉じる契約を追加。
+- detail開閉後もnearby map、selected card、zoom stateを保持し、閉じた後は元の「お品書きを見る」buttonへfocusを返す。
+- focused verification: circle/detail/dialog/view tests 11件 passed、対象E2E passed、`npm run check:webapp` passed、`npm run test:webapp` passed、`npm run build:webapp` passed。

@@ -185,8 +185,8 @@ export class DomRouteGuidanceView {
 
   // --- Modal Delegate Methods ---
 
-  showPdfModal(source) {
-    this.modalManager.showPdfModal(source);
+  showPdfModal(source, options = {}) {
+    this.modalManager.showPdfModal(source, options);
   }
 
   setRouteMotionPreference(preference) {
