@@ -6,9 +6,9 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.5（Task 6完了、Task 7着手）**
-- 現在Task: **Task 7: ALNS best orderを地図上でlive preview**
-- 次に着手するTask: **Task 7**
+- 現在フェーズ: **Phase 7.5（Task 7完了、Task 8着手）**
+- 現在Task: **Task 8: 統合回帰・実機/人間受入でPhaseを閉じる**
+- 次に着手するTask: **Task 8**
 - canonical plan: `docs/plans/phase-07-5/README.md`
 - 設計: `docs/specs/2026-08-14-phase-07-5-map-first-ui-and-alns-visualization-design.md`
 - planning basis: `docs/reviews/phase-07-5-planning-basis.md`
@@ -52,8 +52,8 @@ Phase 7.5では既存worker群を接続し、progressをephemeral preview、comp
 | 4 | 周辺cardをperimeter配置し10件単位paginationを追加 | **完了（a2016c3）** | Task 3 |
 | 5 | map関連UIのinteraction polish | **完了（d671a23）** | Task 2〜4 |
 | 6 | fresh start ALNSとpreview-only progress contractをproduction接続 | **完了（d0c0e69）** | Task 1 |
-| 7 | ALNS best orderを地図上でlive preview | 未着手 | Task 6、Task 2 |
-| 8 | 統合回帰・実機/人間受入 | 未着手 | Task 1〜7 |
+| 7 | ALNS best orderを地図上でlive preview | **完了（a0092b5）** | Task 6、Task 2 |
+| 8 | 統合回帰・実機/人間受入 | 着手 | Task 1〜7 |
 
 ## 既存の外部確認残件
 
@@ -118,3 +118,10 @@ Phase 7.5では既存worker群を接続し、progressをephemeral preview、comp
 - `RouteOptimizationPreview`/callbacksを追加し、ALNS progressはpreview callbackのみ、completeだけがNavigationStateとsnapshotへcommitする。stale/cancelled jobは世代無効化でUI/stateを更新しない。
 - worker progressは初回即時、改善通知は250ms以上でcoalesceし、completeは即時通知する。
 - focused verification: Task 6 Vitest 6 files / 38 tests passed、`npm run check:webapp` passed、`npm run build:webapp` passed、`git diff --check` passed。
+
+## Task 7完了記録
+
+- ALNS progressをephemeralな青〜紫の`optimization-preview-overlay`とcompact statusへ接続し、同一overlayのpolylineだけを更新する構成を追加した。正式な赤current routeは維持し、complete時だけpreviewを消して正式best orderへ戻す。
+- previewの地図点は既存points JSONと`parseSpace`を再利用して解決し、drag/pinch中はDOM更新を保留して操作終了時に最新previewへ追従する。manual destination、購入/保留、reset、cancel/errorでもpreviewをclearする。
+- focused verification: preview model / route map contract / runtime controllerの3 files・12 tests passed、新規ALNS preview mobile E2E passed、`npm run check:webapp` passed、`npm run build:webapp` passed、`git diff --check` passed。
+- 指定mobile E2E全体は35件中27 passed / 8 failed。8件はTask 5時点から継続しているmap-first visual baselineまたはcatalog表示前提の既存失敗で、新規preview E2Eの失敗ではない。visual snapshotは人間確認前のため更新していない。
