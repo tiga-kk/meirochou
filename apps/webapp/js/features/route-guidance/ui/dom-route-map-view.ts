@@ -12,12 +12,15 @@ import {
   findNearestMapViewportPoint,
   resolveNearestMapPin,
 } from "./route-map-pin-model";
-import { calculateRouteMotionMetrics } from "./route-motion-metrics";
 import { buildRouteOverlaySvg } from "./route-overlay-svg";
 import {
   normalizeRouteMotionPreference,
   resolveRouteMotionEnabled,
 } from "./route-motion-preference";
+import {
+  createRouteMotionController,
+  sampleRouteGeometry,
+} from "./route-motion-controller";
 
 function findAreaForSpace(space, mapAreaCatalog) {
   if (!space || typeof space !== "string") return null;
@@ -107,9 +110,11 @@ export class DomRouteMapView {
     this.navigationMapImageLoadListenerAttached = false;
     this.navigationMapResizeObserver = null;
     this.currentRouteMotionContext = null;
+    this.routeMotionController = null;
     this.routeMotionPreference = "system";
     this.routeMotionMediaQueryList = null;
     this.routeMotionMediaQueryListenerAttached = false;
+    this.routeMotionVisibilityListenerAttached = false;
     this.routeMotionRenderedWidth = 0;
     this.viewportCenterTimer = null;
 
@@ -140,9 +145,11 @@ export class DomRouteMapView {
           overscrollLimit: 18,
           onTransformChange: ({ scale }) => {
             this.applyRouteOverlayStrokeWidth(scale);
-            this.applyCurrentRouteMotionMetrics(scale);
+            this.applyRouteMotionSpeed(scale);
             this.scheduleViewportCenterUpdate();
           },
+          onGestureActivityChange: (active) =>
+            this.routeMotionController?.setGestureActive(active),
         },
       );
       if (typeof ResizeObserver === "function") {
@@ -166,6 +173,13 @@ export class DomRouteMapView {
         }
       });
       this.routeMotionMediaQueryListenerAttached = true;
+    }
+
+    if (!this.routeMotionVisibilityListenerAttached) {
+      document.addEventListener("visibilitychange", () => {
+        this.applyRouteMotionPreference();
+      });
+      this.routeMotionVisibilityListenerAttached = true;
     }
 
     if (
@@ -253,7 +267,6 @@ export class DomRouteMapView {
     );
     this.routeMotionRenderedWidth = layer.clientWidth;
     this.applyRouteOverlayStrokeWidth(this.zoomHelper?.state.scale ?? 1);
-    this.applyCurrentRouteMotionMetrics(this.zoomHelper?.state.scale ?? 1);
   }
 
   applyRouteOverlayStrokeWidth(scale) {
@@ -262,42 +275,20 @@ export class DomRouteMapView {
       "--route-overlay-stroke-width",
       `${baseWidth}px`,
     );
-    this.els.pinLayer?.style.setProperty(
-      "--route-flow-stroke-width",
-      `${Math.max(3, baseWidth * 0.75)}px`,
-    );
-  }
-
-  applyCurrentRouteMotionMetrics(scale) {
-    const context = this.currentRouteMotionContext;
-    const renderedWidth = this.routeMotionRenderedWidth;
-    if (!context || !renderedWidth) return;
-
-    const metrics = calculateRouteMotionMetrics({
-      sourceRouteLengthPx: context.route.physicalPixelLength,
-      imageWidth: context.route.image.width,
-      renderedWidth,
-      zoomScale: scale,
-    });
-    if (!metrics) return;
-
-    context.overlay.style.setProperty(
-      "--route-flow-cue-length",
-      `${metrics.cuePathLengthUnits}`,
-    );
-    context.overlay.style.setProperty(
-      "--route-flow-gap-length",
-      `${metrics.gapPathLengthUnits}`,
-    );
-    context.overlay.style.setProperty(
-      "--route-flow-duration",
-      `${metrics.durationMs}ms`,
-    );
   }
 
   setRouteMotionPreference(preference) {
     this.routeMotionPreference = normalizeRouteMotionPreference(preference);
     this.applyRouteMotionPreference();
+  }
+
+  applyRouteMotionSpeed(scale) {
+    const route = this.currentRouteMotionContext?.route;
+    if (!route || !this.routeMotionController) return;
+    this.routeMotionController.setSpeedScreenPxPerSecond(
+      (160 * route.image.width) /
+        Math.max(1, this.routeMotionRenderedWidth * scale),
+    );
   }
 
   applyRouteMotionPreference() {
@@ -309,18 +300,10 @@ export class DomRouteMapView {
       "data-route-motion",
       enabled ? "on" : "off",
     );
-    const flow = this.currentRouteMotionContext?.overlay.querySelector(
-      ".route-flow-comet",
-    );
-    if (!flow?.style) return;
-    if (this.routeMotionPreference === "always") {
-      flow.style.animation =
-        "route-flow-comet var(--route-flow-duration, 600ms) linear infinite";
-    } else if (!enabled) {
-      flow.style.animation = "none";
-    } else {
-      flow.style.removeProperty("animation");
-    }
+    if (!this.routeMotionController) return;
+    this.routeMotionController.setEnabled(enabled);
+    if (enabled && !document.hidden) this.routeMotionController.start();
+    else this.routeMotionController.stop();
   }
 
   scheduleViewportCenterUpdate() {
@@ -432,7 +415,27 @@ export class DomRouteMapView {
     this.els.pinLayer.appendChild(overlay);
     if (kind === "current") {
       this.currentRouteMotionContext = { route, overlay };
-      this.applyCurrentRouteMotionMetrics(this.zoomHelper?.state.scale ?? 1);
+      const cues = [...overlay.querySelectorAll(".route-motion-cue")];
+      const scale = this.zoomHelper?.state.scale ?? 1;
+      const renderedWidth = this.routeMotionRenderedWidth || route.image.width;
+      const speed = (160 * route.image.width) / Math.max(1, renderedWidth * scale);
+      this.routeMotionController = createRouteMotionController({
+        cueCount: cues.length || 5,
+        speedScreenPxPerSecond: speed,
+        requestFrame: globalThis.requestAnimationFrame.bind(globalThis),
+        cancelFrame: globalThis.cancelAnimationFrame.bind(globalThis),
+        onFrame: (positions) => {
+          positions.forEach((position, index) => {
+            cues[index]?.setAttribute(
+              "transform",
+              `translate(${position.x} ${position.y})`,
+            );
+          });
+        },
+      });
+      this.routeMotionController.setRouteGeometry(
+        sampleRouteGeometry(route.points),
+      );
       this.applyRouteMotionPreference();
     }
   }
@@ -535,6 +538,8 @@ export class DomRouteMapView {
       requireIndexedPositions: Boolean(area?.pointsFile),
     });
 
+    this.routeMotionController?.dispose();
+    this.routeMotionController = null;
     this.els.pinLayer.innerHTML = "";
     this.currentRouteMotionContext = null;
     this.renderRouteOverlay(currentRoute, "current");

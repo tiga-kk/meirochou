@@ -253,6 +253,19 @@ describe("GestureZoomController", () => {
     expect(image.classList.contains("is-direct-manipulation")).toBe(false);
   });
 
+  it("reports gesture activity through drag and inertia until settling", () => {
+    const activity: boolean[] = [];
+    const { container } = createController({
+      onGestureActivityChange: (active: boolean) => activity.push(active),
+    });
+    container.dispatchEvent(pointerEvent("pointerdown", 1, 10, 10));
+    container.dispatchEvent(pointerEvent("pointerup", 1, 10, 10));
+
+    expect(activity[0]).toBe(true);
+    for (let frame = 0; frame < 100; frame += 1) flushRaf();
+    expect(activity.at(-1)).toBe(false);
+  });
+
   it("clears direct manipulation on pointer cancel and capture loss", () => {
     const { container, image } = createController();
 

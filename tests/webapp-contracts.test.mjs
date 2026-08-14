@@ -512,17 +512,15 @@ test("webapp map pin source sizes stay close to one grid cell", () => {
   assert.equal(getPinSourceSize("next"), 12);
 });
 
-test("webapp route strokes keep a readable screen-space width", () => {
+test("webapp route strokes and moving cues keep readable screen-space contracts", () => {
   const css = read("apps/webapp/css/target.css");
 
   assert.match(
     css,
     /\.route-overlay-line[\s\S]*?vector-effect:\s*non-scaling-stroke/,
   );
-  assert.match(
-    css,
-    /\.route-flow-comet,[\s\S]*?vector-effect:\s*non-scaling-stroke/,
-  );
+  assert.match(css, /\.route-motion-cue[\s\S]*?vector-effect:\s*non-scaling-stroke/);
+  assert.doesNotMatch(css, /route-flow-comet/);
   assert.match(css, /\.route-overlay-line[\s\S]*stroke-linecap:\s*round/);
 });
 

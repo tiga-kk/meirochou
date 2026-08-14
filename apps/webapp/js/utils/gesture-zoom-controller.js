@@ -31,6 +31,10 @@ export class GestureZoomController {
       typeof options.onTransformChange === "function"
         ? options.onTransformChange
         : null;
+    this.onGestureActivityChange =
+      typeof options.onGestureActivityChange === "function"
+        ? options.onGestureActivityChange
+        : null;
     this.overscrollLimit = Number.isFinite(options.overscrollLimit)
       ? Math.max(0, options.overscrollLimit)
       : 32;
@@ -51,6 +55,7 @@ export class GestureZoomController {
     this.BOUNCE_FRICTION = 0.8; // バウンド時の減衰率
 
     this.isDragging = false;
+    this.gestureActive = false;
     this.activePointers = new Map();
     this.vx = 0;
     this.vy = 0;
@@ -190,6 +195,12 @@ export class GestureZoomController {
     this.img.classList.toggle("is-direct-manipulation", active);
   }
 
+  setGestureActivity(active) {
+    if (this.gestureActive === active) return;
+    this.gestureActive = active;
+    this.onGestureActivityChange?.(active);
+  }
+
   reset() {
     this.state = { scale: 1, x: this.baseX, y: this.baseY };
     this.vx = 0;
@@ -198,9 +209,11 @@ export class GestureZoomController {
     this.inertiaLastTimestamp = null;
     this.activePointers.clear();
     this.isDragging = false;
+    this.setGestureActivity(false);
     this.initialDistance = 0;
     this.cancelAnimation();
     this.setDirectManipulation(false);
+    this.setGestureActivity(false);
     this.updateTransform();
   }
 
@@ -267,8 +280,10 @@ export class GestureZoomController {
       !outOfBounds
     ) {
       this.setDirectManipulation(false);
+      this.setGestureActivity(false);
       return;
     }
+    this.setGestureActivity(true);
     if (this.rafId === null) {
       this.inertiaLastTimestamp = null;
       this.rafId = requestAnimationFrame((timestamp) =>
@@ -334,6 +349,7 @@ export class GestureZoomController {
     } else {
       this.inertiaLastTimestamp = null;
       this.setDirectManipulation(false);
+      this.setGestureActivity(false);
     }
   }
 
@@ -353,6 +369,7 @@ export class GestureZoomController {
     });
     this.container.setPointerCapture?.(e.pointerId);
     this.isDragging = true;
+    this.setGestureActivity(true);
     this.setDirectManipulation(true);
     this.vx = 0;
     this.vy = 0;
@@ -474,6 +491,7 @@ export class GestureZoomController {
   // PC (Wheel) ズーム処理
   handleWheel(e) {
     e.preventDefault();
+    this.setGestureActivity(true);
     if (this.rafId) cancelAnimationFrame(this.rafId);
 
     const zoomIntensity = 0.1;

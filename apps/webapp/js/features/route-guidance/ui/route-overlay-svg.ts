@@ -29,7 +29,6 @@ function createFallbackOverlay(
       return null;
     },
   };
-  const flow = kind === "current" ? { getAttribute: () => null } : null;
   const direction = {
     getAttribute(name: string) {
       return name === "marker-end" ? "url(#route-direction-arrow)" : null;
@@ -50,8 +49,6 @@ function createFallbackOverlay(
     querySelector(selector: string) {
       if (selector === "polyline" || selector === ".route-overlay-line")
         return polyline;
-      if (selector === ".route-flow-line" || selector === ".route-flow-comet")
-        return flow;
       if (selector === ".route-flow-direction")
         return kind === "current" ? direction : null;
       if (selector === ".route-start-marker")
@@ -123,14 +120,6 @@ export function buildRouteOverlaySvg(
   svg.appendChild(polyline);
 
   if (kind === "current") {
-    const flow = ownerDocument.createElementNS(SVG_NS, "polyline");
-    flow.setAttribute("class", "route-flow-comet route-flow-line");
-    flow.setAttribute("pathLength", "100");
-    flow.setAttribute("points", polyline.getAttribute("points") || "");
-    svg.appendChild(flow);
-  }
-
-  if (kind === "current") {
     const direction = ownerDocument.createElementNS(SVG_NS, "polyline");
     direction.setAttribute("class", "route-flow-direction");
     direction.setAttribute("pathLength", "100");
@@ -138,6 +127,17 @@ export function buildRouteOverlaySvg(
     direction.setAttribute("marker-end", "url(#route-direction-arrow)");
     svg.appendChild(direction);
 
+    const cues = ownerDocument.createElementNS(SVG_NS, "g");
+    cues.setAttribute("class", "route-motion-cues");
+    cues.setAttribute("data-cue-count", "5");
+    for (let index = 0; index < 5; index += 1) {
+      const cue = ownerDocument.createElementNS(SVG_NS, "circle");
+      cue.setAttribute("class", "route-motion-cue");
+      cue.setAttribute("r", "10");
+      cue.setAttribute("transform", `translate(${route.points[0].x} ${route.points[0].y})`);
+      cues.appendChild(cue);
+    }
+    svg.appendChild(cues);
   }
 
   const [start, goal] = [route.points[0], route.points.at(-1)];

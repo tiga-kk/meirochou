@@ -51,15 +51,12 @@ const fictionalGridMeta: GridMeta = {
 const fictionalGridBytes = new Uint8Array(100 * 80);
 fictionalGridBytes.fill(1);
 
-test("route cues are distinct and long enough to read on both route overlays", () => {
+test("current route exposes five static cue nodes without full-path animation", () => {
   const css = readFileSync("apps/webapp/css/target.css", "utf8");
   assert.match(css, /\.route-overlay-line[\s\S]*?vector-effect:\s*non-scaling-stroke/);
-  assert.match(css, /\.route-flow-comet,[\s\S]*?vector-effect:\s*non-scaling-stroke/);
-  assert.match(
-    css,
-    /stroke-dasharray:\s*var\(--route-flow-cue-length,[\s\S]*?var\(--route-flow-gap-length,/,
-  );
-  assert.match(css, /animation:\s*route-flow-comet\s+var\(--route-flow-duration,/);
+  assert.match(css, /\.route-motion-cue[\s\S]*?vector-effect:\s*non-scaling-stroke/);
+  assert.doesNotMatch(css, /route-flow-comet/);
+  assert.doesNotMatch(css, /stroke-dasharray:\s*var\(--route-flow-cue-length/);
   assert.doesNotMatch(
     css,
     /\.route-overlay-candidate \.route-overlay-line[\s\S]*?stroke-dasharray:/,
@@ -126,12 +123,9 @@ test("planRoute and buildRouteOverlaySvg fulfill coordinate contracts with ficti
     svg.querySelector(".route-overlay-line")?.getAttribute("pathLength"),
     "100",
   );
-  assert.ok(svg.querySelector(".route-flow-line"));
-  assert.ok(svg.querySelector(".route-flow-comet"));
-  assert.equal(
-    svg.querySelector(".route-flow-comet")?.getAttribute("pathLength"),
-    "100",
-  );
+  assert.equal(svg.querySelectorAll(".route-motion-cue").length, 5);
+  assert.equal(svg.querySelector(".route-flow-line"), null);
+  assert.equal(svg.querySelector(".route-flow-comet"), null);
   assert.equal(
     svg.querySelector(".route-flow-direction")?.getAttribute("marker-end"),
     "url(#route-direction-arrow)",
@@ -221,10 +215,8 @@ test("planRouteFromGridIndex keeps ordered points for current route endpoints an
     overlay.querySelector(".route-overlay-line")?.getAttribute("points"),
     orderedPoints,
   );
-  assert.equal(
-    overlay.querySelector(".route-flow-line")?.getAttribute("points"),
-    orderedPoints,
-  );
+  assert.equal(overlay.querySelector(".route-flow-line"), null);
+  assert.equal(overlay.querySelectorAll(".route-motion-cue").length, 5);
   assert.equal(
     overlay.querySelector(".route-start-marker")?.getAttribute("transform"),
     `translate(${route.points[0].x} ${route.points[0].y})`,

@@ -150,16 +150,11 @@
   stroke-opacity: 0.78;
 }
 
-.route-flow-comet,
-.route-flow-line {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.96);
-  stroke-width: var(--route-flow-stroke-width, 9px);
+.route-motion-cue {
+  fill: rgba(255, 255, 255, 0.96);
+  stroke: rgba(0, 0, 0, 0.45);
+  stroke-width: 2px;
   vector-effect: non-scaling-stroke;
-  stroke-linecap: round;
-  stroke-dasharray: var(--route-flow-cue-length, 24)
-    var(--route-flow-gap-length, 76);
-  animation: route-flow-comet var(--route-flow-duration, 600ms) linear infinite;
   pointer-events: none;
 }
 
@@ -174,12 +169,6 @@
 .route-direction-arrow {
   fill: var(--danger);
   stroke: none;
-}
-
-@keyframes route-flow-comet {
-  to {
-    stroke-dashoffset: -100;
-  }
 }
 
 .route-endpoint {
@@ -200,10 +189,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .route-flow-comet,
-  .route-flow-line {
-    animation: none;
-  }
+  .route-motion-cue { opacity: 0; }
+}
+
+#navigation-map[data-route-motion="on"] .route-motion-cue {
+  opacity: 1;
+}
+
+#navigation-map[data-route-motion="off"] .route-motion-cue {
+  opacity: 0;
 }
 
 .route-overlay-candidate .route-overlay-line {

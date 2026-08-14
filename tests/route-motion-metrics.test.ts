@@ -40,8 +40,8 @@ test("keeps screen speed stable when zoom changes", () => {
 
   assert.ok(initial);
   assert.ok(zoomed);
-  assert.ok(Math.abs(initial.speedScreenPxPerSecond - 96) < 0.001);
-  assert.ok(Math.abs(zoomed.speedScreenPxPerSecond - 96) < 0.001);
+  assert.ok(Math.abs(initial.speedScreenPxPerSecond - 160) < 0.001);
+  assert.ok(Math.abs(zoomed.speedScreenPxPerSecond - 160) < 0.001);
   assert.ok(zoomed.durationMs > initial.durationMs);
 });
 

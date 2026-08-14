@@ -1,6 +1,6 @@
 const TARGET_CUE_SCREEN_PX = 24;
 const MAX_CUE_ROUTE_FRACTION = 0.4;
-const TARGET_SPEED_SCREEN_PX_PER_SECOND = 96;
+const TARGET_SPEED_SCREEN_PX_PER_SECOND = 160;
 const MIN_DURATION_MS = 600;
 
 export interface RouteMotionMetricsInput {
