@@ -2,51 +2,68 @@
 
 更新日: 2026-08-14
 
-この文書を現在フェーズ・現在Task・次Task・未完了外部確認の正本とする。各Taskの詳細は`docs/plans/phase-07-4/`とreview文書を参照する。
+この文書を、現在フェーズ、現在Task、次に着手するTask、未完了の外部確認の唯一の正本とする。
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.4（Task 18人間受入FAIL・follow-up中）**
-- 現在Task: **Task 19: Android実機でcurrent route animationを診断・修正**
-- 次に着手するTask: **Task 19**
+- 現在フェーズ: **Phase 7.4（第二回人間受入FAILにより再オープン）**
+- 現在Task: **Task 23: 経路アニメーション設定をアプリ内へ追加**
+- 次に着手するTask: **Task 23**
 - canonical plan: `docs/plans/phase-07-4/README.md`
-- 人間受入FAIL: `docs/reviews/phase-07-4-human-acceptance-failures.md`
-- 自動/外部検証: `docs/reviews/phase-07-4-field-verification.md`
+- 最新設計: `docs/specs/2026-08-14-phase-07-4-motion-and-map-workspace-redesign.md`
+- 最新人間受入記録: `docs/reviews/phase-07-4-second-human-acceptance-failures.md`
 
-Task 1〜17の実装履歴は保持する。Task 18の自動再検証では新規回帰を修正した後、`npm run test:e2e:ci`が60 passed / 7既存snapshot failed / 8 skippedとなった。その後の2026-08-14 Android実画面確認で3件が残ったため、Phase終了判定はFAILした。
+Task開始時の基準commitは、実装開始直前の対象branch最新remote HEADから取得する。文書中の過去SHAを実装開始点として固定しない。
 
-## 未解決事項
+## 履歴の扱い
 
-| 問題 | 対応Task |
-|---|---|
-| Android Chrome実機でcurrent route animationが見えない。`prefers-reduced-motion`かproduction描画か未分離 | Task 19 |
-| 通常route map / 独立「地図」で横長mapが小さく操作しづらい | Task 20 |
-| 独立「地図」でお品書きcardがmapを覆う。leader line自体は良好 | Task 21 |
+Task 1〜18の実装・検証履歴は保持する。第二回人間確認で改善済みと判断された近接pin、candidate青線、priority/件数/hold、目的地action、購入Undo、leader line、表示中心等を未実装へ巻き戻さない。
 
-Task 19ではAndroid実機の`prefers-reduced-motion`、production `CSSAnimation`の存在・進行・可視性を順に確認する。`reduce`ならanimationを強制せず、`no-preference`でも再現する場合だけproduction描画を修正する。
+Task 19〜22は2026-08-14の第二回実機確認より前に作成した**未実装の暫定計画**である。実機結果によって前提が変わったため、実装せずTask 23〜27へ置換する。後続sessionはTask 19〜22を実装開始点にしない。
 
-Task 20では横長mapの全体containを絶対条件にせず、390px程度のphoneで約280pxの地図高さを目安にし、必要なら左右crop + panを許可する。通常route mapと独立mapへ同じ方針を適用する。
+## 第二回人間確認で確定した残件
 
-Task 21では周辺cardをmap外の下部stripへ移し、leader lineを地図上anchorから外側cardへ維持する。pan/zoom/strip scrollでcard DOMを再生成しない。
+### 経路アニメーション
 
-## Task状態
+Motorola Androidで`Animator 再生時間スケール=0x`のときcurrent route motionが見えず、この設定だけを1xにするとmotionが見えることを確認した。同時にmap pan/dragが重くなり、通常Androidアプリのanimationも復活した。
 
-- Task 1〜17: 完了。Task 12はAndroid実機FAILをTask 19へ、Task 14はwide-map補正をTask 20へ、Task 15はcard外部配置をTask 21へ引き継ぐ。
-- Task 18: **完了（人間受入FAIL）**。
-- Task 19: 未着手。
-- Task 20: 未着手。
-- Task 21: 未着手。
-- Task 22: 未着手。Task 19〜21後の最終人間受入。
+利用者にOS全体を1xへ変更させる運用は採用しない。アプリ内`system / always / off`設定と、5個程度・約160px/sの軽量moving cueへ再設計する。gesture中はmap操作を優先する。
 
-## 外部確認残件
+### 独立「地図」画面
 
-- 実GASの同一space更新・既存Sheet列保持。
-- Phase 7.3からのmap drag体感遅延はphysical inputで再現できる場合のみ再調査する。
+第二回確認画面では上部・左右の余白に対してmapが小さい。card非重複とleader lineは改善したが、お品書きが横一列stripのため5件でも水平slideが必要で、画像aspectも一律に見える。`お品書きを見る`のdetailはnearby mapの背面へ入り、一度mapを閉じないと見られない。
+
+地図をfull-height workspaceの主役にし、narrow/mediumでは折り返しgrid、wideではright side panelを使う。cardはmap外で自然aspect ratioを保つ。既存catalog detailをnearby mapより前面へ表示し、map stateを維持する。
+
+詳細は`docs/specs/2026-08-14-phase-07-4-motion-and-map-workspace-redesign.md`を正本とする。
+
+## Phase 7.4 後続Task
+
+| Task | 内容 | 状態 | 依存 |
+|---|---|---|---|
+| 1〜18 | 初期実装・第一回follow-up | 完了履歴 | 各Task参照 |
+| 19〜22 | 第二回確認前の暫定案 | 置換済み・実装禁止 | - |
+| 23 | 経路アニメーション設定をアプリ内へ追加 | **未着手 / 現在Task** | Task 18 |
+| 24 | 軽量な複数経路cueへ置換 | 未着手 | Task 23 |
+| 25 | 独立地図をレスポンシブなworkspaceへ再設計 | 未着手 | Task 24後推奨 |
+| 26 | お品書き詳細を地図より前面に表示 | 未着手 | Task 25 |
+| 27 | 経路motion・地図workspaceの最終人間受入 | 未着手 | Task 23〜26 |
+
+## 既存の外部確認残件
+
+- 実GASで同一space再送が既存行更新になる明示証拠。
+- GAS更新時に対象外の既存Sheet列が保持される明示証拠。
+
+これらは今回のanimation/map workspace follow-upとは独立しており、Task 23〜27の実装範囲へ混ぜない。資格情報がないことを理由にTask 23〜26を止めない。
 
 ## 進行規則
 
-- 一度に一Taskずつ実装・review・commitする。
-- Task 19で`prefers-reduced-motion: reduce`を無視しない。
-- Task 21でtransformごとのcard DOM再生成を再導入しない。
-- Task 22はheadless自動検証だけで人間受入済みにしない。
+- 一度に一Taskだけ実装・review・commitする。
+- 各Taskはfocused REDを先に作る。
+- Task 23〜24でOS Animator設定を変更する処理を作らない。
+- Task 24はframeごとのroute再計算、SVG再生成、cue DOM再生成を禁止する。
+- Task 25はcardをmap上へ戻したり水平一列stripへ戻したりしない。
+- Task 26はcatalog viewerを二重実装しない。
+- Task 27はheadless自動テストだけで完了判定しない。Motorola実機のAnimator=0とmap操作、実画面workspace/detailを人間が確認する。
 - snapshotは人間visual確認なしに一括更新しない。
+- 未完了WIPを破棄、resetして過去Taskから再出発しない。
