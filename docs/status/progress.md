@@ -6,9 +6,9 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.5（Task 5完了、Task 6着手）**
-- 現在Task: **Task 6: fresh start ALNSとpreview-only progress contractをproduction接続**
-- 次に着手するTask: **Task 6**
+- 現在フェーズ: **Phase 7.5（Task 6完了、Task 7着手）**
+- 現在Task: **Task 7: ALNS best orderを地図上でlive preview**
+- 次に着手するTask: **Task 7**
 - canonical plan: `docs/plans/phase-07-5/README.md`
 - 設計: `docs/specs/2026-08-14-phase-07-5-map-first-ui-and-alns-visualization-design.md`
 - planning basis: `docs/reviews/phase-07-5-planning-basis.md`
@@ -51,7 +51,7 @@ Phase 7.5では既存worker群を接続し、progressをephemeral preview、comp
 | 3 | 独立地図の補助controlsをcompact drawer化 | **完了（f637fbf）** | Task 1 |
 | 4 | 周辺cardをperimeter配置し10件単位paginationを追加 | **完了（a2016c3）** | Task 3 |
 | 5 | map関連UIのinteraction polish | **完了（d671a23）** | Task 2〜4 |
-| 6 | fresh start ALNSとpreview-only progress contractをproduction接続 | 未着手 | Task 1 |
+| 6 | fresh start ALNSとpreview-only progress contractをproduction接続 | **完了（d0c0e69）** | Task 1 |
 | 7 | ALNS best orderを地図上でlive preview | 未着手 | Task 6、Task 2 |
 | 8 | 統合回帰・実機/人間受入 | 未着手 | Task 1〜7 |
 
@@ -110,3 +110,11 @@ Phase 7.5では既存worker群を接続し、progressをephemeral preview、comp
 - route詳細のEscapeで詳細だけを閉じ、詳細toggleへfocusを戻す。nearbyの既存close focus復帰も維持。
 - focused verification: Task 5 Vitest 3 files / 15 tests passed、対象nearby/map-first E2E 2 tests passed、keyboard E2E 2 projects passed、`npm run check:webapp` passed、`git diff --check` passed。
 - 指定E2E全体は26 passed / 8 failed。失敗はTask 2 map-first変更に伴う既存visual snapshot差分と旧来の詳細表示前提で、snapshotは人間visual確認前のため更新していない。
+
+## Task 6完了記録
+
+- `PrepareRouteOptimizationUseCase`を追加し、fresh startで`searchNext()`から渡された同一`pendingCircles`だけをmatrix endpointsとALNS inputへ接続した。候補の再取得やpriority/holdの再解釈は行わない。
+- composition rootで既存`DistanceMatrixController`をLocalStorage repositoryとdistance-matrix workerへ接続し、cache hit時はworker再計算を避ける。matrix準備失敗時は表示中のcurrent exact routeを維持する。
+- `RouteOptimizationPreview`/callbacksを追加し、ALNS progressはpreview callbackのみ、completeだけがNavigationStateとsnapshotへcommitする。stale/cancelled jobは世代無効化でUI/stateを更新しない。
+- worker progressは初回即時、改善通知は250ms以上でcoalesceし、completeは即時通知する。
+- focused verification: Task 6 Vitest 6 files / 38 tests passed、`npm run check:webapp` passed、`npm run build:webapp` passed、`git diff --check` passed。
