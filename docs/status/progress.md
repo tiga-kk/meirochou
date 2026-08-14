@@ -6,9 +6,9 @@
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.5（Task 4完了、Task 5着手可能）**
-- 現在Task: **Task 5: map関連UIのinteraction polish**
-- 次に着手するTask: **Task 5**
+- 現在フェーズ: **Phase 7.5（Task 5完了、Task 6着手）**
+- 現在Task: **Task 6: fresh start ALNSとpreview-only progress contractをproduction接続**
+- 次に着手するTask: **Task 6**
 - canonical plan: `docs/plans/phase-07-5/README.md`
 - 設計: `docs/specs/2026-08-14-phase-07-5-map-first-ui-and-alns-visualization-design.md`
 - planning basis: `docs/reviews/phase-07-5-planning-basis.md`
@@ -50,7 +50,7 @@ Phase 7.5では既存worker群を接続し、progressをephemeral preview、comp
 | 2 | 経路画面をmap-first surfaceへ再構成 | **完了（c70cf32）** | Task 1 |
 | 3 | 独立地図の補助controlsをcompact drawer化 | **完了（f637fbf）** | Task 1 |
 | 4 | 周辺cardをperimeter配置し10件単位paginationを追加 | **完了（a2016c3）** | Task 3 |
-| 5 | map関連UIのinteraction polish | 未着手 | Task 2〜4 |
+| 5 | map関連UIのinteraction polish | **完了（d671a23）** | Task 2〜4 |
 | 6 | fresh start ALNSとpreview-only progress contractをproduction接続 | 未着手 | Task 1 |
 | 7 | ALNS best orderを地図上でlive preview | 未着手 | Task 6、Task 2 |
 | 8 | 統合回帰・実機/人間受入 | 未着手 | Task 1〜7 |
@@ -102,3 +102,11 @@ Phase 7.5では既存worker群を接続し、progressをephemeral preview、comp
 - page/filter/area/origin変更時はpageを先頭へ戻し、pan/zoomではcard DOMを再生成せずleader geometryだけを更新する既存経路を維持。
 - selected cardの操作はcard内から`nearby-selection-toolbar`へ分離し、画像の自然aspect ratioを維持。
 - focused verification: Task 4 Vitest 5 files / 19 tests passed、mobile nearby E2E 3 tests passed、desktop workspace E2E 2 tests passed、`npm run check:webapp` passed、`npm run build:webapp` passed、`git diff --check` passed。
+
+## Task 5完了記録
+
+- map関連button/controlに44px操作領域、hover/active/focus-visible、selected/disabled/busyの視覚状態、reduced-motion時のtransition停止を追加。
+- 購入・保留とnearbyの目的地設定をpending中disabled/`aria-busy`にし、カードのdrag/pointerupを選択clickへ変換しないようにした。
+- route詳細のEscapeで詳細だけを閉じ、詳細toggleへfocusを戻す。nearbyの既存close focus復帰も維持。
+- focused verification: Task 5 Vitest 3 files / 15 tests passed、対象nearby/map-first E2E 2 tests passed、keyboard E2E 2 projects passed、`npm run check:webapp` passed、`git diff --check` passed。
+- 指定E2E全体は26 passed / 8 failed。失敗はTask 2 map-first変更に伴う既存visual snapshot差分と旧来の詳細表示前提で、snapshotは人間visual確認前のため更新していない。
