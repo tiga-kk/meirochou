@@ -122,6 +122,7 @@ export class DomNearbyMapView {
   private selectedPriorities: readonly number[] | null = null;
   private includeHeld = false;
   private nearbyLimit: NearbyCircleLimit = 5;
+  private controlsExpanded = false;
   private selectedSpace: string | null = null;
   private selectionMode = false;
   private tapStart: { pointerId: number; clientX: number; clientY: number } | null = null;
@@ -161,15 +162,21 @@ export class DomNearbyMapView {
       <div class="nearby-map-dialog">
         <div class="nearby-map-header">
           <h2 id="nearby-map-title">地図</h2>
-          <button type="button" id="btn-close-nearby-map" class="btn-close-modal" aria-label="地図を閉じる">×</button>
+          <div class="nearby-map-header-actions">
+            <span id="nearby-map-filter-summary" class="nearby-map-filter-summary"></span>
+            <button type="button" id="btn-nearby-toggle-controls" class="nearby-map-toggle-controls" aria-expanded="false" aria-controls="nearby-map-controls">条件</button>
+            <button type="button" id="btn-close-nearby-map" class="btn-close-modal" aria-label="地図を閉じる">×</button>
+          </div>
         </div>
-        <label class="nearby-map-area-label" for="nearby-map-area">エリア</label>
+        <div id="nearby-map-controls" class="nearby-map-controls" aria-label="周辺地図の絞り込み" hidden>
+          <div class="nearby-map-area-control">
+            <label class="nearby-map-area-label" for="nearby-map-area">エリア</label>
           <select id="nearby-map-area" class="nearby-map-area-select"></select>
-        <div class="nearby-map-origin-controls">
-          <button type="button" id="btn-nearby-use-current-location">現在地を使う</button>
-          <button type="button" id="btn-nearby-select-origin">基準地点を変更</button>
-        </div>
-        <div id="nearby-map-controls" class="nearby-map-controls" aria-label="周辺地図の絞り込み">
+          </div>
+          <div class="nearby-map-origin-controls">
+            <button type="button" id="btn-nearby-use-current-location">現在地を使う</button>
+            <button type="button" id="btn-nearby-select-origin">基準地点を変更</button>
+          </div>
           <div class="nearby-map-filter-group">
             <span class="nearby-map-filter-label">優先度</span>
             <div id="nearby-map-priority-filter" class="nearby-map-priority-filter"></div>
@@ -204,6 +211,9 @@ export class DomNearbyMapView {
       </div>`;
     this.renderAreaOptions();
     this.surface.querySelector("#btn-close-nearby-map")?.addEventListener("click", () => this.close());
+    this.surface.querySelector("#btn-nearby-toggle-controls")?.addEventListener("click", () => {
+      this.setControlsExpanded(!this.controlsExpanded);
+    });
     this.surface.querySelector("#nearby-map-area")?.addEventListener("change", (event) => {
       void this.selectArea((event.target as HTMLSelectElement).value);
     });
@@ -270,6 +280,7 @@ export class DomNearbyMapView {
     if (!this.surface || this.areas.length === 0) return;
     this.opener = opener;
     this.surface.classList.remove("hidden");
+    this.setControlsExpanded(false);
     this.renderAreaOptions();
     this.renderNearbyControls();
     const fallback = this.areas.find((area) =>
@@ -373,6 +384,31 @@ export class DomNearbyMapView {
       held.checked = this.includeHeld;
       held.onchange = () => this.setNearbyFilters({ includeHeld: held.checked });
     }
+    this.updateFilterSummary();
+  }
+
+  private setControlsExpanded(expanded: boolean): void {
+    this.controlsExpanded = Boolean(expanded);
+    const controls = this.surface?.querySelector(
+      "#nearby-map-controls",
+    ) as HTMLElement | null;
+    const toggle = this.surface?.querySelector(
+      "#btn-nearby-toggle-controls",
+    ) as HTMLButtonElement | null;
+    if (controls) controls.hidden = !this.controlsExpanded;
+    toggle?.setAttribute("aria-expanded", String(this.controlsExpanded));
+    this.applyViewportLayout();
+  }
+
+  private updateFilterSummary(): void {
+    const summary = this.surface?.querySelector("#nearby-map-filter-summary");
+    if (!summary) return;
+    const area = this.activeArea ?? this.areas[0];
+    const areaLabel = area?.name ?? area?.displayName ?? (area ? areaId(area) : "エリア");
+    const priorities = this.selectedPriorities?.length
+      ? this.selectedPriorities.join(",")
+      : "すべて";
+    summary.textContent = `${areaLabel}・${priorities}・${this.nearbyLimit}件`;
   }
 
   private renderAreaOptions(): void {
@@ -390,6 +426,7 @@ export class DomNearbyMapView {
     const area = this.areas.find((candidate) => areaId(candidate) === id);
     if (!area || !this.surface) return;
     this.activeArea = area;
+    this.updateFilterSummary();
     this.activeAssets = null;
     this.nearbyViewportPoints = [];
     this.origin = null;

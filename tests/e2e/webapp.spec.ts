@@ -99,7 +99,21 @@ test("周辺地図のお品書きカードとleader lineから既存拡大表示
   await expect(page.locator("#loc-label")).toHaveValue("ア");
   await page.locator("#loc-number").fill("10");
   await page.getByRole("button", { name: "地図" }).click();
+  const nearbyControlsToggle = page.getByRole("button", { name: "条件" });
+  await expect(nearbyControlsToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#nearby-map-controls")).toBeHidden();
+  await nearbyControlsToggle.click();
+  await expect(nearbyControlsToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator("#nearby-map-controls")).toBeVisible();
   await page.getByRole("button", { name: "現在地を使う" }).click();
+
+  const expandedWorkspace = await page.locator("#nearby-map-workspace").boundingBox();
+  await nearbyControlsToggle.click();
+  await expect(nearbyControlsToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#nearby-map-controls")).toBeHidden();
+  const collapsedWorkspace = await page.locator("#nearby-map-workspace").boundingBox();
+  expect(collapsedWorkspace?.height).toBeGreaterThan(expandedWorkspace?.height ?? 0);
+  await nearbyControlsToggle.click();
 
   const cards = page.locator(".nearby-catalog-card");
   await expect(cards).toHaveCount(2);
@@ -234,6 +248,7 @@ test("周辺地図のお品書きカードとleader lineから既存拡大表示
   await expect(page.locator("#nearby-map-surface")).toBeHidden();
   await page.getByRole("button", { name: "地図" }).click();
   await expect(page.locator("#nearby-map-surface")).toBeVisible();
+  await page.getByRole("button", { name: "条件" }).click();
   await page.getByRole("button", { name: "現在地を使う" }).click();
   await expect(cards).toHaveCount(2);
   await cards.first()
@@ -247,6 +262,7 @@ test("地図の基準地点は選択モード中のtapだけで変更される",
   await page.goto("/");
 
   await page.getByRole("button", { name: "地図" }).click();
+  await page.getByRole("button", { name: "条件" }).click();
   const viewport = page.locator("#nearby-map-viewport");
   const stage = page.locator("#nearby-map-layer");
   const marker = page.locator("#nearby-map-origin-marker");

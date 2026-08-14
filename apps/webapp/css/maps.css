@@ -87,6 +87,35 @@
   margin: 0;
 }
 
+.nearby-map-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.nearby-map-filter-summary {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-sub);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nearby-map-toggle-controls {
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--ink);
+  background: var(--bg-card);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .nearby-map-area-label {
   font-weight: 700;
 }
@@ -109,9 +138,19 @@
 }
 
 .nearby-map-controls {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--ink);
+  background: var(--panel);
+}
+
+.nearby-map-controls[hidden] {
+  display: none;
+}
+
+.nearby-map-area-control {
+  display: grid;
   gap: 8px;
 }
 

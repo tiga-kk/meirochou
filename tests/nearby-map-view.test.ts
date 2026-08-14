@@ -52,6 +52,30 @@ function createView() {
 }
 
 describe("DomNearbyMapView", () => {
+  it("opens with compact conditions collapsed and a filter summary", async () => {
+    renderDom();
+    const opener = document.getElementById("open-map") as HTMLButtonElement;
+    const { view, loader } = createView();
+
+    view.open(opener, "east");
+    await vi.waitFor(() => expect(loader.loadMapAssets).toHaveBeenCalled());
+
+    const toggle = document.getElementById("btn-nearby-toggle-controls");
+    const controls = document.getElementById("nearby-map-controls");
+    const summary = document.getElementById("nearby-map-filter-summary");
+    expect(toggle?.getAttribute("aria-expanded")).toBe("false");
+    expect(controls?.hidden).toBe(true);
+    expect(summary?.textContent).toContain("東123");
+
+    view.setNearbyFilters({ limit: 10, selectedPriorities: [2] });
+    expect(summary?.textContent).toContain("2・10件");
+    (toggle as HTMLButtonElement).click();
+    expect(controls?.hidden).toBe(false);
+    expect((document.getElementById("nearby-map-limit") as HTMLSelectElement).value).toBe("10");
+    (toggle as HTMLButtonElement).click();
+    expect(controls?.hidden).toBe(true);
+  });
+
   it("keeps the catalog panel and leader layer outside the map viewport", () => {
     renderDom();
     createView();
