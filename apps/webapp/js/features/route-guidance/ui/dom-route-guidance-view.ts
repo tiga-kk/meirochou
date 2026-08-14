@@ -549,6 +549,7 @@ export class DomRouteGuidanceView {
 
     this.closeCandidatePreview();
     this.candidatePreviewTarget = target;
+    this.setTargetDetailExpanded(true);
     const state = this.lastNavigationState || {};
     const screenModel = buildRouteGuidanceScreenModel({
       currentDestination: target,
@@ -654,6 +655,7 @@ export class DomRouteGuidanceView {
     surface.classList.remove("hidden");
 
     this.candidatePreviewOutsideClick = (event) => {
+      if (this.els.toggleTargetDetail?.contains(event.target as Node)) return;
       if (!surface.contains(event.target)) {
         this.closeCandidatePreview({ cancelSelection: true });
       }
