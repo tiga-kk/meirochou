@@ -74,4 +74,48 @@ describe("route motion controller", () => {
     controller.dispose();
     expect(cancelFrame).toHaveBeenCalled();
   });
+
+  test("resumes a running animation after gesture activity ends", () => {
+    const callbacks = new Map<number, (time: number) => void>();
+    const frames: Array<readonly { x: number; y: number }[]> = [];
+    let nextId = 1;
+    const controller = createRouteMotionController({
+      cueCount: 1,
+      speedScreenPxPerSecond: 100,
+      requestFrame: (callback) => {
+        const id = nextId++;
+        callbacks.set(id, callback);
+        return id;
+      },
+      cancelFrame: (id) => callbacks.delete(id),
+      onFrame: (positions) => frames.push(positions),
+    });
+
+    controller.setRouteGeometry(
+      sampleRouteGeometry([
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+      ]),
+    );
+    controller.setEnabled(true);
+    controller.start();
+    const initialFrameId = [...callbacks.keys()][0];
+    const initialFrame = [...callbacks.values()][0];
+    callbacks.delete(initialFrameId);
+    initialFrame(0);
+    const pendingFrame = [...callbacks.keys()][0];
+    controller.setGestureActive(true);
+    expect(callbacks.size).toBe(0);
+
+    controller.setGestureActive(false);
+    expect(callbacks.size).toBe(1);
+    const resumedFrame = [...callbacks.values()][0];
+    resumedFrame(1000);
+    const nextFrame = [...callbacks.values()][0];
+    nextFrame(1500);
+
+    expect(frames.at(-1)?.[0].x).toBeGreaterThan(frames.at(-2)?.[0].x ?? 0);
+    expect(pendingFrame).toBe(2);
+    controller.dispose();
+  });
 });

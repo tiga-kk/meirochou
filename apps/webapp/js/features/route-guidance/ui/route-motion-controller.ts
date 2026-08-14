@@ -159,7 +159,7 @@ export function createRouteMotionController(
         lastTimestamp = null;
       } else if (resumeAfterGesture) {
         resumeAfterGesture = false;
-        start();
+        scheduleFrame();
       }
     },
     start,
