@@ -24,11 +24,17 @@ import {
   buildMapViewportPoints,
   calculateMapPinSize,
   calculateNativeImageScale,
-  calculateMinimumInteractiveMapHeight,
   findNearestMapViewportPoint,
   getPinPosition,
   normalizeExternalUrl,
 } from "./route-map-pin-model";
+
+function calculateStandaloneMapMinimumHeight(viewportWidth: number): number {
+  if (!Number.isFinite(viewportWidth) || viewportWidth <= 0) return 260;
+  return Math.round(
+    Math.max(260, Math.min(320, 260 + ((viewportWidth - 320) * 20) / 70)),
+  );
+}
 
 type NearbyArea = MapArea & {
   id: string;
@@ -87,7 +93,7 @@ export function calculateStandaloneMapViewportLayout(
   const stageHeight = input.imageHeight * scale;
   const minimumHeight = Math.min(
     input.availableHeight,
-    calculateMinimumInteractiveMapHeight(input.availableWidth),
+    calculateStandaloneMapMinimumHeight(input.availableWidth),
   );
   const naturalHeight =
     (input.availableWidth * input.imageHeight) / input.imageWidth;
