@@ -13,8 +13,9 @@
 - 最新設計: `docs/specs/2026-08-14-phase-07-4-motion-and-map-workspace-redesign.md`
 - 最新人間受入記録: `docs/reviews/phase-07-4-second-human-acceptance-failures.md`
 - レビュー指摘対応: 経路motionのgesture後resumeを`cfffd85`、nearby workspaceのJS/CSS mode統一を`e494ecb`で修正。
-- 人間確認前に作成されたsnapshot-only 3コミットの対象10枚は`0c7b476`で更新前へ復元済み。Task 27の人間visual確認までbaselineを更新しない。
-- 最終自動gate: `node scripts/audit-public-tree.mjs` と `git diff --check` はPASS。GitHub Actions `31769523375`（`193659f`）はunit/type/build/map assetsがPASS、mobile E2Eは復元済み7 visual baseline差分でFAIL（62 passed / 8 skipped）。
+- 人間確認前に作成されたsnapshot-only 3コミットの対象10枚は`0c7b476`で復元後、人間確認済みの状態を`6d564c2`でbaselineへ反映。
+- Task 27のMotorola Android実機確認、地図操作後のmotion再開、workspace/detail表示、visual差分確認は人間確認済み。最終CIのgreen確認を残す。
+- `node scripts/audit-public-tree.mjs` と `git diff --check` はPASS。baseline更新前のGitHub Actions `31769779927`（`c6fc1d0`）はunit/type/build/map assetsがPASS、mobile E2Eは7 visual差分でFAILしたため、承認後に再生成する。
 
 Task開始時の基準commitは、実装開始直前の対象branch最新remote HEADから取得する。文書中の過去SHAを実装開始点として固定しない。
 
@@ -50,7 +51,7 @@ Motorola Androidで`Animator 再生時間スケール=0x`のときcurrent route 
 | 24 | 軽量な複数経路cueへ置換 | **完了（b76be21）** | Task 23 |
 | 25 | 独立地図をレスポンシブなworkspaceへ再設計 | **完了** | Task 24後推奨 |
 | 26 | お品書き詳細を地図より前面に表示 | **完了** | Task 25 |
-| 27 | 経路motion・地図workspaceの最終人間受入 | 未着手 | Task 23〜26 |
+| 27 | 経路motion・地図workspaceの最終人間受入 | **人間確認済み・CI確認中** | Task 23〜26 |
 
 ## 既存の外部確認残件
 
