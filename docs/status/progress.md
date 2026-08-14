@@ -12,6 +12,8 @@
 - canonical plan: `docs/plans/phase-07-4/README.md`
 - 最新設計: `docs/specs/2026-08-14-phase-07-4-motion-and-map-workspace-redesign.md`
 - 最新人間受入記録: `docs/reviews/phase-07-4-second-human-acceptance-failures.md`
+- レビュー指摘対応: 経路motionのgesture後resumeを`cfffd85`、nearby workspaceのJS/CSS mode統一を`e494ecb`で修正。
+- 人間確認前に作成されたsnapshot-only 3コミットの対象10枚は`0c7b476`で更新前へ復元済み。Task 27の人間visual確認までbaselineを更新しない。
 
 Task開始時の基準commitは、実装開始直前の対象branch最新remote HEADから取得する。文書中の過去SHAを実装開始点として固定しない。
 
@@ -79,6 +81,7 @@ Motorola Androidで`Animator 再生時間スケール=0x`のときcurrent route 
 - current routeのfull-path dash animationを廃止し、5個の白いcueを単一rAF controllerで更新する方式へ置換。
 - gesture drag/pinch/慣性中はcue更新を停止し、`system/always/off`とdocument visibilityへ接続。
 - focused verification: 5 files / 111 tests passed、`npm run check:webapp` passed、`npm run test:webapp` 119 files / 807 tests passed、`npm run build:webapp` passed。
+- gesture開始前から動作中の経路がgesture終了後に自動resumeする回帰testを追加し、focused testで確認済み。
 - targeted Playwrightは機能assertionを通過。map表示変更に伴う既存snapshot 2件は人間visual確認待ちで更新していない。
 
 ## Task 25完了記録
@@ -86,6 +89,7 @@ Motorola Androidで`Animator 再生時間スケール=0x`のときcurrent route 
 - 独立地図をfull-height workspaceへ再構成し、narrow/mediumは上下grid、wideは右catalog panelへ配置。
 - カードをmap外の折り返しgridへ移し、横一列stripを廃止。画像は自然aspect ratioを基本にし、leader SVGはworkspace全体を基準に更新。
 - narrow/medium/wideとbounded-cover判定を純粋なgeometry helperへ分離し、pan/zoom時は既存card DOMを再生成せずleader端点だけ更新。
+- CSSのwide/medium切替をJSの`data-mode`へ統一し、panel geometry用custom propertyをworkspaceへ設定。920px/1024pxの実DOM geometry testをDesktop Chromeで追加。
 - focused verification: workspace/view/aspect/catalog tests passed、`npm run check:webapp` passed、`npm run build:webapp` passed、対象E2Eの機能assertion passed。既存snapshot 1件は人間visual確認待ちで更新していない。
 
 ## Task 26完了記録
