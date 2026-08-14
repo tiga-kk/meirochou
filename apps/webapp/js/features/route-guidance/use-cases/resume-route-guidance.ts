@@ -20,6 +20,7 @@ import type {
 import type { NavigationSnapshot } from "./route-guidance-snapshot-repository";
 import type { RouteMapAssetsLoader } from "./route-map-assets-loader";
 import { parseSpace } from "../../../shared/domain/space-parser";
+import type { RouteOptimizationCallbacks } from "./route-optimization-preview";
 
 export interface ResumeRouteGuidanceInput {
   readonly eventDay: EventDayRef;
@@ -67,7 +68,7 @@ export interface RouteGuidanceRuntimePort {
       randomSeed: number;
       initialSolutions: readonly (readonly string[])[];
     },
-    onProgress: (updatedState: NavigationState) => void,
+    callbacks: RouteOptimizationCallbacks | ((updatedState: NavigationState) => void),
   ): NavigationState;
   saveSnapshot(
     eventId: string,
@@ -226,6 +227,32 @@ export class ResumeRouteGuidanceUseCase {
     }
 
     try {
+      const commitNavigationState = (nextNavState: NavigationState) => {
+        const currentNavState = this.session.getSnapshot().navigationState;
+        if (
+          currentNavState &&
+          (currentNavState.targetSpace !== nextNavState.targetSpace ||
+            (currentNavState.optimizationGeneration !== undefined &&
+              nextNavState.optimizationGeneration !== undefined &&
+              currentNavState.optimizationGeneration !==
+                nextNavState.optimizationGeneration))
+        ) {
+          return;
+        }
+        this.session.replaceSnapshot({
+          ...this.session.getSnapshot(),
+          navigationState: nextNavState,
+        });
+        this.persistSnapshot(
+          snapshot,
+          nextNavState,
+          resumeResult.optimizationTimeLimitMs,
+        );
+      };
+      const callbacks = Object.assign(commitNavigationState, {
+        onPreview: () => undefined,
+        onCommit: commitNavigationState,
+      });
       navState = this.runtimeController.launchAlnsOptimization(
         {
           navState,
@@ -238,28 +265,7 @@ export class ResumeRouteGuidanceUseCase {
           randomSeed: 0,
           initialSolutions: optimizationInput.initialSolutions,
         },
-        (nextNavState) => {
-          const currentNavState = this.session.getSnapshot().navigationState;
-          if (
-            currentNavState &&
-            (currentNavState.targetSpace !== nextNavState.targetSpace ||
-              (currentNavState.optimizationGeneration !== undefined &&
-                nextNavState.optimizationGeneration !== undefined &&
-                currentNavState.optimizationGeneration !==
-                  nextNavState.optimizationGeneration))
-          ) {
-            return;
-          }
-          this.session.replaceSnapshot({
-            ...this.session.getSnapshot(),
-            navigationState: nextNavState,
-          });
-          this.persistSnapshot(
-            snapshot,
-            nextNavState,
-            resumeResult.optimizationTimeLimitMs,
-          );
-        },
+        callbacks,
       );
     } catch (error) {
       console.error("Failed to start ALNS optimization", error);

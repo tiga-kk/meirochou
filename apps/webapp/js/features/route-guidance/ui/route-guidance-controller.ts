@@ -24,6 +24,12 @@ import type {
 } from "../use-cases/resume-route-guidance";
 import type { StartRouteGuidanceUseCase } from "../use-cases/start-route-guidance";
 import type { RouteGuidanceNavigationOperations } from "../use-cases/route-guidance-navigation-operations";
+import type {
+  PrepareRouteOptimizationInput,
+  PrepareRouteOptimizationUseCase,
+} from "../use-cases/prepare-route-optimization";
+import type { RouteOptimizationCallbacks } from "../use-cases/route-optimization-preview";
+import type { NavigationState } from "../domain/route-guidance-types";
 
 export interface RouteGuidanceControllerDependencies {
   startGuidance: StartRouteGuidanceUseCase;
@@ -35,6 +41,7 @@ export interface RouteGuidanceControllerDependencies {
   applyOptimizedOrder?: ApplyOptimizedRouteOrderUseCase;
   navigationRuntimeController: RouteGuidanceRuntimePort;
   navigationOperations?: RouteGuidanceNavigationOperations;
+  prepareOptimization?: PrepareRouteOptimizationUseCase;
 }
 
 export interface InitializeResumeStartupInput {
@@ -58,6 +65,7 @@ export type InitializeResumeStartupResult =
 
 export class RouteGuidanceController {
   private optimizationTimeLimitMs: 5000 | 10000 | 15000 = 10000;
+  private optimizationRequest = 0;
 
   constructor(private deps: RouteGuidanceControllerDependencies) {}
 
@@ -80,10 +88,25 @@ export class RouteGuidanceController {
   async startFromCurrentLocation(
     input: StartRouteGuidanceControllerInput,
   ): Promise<void> {
-    return this.deps.startGuidance.execute({
+    this.invalidateOptimization();
+    await this.deps.startGuidance.execute({
       ...input,
       matrixRef: this.deps.navigationRuntimeController.getMatrixRef(),
       optimizationTimeLimitMs: this.optimizationTimeLimitMs,
+    });
+    if (!this.deps.prepareOptimization || !this.deps.session) return;
+    const request = ++this.optimizationRequest;
+    const started = this.deps.session.getSnapshot();
+    const navState = started.navigationState;
+    if (!navState?.currentPosition || input.pendingCircles.length === 0) return;
+    void this.prepareAndLaunchOptimization(request, {
+      eventDay: input.eventDay,
+      bundleVersion: input.bundleVersion,
+      areaId: navState.areaId ?? navState.currentPosition.areaId,
+      currentPosition: navState.currentPosition,
+      pendingCircles: input.pendingCircles as unknown as PrepareRouteOptimizationInput["pendingCircles"],
+      searchTimeLimitMs: this.optimizationTimeLimitMs,
+      navState,
     });
   }
 
@@ -131,6 +154,7 @@ export class RouteGuidanceController {
   }
 
   removePurchasedSpaceFromOrder(space: string): boolean {
+    this.invalidateOptimization();
     const session = this.deps.session;
     const operations = this.deps.navigationOperations;
     const snapshot = session?.getSnapshot();
@@ -150,6 +174,7 @@ export class RouteGuidanceController {
     circleSpace: string,
     circles: readonly Circle[],
   ): Promise<ManualDestinationResult> {
+    this.invalidateOptimization();
     return this.deps.changeDestination.changeManually({ circleSpace, circles });
   }
 
@@ -161,6 +186,7 @@ export class RouteGuidanceController {
   async finishCurrentCircle(
     input: FinishCurrentCircleInput,
   ): Promise<FinishCurrentCircleResult> {
+    this.invalidateOptimization();
     return this.deps.finishCircle.execute(input);
   }
 
@@ -170,10 +196,58 @@ export class RouteGuidanceController {
   }
 
   resetRuntimeState(): void {
-    this.deps.navigationRuntimeController.invalidateActiveOptimization();
+    this.invalidateOptimization();
     this.deps.navigationRuntimeController.setPendingResumeSnapshot(null);
     this.deps.navigationRuntimeController.setMatrixRef(null);
     this.reset();
+  }
+
+  private invalidateOptimization(): void {
+    this.optimizationRequest += 1;
+    this.deps.navigationRuntimeController?.invalidateActiveOptimization?.();
+  }
+
+  private async prepareAndLaunchOptimization(
+    request: number,
+    input: PrepareRouteOptimizationInput & { readonly navState: NavigationState },
+  ): Promise<void> {
+    try {
+      const prepared = await this.deps.prepareOptimization!.execute(input);
+      if (request !== this.optimizationRequest) return;
+      const current = this.deps.session!.getSnapshot();
+      if (!current.navigationState || current.navigationState.targetSpace !== input.navState.targetSpace) return;
+      this.deps.navigationRuntimeController.setMatrixRef(prepared.matrixRef);
+      const started = this.deps.navigationRuntimeController.launchAlnsOptimization(
+        {
+          navState: current.navigationState,
+          areaId: prepared.areaId,
+          startDistanceToCircles: prepared.startDistanceToCircles,
+          pendingCircles: prepared.pendingCircles,
+          distanceMatrix: prepared.distanceMatrix,
+          fixedFirstTarget: current.navigationState.targetSpace,
+          searchTimeLimitMs: prepared.searchTimeLimitMs,
+          randomSeed: 0,
+          initialSolutions: [],
+        },
+        {
+          onPreview: () => undefined,
+          onCommit: (nextNavState) => {
+            if (request !== this.optimizationRequest) return;
+            const snapshot = this.deps.session!.getSnapshot();
+            if (snapshot.navigationState?.targetSpace !== nextNavState.targetSpace) return;
+            this.deps.session!.replaceSnapshot({ ...snapshot, navigationState: nextNavState });
+            this.saveSnapshot(input.eventDay, input.bundleVersion);
+          },
+          onError: (code) => console.warn("Route optimization failed", code),
+        } satisfies RouteOptimizationCallbacks,
+      );
+      const snapshot = this.deps.session!.getSnapshot();
+      this.deps.session!.replaceSnapshot({ ...snapshot, navigationState: started });
+    } catch (error) {
+      if (request === this.optimizationRequest) {
+        console.warn("Route optimization preparation failed", error);
+      }
+    }
   }
 
   setOptimizationTimeLimit(value: 5000 | 10000 | 15000): void {

@@ -81,6 +81,9 @@ export class TimeDecayedAlnsWorkerKernel {
       }
 
       this.postProgress(jobId, problem, best, startedAt);
+      let lastProgressAt = startedAt;
+      let lastEmittedScore = best.score;
+      let dirty = false;
       let iterations = 0;
       while (
         maxIterations === undefined
@@ -98,7 +101,14 @@ export class TimeDecayedAlnsWorkerKernel {
             : Math.min(this.batchIterations, maxIterations - iterations);
         best = solver.step(batch);
         iterations += batch;
-        this.postProgress(jobId, problem, best, startedAt);
+        if (best.score > lastEmittedScore + 1e-9) dirty = true;
+        const now = this.now();
+        if (dirty && now - lastProgressAt >= 250) {
+          this.postProgress(jobId, problem, best, startedAt, now);
+          lastProgressAt = now;
+          lastEmittedScore = best.score;
+          dirty = false;
+        }
         await this.yieldControl();
       }
 
@@ -129,12 +139,13 @@ export class TimeDecayedAlnsWorkerKernel {
     problem: TimeDecayedAlnsProblem,
     best: TimeDecayedAlnsBestSolution,
     startedAt: number,
+    now = this.now(),
   ): void {
     this.postMessage({
       type: "progress",
       stage: "time-decayed-alns",
       jobId,
-      elapsedMs: Math.max(0, this.now() - startedAt),
+      elapsedMs: Math.max(0, now - startedAt),
       searchTimeLimitMs: problem.searchTimeLimitMs,
       best,
     });

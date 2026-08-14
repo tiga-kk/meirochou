@@ -164,6 +164,85 @@ describe("RouteGuidanceController", () => {
     });
   });
 
+  it("starts background optimization from the same filtered candidate collection", async () => {
+    const session = createRouteGuidanceSession();
+    const pendingCircles = [
+      { space: "東A01a", priority: 10 },
+      { space: "東A02b", priority: 10 },
+    ];
+    const startGuidance = {
+      execute: vi.fn(async () => {
+        session.replaceSnapshot({
+          navigationState: {
+            stage: "navigating",
+            areaId: "east",
+            currentPosition: {
+              areaId: "east",
+              gridIndex: 0,
+              svgX: 10,
+              svgY: 10,
+              source: "manual-start",
+            },
+            targetSpace: "東A01a",
+            lockedFirstLeg: {
+              from: { type: "start", areaId: "east", gridIndex: 0 },
+              toSpace: "東A01a",
+            },
+            provisionalOrder: ["東A01a", "東A02b"],
+            bestOrder: ["東A01a", "東A02b"],
+          },
+          currentDestination: null,
+          currentRoute: null,
+          selectedDestination: null,
+          selectedRoute: null,
+          selectionStatus: "idle",
+          routeOptimizationGeneration: 1,
+        });
+      }),
+    };
+    const prepareOptimization = {
+      execute: vi.fn(async (input) => ({
+        areaId: input.areaId,
+        matrixRef: "matrix-key",
+        pendingCircles: input.pendingCircles,
+        startDistanceToCircles: [10, 20],
+        distanceMatrix: [0, 5, 5, 0],
+        searchTimeLimitMs: input.searchTimeLimitMs,
+      })),
+    };
+    const runtime = {
+      getMatrixRef: vi.fn(() => null),
+      invalidateActiveOptimization: vi.fn(),
+      setMatrixRef: vi.fn(),
+      launchAlnsOptimization: vi.fn(({ navState }) => navState),
+    };
+    const controller = new RouteGuidanceController({
+      startGuidance: startGuidance as any,
+      resumeGuidance: {} as any,
+      changeDestination: {} as any,
+      finishCircle: {} as any,
+      session,
+      navigationRuntimeController: runtime as any,
+      prepareOptimization: prepareOptimization as any,
+    });
+
+    await controller.startFromCurrentLocation({
+      eventDay: { eventId: "event", dayId: "day" },
+      bundleVersion: "bundle-1",
+      currentLocation: { areaId: "east", label: "A", number: 1 },
+      pendingCircles,
+    });
+    await vi.waitFor(() => expect(runtime.launchAlnsOptimization).toHaveBeenCalledOnce());
+
+    expect(prepareOptimization.execute).toHaveBeenCalledWith(expect.objectContaining({
+      pendingCircles,
+    }));
+    expect(runtime.launchAlnsOptimization).toHaveBeenCalledWith(
+      expect.objectContaining({ pendingCircles }),
+      expect.objectContaining({ onPreview: expect.any(Function), onCommit: expect.any(Function) }),
+    );
+  });
+
   it("delegates the finish input and result without rebuilding guidance", async () => {
     const finishCircle = {
       execute: vi.fn(async () => ({ kind: "advanced" as const })),

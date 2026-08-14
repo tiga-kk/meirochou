@@ -98,4 +98,24 @@ describe("Phase 5C Task 6: TimeDecayedAlnsWorkerKernel", () => {
       stage: "time-decayed-alns",
     });
   });
+
+  test("coalesces improving progress to at most one notification per 250ms", async () => {
+    let now = 0;
+    const messages: TimeDecayedAlnsWorkerMessage[] = [];
+    const kernel = new TimeDecayedAlnsWorkerKernel(
+      (msg) => messages.push(msg),
+      {
+        now: () => now,
+        yieldControl: async () => { now += 100; },
+        batchIterations: 1,
+      },
+    );
+
+    await kernel.start("job-alns-throttle", makeProblem(), 20);
+
+    const progress = messages.filter((message) => message.type === "progress");
+    for (let index = 1; index < progress.length; index += 1) {
+      expect(progress[index].elapsedMs - progress[index - 1].elapsedMs).toBeGreaterThanOrEqual(250);
+    }
+  });
 });

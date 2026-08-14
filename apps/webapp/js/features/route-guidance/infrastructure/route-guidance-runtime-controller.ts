@@ -15,6 +15,10 @@ import type {
   StartupInitResult,
 } from "../use-cases/resume-route-guidance";
 import { parseTimeDecayedAlnsWorkerResponse } from "./worker/alns-worker-protocol";
+import type {
+  RouteOptimizationCallbacks,
+  RouteOptimizationPreview,
+} from "../use-cases/route-optimization-preview";
 
 export interface AlnsWorkerPort {
   onmessage: ((event: MessageEvent<unknown>) => void) | null;
@@ -46,6 +50,10 @@ export interface OptimizationStartResult {
 export interface LaunchOptimizationInput extends OptimizationProblemInput {
   readonly navState: NavigationState;
 }
+
+type OptimizationCallbacks =
+  | RouteOptimizationCallbacks
+  | ((updatedState: NavigationState) => void);
 
 export class RouteGuidanceRuntimeController {
   private readonly snapshotRepo: LocalStorageRouteGuidanceSnapshotRepository;
@@ -140,7 +148,7 @@ export class RouteGuidanceRuntimeController {
 
   launchAlnsOptimization(
     input: LaunchOptimizationInput,
-    onProgress: (updatedState: NavigationState) => void,
+    callbacks: OptimizationCallbacks,
   ): NavigationState {
     // Validate and prepare all input before advancing the orchestration
     // generation. A malformed problem must not invalidate the active job.
@@ -166,6 +174,24 @@ export class RouteGuidanceRuntimeController {
     const { jobId, generation } = optimization;
 
     let currentState = optimization.navState;
+    const legacyProgress =
+      typeof callbacks === "function" &&
+      !("onPreview" in callbacks && "onCommit" in callbacks)
+        ? callbacks
+        : null;
+    const handlers: RouteOptimizationCallbacks = legacyProgress
+      ? {
+          onPreview: (preview) => {
+            const previewState = this.orchestration.handleWorkerProgress(
+              currentState,
+              preview.bestOrder,
+              currentState.optimizationGeneration,
+            );
+            legacyProgress(previewState);
+          },
+          onCommit: legacyProgress,
+        }
+      : callbacks as RouteOptimizationCallbacks;
 
     this.worker.onmessage = (event: MessageEvent<unknown>) => {
       const response = parseTimeDecayedAlnsWorkerResponse(event.data);
@@ -179,13 +205,28 @@ export class RouteGuidanceRuntimeController {
         (response.type === "progress" || response.type === "complete") &&
         response.best?.route
       ) {
-        currentState = this.orchestration.handleWorkerProgress(
+        const nextState = this.orchestration.handleWorkerProgress(
           currentState,
           response.best.route,
           currentState.optimizationGeneration,
         );
-        onProgress(currentState);
+        if (response.type === "progress") {
+          const preview: RouteOptimizationPreview = {
+            jobId: response.jobId,
+            generation,
+            elapsedMs: response.elapsedMs,
+            searchTimeLimitMs: response.searchTimeLimitMs as 5000 | 10000 | 15000,
+            bestOrder: nextState.bestOrder,
+            score: response.best.score,
+          };
+          handlers.onPreview(preview);
+          return;
+        }
+        currentState = nextState;
+        handlers.onCommit(currentState);
       }
+      if (response.type === "cancelled") handlers.onCancel?.();
+      if (response.type === "error") handlers.onError?.(response.code);
     };
 
     try {

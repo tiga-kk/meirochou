@@ -16,6 +16,8 @@ export * from "./use-cases/route-guidance-snapshot-repository";
 export * from "./use-cases/route-map-assets-loader";
 export * from "./use-cases/route-optimizer";
 export * from "./use-cases/start-route-guidance";
+export * from "./use-cases/prepare-route-optimization";
+export * from "./use-cases/route-optimization-preview";
 export { DomRouteGuidanceView } from "./ui/dom-route-guidance-view";
 export {
   DomNearbyMapView,

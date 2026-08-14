@@ -326,6 +326,69 @@ describe("Phase 5C Task 11: NavigationRuntimeController", () => {
     ]);
   });
 
+  test("keeps progress ephemeral and commits the best order only on complete", () => {
+    let postedMessage: any = null;
+    const fakeWorker = {
+      postMessage(message: unknown) {
+        postedMessage = message;
+      },
+      onmessage: null as ((event: { data: unknown }) => void) | null,
+    };
+    const controller = new NavigationRuntimeController({
+      snapshotRepo: new LocalStorageNavigationSnapshotRepository(localStorage),
+      matrixRepo: new LocalStorageDistanceMatrixRepository(localStorage),
+      orchestration: new NavigationOrchestrationService(),
+      workerFactory: () => fakeWorker as unknown as Worker,
+    });
+    const navState = {
+      stage: "navigating" as const,
+      areaId: "e456",
+      currentPosition: null,
+      targetSpace: "A-01",
+      lockedFirstLeg: null,
+      provisionalOrder: ["A-01", "A-02"],
+      bestOrder: ["A-01", "A-02"],
+    };
+    const onPreview = vi.fn();
+    const onCommit = vi.fn();
+    controller.launchAlnsOptimization(
+      {
+        navState,
+        areaId: "e456",
+        startDistanceToCircles: [10, 20],
+        pendingCircles: [
+          { space: "A-01", priority: 1 },
+          { space: "A-02", priority: 2 },
+        ],
+        distanceMatrix: [0, 5, 5, 0],
+        fixedFirstTarget: "A-01",
+        searchTimeLimitMs: 10000,
+        initialSolutions: [],
+      },
+      { onPreview, onCommit },
+    );
+    const response = (type: "progress" | "complete") => ({
+      type,
+      stage: "time-decayed-alns",
+      jobId: postedMessage.jobId,
+      ...(type === "progress" ? { elapsedMs: 250, searchTimeLimitMs: 10000 } : {}),
+      best: {
+        score: 8,
+        route: ["A-01", "A-02"],
+        completionTimesSec: [5, 15],
+        elapsedMs: 250,
+        optimizationProfileVersion: "v1",
+      },
+    });
+
+    fakeWorker.onmessage?.({ data: response("progress") });
+    expect(onPreview).toHaveBeenCalledOnce();
+    expect(onCommit).not.toHaveBeenCalled();
+
+    fakeWorker.onmessage?.({ data: response("complete") });
+    expect(onCommit).toHaveBeenCalledOnce();
+  });
+
   test("invalidateActiveOptimization terminates the old worker and ignores stale progress callbacks", () => {
     let postedMessage: unknown = null;
     const fakeWorker = {

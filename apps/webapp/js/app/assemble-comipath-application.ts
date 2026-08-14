@@ -58,6 +58,7 @@ import { runtimeMapAreaCatalog } from "../features/route-guidance/infrastructure
 import type { MapAreaCatalog } from "../features/route-guidance/domain/map-area";
 import { HttpRouteMapAssetsLoader } from "../features/route-guidance/infrastructure/http-route-map-assets-loader";
 import { LocalStorageDistanceMatrixRepository } from "../features/route-guidance/infrastructure/local-storage-distance-matrix-repository";
+import { DistanceMatrixController } from "../features/route-guidance/infrastructure/distance-matrix-controller";
 import { LocalStorageRouteGuidanceSnapshotRepository } from "../features/route-guidance/infrastructure/local-storage-route-guidance-snapshot-repository";
 import { RouteGuidanceRuntimeController } from "../features/route-guidance/infrastructure/route-guidance-runtime-controller";
 import { RouteGuidanceController } from "../features/route-guidance/ui/route-guidance-controller";
@@ -68,6 +69,7 @@ import { ResumeRouteGuidanceUseCase } from "../features/route-guidance/use-cases
 import { RouteGuidanceNavigationOperations } from "../features/route-guidance/use-cases/route-guidance-navigation-operations";
 import { createRouteGuidanceSession } from "../features/route-guidance/use-cases/route-guidance-session";
 import { StartRouteGuidanceUseCase } from "../features/route-guidance/use-cases/start-route-guidance";
+import { PrepareRouteOptimizationUseCase } from "../features/route-guidance/use-cases/prepare-route-optimization";
 import type { MapBundleManifest } from "../features/event-day/domain/event-day-contracts";
 import type { MapBundleManifestV1 } from "../features/event-day/domain/application-contract-types";
 import { StorageService } from "../state/storage-service";
@@ -285,6 +287,9 @@ export function assembleComiPathApplication(
   const routeMapAssetsLoader = new HttpRouteMapAssetsLoader();
   const snapshotRepository = new LocalStorageRouteGuidanceSnapshotRepository();
   const matrixRepository = new LocalStorageDistanceMatrixRepository();
+  const distanceMatrixController = new DistanceMatrixController({
+    repository: matrixRepository,
+  });
   const orchestrationService = new RouteGuidanceNavigationOperations();
   const navigationRuntimeController = new RouteGuidanceRuntimeController({
     snapshotRepo: snapshotRepository,
@@ -325,6 +330,11 @@ export function assembleComiPathApplication(
       routeGuidanceSession,
     ),
     navigationRuntimeController,
+    prepareOptimization: new PrepareRouteOptimizationUseCase(
+      routeMapAreaCatalog,
+      routeMapAssetsLoader,
+      distanceMatrixController,
+    ),
   });
 
   const deleteLocalDataUseCase = new DeleteLocalDataUseCase(
