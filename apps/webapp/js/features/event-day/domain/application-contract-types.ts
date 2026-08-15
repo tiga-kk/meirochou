@@ -84,6 +84,7 @@ export type SaleUpdatePayload =
 export interface EventDay {
   readonly dayId: string;
   readonly displayName: string;
+  readonly date?: string;
 }
 
 export interface EventRegistryEntryV1 {

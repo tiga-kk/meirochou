@@ -6,8 +6,8 @@
       "displayName": "C108",
       "mapBundle": "../maps/C108/manifest.json",
       "days": [
-        { "dayId": "day1", "displayName": "1日目" },
-        { "dayId": "day2", "displayName": "2日目" }
+        { "dayId": "day1", "displayName": "1日目", "date": "2026-08-15" },
+        { "dayId": "day2", "displayName": "2日目", "date": "2026-08-16" }
       ]
     }
   ]

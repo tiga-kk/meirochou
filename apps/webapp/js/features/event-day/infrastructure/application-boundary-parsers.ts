@@ -53,6 +53,18 @@ function nonEmptyExactText(value: unknown, path: string): string {
   return parsed;
 }
 
+function parseOptionalEventDate(value: unknown, path: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new BoundaryValidationError(path, "an existing YYYY-MM-DD date");
+  }
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    throw new BoundaryValidationError(path, "an existing YYYY-MM-DD date");
+  }
+  return value;
+}
+
 export function parseEventId(value: unknown, path = "eventId"): string {
   if (typeof value !== "string") {
     throw new BoundaryValidationError(path, "a string");
@@ -498,10 +510,12 @@ export function parseEventRegistry(input: unknown): EventRegistryV1 {
         dayObj.displayName,
         `${dayPath}.displayName`,
       );
+      const date = parseOptionalEventDate(dayObj.date, `${dayPath}.date`);
       days.push(
         Object.freeze({
           dayId,
           displayName: dayDisplayName,
+          ...(date === undefined ? {} : { date }),
         }),
       );
     }

@@ -3,6 +3,7 @@ import { test } from "vitest";
 import {
   BoundaryValidationError,
   parseEventMapBundleManifest,
+  parseEventRegistry,
   parseGasCircleResponse,
   parseGasSheetListResponse,
   parseMapBundleManifest,
@@ -47,6 +48,39 @@ test("map manifest parser resolves asset paths relative to the manifest", () => 
     manifest.areas[0].pointsFile,
     "https://example.test/assets/maps/demo-east/points.json",
   );
+});
+
+test("event registry accepts real optional calendar dates and legacy days", () => {
+  const registry = parseEventRegistry({
+    schemaVersion: 1,
+    events: [{
+      eventId: "C108",
+      displayName: "C108",
+      mapBundle: "../maps/C108/manifest.json",
+      days: [
+        { dayId: "day1", displayName: "1日目", date: "2026-08-15" },
+        { dayId: "day2", displayName: "2日目", date: "2026-08-16" },
+        { dayId: "legacy", displayName: "旧日程" },
+      ],
+    }],
+  });
+
+  assert.equal(registry.events[0].days[0].date, "2026-08-15");
+  assert.equal(registry.events[0].days[2].date, undefined);
+});
+
+test("event registry rejects malformed and impossible calendar dates", () => {
+  for (const date of ["2026-02-30", "2026-8-15", " 2026-08-15 ", "2026-13-01"]) {
+    assert.throws(() => parseEventRegistry({
+      schemaVersion: 1,
+      events: [{
+        eventId: "C108",
+        displayName: "C108",
+        mapBundle: "../maps/C108/manifest.json",
+        days: [{ dayId: "day1", displayName: "1日目", date }],
+      }],
+    }), /date/);
+  }
 });
 
 test("map manifest parser rejects duplicate area and map identifiers", () => {
