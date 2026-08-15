@@ -103,6 +103,16 @@
   transition: transform 0.2s ease-out; /* For smooth reset/swipe */
 }
 
+.gallery-sale-mention {
+  display: inline-block;
+  margin-inline-start: 0.35rem;
+  padding: 0.1rem 0.3rem;
+  border: 1px solid var(--warning, #b7791f);
+  color: var(--warning, #b7791f);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
 .gallery-item.is-purchasing {
   pointer-events: none;
 }

@@ -27,7 +27,8 @@ function hasUsableMapScale(area) {
  * DOM操作、表示更新を担当
  */
 export class DomRouteGuidanceView {
-  constructor(mapAreaCatalog) {
+  /** @param {any} routeMapAssetsLoader */
+  constructor(mapAreaCatalog, routeMapAssetsLoader = null) {
     this.mapAreaCatalog = mapAreaCatalog;
     this.dataManager = null;
     this.onSetNextTarget = null; // コールバック
@@ -41,7 +42,10 @@ export class DomRouteGuidanceView {
     this.candidatePreviewEscape = null;
     this.targetDetailEscape = null;
     this.statsRenderer = new DomCircleProgressView(this, mapAreaCatalog);
-    this.modalManager = new DomCircleGalleryView(mapAreaCatalog);
+    const loadGalleryPoints = routeMapAssetsLoader
+      ? async (area) => (await routeMapAssetsLoader.loadMapAssets(area)).points
+      : null;
+    this.modalManager = new DomCircleGalleryView(mapAreaCatalog, loadGalleryPoints);
     this.mapRenderer = new DomRouteMapView(this, mapAreaCatalog);
 
     this.els = {
@@ -458,6 +462,7 @@ export class DomRouteGuidanceView {
   /** Applies warning modifiers to the route map's existing pin elements. */
   setSaleMentionSpaces(spaces) {
     this.mapRenderer?.setSaleMentionSpaces(spaces);
+    this.modalManager?.setSaleMentionSpaces(spaces);
   }
 
   clearOptimizationPreview() {

@@ -426,7 +426,10 @@ export class BrowserApplication {
     this.asyncOperationIndicator = this.document.getElementById(
       "async-operation-indicator",
     ) as { status: AsyncOperationStatus } | null;
-    this.ui = new DomRouteGuidanceView(this.routeMapAreaCatalog) as BrowserUi;
+    this.ui = new DomRouteGuidanceView(
+      this.routeMapAreaCatalog,
+      this.routeMapAssetsLoader as any,
+    ) as BrowserUi;
     this.nearbyMapView = new DomNearbyMapView(
       this.routeMapAreaCatalog,
       this.routeMapAssetsLoader,

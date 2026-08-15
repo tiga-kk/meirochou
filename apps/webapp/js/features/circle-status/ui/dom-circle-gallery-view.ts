@@ -4,6 +4,7 @@ import {
   collectGalleryPriorities,
   galleryPriority,
   selectGalleryCircles,
+  sortGalleryCirclesByMapPosition,
 } from "./gallery-view-model";
 import {
   GestureZoomController,
@@ -17,7 +18,7 @@ import { DialogFocusController } from "../../../ui/dialog-focus";
  * PDF（画像）モーダルおよびギャラリーモーダルの制御を担当
  */
 export class DomCircleGalleryView {
-  constructor(mapAreaCatalog) {
+  constructor(mapAreaCatalog, loadGalleryPoints = null) {
     this.els = {
       pdfModal: document.getElementById("pdf-modal"),
       pdfImage: document.getElementById("pdf-modal-image"),
@@ -29,10 +30,6 @@ export class DomCircleGalleryView {
       galleryGrid: document.getElementById("gallery-grid"),
       btnCloseGallery: document.getElementById("btn-close-gallery"),
       btnGalleryHelp: document.getElementById("btn-gallery-help"),
-
-      // Sort buttons
-      btnSortSpace: document.getElementById("btn-sort-space"),
-      btnSortPriority: document.getElementById("btn-sort-priority"),
 
       // Gallery Map
       galleryMapContainer: document.getElementById("gallery-map-container"),
@@ -46,6 +43,7 @@ export class DomCircleGalleryView {
     this.uiManager = null;
     this.dataManager = null;
     this.mapAreaCatalog = mapAreaCatalog;
+    this.loadGalleryPoints = loadGalleryPoints;
     this.pdfFocusController = this.els.pdfModal
       ? new DialogFocusController(this.els.pdfModal, {
           onEscape: () => this.hidePdfModal(),
@@ -57,7 +55,9 @@ export class DomCircleGalleryView {
     // Gallery state
     this.currentTargets = [];
     this.activePriorities = null;
-    this.sortMode = "priority"; // 'space' | 'priority'
+    this.galleryPointsByAreaId = new Map();
+    this.galleryRenderGeneration = 0;
+    this.saleMentionSpaces = new Set();
     this.currentGalleryScope = { kind: "all-unvisited" };
     this.inFlightPurchases = new Set();
     this.hintKey = "comipath:ui:v2:gallery-swipe-hint-seen";
@@ -130,39 +130,12 @@ export class DomCircleGalleryView {
       );
     }
 
-    // Sort buttons events
-    if (this.els.btnSortSpace) {
-      this.els.btnSortSpace.addEventListener("click", () =>
-        this.changeSortMode("space"),
-      );
-    }
-    if (this.els.btnSortPriority) {
-      this.els.btnSortPriority.addEventListener("click", () =>
-        this.changeSortMode("priority"),
-      );
-    }
   }
 
-  /**
-   * ソートモードを変更して再描画
-   */
-  changeSortMode(mode) {
-    if (this.sortMode === mode) return;
-    this.sortMode = mode;
-
-    // UI update
-    if (mode === "space") {
-      if (this.els.btnSortSpace) this.els.btnSortSpace.classList.add("active");
-      if (this.els.btnSortPriority)
-        this.els.btnSortPriority.classList.remove("active");
-    } else {
-      if (this.els.btnSortSpace)
-        this.els.btnSortSpace.classList.remove("active");
-      if (this.els.btnSortPriority)
-        this.els.btnSortPriority.classList.add("active");
-    }
-
-    this.renderGallery();
+  /** Updates gallery warning badges without reordering or rerendering cards. */
+  setSaleMentionSpaces(spaces) {
+    this.saleMentionSpaces = new Set(spaces);
+    this.applySaleMentionBadges();
   }
 
   /**
@@ -189,30 +162,16 @@ export class DomCircleGalleryView {
     this.renderGallery();
   }
 
-  /**
-   * ターゲットリストを現在のモードでソート
-   */
   sortTargets(targets) {
-    const sorted = [...targets];
-
-    sorted.sort((a, b) => {
-      if (this.sortMode === "priority") {
-        const pA = galleryPriority(a.priority) ?? Number.NEGATIVE_INFINITY;
-        const pB = galleryPriority(b.priority) ?? Number.NEGATIVE_INFINITY;
-        if (pA !== pB) return pB - pA; // Descending
-      }
-
-      // Secondary sort (or primary if mode is 'space'): Space order
-      const areas = this.mapAreaCatalog?.getAllMapAreas?.() || [];
-      const [h1, l1, n1] = parseSpace(a.space, areas);
-      const [h2, l2, n2] = parseSpace(b.space, areas);
-
-      if (h1 !== h2) return h1.localeCompare(h2);
-      if (l1 !== l2) return l1.localeCompare(l2);
-      return n1 - n2;
+    const areas = this.mapAreaCatalog?.getAllMapAreas?.() || [];
+    return sortGalleryCirclesByMapPosition(targets, {
+      areas,
+      pointsByAreaId: this.galleryPointsByAreaId,
+      resolveAreaId: (space) => {
+        const [areaName] = parseSpace(space, areas);
+        return areas.find((area) => area.name === areaName)?.id ?? null;
+      },
     });
-
-    return sorted;
   }
 
   /**
@@ -274,6 +233,7 @@ export class DomCircleGalleryView {
       holdSpaces: new Set(this.dataManager.holdList),
       resolveAreaId,
     });
+    const generation = ++this.galleryRenderGeneration;
 
     // 地図表示処理（著作権保護のため無効化）
     if (this.els.galleryMapContainer) {
@@ -283,6 +243,31 @@ export class DomCircleGalleryView {
     this.renderGallery();
     this.els.galleryModal.classList.remove("hidden");
     this.showSwipeHint();
+    void this.loadPointsForGallery(generation, areas);
+  }
+
+  async loadPointsForGallery(generation, areas) {
+    if (!this.loadGalleryPoints) return;
+    const areaIds = [...new Set(this.currentTargets.map((circle) => {
+      const [areaName] = parseSpace(circle.space, areas);
+      return areas.find((area) => area.name === areaName)?.id ?? null;
+    }).filter(Boolean))];
+    await Promise.all(areaIds.map(async (areaId) => {
+      if (this.galleryPointsByAreaId.has(areaId)) return;
+      const area = areas.find((candidate) => candidate.id === areaId);
+      if (!area) return;
+      try {
+        const payload = await this.loadGalleryPoints(area);
+        this.galleryPointsByAreaId.set(
+          areaId,
+          Array.isArray(payload) ? payload : payload?.points ?? [],
+        );
+      } catch (error) {
+        console.warn("Gallery map points could not be loaded.", error);
+      }
+    }));
+    if (generation !== this.galleryRenderGeneration || this.els.galleryModal.classList.contains("hidden")) return;
+    this.renderGallery();
   }
 
   showSwipeHint({ force = false } = {}) {
@@ -424,6 +409,14 @@ export class DomCircleGalleryView {
         name.innerHTML = `${c.space}${prioritySpan}`;
         info.appendChild(name);
 
+        if (this.saleMentionSpaces.has(c.space)) {
+          const badge = document.createElement("span");
+          badge.className = "gallery-sale-mention";
+          badge.setAttribute("aria-label", "完売・売り切れ関連投稿あり");
+          badge.textContent = "完売関連";
+          info.appendChild(badge);
+        }
+
         // Twitter Link
         if (c.account) {
           const twLink = document.createElement("a");
@@ -465,6 +458,25 @@ export class DomCircleGalleryView {
         this.els.galleryGrid.appendChild(item);
       });
     }
+    this.applySaleMentionBadges();
+  }
+
+  applySaleMentionBadges() {
+    this.els.galleryGrid?.querySelectorAll(".gallery-item[data-space]").forEach((item) => {
+      const info = item.querySelector(".circle-info");
+      if (!info) return;
+      const existing = info.querySelector(".gallery-sale-mention");
+      const mentioned = this.saleMentionSpaces.has(item.dataset.space || "");
+      if (mentioned && !existing) {
+        const badge = document.createElement("span");
+        badge.className = "gallery-sale-mention";
+        badge.setAttribute("aria-label", "完売・売り切れ関連投稿あり");
+        badge.textContent = "完売関連";
+        info.appendChild(badge);
+      } else if (!mentioned) {
+        existing?.remove();
+      }
+    });
   }
 
   /**
@@ -584,6 +596,7 @@ export class DomCircleGalleryView {
    */
   hideGalleryModal() {
     if (!this.els.galleryModal || !this.els.galleryGrid) return;
+    this.galleryRenderGeneration += 1;
     this.els.galleryModal.classList.add("hidden");
     this.els.galleryGrid.innerHTML = "";
     this.undoSnackbar?.remove();
