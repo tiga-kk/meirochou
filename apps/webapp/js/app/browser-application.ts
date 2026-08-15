@@ -1473,6 +1473,7 @@ export class BrowserApplication {
       try {
         monitor.start({ ref, eventDate: this.eventDayDate(ref) });
       } catch (error) {
+        monitor.stop();
         this.saleMentionEventDayKey = null;
         console.warn("X post monitoring could not start.", error);
       }

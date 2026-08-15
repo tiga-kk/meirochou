@@ -44,6 +44,8 @@ describe("X-post runtime lifecycle", () => {
 
     expect(document.querySelector("#target-x-posts")?.hasAttribute("hidden")).toBe(true);
     expect(document.querySelector("#target-x-post-list")?.textContent).toBe("");
+    await panel.show({ ref, circle: { space: "東A02", account: "https://x.com/another" } });
+    expect(client.fetchPage).toHaveBeenCalledOnce();
   });
 
   it("removes monitor lifecycle listeners and rejects stale completion after stop", async () => {

@@ -6,5 +6,6 @@ describe("BrowserIndexedDbXPostCache", () => {
     const cache = new BrowserIndexedDbXPostCache({ indexedDB: undefined });
     await expect(cache.get({ eventId: "C108", dayId: "day1" }, "user")).rejects.toThrow(/IndexedDB/);
     expect(() => { cache.dispose(); cache.dispose(); }).not.toThrow();
+    await expect(cache.get({ eventId: "C108", dayId: "day1" }, "user")).rejects.toThrow(/disposed/);
   });
 });

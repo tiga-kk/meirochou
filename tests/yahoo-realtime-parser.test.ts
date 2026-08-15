@@ -58,4 +58,13 @@ describe("Yahoo realtime adapter", () => {
       handle: "circle_1", day: null, fetchedAt: "2026-08-14T00:00:00.000Z",
     })).toThrow(/schema/i);
   });
+
+  it("rejects inconsistent provider totals instead of declaring a truncated scan complete", () => {
+    expect(() => parseYahooRealtimeResponse({
+      timeline: {
+        head: { totalResultsAvailable: 2, totalResultsReturned: 1 },
+        entry: [],
+      },
+    }, { handle: "circle_1", day: "2026-08-15", fetchedAt: "2026-08-14T00:00:00.000Z" })).toThrow(/schema/i);
+  });
 });

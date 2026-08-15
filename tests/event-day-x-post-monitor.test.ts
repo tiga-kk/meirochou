@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DefaultEventDayXPostMonitor,
+  createEmptyXPostCacheEntry,
   type XPostCache,
   type XPostCacheEntry,
   type XPostClient,
@@ -143,5 +144,75 @@ describe("DefaultEventDayXPostMonitor", () => {
     expect(monitor.getSaleMention("東A01")).toEqual({ status: "unknown" });
     await Promise.resolve();
     expect(client.fetchPage).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops current-day refresh at the cached newest post", async () => {
+    const cached = createEmptyXPostCacheEntry(ref, "circle_1", "2026-08-15");
+    const entry = {
+      ...cached,
+      dayScan: {
+        ...cached.dayScan,
+        state: "complete" as const,
+        scannedAt: "2026-08-15T00:00:00.000Z",
+        lastRefreshAt: "2026-08-15T00:00:00.000Z",
+        newestPostId: "old",
+      },
+    };
+    const client: XPostClient = {
+      fetchPage: vi.fn(async () => makePage([
+        { id: "new", text: "新しい投稿", createdAt: "2026-08-15T01:00:00.000Z" },
+        { id: "old", text: "既知の投稿", createdAt: "2026-08-15T00:00:00.000Z" },
+      ], "more")),
+    };
+    const { onlineTarget, monitorClock } = makeEnvironment();
+    const monitor = new DefaultEventDayXPostMonitor({
+      client,
+      cache: makeCache([entry]),
+      activeEventDayReader: makeReader([{ space: "東A01", account: "https://x.com/circle_1" }]),
+      document,
+      onlineTarget,
+      now: monitorClock.now,
+      setTimer: (callback, delayMs) =>
+        delayMs >= 10 * 60 * 1000 ? callback : monitorClock.setTimer(callback, delayMs),
+      clearTimer: monitorClock.clearTimer,
+    });
+
+    monitor.start({ ref, eventDate: "2026-08-15" });
+    await vi.waitFor(() => expect(monitor.getSaleMention("東A01").status).toBe("no-mention"));
+    expect(client.fetchPage).toHaveBeenCalledOnce();
+  });
+
+  it("removes warning state when source refresh removes a circle", async () => {
+    let circles = [{ space: "東A01", account: "https://x.com/circle_1" }];
+    const reader = {
+      getAllCircles: () => circles,
+      getPendingCircles: () => circles,
+      getPurchasedCircleSpaces: () => [],
+      getHeldCircleSpaces: () => [],
+      getCircleStatus: () => "pending" as const,
+    };
+    const client: XPostClient = {
+      fetchPage: vi.fn(async () => makePage([
+        { id: "sale", text: "完売", createdAt: "2026-08-15T00:00:00.000Z" },
+      ], null)),
+    };
+    const { onlineTarget, monitorClock } = makeEnvironment();
+    const monitor = new DefaultEventDayXPostMonitor({
+      client,
+      cache: makeCache(),
+      activeEventDayReader: reader,
+      document,
+      onlineTarget,
+      now: monitorClock.now,
+      setTimer: monitorClock.setTimer,
+      clearTimer: monitorClock.clearTimer,
+    });
+
+    monitor.start({ ref, eventDate: "2026-08-15" });
+    await vi.waitFor(() => expect(monitor.getMentionSpaces()).toEqual(new Set(["東A01"])));
+    circles = [];
+    monitor.refreshCircleAccounts();
+    expect(monitor.getMentionSpaces()).toEqual(new Set());
+    expect(monitor.getSaleMention("東A01")).toEqual({ status: "unknown" });
   });
 });

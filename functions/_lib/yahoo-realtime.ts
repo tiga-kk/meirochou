@@ -66,7 +66,8 @@ export function parseYahooRealtimeResponse(
   const totalResultsReturned = head.totalResultsReturned;
   if (!Array.isArray(entries) ||
       typeof totalResultsAvailable !== "number" || !Number.isInteger(totalResultsAvailable) || totalResultsAvailable < 0 ||
-      typeof totalResultsReturned !== "number" || !Number.isInteger(totalResultsReturned) || totalResultsReturned < 0) {
+      typeof totalResultsReturned !== "number" || !Number.isInteger(totalResultsReturned) || totalResultsReturned < 0 ||
+      totalResultsReturned > totalResultsAvailable || totalResultsReturned !== entries.length) {
     throw new Error("upstream schema changed");
   }
 

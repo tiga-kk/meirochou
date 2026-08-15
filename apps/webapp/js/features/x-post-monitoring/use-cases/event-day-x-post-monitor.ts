@@ -121,6 +121,7 @@ export class DefaultEventDayXPostMonitor implements EventDayXPostMonitor {
   private readonly states = new Map<string, SaleMentionState>();
   private readonly jobs = new Map<string, HandleJob>();
   private readonly abortControllers = new Map<string, AbortController>();
+  private readonly requestSlotCancels = new Set<() => void>();
   private ref: EventDayRef | null = null;
   private eventDate: string | null = null;
   private generation = 0;
@@ -171,11 +172,15 @@ export class DefaultEventDayXPostMonitor implements EventDayXPostMonitor {
     }
     for (const controller of this.abortControllers.values()) controller.abort();
     this.abortControllers.clear();
+    for (const cancel of this.requestSlotCancels) cancel();
+    this.requestSlotCancels.clear();
     this.jobs.clear();
+    const hadStates = this.states.size > 0;
     this.states.clear();
     this.activeRequests = 0;
     this.ref = null;
     this.eventDate = null;
+    if (hadStates) this.notify();
   }
 
   /** Raises an unstarted account job without aborting work already in flight. */
@@ -212,11 +217,16 @@ export class DefaultEventDayXPostMonitor implements EventDayXPostMonitor {
       const spaces = next.get(handle);
       if (!spaces) {
         this.abortControllers.get(handle)?.abort();
+        this.abortControllers.delete(handle);
         this.jobs.delete(handle);
         continue;
       }
       job.spaces.clear();
       for (const space of spaces) job.spaces.add(space);
+    }
+    const activeSpaces = new Set([...next.values()].flatMap((spaces) => [...spaces]));
+    for (const space of this.states.keys()) {
+      if (!activeSpaces.has(space)) this.states.delete(space);
     }
     let rank = 0;
     for (const [handle, spaces] of next) {
@@ -312,7 +322,7 @@ export class DefaultEventDayXPostMonitor implements EventDayXPostMonitor {
       while (this.isCurrent(job, generation) && this.canStartRequests()) {
         const cursorKey = cursor ?? "__first__";
         if (seenCursors.has(cursorKey)) {
-          await this.persistScan(entry, "error", cursor, "upstream_schema_changed");
+          entry = await this.persistScan(entry, "error", cursor, "upstream_schema_changed");
           this.setStates(job, entry);
           return;
         }
@@ -327,7 +337,9 @@ export class DefaultEventDayXPostMonitor implements EventDayXPostMonitor {
           signal: controller.signal,
         });
         this.globalFailureCount = 0;
-        this.abortControllers.delete(job.handle);
+        if (this.abortControllers.get(job.handle) === controller) {
+          this.abortControllers.delete(job.handle);
+        }
         if (!this.isCurrent(job, generation)) return;
         const result = await this.applyPage(job, entry, page, cursor, today, knownNewest);
         entry = result.entry;
@@ -335,13 +347,13 @@ export class DefaultEventDayXPostMonitor implements EventDayXPostMonitor {
         normalizedPosts += page.posts.length;
         cursor = page.nextCursor;
         if (result.stoppedAtKnownNewest || cursor === null) {
-          await this.persistScan(entry, "complete", null, null);
+          entry = await this.persistScan(entry, "complete", null, null);
           this.setStates(job, entry);
           if (today) this.scheduleJob(job, CURRENT_DAY_REFRESH_MS);
           return;
         }
         if (pages >= MAX_PAGES_PER_SLICE || normalizedPosts >= MAX_POSTS_PER_SLICE) {
-          await this.persistScan(entry, "partial", cursor, null);
+          entry = await this.persistScan(entry, "partial", cursor, null);
           this.setStates(job, entry);
           this.scheduleJob(job, CONTINUATION_DELAY_MS);
           return;
@@ -352,8 +364,8 @@ export class DefaultEventDayXPostMonitor implements EventDayXPostMonitor {
       const code = errorCode(error) ?? "upstream_unavailable";
       const existing = (await this.cache.get(this.ref!, job.handle).catch(() => null)) ??
         createEmptyXPostCacheEntry(this.ref!, job.handle, this.eventDate);
-      await this.persistScan(existing, "error", existing.dayScan.resumeCursor, code);
-      this.setStates(job, existing);
+      const errorEntry = await this.persistScan(existing, "error", existing.dayScan.resumeCursor, code);
+      this.setStates(job, errorEntry);
       if (code !== "upstream_schema_changed") {
         this.globalFailureCount += 1;
         const backoff = BACKOFF_MS[Math.min(this.globalFailureCount - 1, BACKOFF_MS.length - 1)];
@@ -401,7 +413,7 @@ export class DefaultEventDayXPostMonitor implements EventDayXPostMonitor {
     this.setStates(job, next);
     return {
       entry: next,
-      stoppedAtKnownNewest: Boolean(today && knownNewest && page.posts.some((post) => post.id === knownNewest) && cursor === null),
+      stoppedAtKnownNewest: Boolean(today && knownNewest && page.posts.some((post) => post.id === knownNewest)),
     };
   }
 
@@ -410,9 +422,9 @@ export class DefaultEventDayXPostMonitor implements EventDayXPostMonitor {
     state: XPostCacheEntry["dayScan"]["state"],
     resumeCursor: string | null,
     errorCodeValue: XPostCacheEntry["dayScan"]["errorCode"],
-  ): Promise<void> {
+  ): Promise<XPostCacheEntry> {
     const checkedAt = this.now().toISOString();
-    await this.cache.put({
+    const next: XPostCacheEntry = {
       ...entry,
       eventDate: this.eventDate,
       dayScan: {
@@ -423,7 +435,9 @@ export class DefaultEventDayXPostMonitor implements EventDayXPostMonitor {
         scannedAt: state === "complete" ? checkedAt : entry.dayScan.scannedAt,
         lastRefreshAt: state === "complete" ? checkedAt : entry.dayScan.lastRefreshAt,
       },
-    }).catch(() => {});
+    };
+    await this.cache.put(next).catch(() => {});
+    return next;
   }
 
   private applyCachedState(job: HandleJob, entry: XPostCacheEntry): void {
@@ -455,7 +469,26 @@ export class DefaultEventDayXPostMonitor implements EventDayXPostMonitor {
 
   private async waitForRequestSlot(generation: number): Promise<boolean> {
     const delay = Math.max(0, REQUEST_INTERVAL_MS - (this.now().getTime() - this.lastRequestStartedAt));
-    if (delay > 0) await new Promise<void>((resolve) => this.setTimer(resolve, delay));
+    if (delay > 0) {
+      const ready = await new Promise<boolean>((resolve) => {
+        let timer: unknown;
+        let settled = false;
+        let cancel!: () => void;
+        const finish = (result: boolean) => {
+          if (settled) return;
+          settled = true;
+          this.requestSlotCancels.delete(cancel);
+          resolve(result);
+        };
+        cancel = () => {
+          if (timer !== undefined) this.clearTimer(timer);
+          finish(false);
+        };
+        this.requestSlotCancels.add(cancel);
+        timer = this.setTimer(() => finish(true), delay);
+      });
+      if (!ready) return false;
+    }
     if (!this.started || this.stopped || generation !== this.generation || !this.canStartRequests()) return false;
     this.lastRequestStartedAt = this.now().getTime();
     return true;

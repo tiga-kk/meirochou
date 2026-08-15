@@ -75,6 +75,7 @@ export class DomXPostPanel implements XPostPanel {
   }
 
   async show(target: XPostPanelTarget): Promise<void> {
+    if (this.disposed) return;
     const generation = ++this.generation;
     this.abortController?.abort();
     this.abortController = new AbortController();

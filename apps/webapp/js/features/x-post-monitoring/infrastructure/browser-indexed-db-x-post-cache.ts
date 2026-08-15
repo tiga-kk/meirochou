@@ -12,6 +12,8 @@ export class BrowserIndexedDbXPostCache implements XPostCache {
   private readonly indexedDB: IDBFactory | undefined;
   private db: IDBDatabase | null = null;
   private opening: Promise<IDBDatabase> | null = null;
+  private disposed = false;
+  private openGeneration = 0;
 
   constructor(options: { readonly indexedDB?: IDBFactory } = {}) {
     this.indexedDB = options.indexedDB ?? globalThis.indexedDB;
@@ -46,15 +48,19 @@ export class BrowserIndexedDbXPostCache implements XPostCache {
   }
 
   dispose(): void {
+    this.disposed = true;
+    this.openGeneration += 1;
     this.opening = null;
     this.db?.close();
     this.db = null;
   }
 
   private open(): Promise<IDBDatabase> {
+    if (this.disposed) return Promise.reject(new Error("X post cache is disposed"));
     if (this.db) return Promise.resolve(this.db);
     if (this.opening) return this.opening;
     if (!this.indexedDB) return Promise.reject(new Error("IndexedDB is unavailable"));
+    const generation = this.openGeneration;
     this.opening = new Promise((resolve, reject) => {
       const request = this.indexedDB!.open(X_POST_CACHE_DB_NAME, 1);
       request.onupgradeneeded = () => {
@@ -63,6 +69,11 @@ export class BrowserIndexedDbXPostCache implements XPostCache {
         }
       };
       request.onsuccess = () => {
+        if (this.disposed || generation !== this.openGeneration) {
+          request.result.close();
+          reject(new Error("X post cache is disposed"));
+          return;
+        }
         this.db = request.result;
         this.opening = null;
         resolve(this.db);
