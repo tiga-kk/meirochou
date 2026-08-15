@@ -6,6 +6,7 @@ import {
 import { BrowserIndexedDbXPostCache } from "../features/x-post-monitoring/infrastructure/browser-indexed-db-x-post-cache";
 import { HttpXPostClient } from "../features/x-post-monitoring/infrastructure/http-x-post-client";
 import { DeleteLocalDataWithCatalogCleanup } from "./delete-local-data-with-catalog-cleanup";
+import { DeleteLocalDataWithXPostCleanup } from "./delete-local-data-with-x-post-cleanup";
 import {
   CacheEventDayCatalogsUseCase,
   GetCatalogOfflineStatusUseCase,
@@ -372,8 +373,18 @@ export function assembleComiPathApplication(
     repository,
     catalogOfflineCache,
   );
-  const localDataDeletionController = new LocalDataDeletionController({
+  const xPostClient = new HttpXPostClient({
+    fetcher: options.window.fetch?.bind(options.window),
+  });
+  const xPostCache = new BrowserIndexedDbXPostCache({
+    indexedDB: options.window.indexedDB,
+  });
+  const deleteLocalDataWithXPostCleanup = new DeleteLocalDataWithXPostCleanup(
     deleteLocalData,
+    xPostCache,
+  );
+  const localDataDeletionController = new LocalDataDeletionController({
+    deleteLocalData: deleteLocalDataWithXPostCleanup,
     targetElement: options.targetElement ?? options.document,
     onScopeSelect: (detail) =>
       browserRuntime?.handleDeleteOptionSelect(
@@ -387,12 +398,6 @@ export function assembleComiPathApplication(
     onStateChange: () => browserRuntime?.updateManagementModels?.(),
   });
 
-  const xPostClient = new HttpXPostClient({
-    fetcher: options.window.fetch?.bind(options.window),
-  });
-  const xPostCache = new BrowserIndexedDbXPostCache({
-    indexedDB: options.window.indexedDB,
-  });
   const xPostPanel = new DomXPostPanel({
     document: options.document,
     client: xPostClient,
@@ -422,6 +427,7 @@ export function assembleComiPathApplication(
     localDataDeletionController,
     xPostPanel,
     saleMentionMonitor,
+    xPostCache,
     routeGuidanceDependencies: {
       routeGuidanceSession,
       routeMapAreaCatalog,

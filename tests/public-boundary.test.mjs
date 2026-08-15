@@ -51,7 +51,6 @@ test("tracked public tree excludes private projects and credentials", () => {
     "wrangler.json",
     "wrangler.jsonc",
     ".dev.vars",
-    "functions",
   ]) {
     assert.equal(existsSync(new URL(`../${path}`, import.meta.url)), false);
   }

@@ -465,6 +465,10 @@ export class DomRouteGuidanceView {
     this.modalManager?.setSaleMentionSpaces(spaces);
   }
 
+  dispose() {
+    this.modalManager?.dispose();
+  }
+
   clearOptimizationPreview() {
     this.mapRenderer?.clearOptimizationPreview();
   }

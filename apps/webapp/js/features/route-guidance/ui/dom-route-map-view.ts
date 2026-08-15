@@ -712,7 +712,7 @@ export class DomRouteMapView {
           : normalPinLabel,
       );
       button.dataset.baseAriaLabel = button.getAttribute("aria-label") || "";
-      if (this.saleMentionSpaces.has(pin.space)) {
+      if ((this.saleMentionSpaces ?? new Set()).has(pin.space)) {
         button.classList.add("sale-mention");
         button.setAttribute(
           "aria-label",

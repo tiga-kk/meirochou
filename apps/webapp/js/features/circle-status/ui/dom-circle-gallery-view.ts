@@ -138,6 +138,15 @@ export class DomCircleGalleryView {
     this.applySaleMentionBadges();
   }
 
+  /** Invalidates pending point loads and closes the modal during app shutdown. */
+  dispose() {
+    this.galleryRenderGeneration += 1;
+    if (this.hintTimer) clearTimeout(this.hintTimer);
+    this.hintTimer = null;
+    this.hidePdfModal();
+    this.hideGalleryModal();
+  }
+
   /**
    * 優先度フィルターの切り替え
    */

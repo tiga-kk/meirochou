@@ -68,6 +68,7 @@ import type {
   EventDayXPostMonitor,
   SaleMentionReader,
   XPostPanel,
+  XPostCache,
 } from "../features/x-post-monitoring/public-api";
 import type { SpaceArea } from "../shared/domain/space-parser";
 import type { SourceDiffViewModel } from "../shared/ui/management-view-model";
@@ -276,6 +277,7 @@ interface BrowserApplicationOptions {
   readonly localDataDeletionController: LocalDataDeletionController;
   readonly xPostPanel?: XPostPanel;
   readonly saleMentionMonitor?: EventDayXPostMonitor;
+  readonly xPostCache?: XPostCache;
 }
 
 interface PendingGasUpdatesControllerPort {
@@ -315,6 +317,7 @@ export class BrowserApplication {
   localDataDeletionController: LocalDataDeletionController;
   xPostPanel: XPostPanel | null;
   saleMentionMonitor: EventDayXPostMonitor | null;
+  xPostCache: XPostCache | null;
   saleMentionReader: SaleMentionReader | null;
   spreadsheetTitle: string;
   routeGuidanceSession: RouteGuidanceSession;
@@ -410,6 +413,7 @@ export class BrowserApplication {
     this.localDataDeletionController = options.localDataDeletionController;
     this.xPostPanel = options.xPostPanel ?? null;
     this.saleMentionMonitor = options.saleMentionMonitor ?? null;
+    this.xPostCache = options.xPostCache ?? null;
     this.saleMentionReader = this.saleMentionMonitor;
     this.spreadsheetTitle = "";
     this.routeGuidanceSession = routeGuidanceDependencies.routeGuidanceSession;
@@ -1401,6 +1405,8 @@ export class BrowserApplication {
     this.saleMentionUnsubscribe = null;
     this.saleMentionMonitor?.stop();
     this.xPostPanel?.dispose();
+    this.ui?.dispose?.();
+    this.xPostCache?.dispose();
     this.pendingGasUpdatesController?.stop?.();
     this.localDataDeletionController?.stop?.();
   }
@@ -1456,14 +1462,26 @@ export class BrowserApplication {
     if (!ref) {
       monitor.stop();
       this.saleMentionEventDayKey = null;
+      this.applySaleMentionState(null);
+      this.xPostPanel?.hide();
       return;
     }
     const key = `${ref.eventId}:${ref.dayId}`;
     if (key !== this.saleMentionEventDayKey) {
       this.saleMentionEventDayKey = key;
-      monitor.start({ ref, eventDate: this.eventDayDate(ref) });
+      this.applySaleMentionState(null);
+      try {
+        monitor.start({ ref, eventDate: this.eventDayDate(ref) });
+      } catch (error) {
+        this.saleMentionEventDayKey = null;
+        console.warn("X post monitoring could not start.", error);
+      }
     } else {
-      monitor.refreshCircleAccounts();
+      try {
+        monitor.refreshCircleAccounts();
+      } catch (error) {
+        console.warn("X post monitoring could not refresh.", error);
+      }
     }
   }
 
