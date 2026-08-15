@@ -27,6 +27,8 @@ Task 8の計画にある「FAILをこのTask内で場当たり的に修正しな
 
 ## 人間受入
 
+### 旧記録（2026-08-14）
+
 未実施。390px級Motorola Androidで次を確認できる人間確認環境が必要である。
 
 - route/nearby mapの面積、詳細drawer、cardとleader line、natural aspect ratio。
@@ -34,6 +36,15 @@ Task 8の計画にある「FAILをこのTask内で場当たり的に修正しな
 - complete後のpreview消去、赤current route、正式best order。
 - visual snapshot更新可否。
 
+## 2026-08-15 人間受入の更新
+
+ユーザー確認により、Phase 7.5の人間受入は完了扱いとする。対象は次のとおり。
+
+- route/nearby mapの面積、詳細drawer、card/leader line、natural aspect ratio。
+- ALNS探索中の青〜紫preview更新、drag/pinch中のDOM保留、操作後のcatch-up。
+- complete後のpreview消去、赤current route、正式best order。
+- visual snapshotの受入可否。
+
 ## 判定
 
-**Phase 7.5はblocked。** 自動最終gateにFAILがあり、かつ人間/実機受入が未実施のため、`progress.md`を完了へ更新しない。再開条件は、FAILの扱いを決めて必要な修正または既存差分として独立証明し、390px級Motorola Androidで人間受入を完了することである。
+**Phase 7.5は完了。** 自動検証のFAILは既存差分として記録されており、ユーザーによる人間受入確認をもってTask 8を完了扱いとした。次の進捗はPhase 7.6 Task 1である。
