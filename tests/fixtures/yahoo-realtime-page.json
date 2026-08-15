@@ -1,0 +1,20 @@
+{
+  "timeline": {
+    "head": { "totalResultsAvailable": 3, "totalResultsReturned": 2 },
+    "entry": [
+      {
+        "id": "2088219081719840913",
+        "displayText": "完売しました https://example.invalid/post",
+        "createdAt": 1786705200,
+        "media": [{ "item": { "mediaUrl": "https://example.invalid/private.jpg" } }],
+        "name": "不要なプロフィール"
+      },
+      {
+        "id": "2088173781000859898",
+        "displayText": "次の投稿",
+        "createdAt": 1786694400,
+        "likesCount": 999
+      }
+    ]
+  }
+}

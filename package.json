@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "typecheck:webapp": "tsc -p apps/webapp/tsconfig.json --noEmit",
+    "typecheck:functions": "tsc -p tsconfig.functions.json --noEmit",
     "check:webapp": "node scripts/check-webapp-architecture.mjs && npm run typecheck:webapp",
     "dev:webapp": "vite --host 127.0.0.1",
     "dev:webapp:private": "vite --mode private --host 127.0.0.1",
@@ -18,7 +19,7 @@
     "test:task-08-dom-views": "vitest run --root . tests/feature-dom-views.test.ts tests/navigation-view-model-split.test.ts",
     "test:phase-05d-regressions": "vitest run --root . tests/pending-gas-update-background-process.test.ts tests/send-pending-gas-updates.test.ts",
     "test:webapp": "vitest run --root . --config vitest.webapp.config.ts",
-    "verify:webapp": "npm run test:webapp && npm run test:route-guidance && npm run test:phase-05d-regressions && npm run check:webapp && npm run build:webapp && npm run verify:webapp:build",
+    "verify:webapp": "npm run test:webapp && npm run test:route-guidance && npm run test:phase-05d-regressions && npm run check:webapp && npm run typecheck:functions && npm run build:webapp && npm run verify:webapp:build",
     "test:e2e": "playwright test",
     "test:e2e:update": "playwright test --update-snapshots",
     "build:gas": "node scripts/build-public-gas.mjs",
