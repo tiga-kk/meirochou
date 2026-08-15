@@ -7,9 +7,40 @@ import {
   parseGridMeta,
   parsePointsPayload,
 } from "../apps/webapp/js/features/route-guidance/infrastructure/route-asset-parsers";
+import { collectWallIdentifiers } from "../apps/webapp/js/shared/domain/wall-circle-classification";
 
 const BUNDLE_ROOT = resolve("apps/webapp/map-bundles/C108");
-const AREA_IDS = ["e456", "e7", "s12", "w12"];
+const AREA_IDS = ["e456", "e7", "s12", "w12"] as const;
+
+test("C108 wall identifiers come from W_* metadata and do not overlap non-wall points", () => {
+  const expected = {
+    e456: ["W_all:ア"],
+    e7: ["W_all:A"],
+    s12: ["W_all:a"],
+    w12: ["W_left:め", "W_right:あ"],
+  } as const;
+  for (const areaId of AREA_IDS) {
+    const payload = parsePointsPayload(
+      JSON.parse(readFileSync(resolve(BUNDLE_ROOT, areaId, "points.json"), "utf8")),
+    );
+    const wallIdentifiers = collectWallIdentifiers(payload.points);
+    const wallGroups = new Set(
+      payload.points
+        .filter((point) => typeof point.group_id === "string" && point.group_id.startsWith("W_"))
+        .map((point) => `${point.group_id}:${point.identifier}`),
+    );
+    assert.deepEqual([...wallGroups].sort(), [...expected[areaId]].sort());
+    const nonWallIdentifiers = new Set(
+      payload.points
+        .filter((point) => !(typeof point.group_id === "string" && point.group_id.startsWith("W_")))
+        .map((point) => point.identifier),
+    );
+    assert.deepEqual(
+      [...wallIdentifiers].filter((identifier) => nonWallIdentifiers.has(identifier)),
+      [],
+    );
+  }
+});
 
 function parseSvgViewBox(svgContent: string, areaId: string) {
   const svgTag = svgContent.match(/<svg\b[^>]*>/i)?.[0];

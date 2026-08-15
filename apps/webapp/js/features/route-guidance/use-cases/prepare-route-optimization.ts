@@ -9,6 +9,10 @@ import {
 import type { ConfirmedPosition } from "../domain/navigation-state";
 import { parseSpace } from "../../../shared/domain/space-parser";
 import type { RouteMapAssetsLoader } from "./route-map-assets-loader";
+import {
+  collectWallIdentifiers,
+  resolveCircleQueueClass,
+} from "../../../shared/domain/wall-circle-classification";
 
 export interface PrepareRouteOptimizationInput {
   readonly eventDay: EventDayRef;
@@ -74,11 +78,16 @@ export class PrepareRouteOptimizationUseCase {
     const area = this.mapAreaCatalog.getMapArea(input.areaId);
     if (!area) throw new Error(`No map area is available: ${input.areaId}`);
     const assets = await this.assetsLoader.loadMapAssets(area);
-    const endpointIndexes = input.pendingCircles.map((circle) => findPortalIndex(assets, circle.space));
+    const wallIdentifiers = collectWallIdentifiers(assets.points.points);
+    const pendingCircles = input.pendingCircles.map((circle) => ({
+      ...circle,
+      queueClass: resolveCircleQueueClass(circle.space, wallIdentifiers),
+    }));
+    const endpointIndexes = pendingCircles.map((circle) => findPortalIndex(assets, circle.space));
     if (endpointIndexes.some((index) => index === null)) {
       throw new Error("A pending circle is not present in route map assets");
     }
-    const endpoints = input.pendingCircles.map((circle, index) => ({
+    const endpoints = pendingCircles.map((circle, index) => ({
       space: circle.space,
       gridIndex: endpointIndexes[index] as number,
     }));
@@ -117,11 +126,11 @@ export class PrepareRouteOptimizationUseCase {
     return {
       areaId: input.areaId,
       matrixRef: matrix.cacheKey,
-      pendingCircles: input.pendingCircles,
+      pendingCircles,
       startDistanceToCircles,
       distanceMatrix: reorderDistanceMatrix(
         matrix,
-        input.pendingCircles.map((circle) => circle.space),
+        pendingCircles.map((circle) => circle.space),
       ),
       searchTimeLimitMs: input.searchTimeLimitMs,
     };
