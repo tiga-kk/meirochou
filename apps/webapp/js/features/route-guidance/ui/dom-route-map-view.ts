@@ -120,6 +120,7 @@ export class DomRouteMapView {
     this.routeMotionRenderedWidth = 0;
     this.viewportCenterTimer = null;
     this.latestOptimizationPreview = null;
+    this.saleMentionSpaces = new Set();
     this.optimizationPreviewPointIndex = new Map();
     this.optimizationPreviewGestureActive = false;
     this.optimizationPreviewUpdateCount = 0;
@@ -710,6 +711,14 @@ export class DomRouteMapView {
           ? `${itineraryEntry.index}番、${normalPinLabel}`
           : normalPinLabel,
       );
+      button.dataset.baseAriaLabel = button.getAttribute("aria-label") || "";
+      if (this.saleMentionSpaces.has(pin.space)) {
+        button.classList.add("sale-mention");
+        button.setAttribute(
+          "aria-label",
+          `${button.dataset.baseAriaLabel}、完売・売り切れ関連投稿あり`,
+        );
+      }
       const selectable =
         Boolean(pin.circle) &&
         selectionState !== "comparing" &&
@@ -781,5 +790,21 @@ export class DomRouteMapView {
     ) {
       this.renderOptimizationPreview();
     }
+  }
+
+  /** Applies sale warnings to existing pin DOM without rebuilding map layers. */
+  setSaleMentionSpaces(spaces) {
+    this.saleMentionSpaces = new Set(spaces);
+    this.els.pinLayer?.querySelectorAll("button.map-pin").forEach((button) => {
+      const space = button.dataset.space || "";
+      const baseLabel = button.dataset.baseAriaLabel || button.getAttribute("aria-label") || "";
+      button.dataset.baseAriaLabel = baseLabel;
+      const mentioned = this.saleMentionSpaces.has(space);
+      button.classList.toggle("sale-mention", mentioned);
+      button.setAttribute(
+        "aria-label",
+        mentioned ? `${baseLabel}、完売・売り切れ関連投稿あり` : baseLabel,
+      );
+    });
   }
 }

@@ -132,6 +132,19 @@ describe("application assembly", () => {
     );
   });
 
+  it("injects the X post panel and sale monitor as separate ports", () => {
+    assembleComiPathApplication({
+      document: {} as Document,
+      window: {} as Window,
+      registry: testRegistry,
+    });
+
+    expect(mockState.options[0]).toMatchObject({
+      xPostPanel: expect.any(Object),
+      saleMentionMonitor: expect.any(Object),
+    });
+  });
+
   it("injects one background process without starting or stopping it twice", async () => {
     const app = assembleComiPathApplication({
       document: {} as Document,

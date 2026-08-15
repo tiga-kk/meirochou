@@ -75,6 +75,7 @@ export class DomRouteGuidanceView {
       subTargetSpace: document.getElementById("sub-target-space"),
       tweetLink: document.getElementById("target-tweet-link"),
       tweetEmbed: document.getElementById("tweet-embed-container"),
+      saleMentionWarning: document.getElementById("target-sale-mention-warning"),
       routeSelectionControls: document.getElementById(
         "route-selection-controls",
       ),
@@ -447,6 +448,16 @@ export class DomRouteGuidanceView {
 
   showOptimizationPreview(preview) {
     this.mapRenderer?.showOptimizationPreview(preview);
+  }
+
+  /** Toggles the persistent current-target sale warning without changing navigation state. */
+  setSaleMentionWarning(visible) {
+    if (this.els.saleMentionWarning) this.els.saleMentionWarning.hidden = !visible;
+  }
+
+  /** Applies warning modifiers to the route map's existing pin elements. */
+  setSaleMentionSpaces(spaces) {
+    this.mapRenderer?.setSaleMentionSpaces(spaces);
   }
 
   clearOptimizationPreview() {

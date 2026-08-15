@@ -44,3 +44,9 @@ export type SaleMentionState =
       readonly matchedKeywords: readonly string[];
       readonly checkedAt: string;
     };
+
+export interface SaleMentionReader {
+  getSaleMention(space: string): SaleMentionState;
+  getMentionSpaces(): ReadonlySet<string>;
+  subscribe(listener: () => void): () => void;
+}

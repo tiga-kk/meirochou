@@ -64,7 +64,11 @@ import type { CompleteCircleVisitInput, CompleteCircleVisitResult } from "./comp
 import type { DeleteScope, ManagementEventDetailMap } from "../shared/ui/management-events";
 import type { RouteResult } from "../features/route-guidance/public-api";
 import type { CircleStatusUndoToken } from "../features/circle-status/public-api";
-import type { XPostPanel } from "../features/x-post-monitoring/public-api";
+import type {
+  EventDayXPostMonitor,
+  SaleMentionReader,
+  XPostPanel,
+} from "../features/x-post-monitoring/public-api";
 import type { SpaceArea } from "../shared/domain/space-parser";
 import type { SourceDiffViewModel } from "../shared/ui/management-view-model";
 import {
@@ -271,6 +275,7 @@ interface BrowserApplicationOptions {
   readonly completeCircleVisit: (input: CompleteCircleVisitInput) => Promise<CompleteCircleVisitResult>;
   readonly localDataDeletionController: LocalDataDeletionController;
   readonly xPostPanel?: XPostPanel;
+  readonly saleMentionMonitor?: EventDayXPostMonitor;
 }
 
 interface PendingGasUpdatesControllerPort {
@@ -309,6 +314,8 @@ export class BrowserApplication {
   completeCircleVisit: (input: CompleteCircleVisitInput) => Promise<CompleteCircleVisitResult>;
   localDataDeletionController: LocalDataDeletionController;
   xPostPanel: XPostPanel | null;
+  saleMentionMonitor: EventDayXPostMonitor | null;
+  saleMentionReader: SaleMentionReader | null;
   spreadsheetTitle: string;
   routeGuidanceSession: RouteGuidanceSession;
   routeMapAreaCatalog: MapAreaCatalog;
@@ -344,6 +351,10 @@ export class BrowserApplication {
   asyncOperationIndicator: { status: AsyncOperationStatus } | null = null;
   managementRows: readonly EventDayManagementRow[] = [];
   private managementUpdateToken = 0;
+  private saleMentionUnsubscribe: (() => void) | null = null;
+  private saleMentionEventDayKey: string | null = null;
+  private saleMentionToastSignature: string | null = null;
+  private saleMentionTargetSpace: string | null = null;
 
   constructor(options?: BrowserApplicationOptions) {
     this.started = false;
@@ -398,6 +409,8 @@ export class BrowserApplication {
     this.managementRows = [];
     this.localDataDeletionController = options.localDataDeletionController;
     this.xPostPanel = options.xPostPanel ?? null;
+    this.saleMentionMonitor = options.saleMentionMonitor ?? null;
+    this.saleMentionReader = this.saleMentionMonitor;
     this.spreadsheetTitle = "";
     this.routeGuidanceSession = routeGuidanceDependencies.routeGuidanceSession;
     this.routeMapAreaCatalog = routeGuidanceDependencies.routeMapAreaCatalog;
@@ -422,11 +435,15 @@ export class BrowserApplication {
       (circle, opener) => this.ui.showPdfModal(circle, { returnFocus: opener }),
       (circle) => this.handleSetNextTarget(circle),
     );
+    this.saleMentionUnsubscribe = this.saleMentionReader?.subscribe(() => {
+      this.applySaleMentionState(this.routeGuidanceSession.getSnapshot().currentDestination);
+    }) ?? null;
     this.activeEventDaySession.subscribe(() => {
       if (this.ui) {
         this.updateManagementModels();
         this.ui.updateCounts?.(this);
         this.renderRoutePriorityFilter();
+        this.syncSaleMentionMonitor();
       }
     });
     baseSession.subscribe((snapshot) => {
@@ -833,6 +850,7 @@ export class BrowserApplication {
       this.ui.updateCurrentLocation(space);
       this.ui.showTarget(null);
       this.xPostPanel?.hide();
+      this.ui.setSaleMentionWarning(false);
       this.saveNavigationSnapshot();
     } else if (routeResult.kind === "failed") {
       this.ui.showToast(
@@ -1169,6 +1187,7 @@ export class BrowserApplication {
         this.invalidateNavigationForSourceChange(activeRefBeforeDelete);
         this.ui.showTarget(null);
         this.xPostPanel?.hide();
+        this.ui.setSaleMentionWarning(false);
         this.updateManagementModels();
         this.ui.updateCounts(this);
       } else {
@@ -1252,6 +1271,7 @@ export class BrowserApplication {
       routeMotionPreference: this.routeMotionPreference,
     });
     this.ui.updateMapVersion?.(manifest?.bundleVersion || manifest?.eventId || "");
+    this.syncSaleMentionMonitor();
     this.renderRoutePriorityFilter();
     const nearbyMapButton = this.document.getElementById("btn-open-nearby-map");
     if (nearbyMapButton) {
@@ -1374,6 +1394,9 @@ export class BrowserApplication {
     for (const cancel of this.ownedTimerCancels.values()) cancel();
     this.ownedTimerCancels.clear();
     this.navigationRuntimeController.dispose();
+    this.saleMentionUnsubscribe?.();
+    this.saleMentionUnsubscribe = null;
+    this.saleMentionMonitor?.stop();
     this.xPostPanel?.dispose();
     this.pendingGasUpdatesController?.stop?.();
     this.localDataDeletionController?.stop?.();
@@ -1418,10 +1441,56 @@ export class BrowserApplication {
     };
   }
 
+  private eventDayDate(ref: EventDayRef): string | null {
+    const event = this.eventRegistry?.events.find((candidate) => candidate.eventId === ref.eventId);
+    return event?.days.find((day) => day.dayId === ref.dayId)?.date ?? null;
+  }
+
+  private syncSaleMentionMonitor(): void {
+    const monitor = this.saleMentionMonitor;
+    if (!monitor) return;
+    const ref = this.activeRef;
+    if (!ref) {
+      monitor.stop();
+      this.saleMentionEventDayKey = null;
+      return;
+    }
+    const key = `${ref.eventId}:${ref.dayId}`;
+    if (key !== this.saleMentionEventDayKey) {
+      this.saleMentionEventDayKey = key;
+      monitor.start({ ref, eventDate: this.eventDayDate(ref) });
+    } else {
+      monitor.refreshCircleAccounts();
+    }
+  }
+
+  private applySaleMentionState(currentTarget: Circle | null): void {
+    const reader = this.saleMentionReader;
+    const spaces = reader?.getMentionSpaces() ?? new Set<string>();
+    this.ui.setSaleMentionSpaces(spaces);
+    this.nearbyMapView.setSaleMentionSpaces(spaces);
+    const targetSpace = currentTarget?.space ?? null;
+    if (targetSpace !== this.saleMentionTargetSpace) {
+      this.saleMentionTargetSpace = targetSpace;
+      this.saleMentionToastSignature = null;
+    }
+    const state = targetSpace && reader
+      ? reader.getSaleMention(targetSpace)
+      : { status: "unknown" as const };
+    this.ui.setSaleMentionWarning(state.status === "mention");
+    if (state.status !== "mention") return;
+    const signature = `${targetSpace}:${[...state.matchedPostIds].sort().join(",")}`;
+    if (signature === this.saleMentionToastSignature) return;
+    this.saleMentionToastSignature = signature;
+    this.ui.showToast("完売・売り切れに関する投稿があります", "warning");
+  }
+
   /** Render navigation and keep the post panel bound to the active destination. */
   private renderNavigation(fitMode = "preserve"): void {
     const context = this.getNavigationContext(fitMode);
     this.ui.showNavigation(context);
+    this.saleMentionMonitor?.prioritizeCircle(context.currentTarget);
+    this.applySaleMentionState(context.currentTarget);
     const ref = this.activeRef;
     if (ref && context.currentTarget) {
       void this.xPostPanel?.show({ ref, circle: context.currentTarget });
@@ -1808,6 +1877,7 @@ export class BrowserApplication {
             this.resetNavigationRuntimeState();
             this.ui.showTarget(null);
             this.xPostPanel?.hide();
+            this.ui.setSaleMentionWarning(false);
             if (notifyComplete)
               this.ui.showToast("全てのサークルを回りました！");
             resolve();
@@ -1906,6 +1976,7 @@ export class BrowserApplication {
             });
             this.ui.showTarget(null);
             this.xPostPanel?.hide();
+            this.ui.setSaleMentionWarning(false);
             if (notifyComplete)
               this.ui.showToast("全てのサークルを回りました！");
             resolve();
@@ -2078,6 +2149,7 @@ export class BrowserApplication {
     if (routeResult.kind === "finished") {
       this.ui.showTarget(null);
       this.xPostPanel?.hide();
+      this.ui.setSaleMentionWarning(false);
       if (type === "purchase") this.saveNavigationSnapshot();
       else this.clearNavigationSnapshot(this.activeRef);
       if (type === "purchase")
@@ -2115,6 +2187,7 @@ export class BrowserApplication {
       this.ui.updateCounts(this);
       this.ui.showTarget(null); // 表示クリア
       this.xPostPanel?.hide();
+      this.ui.setSaleMentionWarning(false);
       this.ui.els.targetSection.classList.add("hidden");
       this.ui.els.targetEmpty.classList.remove("hidden");
       this.ui.showToast("リセットしました");

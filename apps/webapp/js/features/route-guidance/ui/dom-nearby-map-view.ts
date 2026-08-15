@@ -128,6 +128,7 @@ export class DomNearbyMapView {
   private pageIndex = 0;
   private selectedSpace: string | null = null;
   private selectionMode = false;
+  private saleMentionSpaces = new Set<string>();
   private tapStart: { pointerId: number; clientX: number; clientY: number } | null = null;
   private renderToken = 0;
   private nearbyMapResizeObserver: ResizeObserver | null = null;
@@ -325,6 +326,21 @@ export class DomNearbyMapView {
     const selected = this.areas.find((area) => areaId(area) === initialAreaId) ?? fallback ?? this.areas[0];
     void this.selectArea(areaId(selected));
     (this.surface.querySelector("#btn-close-nearby-map") as HTMLElement)?.focus();
+  }
+
+  /** Applies sale-warning modifiers without changing nearby ordering or layout. */
+  setSaleMentionSpaces(spaces: ReadonlySet<string>): void {
+    this.saleMentionSpaces = new Set(spaces);
+    this.surface?.querySelectorAll<HTMLElement>(".map-pin[data-space], .nearby-catalog-card[data-space]").forEach((element) => {
+      const mentioned = this.saleMentionSpaces.has(element.dataset.space || "");
+      const baseLabel = element.dataset.baseAriaLabel || element.getAttribute("aria-label") || "";
+      element.dataset.baseAriaLabel = baseLabel;
+      element.classList.toggle("sale-mention", mentioned);
+      element.setAttribute(
+        "aria-label",
+        mentioned ? `${baseLabel}、完売・売り切れ関連投稿あり` : baseLabel,
+      );
+    });
   }
 
   close(): void {
@@ -532,9 +548,16 @@ export class DomNearbyMapView {
       const element = document.createElement("span");
       element.className = `map-pin ${pin.state}`;
       element.dataset.space = pin.space;
+      element.dataset.baseAriaLabel = pin.space;
+      if (this.saleMentionSpaces?.has(pin.space)) element.classList.add("sale-mention");
       element.style.left = `${pin.x}%`;
       element.style.top = `${pin.y}%`;
-      element.setAttribute("aria-label", pin.space);
+      element.setAttribute(
+        "aria-label",
+        this.saleMentionSpaces?.has(pin.space)
+          ? `${pin.space}、完売・売り切れ関連投稿あり`
+          : pin.space,
+      );
       const size = calculateMapPinSize({ imageWidth: assets?.points.image.width, renderedWidth: layer.clientWidth, sourceSize: 10 });
       element.style.width = `${size}px`;
       element.style.height = `${size}px`;
@@ -621,11 +644,13 @@ export class DomNearbyMapView {
         }
       }
       card.dataset.space = candidate.space;
+      card.dataset.baseAriaLabel = `${candidate.space} 周辺カード`;
       card.setAttribute("role", "group");
       card.tabIndex = 0;
       card.setAttribute("aria-selected", String(this.selectedSpace === candidate.space));
       if (this.selectedSpace === candidate.space) card.classList.add("nearby-catalog-card--selected");
       card.setAttribute("aria-label", `${candidate.space} 周辺カード`);
+      if (this.saleMentionSpaces?.has(candidate.space)) card.classList.add("sale-mention");
       let pointerStart: { x: number; y: number } | null = null;
       let suppressClick = false;
       const selectCard = () => {

@@ -794,6 +794,14 @@
   font-weight: 800;
 }
 
+.sale-mention-warning {
+  margin: 0.6rem 0 0;
+  padding: 0.45rem 0.6rem;
+  border-inline-start: 4px solid var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  font-weight: 800;
+}
+
 .route-selection-controls {
   margin-top: 10px;
   padding: 8px;

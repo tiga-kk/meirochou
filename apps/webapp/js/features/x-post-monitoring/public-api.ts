@@ -6,6 +6,7 @@ export type {
   XPostApiErrorCode,
   XPostClient,
   XPostPage,
+  SaleMentionReader,
 } from "./domain/x-post-types";
 export {
   buildXPostCacheKey,

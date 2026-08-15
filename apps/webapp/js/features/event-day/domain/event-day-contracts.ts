@@ -3,6 +3,7 @@ import type { EventDayRef, LocalEventDayState } from "./event-day-types";
 export interface EventRegistryDay {
   readonly dayId: string;
   readonly displayName: string;
+  readonly date?: string;
 }
 
 export interface EventRegistryEntry {
