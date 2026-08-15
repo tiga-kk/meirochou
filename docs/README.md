@@ -22,7 +22,7 @@
 - `docs/plans/phase-07-3/` — Phase 7.3 実機follow-up。
 - `docs/plans/phase-07-4/` — Phase 7.4 経路motion・周辺地図・人間受入follow-up。完了履歴。
 - `docs/plans/phase-07-5/` — **現在のPhase。map-first UI polish・周辺card perimeter・ALNS live preview。**
-- `docs/plans/phase-07-6/` — **計画済みの次Phase。X投稿の簡素表示・イベント当日scan・完売関連warning。Phase 7.5 closure確認後に着手する。**
+- `docs/plans/phase-07-6/` — **計画済みの次Phase。X投稿の簡素表示・イベント当日scan・完売関連warningに加え、`W_*`壁分類のoptimization接続とgallery位置順整理。Phase 7.5 closure確認後に着手する。**
 
 ## 共通実装原則
 
@@ -31,6 +31,7 @@
 - Route Guidanceの正式状態は既存Session/NavigationStateを使い、同じ意味の第二storeを作らない。
 - optimization previewのような一時表示は正式NavigationState/LocalStorageへ混ぜない。
 - X投稿や完売関連warningのような再取得可能な外部補助情報も、正式LocalStorage business stateへ混ぜない。
+- map asset由来のwall分類はsource/business stateへ永続化せず、表示/optimization準備時のderived metadataとして扱う。
 - LocalStorageへcommit済みの購入結果を、GAS配送失敗、catalog cache失敗、X/Yahoo取得失敗だけを理由に取り消さない。
 - 地図とお品書きを主要情報として扱い、補助UIが不必要に隠さない。
 - map viewportのclipを外すのではなく、viewport自体を適切に大きくする。
