@@ -12,6 +12,15 @@ export interface XPostPage {
   readonly fetchedAt: string;
 }
 
+export interface XPostClient {
+  fetchPage(input: {
+    readonly handle: string;
+    readonly cursor?: string | null;
+    readonly day?: string | null;
+    readonly signal?: AbortSignal;
+  }): Promise<XPostPage>;
+}
+
 export type XPostApiErrorCode =
   | "invalid_request"
   | "upstream_rate_limited"
