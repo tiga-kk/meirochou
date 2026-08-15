@@ -17,6 +17,15 @@ export {
 } from "./domain/x-post-cache-model";
 export { LoadXPostPageUseCase } from "./use-cases/load-x-post-page";
 export {
+  SALE_MENTION_KEYWORDS,
+  detectSaleMentions,
+} from "./domain/sale-mention-detector";
+export {
+  DefaultEventDayXPostMonitor,
+  type EventDayXPostMonitor,
+  type EventDayXPostMonitorOptions,
+} from "./use-cases/event-day-x-post-monitor";
+export {
   DomXPostPanel,
   type XPostPanel,
   type XPostPanelTarget,
