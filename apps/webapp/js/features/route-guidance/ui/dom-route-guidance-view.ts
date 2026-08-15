@@ -499,7 +499,7 @@ export class DomRouteGuidanceView {
     if (viewModel.accountUrl) {
       this.els.tweetLink.href = viewModel.accountUrl;
       this.els.tweetLink.style.display = "block";
-      this.els.tweetLink.innerHTML = `<i class="fa-brands fa-twitter"></i> ${viewModel.accountLabel}`;
+      this.els.tweetLink.textContent = "アカウント";
       this.els.tweetLink.target = "_blank";
       this.els.tweetLink.rel = "noopener noreferrer";
     } else {

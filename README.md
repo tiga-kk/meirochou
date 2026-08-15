@@ -11,6 +11,7 @@
 | イベント・日程切替(C108対応済み) | o |
 | 購入・保留の管理（LocalStorageを正本とする） | o |
 | GAS同期キューの再送・破棄 | o |
+| Xアカウントの最近の投稿表示（IndexedDB cache対応） | o |
 | サークル・日程・全データの削除 | o |
 | CSVエクスポート | o |
 | マルチデバイス同期 | x 非対応 |
@@ -28,6 +29,8 @@
 - tweet：お品書きのURL(twitterのURLを入れないこと。pbs.twimg形式で)
 - account：twitterアカウント
 - isSale：まだ売り切れていないか？
+
+X profile URLの`account`は、現在の目的地詳細に最近の投稿（時刻と本文）を表示する対象になります。Pixivなどの非X URLは投稿取得の対象外です。
 
 (スプレッドシートを使う場合：
 a.スプレッドシートの「拡張機能」->「Apps Script」を選び、

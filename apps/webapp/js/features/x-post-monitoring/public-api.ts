@@ -16,3 +16,8 @@ export {
   type XPostCacheEntry,
 } from "./domain/x-post-cache-model";
 export { LoadXPostPageUseCase } from "./use-cases/load-x-post-page";
+export {
+  DomXPostPanel,
+  type XPostPanel,
+  type XPostPanelTarget,
+} from "./ui/dom-x-post-panel";

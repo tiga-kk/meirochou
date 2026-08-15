@@ -3,6 +3,48 @@
   padding: 0.6rem 0.75rem;
 }
 
+.x-post-panel {
+  margin-top: 0.5rem;
+}
+
+.x-post-panel-title,
+.x-post-message {
+  display: block;
+  margin: 0;
+}
+
+.x-post-message {
+  min-height: 1.25em;
+  color: var(--muted, #5b6470);
+  font-size: 0.85rem;
+}
+
+.x-post-list {
+  max-height: 8rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.x-post-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.45rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--line, rgba(17, 24, 32, 0.16));
+}
+
+.x-post-item time {
+  color: var(--muted, #5b6470);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.x-post-item p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .current-location-header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

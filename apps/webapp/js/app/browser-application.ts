@@ -64,6 +64,7 @@ import type { CompleteCircleVisitInput, CompleteCircleVisitResult } from "./comp
 import type { DeleteScope, ManagementEventDetailMap } from "../shared/ui/management-events";
 import type { RouteResult } from "../features/route-guidance/public-api";
 import type { CircleStatusUndoToken } from "../features/circle-status/public-api";
+import type { XPostPanel } from "../features/x-post-monitoring/public-api";
 import type { SpaceArea } from "../shared/domain/space-parser";
 import type { SourceDiffViewModel } from "../shared/ui/management-view-model";
 import {
@@ -269,6 +270,7 @@ interface BrowserApplicationOptions {
   readonly circleDataSourceController: CircleDataSourceController;
   readonly completeCircleVisit: (input: CompleteCircleVisitInput) => Promise<CompleteCircleVisitResult>;
   readonly localDataDeletionController: LocalDataDeletionController;
+  readonly xPostPanel?: XPostPanel;
 }
 
 interface PendingGasUpdatesControllerPort {
@@ -306,6 +308,7 @@ export class BrowserApplication {
   cacheEventDayCatalogs: CacheEventDayCatalogsUseCase;
   completeCircleVisit: (input: CompleteCircleVisitInput) => Promise<CompleteCircleVisitResult>;
   localDataDeletionController: LocalDataDeletionController;
+  xPostPanel: XPostPanel | null;
   spreadsheetTitle: string;
   routeGuidanceSession: RouteGuidanceSession;
   routeMapAreaCatalog: MapAreaCatalog;
@@ -394,6 +397,7 @@ export class BrowserApplication {
     this.eventRegistryUrl = eventDayDependencies.eventRegistryUrl ?? null;
     this.managementRows = [];
     this.localDataDeletionController = options.localDataDeletionController;
+    this.xPostPanel = options.xPostPanel ?? null;
     this.spreadsheetTitle = "";
     this.routeGuidanceSession = routeGuidanceDependencies.routeGuidanceSession;
     this.routeMapAreaCatalog = routeGuidanceDependencies.routeMapAreaCatalog;
@@ -819,15 +823,16 @@ export class BrowserApplication {
     this.updateManagementModels();
     if (routeResult.kind === "ignored") {
       this.routeGuidanceController.removePurchasedSpaceFromOrder(space);
-      this.ui.showNavigation(this.getNavigationContext("preserve"));
+      this.renderNavigation("preserve");
       this.saveNavigationSnapshot();
     } else if (routeResult.kind === "advanced") {
       this.ui.updateCurrentLocation(space);
-      this.ui.showNavigation(this.getNavigationContext("current"));
+      this.renderNavigation("current");
       this.saveNavigationSnapshot();
     } else if (routeResult.kind === "finished") {
       this.ui.updateCurrentLocation(space);
       this.ui.showTarget(null);
+      this.xPostPanel?.hide();
       this.saveNavigationSnapshot();
     } else if (routeResult.kind === "failed") {
       this.ui.showToast(
@@ -864,7 +869,7 @@ export class BrowserApplication {
     if (restoredLocationSpace) this.ui.updateCurrentLocation(restoredLocationSpace);
     this.ui.updateCounts(this);
     this.updateManagementModels();
-    this.ui.showNavigation(this.getNavigationContext("preserve"));
+    this.renderNavigation("preserve");
     this.saveNavigationSnapshot();
     return true;
   }
@@ -1163,6 +1168,7 @@ export class BrowserApplication {
       } else if (activeRefSourceDeleted && activeRefBeforeDelete) {
         this.invalidateNavigationForSourceChange(activeRefBeforeDelete);
         this.ui.showTarget(null);
+        this.xPostPanel?.hide();
         this.updateManagementModels();
         this.ui.updateCounts(this);
       } else {
@@ -1271,12 +1277,12 @@ export class BrowserApplication {
           this.getUnvisited(),
         );
         this.itineraryOpen = true;
-        this.ui.showNavigation(this.getNavigationContext("preserve"));
+        this.renderNavigation("preserve");
         itineraryDialog.open = true;
       };
       itineraryDialog.addEventListener("itinerary-close", () => {
         this.itineraryOpen = false;
-        this.ui.showNavigation(this.getNavigationContext("preserve"));
+        this.renderNavigation("preserve");
       });
     }
     const userGuideButton = this.document.getElementById("btn-open-user-guide");
@@ -1368,6 +1374,7 @@ export class BrowserApplication {
     for (const cancel of this.ownedTimerCancels.values()) cancel();
     this.ownedTimerCancels.clear();
     this.navigationRuntimeController.dispose();
+    this.xPostPanel?.dispose();
     this.pendingGasUpdatesController?.stop?.();
     this.localDataDeletionController?.stop?.();
   }
@@ -1409,6 +1416,18 @@ export class BrowserApplication {
         : [],
       fitMode,
     };
+  }
+
+  /** Render navigation and keep the post panel bound to the active destination. */
+  private renderNavigation(fitMode = "preserve"): void {
+    const context = this.getNavigationContext(fitMode);
+    this.ui.showNavigation(context);
+    const ref = this.activeRef;
+    if (ref && context.currentTarget) {
+      void this.xPostPanel?.show({ ref, circle: context.currentTarget });
+    } else {
+      this.xPostPanel?.hide();
+    }
   }
 
   /** Persist the current navigation state when all snapshot identity fields exist. */
@@ -1499,7 +1518,7 @@ export class BrowserApplication {
       circle.space,
       this.wantToBuy,
     );
-    this.ui.showNavigation(this.getNavigationContext("preserve"));
+    this.renderNavigation("preserve");
     const result = await selection;
     if (result.kind === "ignored" || result.kind === "stale") return;
     if (result.kind === "route-unavailable") {
@@ -1518,13 +1537,13 @@ export class BrowserApplication {
       this.selectionMessage = "";
     }
     const fitMode = result.kind === "selected" ? "comparison" : "preserve";
-    this.ui.showNavigation(this.getNavigationContext(fitMode));
+    this.renderNavigation(fitMode);
   }
 
   /** Enter the two-route comparison state after a candidate route is ready. */
   handlePreviewRoute() {
     if (!this.routeGuidanceController.compareSelectedDestination()) return;
-    this.ui.showNavigation(this.getNavigationContext("comparison"));
+    this.renderNavigation("comparison");
   }
 
   /** Promote the compared candidate to the active destination without recalculation. */
@@ -1533,7 +1552,7 @@ export class BrowserApplication {
       this.routeGuidanceController.confirmSelectedDestination();
     if (!destination) return;
     this.selectionMessage = "";
-    this.ui.showNavigation(this.getNavigationContext("current"));
+    this.renderNavigation("current");
     this.ui.showToast(`目的地を ${destination.space} に変更しました`);
     this.saveNavigationSnapshot();
   }
@@ -1541,14 +1560,14 @@ export class BrowserApplication {
   /** Leave comparison while retaining the selected target details. */
   handleCancelRoute() {
     if (!this.routeGuidanceController.cancelDestinationComparison()) return;
-    this.ui.showNavigation(this.getNavigationContext("comparison"));
+    this.renderNavigation("comparison");
   }
 
   /** Close the candidate panel and invalidate any pending candidate route. */
   handleCloseRouteSelection() {
     if (!this.routeGuidanceController.cancelDestinationSelection()) return;
     this.selectionMessage = "";
-    this.ui.showNavigation(this.getNavigationContext("current"));
+    this.renderNavigation("current");
   }
 
   /**
@@ -1609,7 +1628,7 @@ export class BrowserApplication {
         ? currentPosition.circleSpace || ""
         : "";
     this.selectionMessage = "";
-    this.ui.showNavigation(this.getNavigationContext("current"));
+    this.renderNavigation("current");
     this.ui.showToast(`目的地を ${circle.space} に設定しました`);
     this.saveNavigationSnapshot();
     return true;
@@ -1665,7 +1684,7 @@ export class BrowserApplication {
       selectionStatus: "idle",
     });
     this.selectionMessage = "";
-    this.ui.showNavigation(this.getNavigationContext("current"));
+    this.renderNavigation("current");
     this.ui.showToast(`目的地を ${circle.space} に設定しました`);
     return true;
   }
@@ -1788,6 +1807,7 @@ export class BrowserApplication {
             this.clearNavigationSnapshot();
             this.resetNavigationRuntimeState();
             this.ui.showTarget(null);
+            this.xPostPanel?.hide();
             if (notifyComplete)
               this.ui.showToast("全てのサークルを回りました！");
             resolve();
@@ -1795,7 +1815,7 @@ export class BrowserApplication {
           }
           const allCandidates = this.getRouteGuidanceCandidates(selectedPriorities);
           if (allCandidates.length === 0) {
-            this.ui.showNavigation(this.getNavigationContext("preserve"));
+            this.renderNavigation("preserve");
             this.ui.showToast(
               "この条件に一致する巡回対象はありません",
               "warning",
@@ -1849,7 +1869,7 @@ export class BrowserApplication {
 
           this.currentStartSpace = currentSpace;
           this.selectionMessage = "";
-          this.ui.showNavigation(this.getNavigationContext("current"));
+          this.renderNavigation("current");
 
           resolve();
         },
@@ -1885,6 +1905,7 @@ export class BrowserApplication {
               selectedRoute: null,
             });
             this.ui.showTarget(null);
+            this.xPostPanel?.hide();
             if (notifyComplete)
               this.ui.showToast("全てのサークルを回りました！");
             resolve();
@@ -1892,7 +1913,7 @@ export class BrowserApplication {
           }
           const candidates = this.getRouteGuidanceCandidates(selectedPriorities);
           if (candidates.length === 0) {
-            this.ui.showNavigation(this.getNavigationContext("preserve"));
+            this.renderNavigation("preserve");
             this.ui.showToast(
               "この条件に一致する巡回対象はありません",
               "warning",
@@ -1972,7 +1993,7 @@ export class BrowserApplication {
               selectionStatus: "idle",
             });
             this.selectionMessage = "";
-            this.ui.showNavigation(this.getNavigationContext("current"));
+          this.renderNavigation("current");
           }
           resolve();
         },
@@ -2039,14 +2060,14 @@ export class BrowserApplication {
     }
     if (type === "purchase" && routeResult.kind === "ignored") {
       this.routeGuidanceController.removePurchasedSpaceFromOrder(space);
-      this.ui.showNavigation(this.getNavigationContext("preserve"));
+      this.renderNavigation("preserve");
       this.saveNavigationSnapshot();
       if (this.rememberPurchaseUndo(space, visitResult, routeSnapshot, currentLocationSpace))
         this.ui.showUndoSnackbar(space);
       return;
     }
     if (routeResult.kind === "advanced") {
-      this.ui.showNavigation(this.getNavigationContext("current"));
+      this.renderNavigation("current");
       this.saveNavigationSnapshot();
       if (type === "purchase")
         if (this.rememberPurchaseUndo(space, visitResult, routeSnapshot, currentLocationSpace))
@@ -2056,6 +2077,7 @@ export class BrowserApplication {
 
     if (routeResult.kind === "finished") {
       this.ui.showTarget(null);
+      this.xPostPanel?.hide();
       if (type === "purchase") this.saveNavigationSnapshot();
       else this.clearNavigationSnapshot(this.activeRef);
       if (type === "purchase")
@@ -2092,6 +2114,7 @@ export class BrowserApplication {
       this.resetNavigationRuntimeState();
       this.ui.updateCounts(this);
       this.ui.showTarget(null); // 表示クリア
+      this.xPostPanel?.hide();
       this.ui.els.targetSection.classList.add("hidden");
       this.ui.els.targetEmpty.classList.remove("hidden");
       this.ui.showToast("リセットしました");
@@ -2145,7 +2168,7 @@ export class BrowserApplication {
     this.currentStartSpace =
       lockedLeg?.from?.type === "circle" ? lockedLeg.from.space : "";
     this.selectionMessage = "";
-    this.ui.showNavigation(this.getNavigationContext("current"));
+    this.renderNavigation("current");
     this.ui.showToast(
       `前回の案内（目的地: ${resumeResult.targetSpace}）を再開しました`,
     );
