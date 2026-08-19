@@ -534,7 +534,7 @@ export function assembleComiPathApplication(
               ? toDomainMapManifest(
                   await loadRuntimeMapBundleManifestFromUrl(
                   resolveEventMapManifestUrl(runtimeRegistryUrl, event),
-                  event.eventId,
+                  event,
                   {
                     fetcher: browserFetcher,
                     signal,

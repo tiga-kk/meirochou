@@ -4,6 +4,7 @@ import { afterEach, test } from "vitest";
 import {
   loadEventMapBundleManifestFromUrl,
   loadMapBundleManifest,
+  loadRuntimeMapBundleManifestFromUrl,
   renderMapBootstrapError,
 } from "../apps/webapp/js/features/event-day/infrastructure/http-map-manifest-loader";
 
@@ -250,4 +251,78 @@ test("loadEventMapBundleManifestFromUrl does not fetch sub-assets on manifest pa
   assert.deepEqual(fetchedUrls, [
     "https://example.test/map-bundles/C108/manifest.json",
   ]);
+});
+
+test("runtime loader adapts a generic non-C108 strict event manifest", async () => {
+  const manifest = await loadRuntimeMapBundleManifestFromUrl(
+    "https://example.test/assets/maps/C999/manifest.json",
+    { eventId: "C999", displayName: "Comic Market 999" },
+    {
+      fetcher: async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          schemaVersion: 1,
+          eventId: "C999",
+          bundleVersion: "c999-v1",
+          areas: [{
+            areaId: "east",
+            displayName: "東ホール",
+            metersPerPixel: 0.1,
+            prefixes: ["東"],
+            labels: ["A", "B"],
+            assets: {
+              svg: "./east/map.svg",
+              points: "./east/points.json",
+              gridMeta: "./east/grid-meta.json",
+              grid: "./east/grid.bin",
+            },
+          }],
+        }),
+      }) as Response,
+    },
+  );
+
+  assert.equal(manifest.eventId, "C999");
+  assert.equal(manifest.displayName, "Comic Market 999");
+  assert.deepEqual(manifest.areas[0].prefixes, ["東"]);
+  assert.deepEqual(manifest.areas[0].labels, ["A", "B"]);
+  assert.equal(
+    manifest.areas[0].mapFile,
+    "https://example.test/assets/maps/C999/east/map.svg",
+  );
+});
+
+test("runtime loader rejects a strict event and bundle eventId mismatch", async () => {
+  await assert.rejects(
+    loadRuntimeMapBundleManifestFromUrl(
+      "https://example.test/assets/maps/C999/manifest.json",
+      { eventId: "C999", displayName: "Comic Market 999" },
+      {
+        fetcher: async () => ({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            schemaVersion: 1,
+            eventId: "C998",
+            bundleVersion: "c998-v1",
+            areas: [{
+              areaId: "east",
+              displayName: "東ホール",
+              metersPerPixel: 0.1,
+              prefixes: ["東"],
+              labels: ["A", "B"],
+              assets: {
+                svg: "./east/map.svg",
+                points: "./east/points.json",
+                gridMeta: "./east/grid-meta.json",
+                grid: "./east/grid.bin",
+              },
+            }],
+          }),
+        }) as Response,
+      },
+    ),
+    /registry=C999.*manifest=C998/,
+  );
 });

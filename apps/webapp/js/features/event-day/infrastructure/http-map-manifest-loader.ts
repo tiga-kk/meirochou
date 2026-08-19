@@ -20,36 +20,16 @@ function errorDetail(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-const C108_AREA_METADATA = {
-  e456: {
-    prefixes: ["東"],
-    labels: [
-      ..."アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン",
-    ],
-  },
-  e7: {
-    prefixes: ["東"],
-    labels: [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"],
-  },
-  s12: {
-    prefixes: ["南"],
-    labels: [..."abcdefghijklmnopqrstuvwxyz"],
-  },
-  w12: {
-    prefixes: ["西"],
-    labels: [
-      ..."あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん",
-    ],
-  },
-} as const;
-
-/** Adapt the strict C108 bundle contract to the legacy renderer area shape. */
+/** Adapt a strict event bundle to the legacy renderer area shape. */
 export function toRuntimeMapBundleManifest(
   eventManifest: EventMapBundleManifest,
   manifestUrl: string,
+  event: Pick<EventRegistryEntryV1, "eventId" | "displayName">,
 ): MapBundleManifestV1 {
-  if (eventManifest.eventId !== "C108") {
-    throw new Error(`Unsupported event map manifest: ${eventManifest.eventId}`);
+  if (eventManifest.eventId !== event.eventId) {
+    throw new Error(
+      `Event map manifest mismatch: registry=${event.eventId}, manifest=${eventManifest.eventId}`,
+    );
   }
 
   const bundleBase = new URL(".", manifestUrl);
@@ -57,21 +37,16 @@ export function toRuntimeMapBundleManifest(
   return {
     schemaVersion: 1,
     eventId: eventManifest.eventId,
-    displayName: "C108",
+    displayName: event.displayName,
     bundleVersion: eventManifest.bundleVersion,
     areas: eventManifest.areas.map((area) => {
-      const metadata =
-        C108_AREA_METADATA[area.areaId as keyof typeof C108_AREA_METADATA];
-      if (!metadata) {
-        throw new Error(`Unsupported C108 area: ${area.areaId}`);
-      }
       return {
         id: area.areaId,
         mapId: area.areaId,
         name: area.displayName,
         metersPerPixel: area.metersPerPixel,
-        prefixes: metadata.prefixes,
-        labels: metadata.labels,
+        prefixes: area.prefixes,
+        labels: area.labels,
         mapFile: new URL(area.assets.svg, bundleBase).href,
         pointsFile: new URL(area.assets.points, bundleBase).href,
         gridMetaFile: new URL(area.assets.gridMeta, bundleBase).href,
@@ -136,7 +111,7 @@ export function resolveEventMapManifestUrl(
   return resolved.href;
 }
 
-/** Fetch and validate a C108 event map bundle manifest from an explicit URL. */
+/** Fetch and validate a strict event map bundle manifest from an explicit URL. */
 export async function loadEventMapBundleManifestFromUrl(
   manifestUrl: string,
   options: LoadMapBundleManifestOptions = {},
@@ -175,20 +150,23 @@ export async function loadEventMapBundleManifestFromUrl(
   return parseEventMapBundleManifest(payload);
 }
 
-/** Load either the C108 contract or a legacy fictional fixture for runtime use. */
+/** Load the registry-selected strict event or legacy map bundle contract. */
 export async function loadRuntimeMapBundleManifestFromUrl(
   manifestUrl: string,
-  eventId: string,
+  event: Pick<
+    EventRegistryEntryV1,
+    "eventId" | "displayName" | "mapBundleContract"
+  >,
   options: LoadMapBundleManifestOptions = {},
 ): Promise<MapBundleManifestV1> {
-  if (eventId === "C108") {
-    const eventManifest = await loadEventMapBundleManifestFromUrl(
-      manifestUrl,
-      options,
-    );
-    return toRuntimeMapBundleManifest(eventManifest, manifestUrl);
+  if (event.mapBundleContract === "legacy") {
+    return loadMapBundleManifestFromUrl(manifestUrl, options);
   }
-  return loadMapBundleManifestFromUrl(manifestUrl, options);
+  const eventManifest = await loadEventMapBundleManifestFromUrl(
+    manifestUrl,
+    options,
+  );
+  return toRuntimeMapBundleManifest(eventManifest, manifestUrl, event);
 }
 
 /** Fetch and validate a map bundle manifest from an explicit URL. */

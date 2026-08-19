@@ -292,7 +292,7 @@ test("runtime loader adapts C108 assets to absolute runtime paths", async () => 
 
   const manifest = await loadRuntimeMapBundleManifestFromUrl(
     manifestUrl,
-    "C108",
+    { eventId: "C108", displayName: "C108" },
     {
       fetcher: vi.fn().mockResolvedValue({
         ok: true,
@@ -302,6 +302,7 @@ test("runtime loader adapts C108 assets to absolute runtime paths", async () => 
   );
 
   expect(manifest.eventId).toBe("C108");
+  expect(manifest.displayName).toBe("C108");
   expect(manifest.areas).toHaveLength(4);
   expect(manifest.areas.map((a) => a.id)).toEqual(["e456", "e7", "s12", "w12"]);
   expect(manifest.areas[0]).toMatchObject({
@@ -338,7 +339,11 @@ test("runtime loader keeps legacy demo fixtures on the legacy contract", async (
 
   const manifest = await loadRuntimeMapBundleManifestFromUrl(
     "http://example.test/assets/maps/demo-v1/manifest.json",
-    "demo-v1",
+    {
+      eventId: "demo-v1",
+      displayName: "ComiPath Demo",
+      mapBundleContract: "legacy",
+    },
     { fetcher },
   );
 
@@ -347,4 +352,35 @@ test("runtime loader keeps legacy demo fixtures on the legacy contract", async (
     mapFile: "http://example.test/assets/maps/demo-v1/map.png",
     pointsFile: "http://example.test/assets/maps/demo-v1/points.json",
   });
+});
+
+test("runtime loader does not fallback to legacy after an implicit strict parse failure", async () => {
+  await assert.rejects(
+    loadRuntimeMapBundleManifestFromUrl(
+      "http://example.test/assets/maps/demo-v1/manifest.json",
+      { eventId: "demo-v1", displayName: "ComiPath Demo" },
+      {
+        fetcher: vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({
+            schemaVersion: 1,
+            eventId: "demo-v1",
+            displayName: "ComiPath Demo",
+            areas: [{
+              id: "demo-east",
+              mapId: "demo-east",
+              name: "デモ東",
+              prefixes: ["東"],
+              labels: ["ア"],
+              mapFile: "./map.png",
+              pointsFile: "./points.json",
+              gridMetaFile: "./grid.json",
+              gridFile: "./grid.bin",
+            }],
+          }),
+        }),
+      },
+    ),
+    /map bundle manifest|BoundaryValidationError/,
+  );
 });
