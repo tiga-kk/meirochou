@@ -51,10 +51,20 @@ Diagnostic evidence:
 
 ## Manual / external acceptance
 
-- `EXTERNAL_ACCEPTANCE_REQUIRED`: Cloudflare preview URL、deploy/authentication、追加secretなしのX/Yahoo live smokeをこの環境では確認できない。`/api/x-posts`のlive route、invalid handleのupstream非到達、public X handleのnormalized response、外部失敗時のroute/gallery継続を未確認。
-- `MANUAL_VISUAL_ACCEPTANCE_REQUIRED`: 実機/mobile相当での投稿panel gesture、map-first surface、warning/badge、gallery操作、200% text zoom、offline cache表示の意味的確認は未実施。snapshotは更新していない。
-- `OPEN_EXTERNAL_DEBT`: 実GASで同一space再送が既存行更新になる明示証拠、GAS更新時に対象外の既存Sheet列が保持される明示証拠。Phase 7.6 X closureとは独立して残す。
-- CI E2Eで自動証明された範囲は自動結果として扱い、上記項目をPASSへ昇格していない。
+2026-08-20 (JST) にユーザーが実環境で以下を確認し、5項目すべて問題なしと受入した。
+
+1. Cloudflare previewでX accountの最近の投稿本文を表示でき、Pixiv等は`投稿情報なし`となり、X取得失敗時もroute/catalog/purchase操作を継続できる。
+2. mobile相当/実機で投稿panel内部scrollが地図pan/pinchやpage scrollと致命的に競合せず、sale warning、map pin、gallery badgeに意味的な破綻がない。
+3. 200% text zoomで投稿本文、warning、badge、操作buttonに切れ・重大な重なりがない。
+4. cache取得後のoffline状態でcache済み投稿・warningを表示でき、主要機能を継続利用できる。
+5. gallery ordering、swipe purchase、priority filter、wall circle位置補正に目立つ破綻がない。
+
+判定:
+
+- `EXTERNAL_ACCEPTANCE_REQUIRED`: **ACCEPTED**。上記1でlive X/Pixiv/failure degradationを確認。
+- `MANUAL_VISUAL_ACCEPTANCE_REQUIRED`: **ACCEPTED**。上記2〜5でgesture/visual/200% zoom/offline/galleryを確認。
+- `OPEN_EXTERNAL_DEBT`: **OPENのまま**。実GASで同一space再送が既存行更新になる明示証拠、およびGAS更新時に対象外の既存Sheet列が保持される明示証拠はPhase 7.6 X closureと独立した残件として後続Taskを阻害しない。
+- snapshotは今回更新していない。
 
 ## Final automated verification
 
@@ -72,4 +82,4 @@ Diagnostic evidence:
 
 自動検証上のfailureは解消した。唯一のcurrent failureだったmanagement scroll assertionは`STALE_TEST_EXPECTATION`であり、production semanticsを変更せずE2Eの計測タイミングを安定化した。
 
-Task 0は、`EXTERNAL_ACCEPTANCE_REQUIRED`（Cloudflare/X live smoke）、`MANUAL_VISUAL_ACCEPTANCE_REQUIRED`（実機・visual/gesture/200% zoom/offline確認）、`OPEN_EXTERNAL_DEBT`（GAS 2件）が残るため、Phase 7.6完了またはPhase 8 Task 1開始とは判定しない。これらを自動PASSへ昇格せず、Phase 7.6 closure verificationとして引き渡す。
+2026-08-20 (JST) のmanual/live acceptanceも完了したため、**Phase 7.6およびPhase 8 Task 0は完了**と判定する。GAS 2件は`OPEN_EXTERNAL_DEBT`として保持するが、Phase 8 Task 1以降のevent map汎用化を阻害しない。
