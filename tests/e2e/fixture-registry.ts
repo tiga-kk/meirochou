@@ -7,6 +7,7 @@ export const DEMO_EVENT_REGISTRY = {
       eventId: "demo-v1",
       displayName: "ComiPath Demo",
       mapBundle: "../maps/demo-v1/manifest.json",
+      mapBundleContract: "legacy",
       days: [
         { dayId: "day1", displayName: "デモ1日目" },
         { dayId: "day2", displayName: "デモ2日目" },

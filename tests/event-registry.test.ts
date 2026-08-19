@@ -34,6 +34,34 @@ test("parseEventRegistry accepts a valid registry and freezes the output", () =>
   assert.equal(Object.isFrozen(result.events[0].days[0]), true);
 });
 
+test("parseEventRegistry accepts explicit event and legacy map bundle contracts", () => {
+  const missing = parseEventRegistry(validRegistry);
+  const event = parseEventRegistry({
+    ...validRegistry,
+    events: [{ ...validRegistry.events[0], mapBundleContract: "event" }],
+  });
+  const legacy = parseEventRegistry({
+    ...validRegistry,
+    events: [{ ...validRegistry.events[0], mapBundleContract: "legacy" }],
+  });
+
+  assert.equal(missing.events[0].mapBundleContract, undefined);
+  assert.equal(event.events[0].mapBundleContract, "event");
+  assert.equal(legacy.events[0].mapBundleContract, "legacy");
+});
+
+test("parseEventRegistry rejects unknown map bundle contracts", () => {
+  for (const mapBundleContract of ["foo", "", 1]) {
+    assert.throws(
+      () => parseEventRegistry({
+        ...validRegistry,
+        events: [{ ...validRegistry.events[0], mapBundleContract }],
+      }),
+      /mapBundleContract/,
+    );
+  }
+});
+
 test("parseEventRegistry rejects invalid schemaVersion", () => {
   assert.throws(
     () => parseEventRegistry({ ...validRegistry, schemaVersion: 2 }),

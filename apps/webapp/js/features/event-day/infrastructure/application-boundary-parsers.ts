@@ -486,6 +486,17 @@ export function parseEventRegistry(input: unknown): EventRegistryV1 {
       eventObj.mapBundle,
       `${eventPath}.mapBundle`,
     );
+    const mapBundleContract = eventObj.mapBundleContract;
+    if (
+      mapBundleContract !== undefined &&
+      mapBundleContract !== "event" &&
+      mapBundleContract !== "legacy"
+    ) {
+      throw new BoundaryValidationError(
+        `${eventPath}.mapBundleContract`,
+        '"event" or "legacy"',
+      );
+    }
 
     if (!Array.isArray(eventObj.days)) {
       throw new BoundaryValidationError(`${eventPath}.days`, "an array");
@@ -525,6 +536,7 @@ export function parseEventRegistry(input: unknown): EventRegistryV1 {
         eventId,
         displayName,
         mapBundle,
+        ...(mapBundleContract === undefined ? {} : { mapBundleContract }),
         days: Object.freeze(days),
       }),
     );
