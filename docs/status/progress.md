@@ -1,15 +1,17 @@
 # 実装進捗
 
-更新日: 2026-08-15
+更新日: 2026-08-19
 
 この文書を、現在フェーズ、現在Task、次に着手するTask、未完了の外部確認の唯一の正本とする。
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 7.6（Task 1実装途中）**
-- 現在Task: **Task 1: X投稿proxy契約とYahoo raw parserを確立**
-- 次に着手するTask: **Task 1のlive smoke・最終検証・完了判定**
-- canonical plan: `docs/plans/phase-07-6/README.md`
+- 現在フェーズ: **Phase 7.6 closure verification（Phase 8 Task 0）**
+- 現在Task: **Phase 8 Task 0: baseline verificationとPhase 7.6 closure**
+- 次に着手するTask: **manual/live acceptance確認後のPhase 7.6 closure判定**
+- canonical plan: `docs/plans/phase-08/task-00-baseline-and-phase-07-6-closure.md`
+- verification report: `docs/reviews/phase-08-task-00-baseline-verification.md`
+- Phase 8 Task 1（event map contract汎用化）は未着手。Phase 7.6のmanual/live acceptanceが未完のため、先行していない。
 - 設計: `docs/specs/2026-08-15-phase-07-6-x-post-monitoring-and-sale-alert-design.md`
 - planning basis: `docs/reviews/phase-07-6-planning-basis.md`
 
@@ -61,6 +63,32 @@ Phase 7.5では既存worker群を接続し、progressをephemeral preview、comp
 - GAS更新時に対象外の既存Sheet列が保持される明示証拠。
 
 これらはPhase 7.5のmap/UI/ALNS要件と独立しており、資格情報がないことを理由にTask 1〜7を止めない。
+
+## Phase 7.6実装履歴
+
+Phase 7.6 Task 1〜9のproduction実装は、`origin/main` に次の履歴として存在する。Task 0のclosure verificationは別途進行中である。
+
+| Task | 内容 | 実装履歴 |
+|---|---|---|
+| 1 | X投稿proxy契約とYahoo raw parser | `8f4edd8` |
+| 2 | event dateとX account contract | `5f83d0f` |
+| 3 | XPost clientとbounded cache | `6cbdba9` |
+| 4 | 投稿panel接続 | `a0ed6cc` |
+| 5 | event-day sale mention monitor | `f200271` |
+| 6 | sale warning接続 | `13ff131` |
+| 7 | `W_*`壁分類とoptimization接続 | `b1491c8` |
+| 8 | gallery位置順・wall anchor・badge | `dc52cbb` |
+| 9 | lifecycle・削除・回帰接続 | `cdaf701`, `2535a30` |
+
+### Phase 8 Task 0 baseline status
+
+- 初回`npm run verify`: PASS（142 files / 889 testsほか全gate成功）。
+- 初回`npm run test:e2e:ci`: 80 tests中71 passed / 1 failed / 8 skipped。management scroll assertionは`STALE_TEST_EXPECTATION`として`1f57160`でテスト計測を安定化した。
+- focused closure regression: lifecycle 46 tests、wall/optimization/gallery 23 tests、management focused E2E 1 testがPASS。
+- final `npm run verify`: PASS（142 files / 889 testsほか全gate）。
+- final `npm run test:e2e:ci`: PASS（CI container、80 tests中72 passed / 8 skipped）。
+- final `node scripts/audit-public-tree.mjs` / `git diff --check`: PASS。
+- Cloudflare/X live smoke、実GAS、実機visual確認はreportの状態に従い、未完了項目を残している。
 
 ## 進行規則
 
@@ -133,4 +161,4 @@ Phase 7.5では既存worker群を接続し、progressをephemeral preview、comp
 - `npm run test:e2e:ci`は終了コード1、62 passed / 9 failed / 8 skipped（managementの1件はretry成功）。失敗には既存visual baseline差分に加え、`navigation-resume`の期待snapshot世代、candidate Escape、catalog表示前提が含まれる。Task 8の計画に従い、このTask内で場当たり的な修正やsnapshot更新は行わない。
 - 390px級Motorola Androidでのheaded実機操作、ALNS preview中のdrag/pinch、visual snapshotを含む人間受入はユーザー確認済みとして受入した。
 - `npm run verify` / `npm run test:e2e:ci`の既知FAILは`docs/reviews/phase-07-5-field-verification.md`へ記録済みの既存差分として扱い、Phase 7.5の完了を阻害しないものとした。
-- Phase 7.5は完了し、次の現在フェーズをPhase 7.6 Task 1へ進める。
+- Phase 7.5は完了。Phase 7.6 Task 1〜9の実装履歴は存在するが、Task 0のfinal verificationとmanual/live acceptanceが未完のため、Phase 7.6はclosure verification扱いとする。
