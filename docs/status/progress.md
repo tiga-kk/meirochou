@@ -137,7 +137,7 @@ Phase 7.6 Task 1〜9のproduction実装は、`origin/main` に次の履歴とし
 - 購入・保留とnearbyの目的地設定をpending中disabled/`aria-busy`にし、カードのdrag/pointerupを選択clickへ変換しないようにした。
 - route詳細のEscapeで詳細だけを閉じ、詳細toggleへfocusを戻す。nearbyの既存close focus復帰も維持。
 - focused verification: Task 5 Vitest 3 files / 15 tests passed、対象nearby/map-first E2E 2 tests passed、keyboard E2E 2 projects passed、`npm run check:webapp` passed、`git diff --check` passed。
-- 指定E2E全体は26 passed / 8 failed。失敗はTask 2 map-first変更に伴う既存visual snapshot差分と旧来の詳細表示前提で、snapshotは人間visual確認前のため更新していない。
+- 指定E2E全体は26 passed / 8 failed。失敗はTask 2 map-first変更に伴う既存visual snapshot差分と旧来の詳細表示前提で、snapshotは人間確認前のため更新していない。
 
 ## Task 6完了記録
 
@@ -161,4 +161,4 @@ Phase 7.6 Task 1〜9のproduction実装は、`origin/main` に次の履歴とし
 - `npm run test:e2e:ci`は終了コード1、62 passed / 9 failed / 8 skipped（managementの1件はretry成功）。失敗には既存visual baseline差分に加え、`navigation-resume`の期待snapshot世代、candidate Escape、catalog表示前提が含まれる。Task 8の計画に従い、このTask内で場当たり的な修正やsnapshot更新は行わない。
 - 390px級Motorola Androidでのheaded実機操作、ALNS preview中のdrag/pinch、visual snapshotを含む人間受入はユーザー確認済みとして受入した。
 - `npm run verify` / `npm run test:e2e:ci`の既知FAILは`docs/reviews/phase-07-5-field-verification.md`へ記録済みの既存差分として扱い、Phase 7.5の完了を阻害しないものとした。
-- Phase 7.5は完了。Phase 7.6 Task 1〜9の実装履歴は存在するが、Task 0のfinal verificationとmanual/live acceptanceが未完のため、Phase 7.6はclosure verification扱いとする。
+- Phase 7.5は完了。Phase 7.6 Task 1〜9の実装履歴は存在し、Task 0の最終自動verificationも完了しているが、manual/live acceptanceが未完のため、Phase 7.6はclosure verification扱いとする。
