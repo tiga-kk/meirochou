@@ -292,7 +292,7 @@ test("runtime loader adapts C108 assets to absolute runtime paths", async () => 
 
   const manifest = await loadRuntimeMapBundleManifestFromUrl(
     manifestUrl,
-    { eventId: "C108", displayName: "C108" },
+    c108Event,
     {
       fetcher: vi.fn().mockResolvedValue({
         ok: true,
@@ -302,7 +302,8 @@ test("runtime loader adapts C108 assets to absolute runtime paths", async () => 
   );
 
   expect(manifest.eventId).toBe("C108");
-  expect(manifest.displayName).toBe("C108");
+  expect(c108Event.mapBundleContract).toBeUndefined();
+  expect(manifest.displayName).toBe(c108Event.displayName);
   expect(manifest.areas).toHaveLength(4);
   expect(manifest.areas.map((a) => a.id)).toEqual(["e456", "e7", "s12", "w12"]);
   expect(manifest.areas[0]).toMatchObject({

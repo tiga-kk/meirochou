@@ -10,6 +10,7 @@ export interface EventRegistryEntry {
   readonly eventId: string;
   readonly displayName: string;
   readonly mapBundle: string;
+  readonly mapBundleContract?: "event" | "legacy";
   readonly days: readonly EventRegistryDay[];
 }
 
