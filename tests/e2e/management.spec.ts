@@ -178,7 +178,9 @@ test.describe("Mobile Management Flows", () => {
     const before = await page.evaluate(() => {
       document.body.style.minHeight = "2000px";
       window.scrollTo(0, 160);
-      return window.scrollY;
+      return new Promise<number>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve(window.scrollY))),
+      );
     });
 
     await page.locator("#toggle-settings").click();
