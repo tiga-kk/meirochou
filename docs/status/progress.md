@@ -1,14 +1,14 @@
 # 実装進捗
 
-更新日: 2026-08-20
+更新日: 2026-08-19
 
 この文書を、現在フェーズ、現在Task、次に着手するTask、未完了の外部確認の唯一の正本とする。
 
 ## 現在状態
 
 - 現在フェーズ: **Phase 8: event map / bundle汎用化**
-- 現在Task: **Task 1: generic event map contract**
-- 次に着手するTask: **Task 1実装（strict manifest generic化、C108 metadata data化、legacy demo明示分離）**
+- 現在Task: **Task 1: generic event map contract（完了）**
+- 次に着手するTask: **Phase 8 Task 2: map.svg再現可能生成（未着手）**
 - canonical plan: `docs/plans/phase-08/task-01-generic-event-map-contract.md`
 - design: `docs/specs/2026-08-20-phase-08-generic-event-map-contract-design.md`
 - Phase 7.6 / Phase 8 Task 0 verification report: `docs/reviews/phase-08-task-00-baseline-verification.md`
@@ -107,6 +107,20 @@ Phase 7.6 Task 1〜9のproduction実装は、`origin/main` に次の履歴とし
 - application大規模refactor。
 - 初回onboarding。
 - route/ALNS/grid/points/wall semantics変更。
+
+## Phase 8 Task 1完了記録
+
+- 実装commit: `e02d676`, `3dd15e5`, `9b50715`。browser review対応commit: `7f3ffd4`。
+- Finding 1: domain `EventRegistryEntry`へ`mapBundleContract?: "event" | "legacy"`を追加し、transitionの`loadManifest` callbackへlegacy値が保持されるtestを追加。
+- Finding 2: production registryから取得した`c108Event`をruntime loaderへ直接渡し、`mapBundleContract`未指定をassert。production C108 registryは未変更。
+- E2E blockerは`TASK1_REGRESSION`。baseline 3回は各`18 passed / 0 failed`、headはFlow 2/3/7/9が再現。原因はmanagement specの5つのcustom legacy registry fixtureにdiscriminatorがなかったこと。`tests/e2e/management.spec.ts`へ`mapBundleContract: "legacy"`を追加。
+- focused Vitest: 6 files / 72 tests passed。
+- focused management E2E: 18 passed / 0 failed / exit 0。
+- `npm run check:webapp`: PASS。`npm run typecheck:functions`: PASS。`npm run build:webapp`: PASS。`node scripts/audit-public-tree.mjs`: PASS。`git diff --check`: PASS。
+- `npm run verify`: standalone clean checkoutでPASS（Vitest 142 files / 896 tests、route 40、Phase 5D 4、GAS 38、catalog 24）。linked worktreeでは`.git`ファイルの`/tmp`絶対パスを検出する既知環境差が1件発生したため、completion gateはstandalone結果で確認。
+- 通常`npm run test:e2e:ci`: exit 0（80 tests、71 passed / 1 flaky / 8 skipped）。flakyはALNS preview testの初回失敗・retry成功のみ。
+- hardcode scan: 指定4パターンは0件。
+- Task 2は未着手。
 
 ## 進行規則
 

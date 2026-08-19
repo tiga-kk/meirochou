@@ -162,3 +162,44 @@ Task 1完了は次をすべて満たした時だけ。
 9. docs commitを作成してbranchへpush。
 
 Task 2へはまだ進まない。
+
+## Final diagnosis and closure
+
+実行環境: 同一 `mcr.microsoft.com/playwright:v1.61.1-noble` CI container、Node.js `22.14.0`、npm `10.9.2`。
+
+### E2E classification
+
+`Flow 2: 日程ごとのデータ独立性と重複マニフェスト請求の防止`、`Flow 3: イベント地図の分離とマニフェスト取得遅延・失敗時の安全挙動`、`Flow 7: 4つのストレージ削除スコープと確定ダイアログ制御`、`Flow 9: ソース取得およびプレビューの競合排除`は、`TASK1_REGRESSION`と分類する。
+
+### Reproduction matrix
+
+Command:
+
+```bash
+bash scripts/run-e2e-in-ci-container.sh tests/e2e/management.spec.ts --project=mobile-chromium
+```
+
+| revision | run | result | exact failures / retry |
+|---|---:|---|---|
+| `76fa5ae` baseline | 1 | 18 passed / 0 failed | 失敗なし、retryなし |
+| `76fa5ae` baseline | 2 | 18 passed / 0 failed | 失敗なし、retryなし |
+| `76fa5ae` baseline | 3 | 18 passed / 0 failed | 失敗なし、retryなし |
+| `9b50715` head | 1 | process exit 143で要約前に終了 | Flow 2/3の初回+retry #1/#2を観測。Flow 7/9到達前に終了したため不完全run |
+| `9b50715` head | 2 | 14 passed / 4 failed | Flow 2/3/7/9が各初回+retry #1/#2失敗 |
+| `9b50715` head | 3 | 13 passed / 4 failed / 1 flaky | Flow 2/3/7/9が各初回+retry #1/#2失敗。scroll testは初回失敗、retry #1成功 |
+
+HeadのFlow 2は `#target-space-heading` 不在（strict loader error: `map bundle manifest.bundleVersion: expected a string`）、Flow 3/7/9は `#toggle-settings` click timeoutで、いずれも同じ起動時strict parse errorを示した。
+
+### Root cause and fix
+
+Task 1で未指定 `mapBundleContract` をstrict扱いにした一方、`tests/e2e/management.spec.ts`の`routeRegistry()`へ渡す5つのcustom legacy registry entry（Flow 2、Flow 3の2イベント、Flow 7、Flow 9）が`mapBundleContract: "legacy"`を欠いていた。そのため既存legacy `demo-v1` manifestがstrict parserへ入り、application shellが起動しなかった。
+
+5つのfixtureへlegacy discriminatorを追加した。production management code、timeout、retry、snapshotは変更していない。
+
+### Final verification
+
+- focused Vitest: 6 files / 72 tests passed。
+- focused management E2E: 18 passed / 0 failed。
+- `npm run verify`: standalone clean checkoutでexit 0、Vitest 142 files / 896 testsほか全gate PASS。linked worktree単独では`.git`ファイルのlocal absolute path検出が発生するため、standaloneで同一差分を検証した。
+- final normal `npm run test:e2e:ci`: exit 0、80 tests中71 passed / 1 flaky / 8 skipped。
+- hardcode scan: `C108_AREA_METADATA`、`Unsupported C108 area`、C108/demo-v1 eventId contract guardsは0件。
