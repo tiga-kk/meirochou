@@ -574,7 +574,7 @@ function parseBundleAssetPath(
   return relativePath;
 }
 
-/** Validate the strict four-area manifest used by the C108 map bundle. */
+/** Validate a strict production event map bundle manifest. */
 export function parseEventMapBundleManifest(
   input: unknown,
 ): EventMapBundleManifest {
@@ -592,10 +592,10 @@ export function parseEventMapBundleManifest(
     "map bundle manifest.bundleVersion",
   );
 
-  if (!Array.isArray(value.areas) || value.areas.length !== 4) {
+  if (!Array.isArray(value.areas) || value.areas.length === 0) {
     throw new BoundaryValidationError(
       "map bundle manifest.areas",
-      "an array containing exactly four entries",
+      "a non-empty array",
     );
   }
 
@@ -630,6 +630,11 @@ export function parseEventMapBundleManifest(
       areaObj.metersPerPixel,
       `${areaPath}.metersPerPixel`,
     );
+    const prefixes = uniqueTextArray(
+      areaObj.prefixes,
+      `${areaPath}.prefixes`,
+    );
+    const labels = uniqueTextArray(areaObj.labels, `${areaPath}.labels`);
     const assetsObj = record(areaObj.assets, `${areaPath}.assets`);
 
     const assets: MapAssetPaths = Object.freeze({
@@ -664,6 +669,8 @@ export function parseEventMapBundleManifest(
         areaId,
         displayName,
         metersPerPixel,
+        prefixes,
+        labels,
         assets,
       }),
     );

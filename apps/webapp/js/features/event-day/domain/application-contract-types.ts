@@ -206,6 +206,8 @@ export interface EventMapAreaManifest {
   readonly areaId: string;
   readonly displayName: string;
   readonly metersPerPixel: number;
+  readonly prefixes: readonly string[];
+  readonly labels: readonly string[];
   readonly assets: MapAssetPaths;
 }
 
