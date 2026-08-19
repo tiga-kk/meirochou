@@ -119,6 +119,7 @@ Phase 7.6 Task 1〜9のproduction実装は、`origin/main` に次の履歴とし
 - `npm run check:webapp`: PASS。`npm run typecheck:functions`: PASS。`npm run build:webapp`: PASS。`node scripts/audit-public-tree.mjs`: PASS。`git diff --check`: PASS。
 - `npm run verify`: standalone clean checkoutでPASS（Vitest 142 files / 896 tests、route 40、Phase 5D 4、GAS 38、catalog 24）。linked worktreeでは`.git`ファイルの`/tmp`絶対パスを検出する既知環境差が1件発生したため、completion gateはstandalone結果で確認。
 - 通常`npm run test:e2e:ci`: exit 0（80 tests、71 passed / 1 flaky / 8 skipped）。flakyはALNS preview testの初回失敗・retry成功のみ。
+- baseline `76fa5ae`のfull `npm run test:e2e:ci`: exit 0（72 passed / 8 skipped）。未修正head `9b50715`のfull E2E: exit 1（67 passed / 5 failed / 8 skipped、Flow 2/3/7/9と既存ALNS preview test）。
 - hardcode scan: 指定4パターンは0件。
 - Task 2は未着手。
 

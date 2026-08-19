@@ -203,3 +203,9 @@ Task 1で未指定 `mapBundleContract` をstrict扱いにした一方、`tests/e
 - `npm run verify`: standalone clean checkoutでexit 0、Vitest 142 files / 896 testsほか全gate PASS。linked worktree単独では`.git`ファイルのlocal absolute path検出が発生するため、standaloneで同一差分を検証した。
 - final normal `npm run test:e2e:ci`: exit 0、80 tests中71 passed / 1 flaky / 8 skipped。
 - hardcode scan: `C108_AREA_METADATA`、`Unsupported C108 area`、C108/demo-v1 eventId contract guardsは0件。
+
+### Full-suite comparison
+
+- baseline `76fa5ae`: `npm run test:e2e:ci` exit 0、80 tests中72 passed / 8 skipped / 0 failed。
+- unmodified Task 1 head `9b50715`: `npm run test:e2e:ci` exit 1、80 tests中67 passed / 5 failed / 8 skipped。managementのFlow 2/3/7/9は各retry #1/#2も失敗し、既存ALNS preview testも初回+retry #1/#2が失敗した。
+- review対応後: 通常`npm run test:e2e:ci` exit 0、80 tests中71 passed / 1 flaky / 8 skipped。ALNS preview testは初回失敗・retry成功、managementの4件は再発していない。
