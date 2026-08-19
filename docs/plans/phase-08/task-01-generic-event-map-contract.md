@@ -13,8 +13,8 @@
 ## Global Constraints
 
 - 実装開始前に`git fetch origin --prune`し、`origin/main`と作業branchの関係を記録する。
-- Task 0 closure commitsを失わない。
-- 既存の未追跡/未commit変更があるworktreeでは開始しない。以前残っていた`docs/reviews/phase-07-4-android-route-animation-diagnosis.md`を含め、clean worktreeを使う。
+- Task 0 closure commitsを失わない。`origin/main`へresetしてはいけない。
+- clean worktreeで開始する。既存の未追跡/未commit fileがある場合は別worktreeを使い、勝手に削除・commitしない。
 - `tiga-kk/meirochou_wrapper`は触らない。
 - C109等の新production eventを追加しない。
 - production event registryへ二つ目のeventを追加しない。
@@ -29,50 +29,78 @@
 - `event-day-contracts.ts`と`application-contract-types.ts`の広範囲統合を先取りしない。
 - visual snapshotを更新しない。このTaskに意図したUI変更はない。
 - unrelated cleanup、format-all、rename-allをしない。
+- 各code commitはその時点で関連focused testsがGREENになる単位にする。一時的にC108 bundleを壊したcommitを作らない。
 - mainへmergeしない。実装・検証・commit・pushはこのbranchで完結する。
+
+## Execution preflight
+
+実装変更前に実行する。
+
+```bash
+git fetch origin --prune
+git status --short
+git rev-parse HEAD
+git rev-parse origin/main
+git log -1 --oneline HEAD
+git log -1 --oneline origin/main
+git merge-base --is-ancestor origin/main HEAD
+node --version
+npm --version
+```
+
+期待:
+
+- `git status --short`が空。空でなければ別clean worktreeを作る。
+- `origin/main`がHEADのancestor。mainが進んでいてancestorでない場合は、Task 0 closure + Task 1 plan commitsを保持したままrebaseする。resetで捨てない。
+- Node `v22.14.0`, npm `10.9.2`。違う場合は実versionを最終報告へ記録し、package設定を変更しない。
+
+開始HEADをshell variableへ保存する。
+
+```bash
+TASK_START_SHA="$(git rev-parse HEAD)"
+printf '%s\n' "$TASK_START_SHA"
+```
+
+以降のscope auditではこの`$TASK_START_SHA`を使う。
 
 ## File map
 
 ### Modify
 
 - `apps/webapp/js/features/event-day/domain/application-contract-types.ts`
-  - `EventMapAreaManifest`へ`prefixes` / `labels`を追加。
-  - `EventRegistryEntryV1`へoptional `mapBundleContract`を追加。
 - `apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers.ts`
-  - strict production event bundle parserをgeneric化。
-  - registry parserで`mapBundleContract`をvalidate。
 - `apps/webapp/js/features/event-day/infrastructure/http-map-manifest-loader.ts`
-  - `C108_AREA_METADATA`を削除。
-  - runtime loaderをregistry metadata-drivenに変更。
 - `apps/webapp/js/app/assemble-comipath-application.ts`
-  - built-in demo registry entryへ`mapBundleContract: "legacy"`を付与。
-  - loaderへevent entryそのものを渡す。
 - `apps/webapp/map-bundles/C108/manifest.json`
-  - C108 `prefixes` / `labels`をdataへ移動。
 - `tests/boundary-parsers.test.ts`
 - `tests/map-manifest-loader.test.ts`
 - `tests/event-registry.test.ts`
 - `tests/c108-map-assets.test.ts`
 - `tests/e2e/fixture-registry.ts`
-  - E2E demo registryへ`mapBundleContract: "legacy"`を付与。
-- `docs/status/progress.md`
-  - Task 1完了時のみ実測結果を反映。
+- `docs/status/progress.md`（全gate PASS後のみ）
 
 ### Create/Delete
 
 - production codeの新規fileなし。
 - file削除なし。
+- demo-v1 bundle変更なし。
 
 ---
 
-### Task 1.1: generic strict event bundle type/parser
+### Task 1.1: strict contract generic化とC108 data migrationを同時に行う
+
+このsubtaskでは`prefixes` / `labels`必須化とC108 manifest移行を同じcommitにする。parserだけ先に必須化してcurrent C108を壊してはいけない。
 
 **Files:**
 - Modify: `apps/webapp/js/features/event-day/domain/application-contract-types.ts`
 - Modify: `apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers.ts`
-- Test: `tests/boundary-parsers.test.ts`
+- Modify: `apps/webapp/map-bundles/C108/manifest.json`
+- Modify: `tests/boundary-parsers.test.ts`
+- Modify: `tests/map-manifest-loader.test.ts`
+- Modify: `tests/event-registry.test.ts`
+- Modify: `tests/c108-map-assets.test.ts`
 
-**Interfaces:**
+**Produces:**
 
 ```ts
 export interface EventMapAreaManifest {
@@ -89,14 +117,15 @@ export interface EventMapAreaManifest {
 
 #### やってはいけないこと
 
-- area countを4以外の固定数へ置換しない。
+- area countを別の固定数へ変更しない。
 - `prefixes` / `labels`をoptionalにしない。
 - C108 area id一覧をparserへ追加しない。
-- strict parser失敗時にlegacy parserを試さない。
+- C108 asset fileやmetersPerPixelを変更しない。
+- `bundleVersion`を変更しない。
 
-- [ ] **Step 1: 1-area non-C108 manifestのREDを書く**
+- [ ] **Step 1: generic 1-area strict manifest REDを書く**
 
-`tests/boundary-parsers.test.ts`へ次のfixtureを追加する。
+`tests/boundary-parsers.test.ts`へ次を追加する。
 
 ```ts
 const genericEventMapManifest = {
@@ -119,8 +148,6 @@ const genericEventMapManifest = {
 };
 ```
 
-以下をassertする。
-
 ```ts
 const parsed = parseEventMapBundleManifest(genericEventMapManifest);
 assert.equal(parsed.areas.length, 1);
@@ -128,17 +155,9 @@ assert.deepEqual(parsed.areas[0].prefixes, ["東"]);
 assert.deepEqual(parsed.areas[0].labels, ["A", "B"]);
 ```
 
-- [ ] **Step 2: REDを実行する**
+- [ ] **Step 2: prefixes/labels validation REDを書く**
 
-```bash
-npx vitest run --root . tests/boundary-parsers.test.ts
-```
-
-期待: current exactly-four contractでFAIL。
-
-- [ ] **Step 3: metadata validation REDを追加する**
-
-次をそれぞれrejectするtestを書く。
+以下を個別にrejectする。
 
 ```text
 prefixes missing
@@ -153,11 +172,19 @@ labels [""]
 
 error pathは`.prefixes` / `.labels`を含むこと。
 
-- [ ] **Step 4: type/parserを最小変更する**
+- [ ] **Step 3: REDを確認する**
 
-`EventMapAreaManifest`へ`prefixes`, `labels`を追加する。
+```bash
+npx vitest run --root . tests/boundary-parsers.test.ts
+```
 
-`parseEventMapBundleManifest()`のarea数条件を:
+期待: exactly-four制約または未実装metadataでFAIL。
+
+- [ ] **Step 4: type/parserをgeneric化する**
+
+`EventMapAreaManifest`へ`prefixes`, `labels`を追加。
+
+`parseEventMapBundleManifest()`のarea数条件をnon-emptyへ変更する。
 
 ```ts
 if (!Array.isArray(value.areas) || value.areas.length === 0) {
@@ -168,8 +195,6 @@ if (!Array.isArray(value.areas) || value.areas.length === 0) {
 }
 ```
 
-へ変更する。
-
 area解析では既存`uniqueTextArray()`を使う。
 
 ```ts
@@ -179,36 +204,74 @@ const labels = uniqueTextArray(areaObj.labels, `${areaPath}.labels`);
 
 returned frozen areaへ両fieldを含める。
 
-既存の`areaId` unique、positive scale、strict asset path、freeze semanticsは維持する。
+既存の`areaId` regex/uniqueness、positive scale、exact asset path、freeze semanticsは維持する。
 
-- [ ] **Step 5: GREEN**
+comment `strict four-area manifest used by C108`もgeneric production wordingへ直す。
+
+- [ ] **Step 5: C108 manifestへ現constantをそのまま移す**
+
+Task開始時の`http-map-manifest-loader.ts`にある`C108_AREA_METADATA`を移行元にする。
+
+- `e456`: `prefixes=["東"]` + current katakana sequence
+- `e7`: `prefixes=["東"]` + A-Z
+- `s12`: `prefixes=["南"]` + a-z
+- `w12`: `prefixes=["西"]` + current hiragana sequence
+
+JSONでは各symbolをstring arrayとして明示する。
+
+- [ ] **Step 6: existing strict fixture literalsも同時更新する**
+
+parser必須化により壊れるstrict manifest fixtureを同じcommitで直す。
+
+最低限:
+
+- `tests/map-manifest-loader.test.ts` の `validC108Payload`
+- `tests/event-registry.test.ts` の `mockC108Manifest`
+
+各areaへC108 manifestと同じ`prefixes` / `labels`を入れる。test fixture独自の簡略labelsを使ってcurrent behaviorを弱めない。
+
+- [ ] **Step 7: C108 asset exact metadata testを追加する**
+
+`tests/c108-map-assets.test.ts`でparsed manifestのprefixes/labelsを完全一致assertする。
+
+`length > 0`だけでは不可。
+
+- [ ] **Step 8: focused GREEN**
 
 ```bash
-npx vitest run --root . tests/boundary-parsers.test.ts
+npx vitest run --root . \
+  tests/boundary-parsers.test.ts \
+  tests/map-manifest-loader.test.ts \
+  tests/event-registry.test.ts \
+  tests/c108-map-assets.test.ts
 ```
 
-- [ ] **Step 6: commit**
+- [ ] **Step 9: commit**
 
 ```bash
 git add \
   apps/webapp/js/features/event-day/domain/application-contract-types.ts \
   apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers.ts \
-  tests/boundary-parsers.test.ts
-git commit -m "refactor(event-map): generalize strict bundle contract"
+  apps/webapp/map-bundles/C108/manifest.json \
+  tests/boundary-parsers.test.ts \
+  tests/map-manifest-loader.test.ts \
+  tests/event-registry.test.ts \
+  tests/c108-map-assets.test.ts
+git commit -m "refactor(event-map): generalize strict bundle metadata"
 ```
 
 ---
 
-### Task 1.2: registry contractでstrict/legacyを明示する
+### Task 1.2: registry contractでlegacy demoを明示する
 
 **Files:**
 - Modify: `apps/webapp/js/features/event-day/domain/application-contract-types.ts`
 - Modify: `apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers.ts`
 - Modify: `apps/webapp/js/app/assemble-comipath-application.ts`
 - Modify: `tests/e2e/fixture-registry.ts`
-- Test: `tests/event-registry.test.ts`
+- Modify: `tests/event-registry.test.ts`
 
-**Interfaces:**
+**Produces:**
 
 ```ts
 export interface EventRegistryEntryV1 {
@@ -223,35 +286,33 @@ export interface EventRegistryEntryV1 {
 意味:
 
 - missing / `"event"` => generic strict production contract
-- `"legacy"` => existing legacy demo contract
+- `"legacy"` => existing demo legacy contract
 
 #### やってはいけないこと
 
 - production C108 registryへ`legacy`を付けない。
-- `eventId`やmapBundle pathからlegacyを推測しない。
-- unknown contract値をstrictへsilently fallbackしない。
-- demo manifest自体をstrictへ変換しない。
+- eventIdやpathからlegacyを推測しない。
+- unknown valueをstrictへsilently fallbackしない。
+- demo manifestを変更しない。
 
-- [ ] **Step 1: parser REDを書く**
+- [ ] **Step 1: registry parser REDを書く**
 
-`tests/event-registry.test.ts`へ以下を追加する。
+`tests/event-registry.test.ts`で:
 
-```ts
-expect(parseEventRegistry(registryWithoutContract).events[0].mapBundleContract)
-  .toBeUndefined();
-expect(parseEventRegistry(registryWithLegacy).events[0].mapBundleContract)
-  .toBe("legacy");
-```
+- field missingをaccept
+- `"event"`をaccept
+- `"legacy"`をaccept
+- `"foo"`, `""`, numberをreject
 
-`"foo"`, empty string, number等は`mapBundleContract` pathでrejectする。
+を固定する。
 
 - [ ] **Step 2: type/parserを実装する**
 
-`EventRegistryEntryV1`へoptional fieldを追加する。
+fieldが存在する場合だけexact stringとして読み、`event|legacy`以外を`BoundaryValidationError`でrejectする。
 
-`parseEventRegistry()`でfieldが存在する場合のみexact stringとして読み、`"event" | "legacy"`以外をrejectする。未指定のpayloadへ新fieldを自動書き込まなくてよい。runtime loader側でmissingをstrictとして扱う。
+parsed eventにはfieldが存在した場合だけ保持する。missing payloadへ`event`を書き足す必要はない。
 
-- [ ] **Step 3: demo registryだけlegacyを明示する**
+- [ ] **Step 3: built-in demoだけlegacyを明示する**
 
 `assemble-comipath-application.ts`内のbuilt-in demo registry entry 2箇所へ:
 
@@ -261,23 +322,23 @@ mapBundleContract: "legacy" as const,
 
 を追加する。
 
-`tests/e2e/fixture-registry.ts`の`DEMO_EVENT_REGISTRY`にも:
+- [ ] **Step 4: E2E fixture registryもlegacyを明示する**
+
+`tests/e2e/fixture-registry.ts`:
 
 ```ts
 mapBundleContract: "legacy",
 ```
 
-を追加する。
-
 production `apps/webapp/events/manifest.json`は変更しない。
 
-- [ ] **Step 4: focused GREEN**
+- [ ] **Step 5: focused GREEN**
 
 ```bash
 npx vitest run --root . tests/event-registry.test.ts
 ```
 
-- [ ] **Step 5: commit**
+- [ ] **Step 6: commit**
 
 ```bash
 git add \
@@ -291,17 +352,15 @@ git commit -m "refactor(event-map): make bundle contract explicit"
 
 ---
 
-### Task 1.3: runtime loaderからC108 special caseを除去する
+### Task 1.3: runtime loaderからC108 event/area special caseを除去する
 
 **Files:**
 - Modify: `apps/webapp/js/features/event-day/infrastructure/http-map-manifest-loader.ts`
 - Modify: `apps/webapp/js/app/assemble-comipath-application.ts`
-- Test: `tests/map-manifest-loader.test.ts`
-- Test: `tests/event-registry.test.ts`
+- Modify: `tests/map-manifest-loader.test.ts`
+- Modify: `tests/event-registry.test.ts`
 
 **Interfaces:**
-
-`toRuntimeMapBundleManifest()`:
 
 ```ts
 export function toRuntimeMapBundleManifest(
@@ -310,8 +369,6 @@ export function toRuntimeMapBundleManifest(
   event: Pick<EventRegistryEntryV1, "eventId" | "displayName">,
 ): MapBundleManifestV1
 ```
-
-`loadRuntimeMapBundleManifestFromUrl()`:
 
 ```ts
 export async function loadRuntimeMapBundleManifestFromUrl(
@@ -327,19 +384,21 @@ export async function loadRuntimeMapBundleManifestFromUrl(
 #### やってはいけないこと
 
 - `eventId === "C108"` / `eventId === "demo-v1"`を残さない。
-- strict/legacyをschema parse失敗で切り替えない。
-- C108 metadata constantを別fileへ移すだけにしない。
-- eventId mismatchを黙って受理しない。
+- schema parse failureを契機にlegacy fallbackしない。
+- `C108_AREA_METADATA`を別fileへ移すだけにしない。
+- strict eventId mismatchを黙って受理しない。
 
 - [ ] **Step 1: non-C108 strict runtime REDを書く**
 
-`tests/map-manifest-loader.test.ts`へC999 strict payloadを用意する。1 areaでよい。
+`tests/map-manifest-loader.test.ts`へ1-area C999 strict payloadを追加する。
+
+registry event:
 
 ```ts
 const event = { eventId: "C999", displayName: "Comic Market 999" };
 ```
 
-runtime resultで:
+assert:
 
 ```ts
 assert.equal(runtime.eventId, "C999");
@@ -352,15 +411,13 @@ assert.equal(
 );
 ```
 
-をassertする。
+- [ ] **Step 2: strict eventId mismatch REDを書く**
 
-- [ ] **Step 2: eventId mismatch REDを書く**
+registry=`C999`, bundle=`C998`でrejectし、messageに両IDを含める。
 
-registry=`C999`, strict bundle=`C998`ならrejectする。error messageは両IDを含める。
+- [ ] **Step 3: explicit legacy/no-fallback REDを書く**
 
-- [ ] **Step 3: explicit legacy REDを書く**
-
-`tests/event-registry.test.ts`のlegacy demo runtime testを:
+`tests/event-registry.test.ts`でexisting legacy payloadを:
 
 ```ts
 {
@@ -370,9 +427,9 @@ registry=`C999`, strict bundle=`C998`ならrejectする。error messageは両ID�
 }
 ```
 
-で呼び、existing legacy payloadを読めることを証明する。
+ならload可能とする。
 
-同じpayloadをcontract missingで呼んだ場合、strict parse failureになることも1 testで証明する。これによりsilent fallbackがないことを固定する。
+同じlegacy payloadをcontract missingで呼ぶとstrict parser errorになることも固定する。
 
 - [ ] **Step 4: REDを実行する**
 
@@ -382,13 +439,18 @@ npx vitest run --root . \
   tests/event-registry.test.ts
 ```
 
-- [ ] **Step 5: `C108_AREA_METADATA`を削除する**
+- [ ] **Step 5: `C108_AREA_METADATA`とC108 guardsを削除する**
 
-constant全体と`Unsupported C108 area`分岐を削除する。
+以下をproduction loaderから完全削除する。
+
+- `C108_AREA_METADATA`
+- `eventManifest.eventId !== "C108"` guard
+- `Unsupported C108 area`
+- `eventId === "C108"` contract selection
 
 - [ ] **Step 6: generic adapterを実装する**
 
-strict adapterはregistry eventIdとの一致を先に確認する。
+strict bundleとregistry eventId一致を確認する。
 
 ```ts
 if (eventManifest.eventId !== event.eventId) {
@@ -398,7 +460,7 @@ if (eventManifest.eventId !== event.eventId) {
 }
 ```
 
-area mappingはmanifest metadataだけを使う。
+area runtime metadataはmanifestからのみ取得する。
 
 ```ts
 {
@@ -415,9 +477,9 @@ area mappingはmanifest metadataだけを使う。
 }
 ```
 
-runtime top-level `displayName`はregistry `event.displayName`を使う。
+strict runtime top-level `displayName`はregistry `event.displayName`。
 
-- [ ] **Step 7: runtime loaderをmetadata-drivenにする**
+- [ ] **Step 7: runtime loaderをcontract metadata-drivenにする**
 
 ```ts
 if (event.mapBundleContract === "legacy") {
@@ -430,37 +492,42 @@ const eventManifest = await loadEventMapBundleManifestFromUrl(
 return toRuntimeMapBundleManifest(eventManifest, manifestUrl, event);
 ```
 
-legacy branch以外は常にstrict。catchしてlegacy fallbackしない。
+catchしてlegacyへfallbackしない。
 
-- [ ] **Step 8: composition rootのcallerを新signatureへ変更する**
-
-現在の:
+- [ ] **Step 8: assembly callerを新signatureへ変更する**
 
 ```ts
-loadRuntimeMapBundleManifestFromUrl(url, event.eventId, options)
+loadRuntimeMapBundleManifestFromUrl(
+  resolveEventMapManifestUrl(runtimeRegistryUrl, event),
+  event,
+  { fetcher: browserFetcher, signal },
+)
 ```
 
-を:
+loader選択以外のcompositionを触らない。
 
-```ts
-loadRuntimeMapBundleManifestFromUrl(url, event, options)
-```
+- [ ] **Step 9: C108限定commentをgeneric wordingへ変更する**
 
-へ変更するだけに留める。
-
-- [ ] **Step 9: C108限定commentをgeneric wordingへ直す**
-
-`strict C108`等のcommentを`strict production event bundle`へ変更する。
-
-- [ ] **Step 10: GREEN**
+- [ ] **Step 10: focused GREEN**
 
 ```bash
 npx vitest run --root . \
   tests/map-manifest-loader.test.ts \
-  tests/event-registry.test.ts
+  tests/event-registry.test.ts \
+  tests/application-assembly.test.ts
 ```
 
-- [ ] **Step 11: commit**
+- [ ] **Step 11: hardcode scan**
+
+```bash
+rg -n "C108_AREA_METADATA|Unsupported C108 area|eventId === [\"']C108[\"']|eventId === [\"']demo-v1[\"']" \
+  apps/webapp/js/features/event-day \
+  apps/webapp/js/app
+```
+
+期待: map contract selection / area metadataに関するeventId special case 0件。
+
+- [ ] **Step 12: commit**
 
 ```bash
 git add \
@@ -473,96 +540,21 @@ git commit -m "refactor(event-map): remove C108 runtime special cases"
 
 ---
 
-### Task 1.4: C108 metadataをmanifestへ移す
+### Task 1.4: demo/E2E回帰・full gate・progressを閉じる
 
 **Files:**
-- Modify: `apps/webapp/map-bundles/C108/manifest.json`
-- Modify: `tests/c108-map-assets.test.ts`
-- Existing tests: `tests/map-manifest-loader.test.ts`, `tests/boundary-parsers.test.ts`
-
-#### やってはいけないこと
-
-- `map.svg`, `points.json`, `grid-meta.json`, `grid.bin`を変更しない。
-- `metersPerPixel`を再計算しない。
-- `bundleVersion`を変更しない。
-- labelsの順序/文字種を整理しない。
-
-- [ ] **Step 1: C108 manifest metadata REDを書く**
-
-`tests/c108-map-assets.test.ts`で各areaのprefixesをexact assertする。
-
-```ts
-e456 -> ["東"]
-e7   -> ["東"]
-s12  -> ["南"]
-w12  -> ["西"]
-```
-
-labelsもTask開始時の`C108_AREA_METADATA`と完全一致するexpected arraysでassertする。`length > 0`だけでは不可。
-
-- [ ] **Step 2: REDを実行する**
-
-```bash
-npx vitest run --root . tests/c108-map-assets.test.ts
-```
-
-- [ ] **Step 3: manifestへmetadataを移す**
-
-Task開始時の`http-map-manifest-loader.ts`にあるconstantを唯一の移行元としてJSON arrayへ転記する。
-
-- `e456`: prefix東 + current katakana sequence
-- `e7`: prefix東 + A-Z
-- `s12`: prefix南 + a-z
-- `w12`: prefix西 + current hiragana sequence
-
-`bundleVersion`は`c108-v1`のまま。
-
-- [ ] **Step 4: focused GREEN**
-
-```bash
-npx vitest run --root . \
-  tests/c108-map-assets.test.ts \
-  tests/map-manifest-loader.test.ts \
-  tests/boundary-parsers.test.ts
-```
-
-- [ ] **Step 5: hardcode scan**
-
-```bash
-rg -n "C108_AREA_METADATA|Unsupported C108 area|eventId === [\"']C108[\"']" \
-  apps/webapp/js/features/event-day \
-  apps/webapp/js/app
-```
-
-期待: runtime special case 0 match。
-
-- [ ] **Step 6: commit**
-
-```bash
-git add \
-  apps/webapp/map-bundles/C108/manifest.json \
-  tests/c108-map-assets.test.ts
-git commit -m "data(event-map): move C108 area metadata into manifest"
-```
-
----
-
-### Task 1.5: legacy demo/E2E回帰とfull gateを閉じる
-
-**Files:**
-- Verify/Modify only if reproduced failure requires it:
-  - `tests/e2e/fixture-registry.ts`
-  - `tests/e2e/*.spec.ts`
+- Verify: existing tests/E2E
 - Modify at completion: `docs/status/progress.md`
+- Other modification only if a newly reproduced Task 1 regression requires it
 
 #### やってはいけないこと
 
 - E2E failureを直すためdemo manifestをstrict化しない。
-- `mapBundleContract`をproduction C108 entryへ追加して挙動をごまかさない。
+- production C108 registryへ`mapBundleContract`を追加してごまかさない。
 - visual snapshotを更新しない。
 - Task 2のSVG generatorやwrapperへ進まない。
 
-- [ ] **Step 1: parser/loader/registry/asset focused suite**
+- [ ] **Step 1: complete focused suite**
 
 ```bash
 npx vitest run --root . \
@@ -574,19 +566,24 @@ npx vitest run --root . \
   tests/application-assembly.test.ts
 ```
 
-実在しないtest pathがあれば、`ls tests | rg 'event|application|manifest'`で実在fileを確認してから、同じ責務の既存testを選ぶ。勝手に無関係testへ置換しない。
+期待: PASS。
 
 - [ ] **Step 2: E2E demo fixture smoke**
 
-`routeDemoEventRegistry()`を使う既存E2Eから、最低限以下を含むfocused subsetを実行する。
+`tests/e2e/fixture-registry.ts`の`routeDemoEventRegistry()`を使う既存specから最低限:
 
-- app boot + demo registry
-- navigation resumeまたはroute guidance
-- management flow
+```bash
+npx playwright test \
+  tests/e2e/navigation-resume.spec.ts \
+  tests/e2e/management.spec.ts \
+  --project=mobile-chromium
+```
 
-具体的なspec名は現在repoで確認して実行commandをreportする。
+を実行する。
 
-ここでlegacy demo manifestをstrict parseしようとするfailureが出た場合、まず`DEMO_EVENT_REGISTRY.mapBundleContract === "legacy"`とparsed registry propagationを確認する。
+もしproject名がcurrent configと異なる場合だけ`npx playwright test --list`で実在project名を確認して同等mobile projectを使い、最終報告に実commandを残す。
+
+legacy demo manifestをstrict parseするfailureが出た場合は、まず`DEMO_EVENT_REGISTRY.mapBundleContract === "legacy"`と`parseEventRegistry()`のfield伝播を確認する。
 
 - [ ] **Step 3: architecture/type/build gates**
 
@@ -605,18 +602,18 @@ npm run verify
 npm run test:e2e:ci
 ```
 
-Task 0 final baselineは`verify` PASS、CI E2E 72 passed / 8 skipped / 0 failedだった。今回もexit 0を要求する。件数変化があれば理由を記録する。
+Task 0 final baselineは`verify` PASS、CI E2E 72 passed / 8 skipped / 0 failed。今回もexit 0を要求する。件数変化があれば理由を記録する。
 
 - [ ] **Step 5: scope audit**
 
 ```bash
-git diff --name-only <TASK_START_SHA>..HEAD
-git diff --stat <TASK_START_SHA>..HEAD
+git diff --name-only "$TASK_START_SHA"..HEAD
+git diff --stat "$TASK_START_SHA"..HEAD
 ```
 
 File map外の変更は必要性を説明できなければ戻す。
 
-さらに:
+- [ ] **Step 6: completion hardcode scan**
 
 ```bash
 rg -n "C108_AREA_METADATA|Unsupported C108 area|eventId === [\"']C108[\"']|eventId === [\"']demo-v1[\"']" \
@@ -624,30 +621,32 @@ rg -n "C108_AREA_METADATA|Unsupported C108 area|eventId === [\"']C108[\"']|event
   apps/webapp/js/app
 ```
 
-期待: contract selection / area metadataのeventId special case 0件。
+期待: contract selection / area metadata special case 0件。
 
-- [ ] **Step 6: progress更新**
+- [ ] **Step 7: progress更新**
 
 全gate PASS後だけ`docs/status/progress.md`へ実測値で記録する。
 
 - Phase 7.6 / Phase 8 Task 0 manual acceptance完了
-- Phase 8 Task 1 commit群
+- Phase 8 Task 1実装commit群
 - generic strict manifest contract
-- `mapBundleContract`の意味（missing/event=strict、legacy=demo only）
+- `mapBundleContract`: missing/event=strict、legacy=demo only
 - C108 metadataのmanifest移行
 - C999 non-C108 focused test
 - focused/full verification実数
 - 次Task: Phase 8 Task 2 `map.svg`再現可能生成
 - GAS 2件の`OPEN_EXTERNAL_DEBT`継続
 
-- [ ] **Step 7: docs commit**
+Task 1が全gate PASSするまで完了と書かない。
+
+- [ ] **Step 8: docs commit**
 
 ```bash
 git add docs/status/progress.md
 git commit -m "docs(phase-08): record generic event map contract"
 ```
 
-- [ ] **Step 8: push**
+- [ ] **Step 9: push**
 
 ```bash
 git push origin HEAD:docs/phase-08-task-01-generic-event-map-contract-plan
@@ -660,6 +659,7 @@ mainへmergeしない。
 - [ ] `EventMapAreaManifest`が`prefixes` / `labels`を必須で持つ。
 - [ ] strict parserが1件以上の任意area数を受理する。
 - [ ] missing/empty/duplicate prefixes/labelsをrejectする。
+- [ ] C108 manifestとstrict test fixturesが同じcommitで新contractへ移行し、一時的broken commitがない。
 - [ ] `EventRegistryEntryV1.mapBundleContract?: "event" | "legacy"`が存在する。
 - [ ] unknown mapBundleContractをrejectする。
 - [ ] missing mapBundleContractはstrict production contractとして動く。
