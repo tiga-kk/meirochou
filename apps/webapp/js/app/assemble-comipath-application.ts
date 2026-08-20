@@ -131,6 +131,114 @@ function toDomainMapManifest(manifest: MapBundleManifestV1): MapBundleManifest {
   };
 }
 
+interface RouteGuidanceAssembly {
+  readonly routeGuidanceSession: ReturnType<typeof createRouteGuidanceSession>;
+  readonly routeMapAreaCatalog: MapAreaCatalog;
+  readonly routeMapAssetsLoader: HttpRouteMapAssetsLoader;
+  readonly navigationRuntimeController: RouteGuidanceRuntimeController;
+  readonly routeGuidanceController: RouteGuidanceController;
+}
+
+function assembleRouteGuidance(options: {
+  readonly createAlnsWorker?: () => Worker;
+  readonly getBrowserRuntime: () => BrowserApplication | null;
+}): RouteGuidanceAssembly {
+  const routeGuidanceSession = createRouteGuidanceSession();
+  const routeMapAreaCatalog: MapAreaCatalog = {
+    getAllMapAreas: () => runtimeMapAreaCatalog.getAllMapAreas(),
+    getMapArea: (areaId) => runtimeMapAreaCatalog.getMapArea(areaId),
+    findMapAreaForCircleSpace: (circleSpace) =>
+      runtimeMapAreaCatalog.findMapAreaForCircleSpace(circleSpace),
+    initializeMapAreas: (areas) =>
+      runtimeMapAreaCatalog.initializeMapAreas(
+        areas.map((area) => ({
+          ...area,
+          id: area.id ?? area.areaId,
+          name: area.name ?? area.displayName ?? area.areaId,
+          prefixes: area.prefixes ?? [],
+          labels: area.labels ?? [],
+        })),
+      ),
+    replaceMapAreas: (areas) =>
+      runtimeMapAreaCatalog.replaceMapAreas(
+        areas.map((area) => ({
+          ...area,
+          id: area.id ?? area.areaId,
+          name: area.name ?? area.displayName ?? area.areaId,
+          prefixes: area.prefixes ?? [],
+          labels: area.labels ?? [],
+        })),
+      ),
+  };
+  const routeMapAssetsLoader = new HttpRouteMapAssetsLoader();
+  const snapshotRepository = new LocalStorageRouteGuidanceSnapshotRepository();
+  const matrixRepository = new LocalStorageDistanceMatrixRepository();
+  const distanceMatrixController = new DistanceMatrixController({
+    repository: matrixRepository,
+  });
+  const orchestrationService = new RouteGuidanceNavigationOperations();
+  const navigationRuntimeController = new RouteGuidanceRuntimeController({
+    snapshotRepo: snapshotRepository,
+    matrixRepo: matrixRepository,
+    orchestration: orchestrationService,
+    ...(options.createAlnsWorker
+      ? { workerFactory: options.createAlnsWorker }
+      : {}),
+  });
+  const optimizationFeedback = {
+    onPreview: (preview: RouteOptimizationPreview) =>
+      options.getBrowserRuntime()?.ui.showOptimizationPreview(preview),
+    onClear: () => options.getBrowserRuntime()?.ui.clearOptimizationPreview(),
+  };
+  const routeGuidanceController = new RouteGuidanceController({
+    startGuidance: new StartRouteGuidanceUseCase(
+      routeGuidanceSession,
+      routeMapAreaCatalog,
+      routeMapAssetsLoader,
+      snapshotRepository,
+    ),
+    resumeGuidance: new ResumeRouteGuidanceUseCase(
+      routeGuidanceSession,
+      navigationRuntimeController,
+      routeMapAssetsLoader,
+      routeMapAreaCatalog,
+      optimizationFeedback,
+    ),
+    changeDestination: new ChangeDestinationUseCase(
+      routeGuidanceSession,
+      routeMapAreaCatalog,
+      routeMapAssetsLoader,
+      orchestrationService,
+    ),
+    finishCircle: new FinishCurrentCircleUseCase(
+      routeGuidanceSession,
+      routeMapAreaCatalog,
+      routeMapAssetsLoader,
+      orchestrationService,
+    ),
+    session: routeGuidanceSession,
+    navigationOperations: orchestrationService,
+    invalidateGuidance: new InvalidateRouteGuidanceUseCase(
+      routeGuidanceSession,
+    ),
+    navigationRuntimeController,
+    prepareOptimization: new PrepareRouteOptimizationUseCase(
+      routeMapAreaCatalog,
+      routeMapAssetsLoader,
+      distanceMatrixController,
+    ),
+    optimizationFeedback,
+  });
+
+  return {
+    routeGuidanceSession,
+    routeMapAreaCatalog,
+    routeMapAssetsLoader,
+    navigationRuntimeController,
+    routeGuidanceController,
+  };
+}
+
 /** Composition root for the browser runtime and feature infrastructure. */
 export function assembleComiPathApplication(
   options: AssembleComiPathApplicationOptions,
@@ -265,92 +373,19 @@ export function assembleComiPathApplication(
       browserRuntime?.handleCircleDataSourceOperationComplete(operation),
   });
 
-  const routeGuidanceSession = createRouteGuidanceSession();
-  const routeMapAreaCatalog: MapAreaCatalog = {
-    getAllMapAreas: () => runtimeMapAreaCatalog.getAllMapAreas(),
-    getMapArea: (areaId) => runtimeMapAreaCatalog.getMapArea(areaId),
-    findMapAreaForCircleSpace: (circleSpace) =>
-      runtimeMapAreaCatalog.findMapAreaForCircleSpace(circleSpace),
-    initializeMapAreas: (areas) =>
-      runtimeMapAreaCatalog.initializeMapAreas(
-        areas.map((area) => ({
-          ...area,
-          id: area.id ?? area.areaId,
-          name: area.name ?? area.displayName ?? area.areaId,
-          prefixes: area.prefixes ?? [],
-          labels: area.labels ?? [],
-        })),
-      ),
-    replaceMapAreas: (areas) =>
-      runtimeMapAreaCatalog.replaceMapAreas(
-        areas.map((area) => ({
-          ...area,
-          id: area.id ?? area.areaId,
-          name: area.name ?? area.displayName ?? area.areaId,
-          prefixes: area.prefixes ?? [],
-          labels: area.labels ?? [],
-        })),
-      ),
-  };
-  const routeMapAssetsLoader = new HttpRouteMapAssetsLoader();
-  const snapshotRepository = new LocalStorageRouteGuidanceSnapshotRepository();
-  const matrixRepository = new LocalStorageDistanceMatrixRepository();
-  const distanceMatrixController = new DistanceMatrixController({
-    repository: matrixRepository,
-  });
-  const orchestrationService = new RouteGuidanceNavigationOperations();
-  const navigationRuntimeController = new RouteGuidanceRuntimeController({
-    snapshotRepo: snapshotRepository,
-    matrixRepo: matrixRepository,
-    orchestration: orchestrationService,
+  const routeGuidance = assembleRouteGuidance({
+    getBrowserRuntime: () => browserRuntime,
     ...(options.createAlnsWorker
-      ? { workerFactory: options.createAlnsWorker }
+      ? { createAlnsWorker: options.createAlnsWorker }
       : {}),
   });
-  const optimizationFeedback = {
-    onPreview: (preview: RouteOptimizationPreview) =>
-      browserRuntime?.ui.showOptimizationPreview(preview),
-    onClear: () => browserRuntime?.ui.clearOptimizationPreview(),
-  };
-  const routeGuidanceController = new RouteGuidanceController({
-    startGuidance: new StartRouteGuidanceUseCase(
-      routeGuidanceSession,
-      routeMapAreaCatalog,
-      routeMapAssetsLoader,
-      snapshotRepository,
-    ),
-    resumeGuidance: new ResumeRouteGuidanceUseCase(
-      routeGuidanceSession,
-      navigationRuntimeController,
-      routeMapAssetsLoader,
-      routeMapAreaCatalog,
-      optimizationFeedback,
-    ),
-    changeDestination: new ChangeDestinationUseCase(
-      routeGuidanceSession,
-      routeMapAreaCatalog,
-      routeMapAssetsLoader,
-      orchestrationService,
-    ),
-    finishCircle: new FinishCurrentCircleUseCase(
-      routeGuidanceSession,
-      routeMapAreaCatalog,
-      routeMapAssetsLoader,
-      orchestrationService,
-    ),
-    session: routeGuidanceSession,
-    navigationOperations: orchestrationService,
-    invalidateGuidance: new InvalidateRouteGuidanceUseCase(
-      routeGuidanceSession,
-    ),
+  const {
+    routeGuidanceSession,
+    routeMapAreaCatalog,
+    routeMapAssetsLoader,
     navigationRuntimeController,
-    prepareOptimization: new PrepareRouteOptimizationUseCase(
-      routeMapAreaCatalog,
-      routeMapAssetsLoader,
-      distanceMatrixController,
-    ),
-    optimizationFeedback,
-  });
+    routeGuidanceController,
+  } = routeGuidance;
 
   const deleteLocalDataUseCase = new DeleteLocalDataUseCase(
     repository,
