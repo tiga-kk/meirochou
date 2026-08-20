@@ -12,6 +12,13 @@ import {
 
 const ROUTE_MOTION_PREFERENCE_KEY = "meirochou.route-motion-preference";
 
+const FIRST_USE_GUIDE_SEEN_KEY = "meirochou.first-use-guide-seen";
+
+interface FirstUseGuideStorage {
+  getString(key: string, fallback?: string): string;
+  setString(key: string, value: string): void;
+}
+
 interface RouteMotionPreferenceStorage {
   getString(key: string, fallback?: string): string;
   setString(key: string, value: string): void;
@@ -221,5 +228,25 @@ export function writeRouteMotionPreference(
     );
   } catch {
     // Storage failures must not prevent route guidance from starting.
+  }
+}
+
+export function readFirstUseGuideSeen(
+  storage: FirstUseGuideStorage = new StorageService(),
+): boolean {
+  try {
+    return storage.getString(FIRST_USE_GUIDE_SEEN_KEY, "") === "1";
+  } catch {
+    return true;
+  }
+}
+
+export function markFirstUseGuideSeen(
+  storage: FirstUseGuideStorage = new StorageService(),
+): void {
+  try {
+    storage.setString(FIRST_USE_GUIDE_SEEN_KEY, "1");
+  } catch {
+    // First-use UI persistence must never block application startup.
   }
 }
