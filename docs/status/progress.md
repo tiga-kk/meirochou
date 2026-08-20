@@ -10,8 +10,8 @@
 - Phase 8 Task 1: meirochou generic event map contract — complete.
 - Phase 8 Task 2: meirochou_wrapper reproducible map.svg generation — complete.
 - Phase 8 Task 3: meirochou_wrapper reviewed event build pipeline — complete.
-- 現在Task: **Phase 8 Task 4 data-only event addition proof — implementation complete / browser review pending**
-- 次に着手するTask: **Phase 8 Task 5 targeted application refactor — Task 4 browser acceptanceまで開始禁止**
+- 現在Task: **Phase 8 Task 4 data-only event addition proof — complete / browser acceptance complete**
+- 次に着手するTask: **Phase 8 Task 5 targeted application refactor**
 - canonical Task 4 plan: `docs/plans/phase-08/task-04-data-only-event-proof.md`
 - Task 4 design: `docs/specs/2026-08-20-phase-08-task-04-data-only-event-proof-design.md`
 - Phase 7.6 / Phase 8 Task 0 verification report: `docs/reviews/phase-08-task-00-baseline-verification.md`
@@ -139,7 +139,7 @@ Phase 7.6 Task 1〜9のproduction実装は、`origin/main` に次の履歴とし
 - `npm run verify`: exit code 0。webapp 143 files / 897 tests、route-guidance 6 files / 40 tests、Phase 05D 2 files / 4 tests、architecture 189 files、GAS 2 files / 38 tests、catalog-extension 24 tests passed。build verificationは2 public bundlesの26 byte-identical map assetsを確認。
 - fixture: C999、strict area `east` 1件、internal `map_id` `fixture-map`、`grid.bin` 24 bytes（全byte 1）、`points.json.image.path`なし。
 - production registryはC108-only、public C999 bundleなし、application TypeScript / Vite / package / workflow / integrationsはno-diff gate passed。
-- Task 4はCLOSEDにせず、browser review pending。Task 5は未着手。
+- Task 4はCLOSED。browser acceptanceは人間チェック完了。Task 5は未着手。
 
 ## Phase 7.5 Task 1完了記録
 
