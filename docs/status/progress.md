@@ -10,12 +10,26 @@
 - Phase 8 Task 1: meirochou generic event map contract — complete.
 - Phase 8 Task 2: meirochou_wrapper reproducible map.svg generation — complete.
 - Phase 8 Task 3: meirochou_wrapper reviewed event build pipeline — complete.
-- 現在Task: **Phase 8 Task 4 data-only event addition proof — complete / browser acceptance complete**
-- 次に着手するTask: **Phase 8 Task 5 targeted application refactor**
-- canonical Task 4 plan: `docs/plans/phase-08/task-04-data-only-event-proof.md`
-- Task 4 design: `docs/specs/2026-08-20-phase-08-task-04-data-only-event-proof-design.md`
+- 現在Task: **Phase 8 Task 5 targeted application refactor — implementation complete / browser review pending**
+- 次に着手するTask: **Phase 8 Task 6 first-launch onboarding — Task 5 browser acceptanceまで開始禁止**
+- canonical Task 5 plan: `docs/plans/phase-08/task-05-targeted-application-refactor.md`
+- Task 5 design: `docs/specs/2026-08-20-phase-08-task-05-targeted-application-refactor-design.md`
 - Phase 7.6 / Phase 8 Task 0 verification report: `docs/reviews/phase-08-task-00-baseline-verification.md`
 - Phase 7.6およびPhase 8 Task 0は2026-08-20のmanual/live acceptanceをもって完了。
+
+## Phase 8 Task 5 verification / handoff
+
+- Task 5.0 focused baseline: 6 files / 54 tests passed、architecture 189 files、`git diff --check` PASS。
+- Task 5.1: initial REDはbinder module resolution failure、focused GREENは3 files / 12 tests passed。
+- Task 5.2: initial REDはprojection module resolution failure、focused GREENは4 files / 40 tests passed。
+- Task 5.3: `tests/application-assembly.test.ts`はpre/postとも1 file / 6 tests、Route Guidanceはpre/postとも6 files / 40 tests passed。
+- Task 5 full focused suite: 9 files / 61 tests passed。
+- `npm run verify`: PASS。webapp 145 files / 901 tests、Route Guidance 6 files / 40 tests、Phase 05D 2 files / 4 tests、architecture 191 files、build 26 byte-identical map assets、GAS 2 files / 38 tests、catalog extension 24 tests passed。
+- `npm run test:e2e:ci`: PASS。80 tests中72 passed / 8 skipped、retryなし。
+- `npm run check:webapp:architecture`、`node scripts/audit-public-tree.mjs`、`git diff --check`: PASS。
+- created production modules: `apps/webapp/js/app/bind-management-action-events.ts`, `apps/webapp/js/app/browser-management-projection.ts`。
+- protected-path diff: empty。
+- Browser review pending。Task 5はimplementation completeとして記録し、browser acceptance前に完了扱いにしない。
 
 Task開始時の基準commitは、実装開始直前の対象branch最新remote HEADから取得する。文書中の計画開始SHAを実装開始点として固定しない。
 
