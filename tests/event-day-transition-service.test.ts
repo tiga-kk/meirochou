@@ -27,6 +27,7 @@ const sampleRegistry: EventRegistryV1 = {
       eventId: "c104",
       displayName: "コミックマーケット104",
       mapBundle: "../maps/demo-v1/manifest.json",
+      mapBundleContract: "legacy",
       days: [
         { dayId: "day1", displayName: "1日目" },
         { dayId: "day2", displayName: "2日目" },
@@ -254,7 +255,10 @@ describe("EventDayTransitionService prepare", () => {
         sourceUpdatedAt: "2026-07-23T00:00:00Z",
       },
     });
-    const loadManifest = vi.fn(async () => resolvedManifestC104);
+    const loadManifest = vi.fn(async (event) => {
+      expect(event.mapBundleContract).toBe("legacy");
+      return resolvedManifestC104;
+    });
     const service = new EventDayTransitionService({
       repository: repo,
       registry: sampleRegistry,

@@ -334,6 +334,8 @@ const validC108Manifest = {
       areaId: "area-a",
       displayName: "Area A",
       metersPerPixel: 0.1,
+      prefixes: ["東"],
+      labels: ["ア", "イ", "ウ", "エ", "オ", "カ", "キ", "ク", "ケ", "コ", "サ", "シ", "ス", "セ", "ソ", "タ", "チ", "ツ", "テ", "ト", "ナ", "ニ", "ヌ", "ネ", "ノ", "ハ", "ヒ", "フ", "ヘ", "ホ", "マ", "ミ", "ム", "メ", "モ", "ヤ", "ユ", "ヨ", "ラ", "リ", "ル", "レ", "ロ", "ワ", "ヲ", "ン"],
       assets: {
         svg: "./area-a/map.svg",
         points: "./area-a/points.json",
@@ -345,6 +347,8 @@ const validC108Manifest = {
       areaId: "area-b",
       displayName: "Area B",
       metersPerPixel: 0.2,
+      prefixes: ["東"],
+      labels: ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"],
       assets: {
         svg: "./area-b/map.svg",
         points: "./area-b/points.json",
@@ -356,6 +360,8 @@ const validC108Manifest = {
       areaId: "area-c",
       displayName: "Area C",
       metersPerPixel: 0.3,
+      prefixes: ["南"],
+      labels: ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"],
       assets: {
         svg: "./area-c/map.svg",
         points: "./area-c/points.json",
@@ -367,6 +373,8 @@ const validC108Manifest = {
       areaId: "area-d",
       displayName: "Area D",
       metersPerPixel: 0.4,
+      prefixes: ["西"],
+      labels: ["あ", "い", "う", "え", "お", "か", "き", "く", "け", "こ", "さ", "し", "す", "せ", "そ", "た", "ち", "つ", "て", "と", "な", "に", "ぬ", "ね", "の", "は", "ひ", "ふ", "へ", "ほ", "ま", "み", "む", "め", "も", "や", "ゆ", "よ", "ら", "り", "る", "れ", "ろ", "わ", "を", "ん"],
       assets: {
         svg: "./area-d/map.svg",
         points: "./area-d/points.json",
@@ -376,6 +384,57 @@ const validC108Manifest = {
     },
   ],
 };
+
+const genericEventMapManifest = {
+  schemaVersion: 1,
+  eventId: "C999",
+  bundleVersion: "c999-v1",
+  areas: [{
+    areaId: "east",
+    displayName: "東ホール",
+    metersPerPixel: 0.1,
+    prefixes: ["東"],
+    labels: ["A", "B"],
+    assets: {
+      svg: "./east/map.svg",
+      points: "./east/points.json",
+      gridMeta: "./east/grid-meta.json",
+      grid: "./east/grid.bin",
+    },
+  }],
+};
+
+test("parseEventMapBundleManifest accepts a generic one-area event manifest", () => {
+  const manifest = parseEventMapBundleManifest(genericEventMapManifest);
+  assert.equal(manifest.areas.length, 1);
+  assert.deepEqual(manifest.areas[0].prefixes, ["東"]);
+  assert.deepEqual(manifest.areas[0].labels, ["A", "B"]);
+});
+
+test("parseEventMapBundleManifest rejects missing, empty, or duplicate area metadata", () => {
+  const invalidMetadata = [
+    ["prefixes", undefined],
+    ["prefixes", []],
+    ["prefixes", ["東", "東"]],
+    ["prefixes", [""]],
+    ["labels", undefined],
+    ["labels", []],
+    ["labels", ["A", "A"]],
+    ["labels", [""]],
+  ] as const;
+
+  for (const [field, value] of invalidMetadata) {
+    const area = { ...validC108Manifest.areas[0], [field]: value };
+    assert.throws(
+      () => parseEventMapBundleManifest({
+        ...validC108Manifest,
+        areas: [area, ...validC108Manifest.areas.slice(1)],
+      }),
+      new RegExp(`map bundle manifest\\.areas\\[0\\]\\.${field}`),
+      `${field} should be rejected`,
+    );
+  }
+});
 
 test("parseEventMapBundleManifest accepts valid 4-area C108 manifest", () => {
   const manifest = parseEventMapBundleManifest(validC108Manifest);
@@ -429,17 +488,6 @@ test("parseEventMapBundleManifest rejects invalid manifest structure", () => {
     ["schemaVersion is not 1", { ...validC108Manifest, schemaVersion: 2 }],
     ["eventId is empty", { ...validC108Manifest, eventId: "" }],
     ["bundleVersion is empty", { ...validC108Manifest, bundleVersion: "" }],
-    [
-      "areas count is 3",
-      { ...validC108Manifest, areas: validC108Manifest.areas.slice(0, 3) },
-    ],
-    [
-      "areas count is 5",
-      {
-        ...validC108Manifest,
-        areas: [...validC108Manifest.areas, validC108Manifest.areas[0]],
-      },
-    ],
     [
       "duplicate areaId",
       {

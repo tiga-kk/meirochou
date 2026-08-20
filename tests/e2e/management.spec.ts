@@ -178,7 +178,9 @@ test.describe("Mobile Management Flows", () => {
     const before = await page.evaluate(() => {
       document.body.style.minHeight = "2000px";
       window.scrollTo(0, 160);
-      return window.scrollY;
+      return new Promise<number>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve(window.scrollY))),
+      );
     });
 
     await page.locator("#toggle-settings").click();
@@ -474,6 +476,7 @@ test.describe("Mobile Management Flows", () => {
         eventId: "demo-v1",
         displayName: "ComiPath Demo",
         mapBundle: "../maps/demo-v1/manifest.json",
+        mapBundleContract: "legacy",
         days: [
           { dayId: "day1", displayName: "デモ1日目" },
           { dayId: "day2", displayName: "デモ2日目" },
@@ -547,12 +550,14 @@ test.describe("Mobile Management Flows", () => {
         eventId: "demo-v1",
         displayName: "Demo Event 1",
         mapBundle: "../maps/demo-v1/manifest.json",
+        mapBundleContract: "legacy",
         days: [{ dayId: "day1", displayName: "1日目" }],
       },
       {
         eventId: "demo-v2",
         displayName: "Demo Event 2",
         mapBundle: "../maps/demo-v1/manifest.json",
+        mapBundleContract: "legacy",
         days: [{ dayId: "day1", displayName: "1日目" }],
       },
     ]);
@@ -845,6 +850,7 @@ test.describe("Mobile Management Flows", () => {
         eventId: "demo-v1",
         displayName: "ComiPath Demo",
         mapBundle: "../maps/demo-v1/manifest.json",
+        mapBundleContract: "legacy",
         days: [
           { dayId: "day1", displayName: "デモ1日目" },
           { dayId: "day2", displayName: "デモ2日目" },
@@ -1008,6 +1014,7 @@ test.describe("Mobile Management Flows", () => {
         eventId: "demo-v1",
         displayName: "ComiPath Demo",
         mapBundle: "../maps/demo-v1/manifest.json",
+        mapBundleContract: "legacy",
         days: [
           { dayId: "day1", displayName: "デモ1日目" },
           { dayId: "day2", displayName: "デモ2日目" },

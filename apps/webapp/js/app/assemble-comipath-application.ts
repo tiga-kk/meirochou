@@ -465,6 +465,7 @@ export function assembleComiPathApplication(
                       eventId: "demo-v1",
                       displayName: "Demo Event",
                       mapBundle: "../maps/demo-v1/manifest.json",
+                      mapBundleContract: "legacy" as const,
                       days: [{ dayId: "day1", displayName: "Day 1" }],
                     },
                   ],
@@ -484,6 +485,7 @@ export function assembleComiPathApplication(
                         eventId: "demo-v1",
                         displayName: "Demo Event",
                         mapBundle: "../maps/demo-v1/manifest.json",
+                        mapBundleContract: "legacy" as const,
                         days: [{ dayId: "day1", displayName: "Day 1" }],
                       },
                     ],
@@ -532,7 +534,7 @@ export function assembleComiPathApplication(
               ? toDomainMapManifest(
                   await loadRuntimeMapBundleManifestFromUrl(
                   resolveEventMapManifestUrl(runtimeRegistryUrl, event),
-                  event.eventId,
+                  event,
                   {
                     fetcher: browserFetcher,
                     signal,

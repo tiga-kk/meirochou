@@ -91,6 +91,7 @@ export interface EventRegistryEntryV1 {
   readonly eventId: string;
   readonly displayName: string;
   readonly mapBundle: string;
+  readonly mapBundleContract?: "event" | "legacy";
   readonly days: readonly EventDay[];
 }
 
@@ -206,6 +207,8 @@ export interface EventMapAreaManifest {
   readonly areaId: string;
   readonly displayName: string;
   readonly metersPerPixel: number;
+  readonly prefixes: readonly string[];
+  readonly labels: readonly string[];
   readonly assets: MapAssetPaths;
 }
 

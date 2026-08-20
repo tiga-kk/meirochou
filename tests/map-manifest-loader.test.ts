@@ -4,6 +4,7 @@ import { afterEach, test } from "vitest";
 import {
   loadEventMapBundleManifestFromUrl,
   loadMapBundleManifest,
+  loadRuntimeMapBundleManifestFromUrl,
   renderMapBootstrapError,
 } from "../apps/webapp/js/features/event-day/infrastructure/http-map-manifest-loader";
 
@@ -122,6 +123,8 @@ const validC108Payload = {
       areaId: "e456",
       displayName: "東456ホール",
       metersPerPixel: 270 / 4096,
+      prefixes: ["東"],
+      labels: ["ア", "イ", "ウ", "エ", "オ", "カ", "キ", "ク", "ケ", "コ", "サ", "シ", "ス", "セ", "ソ", "タ", "チ", "ツ", "テ", "ト", "ナ", "ニ", "ヌ", "ネ", "ノ", "ハ", "ヒ", "フ", "ヘ", "ホ", "マ", "ミ", "ム", "メ", "モ", "ヤ", "ユ", "ヨ", "ラ", "リ", "ル", "レ", "ロ", "ワ", "ヲ", "ン"],
       assets: {
         svg: "./e456/map.svg",
         points: "./e456/points.json",
@@ -133,6 +136,8 @@ const validC108Payload = {
       areaId: "e7",
       displayName: "東7ホール",
       metersPerPixel: 120 / 1848,
+      prefixes: ["東"],
+      labels: ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"],
       assets: {
         svg: "./e7/map.svg",
         points: "./e7/points.json",
@@ -144,6 +149,8 @@ const validC108Payload = {
       areaId: "s12",
       displayName: "南12ホール",
       metersPerPixel: 144 / 1872,
+      prefixes: ["南"],
+      labels: ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"],
       assets: {
         svg: "./s12/map.svg",
         points: "./s12/points.json",
@@ -155,6 +162,8 @@ const validC108Payload = {
       areaId: "w12",
       displayName: "西12ホール",
       metersPerPixel: 180 / 2904,
+      prefixes: ["西"],
+      labels: ["あ", "い", "う", "え", "お", "か", "き", "く", "け", "こ", "さ", "し", "す", "せ", "そ", "た", "ち", "つ", "て", "と", "な", "に", "ぬ", "ね", "の", "は", "ひ", "ふ", "へ", "ほ", "ま", "み", "む", "め", "も", "や", "ゆ", "よ", "ら", "り", "る", "れ", "ろ", "わ", "を", "ん"],
       assets: {
         svg: "./w12/map.svg",
         points: "./w12/points.json",
@@ -242,4 +251,78 @@ test("loadEventMapBundleManifestFromUrl does not fetch sub-assets on manifest pa
   assert.deepEqual(fetchedUrls, [
     "https://example.test/map-bundles/C108/manifest.json",
   ]);
+});
+
+test("runtime loader adapts a generic non-C108 strict event manifest", async () => {
+  const manifest = await loadRuntimeMapBundleManifestFromUrl(
+    "https://example.test/assets/maps/C999/manifest.json",
+    { eventId: "C999", displayName: "Comic Market 999" },
+    {
+      fetcher: async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          schemaVersion: 1,
+          eventId: "C999",
+          bundleVersion: "c999-v1",
+          areas: [{
+            areaId: "east",
+            displayName: "東ホール",
+            metersPerPixel: 0.1,
+            prefixes: ["東"],
+            labels: ["A", "B"],
+            assets: {
+              svg: "./east/map.svg",
+              points: "./east/points.json",
+              gridMeta: "./east/grid-meta.json",
+              grid: "./east/grid.bin",
+            },
+          }],
+        }),
+      }) as Response,
+    },
+  );
+
+  assert.equal(manifest.eventId, "C999");
+  assert.equal(manifest.displayName, "Comic Market 999");
+  assert.deepEqual(manifest.areas[0].prefixes, ["東"]);
+  assert.deepEqual(manifest.areas[0].labels, ["A", "B"]);
+  assert.equal(
+    manifest.areas[0].mapFile,
+    "https://example.test/assets/maps/C999/east/map.svg",
+  );
+});
+
+test("runtime loader rejects a strict event and bundle eventId mismatch", async () => {
+  await assert.rejects(
+    loadRuntimeMapBundleManifestFromUrl(
+      "https://example.test/assets/maps/C999/manifest.json",
+      { eventId: "C999", displayName: "Comic Market 999" },
+      {
+        fetcher: async () => ({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            schemaVersion: 1,
+            eventId: "C998",
+            bundleVersion: "c998-v1",
+            areas: [{
+              areaId: "east",
+              displayName: "東ホール",
+              metersPerPixel: 0.1,
+              prefixes: ["東"],
+              labels: ["A", "B"],
+              assets: {
+                svg: "./east/map.svg",
+                points: "./east/points.json",
+                gridMeta: "./east/grid-meta.json",
+                grid: "./east/grid.bin",
+              },
+            }],
+          }),
+        }) as Response,
+      },
+    ),
+    /registry=C999.*manifest=C998/,
+  );
 });
