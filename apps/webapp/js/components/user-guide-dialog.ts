@@ -80,7 +80,7 @@ export class UserGuideDialog extends LitElement {
           </header>
           <div class="user-guide-body">
             <p id="user-guide-intro">
-              現在地を設定して「次の目的地を検索」を押すと案内が始まります。使い方はいつでも確認できます。
+              初めて使う場合は、管理からCSVまたはGASで巡回リストを読み込み、現在地を設定して「次の目的地を検索」を押すと案内が始まります。閉じてもヘッダーの「使い方」からいつでも確認できます。
             </p>
 
             <section aria-labelledby="user-guide-csv-title">

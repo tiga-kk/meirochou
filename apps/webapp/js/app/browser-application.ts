@@ -82,6 +82,8 @@ import {
   filterCirclesByPriority,
 } from "../shared/domain/circle-priority-filter";
 import {
+  markFirstUseGuideSeen,
+  readFirstUseGuideSeen,
   readRouteMotionPreference,
   writeRouteMotionPreference,
 } from "../data/local-state-adapters";
@@ -1232,6 +1234,13 @@ export class BrowserApplication {
       userGuideButton.onclick = () => {
         userGuideDialog.open = true;
       };
+      if (
+        !isDevDemoEnabled(this.window.location) &&
+        !readFirstUseGuideSeen()
+      ) {
+        userGuideDialog.open = true;
+        markFirstUseGuideSeen();
+      }
     }
     this.setupEvents();
 

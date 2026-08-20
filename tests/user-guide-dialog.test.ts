@@ -22,6 +22,15 @@ test("shows the in-app data and operation guide", async () => {
   const dialog = guide.querySelector('[role="dialog"]');
 
   expect(dialog?.getAttribute("aria-modal")).toBe("true");
+  expect(guide.textContent).toContain(
+    "管理からCSVまたはGASで巡回リストを読み込み",
+  );
+  expect(guide.textContent).toContain(
+    "現在地を設定して「次の目的地を検索」を押す",
+  );
+  expect(guide.textContent).toContain(
+    "ヘッダーの「使い方」からいつでも確認",
+  );
   expect(guide.textContent).toContain("CSVを使う");
   expect(guide.textContent).toContain("space");
   expect(guide.textContent).toContain("priority");
