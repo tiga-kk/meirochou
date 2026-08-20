@@ -7,10 +7,13 @@
 ## 現在状態
 
 - 現在フェーズ: **Phase 8: event map / bundle汎用化**
-- 現在Task: **Task 1: generic event map contract（完了）**
-- 次に着手するTask: **Phase 8 Task 2: map.svg再現可能生成（未着手）**
-- canonical plan: `docs/plans/phase-08/task-01-generic-event-map-contract.md`
-- design: `docs/specs/2026-08-20-phase-08-generic-event-map-contract-design.md`
+- Phase 8 Task 1: meirochou generic event map contract — complete.
+- Phase 8 Task 2: meirochou_wrapper reproducible map.svg generation — complete.
+- Phase 8 Task 3: meirochou_wrapper reviewed event build pipeline — complete.
+- 現在Task: **Phase 8 Task 4 data-only event addition proof — implementation complete / browser review pending**
+- 次に着手するTask: **Phase 8 Task 5 targeted application refactor — Task 4 browser acceptanceまで開始禁止**
+- canonical Task 4 plan: `docs/plans/phase-08/task-04-data-only-event-proof.md`
+- Task 4 design: `docs/specs/2026-08-20-phase-08-task-04-data-only-event-proof-design.md`
 - Phase 7.6 / Phase 8 Task 0 verification report: `docs/reviews/phase-08-task-00-baseline-verification.md`
 - Phase 7.6およびPhase 8 Task 0は2026-08-20のmanual/live acceptanceをもって完了。
 
@@ -121,15 +124,22 @@ Phase 7.6 Task 1〜9のproduction実装は、`origin/main` に次の履歴とし
 - 通常`npm run test:e2e:ci`: exit 0（80 tests、71 passed / 1 flaky / 8 skipped）。flakyはALNS preview testの初回失敗・retry成功のみ。
 - baseline `76fa5ae`のfull `npm run test:e2e:ci`: exit 0（72 passed / 8 skipped）。未修正head `9b50715`のfull E2E: exit 1（67 passed / 5 failed / 8 skipped、Flow 2/3/7/9と既存ALNS preview test）。
 - hardcode scan: 指定4パターンは0件。
-- Task 2は未着手。
-
 ## 進行規則
 
 - 一度に一Taskだけ実装・review・commitする。
 - 各Taskは意味のあるfocused REDから開始する。
 - visual snapshotは人間visual確認前に一括更新しない。
 - Phase 8 Task 1では各code commitを関連focused tests GREENの状態で残し、一時的broken commitを作らない。
-- Task 2以降を先取りしない。
+- Task 5以降を先取りしない。
+
+## Phase 8 Task 4 verification / handoff
+
+- focused Task 4: 1 file / 1 test passed、exit code 0。
+- adjacent contract regression: 4 files / 42 tests passed、exit code 0。
+- `npm run verify`: exit code 0。webapp 143 files / 897 tests、route-guidance 6 files / 40 tests、Phase 05D 2 files / 4 tests、architecture 189 files、GAS 2 files / 38 tests、catalog-extension 24 tests passed。build verificationは2 public bundlesの26 byte-identical map assetsを確認。
+- fixture: C999、strict area `east` 1件、internal `map_id` `fixture-map`、`grid.bin` 24 bytes（全byte 1）、`points.json.image.path`なし。
+- production registryはC108-only、public C999 bundleなし、application TypeScript / Vite / package / workflow / integrationsはno-diff gate passed。
+- Task 4はCLOSEDにせず、browser review pending。Task 5は未着手。
 
 ## Phase 7.5 Task 1完了記録
 
@@ -190,4 +200,4 @@ Phase 7.6 Task 1〜9のproduction実装は、`origin/main` に次の履歴とし
 - `npm run test:e2e:ci`は終了コード1、62 passed / 9 failed / 8 skipped（managementの1件はretry成功）。失敗には既存visual baseline差分に加え、`navigation-resume`の期待snapshot世代、candidate Escape、catalog表示前提が含まれる。Task 8の計画に従い、このTask内で場当たり的な修正やsnapshot更新は行わない。
 - 390px級Motorola Androidでのheaded実機操作、ALNS preview中のdrag/pinch、visual snapshotを含む人間受入はユーザー確認済みとして受入した。
 - `npm run verify` / `npm run test:e2e:ci`の既知FAILは`docs/reviews/phase-07-5-field-verification.md`へ記録済みの既存差分として扱い、Phase 7.5の完了を阻害しないものとした。
-- Phase 7.5は完了。Phase 7.6もTask 1〜9実装、Task 0 final automated verification、2026-08-20 manual/live acceptanceを経て完了。現在はPhase 8 Task 1を開始する。
+- Phase 7.5は完了。Phase 7.6もTask 1〜9実装、Task 0 final automated verification、2026-08-20 manual/live acceptanceを経て完了。現在はPhase 8 Task 4のbrowser review pending。
