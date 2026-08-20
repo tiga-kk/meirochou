@@ -59,7 +59,6 @@ import type {
   RouteItineraryEntry,
 } from "../features/route-guidance/public-api";
 import type { SwitchEventDayOperation } from "../features/event-day/public-api";
-import type { LocalDataDeletionScope } from "../features/local-data-deletion/public-api";
 import type { CompleteCircleVisitInput, CompleteCircleVisitResult } from "./complete-circle-visit";
 import type { DeleteScope, ManagementEventDetailMap } from "../shared/ui/management-events";
 import type { RouteResult } from "../features/route-guidance/public-api";
@@ -73,17 +72,11 @@ import type {
 import type { SpaceArea } from "../shared/domain/space-parser";
 import type { SourceDiffViewModel } from "../shared/ui/management-view-model";
 import {
-  buildDeleteOptions,
-  buildEventDayOptions,
-  buildOutboxPanelModel,
-  buildSourceManagerPanelModel,
-  buildStorageDeleteDialogModel,
-} from "../shared/ui/management-view-model";
-import {
   buildEventDayManagementRows,
   type EventDayManagementRow,
 } from "../shared/ui/event-day-management-view-model";
 import { bindBrowserEvents } from "./bind-browser-events";
+import { buildBrowserManagementProjection } from "./browser-management-projection";
 import {
   collectCirclePriorities,
   filterCirclesByPriority,
@@ -124,17 +117,6 @@ function sameEventDayRef(left: EventDayRef | null, right: EventDayRef | null) {
       left.eventId === right.eventId &&
       left.dayId === right.dayId,
   );
-}
-
-function toDeleteScope(scope: LocalDataDeletionScope | null): DeleteScope | null {
-  if (!scope) return null;
-  if (scope.kind === "all-event-days") {
-    return { type: "all-events" };
-  }
-  return {
-    type: scope.kind === "circle-source" ? "circles" : scope.kind,
-    ref: { ...scope.eventDay },
-  } as DeleteScope;
 }
 
 type BrowserElement = HTMLElement & {
@@ -920,8 +902,8 @@ export class BrowserApplication {
   updateManagementModels() {
     if (!this.eventRegistry) return;
     const updateToken = ++this.managementUpdateToken;
-    const states = this.eventDayRepository
-      .listEventDays()
+    const refs = this.eventDayRepository.listEventDays();
+    const states = refs
       .map((ref) => ({
         ref,
         state: this.eventDayRepository.load(ref),
@@ -931,28 +913,16 @@ export class BrowserApplication {
           item.state !== null,
       );
 
-    const options = buildEventDayOptions(
-      this.eventRegistry,
-      states,
-      this.activeRef,
-    );
-
     const activeState = this.activeState;
     const activeRef = this.activeRef;
-    const eventObj = activeRef
-      ? this.eventRegistry.events.find(
-          (e) => e.eventId === activeRef.eventId,
-        )
-      : null;
-    const activeRefLabel = activeRef
-      ? `${eventObj?.displayName || activeRef.eventId} ${activeRef.dayId}`
-      : "";
-
     const sourceSessionSnapshot = this.circleDataSourceSession.getSnapshot();
+    const pendingGasState = this.pendingGasUpdatesController.getViewState();
+    const deletionViewState = this.localDataDeletionController.getViewState();
 
-    const sourceManagerModel = buildSourceManagerPanelModel({
+    const projection = buildBrowserManagementProjection({
+      registry: this.eventRegistry,
+      states,
       activeRef,
-      activeRefLabel,
       activeState,
       sourceDraft: {
         draftWebAppUrl: sourceSessionSnapshot.draftWebAppUrl,
@@ -965,56 +935,17 @@ export class BrowserApplication {
       },
       transitionBusy: this.isTransitioning,
       sourceErrorMessage: this.sourceErrorMessage,
-    });
-
-    const outboxPanelModel = buildOutboxPanelModel(
-      this.eventRegistry,
-      states,
-      {
-        processing: this.pendingGasUpdatesController.getViewState().busy,
-        resultMessage: this.pendingGasUpdatesController.getViewState().resultMessage,
-        errorMessage: this.pendingGasUpdatesController.getViewState().errorMessage,
+      pendingGasState,
+      deletionState: {
+        selectedScope: this.localDataDeletionController.getSelectedScope(),
+        busy: deletionViewState.busy,
+        errorMessage: deletionViewState.errorMessage,
       },
-    );
-
-    const selectedPendingCount = activeState ? activeState.gasOutbox.length : 0;
-    const totalPendingCount = states.reduce(
-      (sum, item) => sum + (item.state ? item.state.gasOutbox.length : 0),
-      0,
-    );
-    const deleteOptions = activeRef
-      ? buildDeleteOptions({
-          selected: activeRef,
-          eventDayCount: this.eventDayRepository.listEventDays().length,
-          activeCircleCount: activeState ? activeState.circles.length : 0,
-          activityCount: activeState
-            ? Object.keys(activeState.circleStates).length
-            : 0,
-          selectedPendingCount,
-          totalPendingCount,
-        })
-      : [];
-
-    const deleteDialogModel = buildStorageDeleteDialogModel({
-      selectedScope: toDeleteScope(
-        this.localDataDeletionController.getSelectedScope(),
-      ),
-      deleteOptions,
-      eventDayLabel: activeRefLabel,
-      busy: this.localDataDeletionController.getViewState().busy,
-      errorMessage: this.localDataDeletionController.getViewState().errorMessage,
+      eventDayCount: refs.length,
+      managementRows: this.managementRows,
     });
 
-    this.ui?.updateSettingsState({
-      eventDayOptions: options,
-      eventDayManagementRows: this.managementRows,
-      selectedEventId: this.activeRef?.eventId || "",
-      selectedDayId: this.activeRef?.dayId || "",
-      sourceManagerModel,
-      outboxPanelModel,
-      deleteOptions,
-      deleteDialogModel,
-    });
+    this.ui?.updateSettingsState(projection);
 
     void buildEventDayManagementRows({
       registry: this.eventRegistry,
