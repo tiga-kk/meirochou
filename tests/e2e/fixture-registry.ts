@@ -16,8 +16,21 @@ export const DEMO_EVENT_REGISTRY = {
   ],
 } as const;
 
+export interface DemoEventRegistryRouteOptions {
+  readonly firstUseGuideSeen?: boolean;
+}
+
 /** Keep browser tests on the fictional demo bundle after production switches to C108. */
-export async function routeDemoEventRegistry(page: Page): Promise<void> {
+export async function routeDemoEventRegistry(
+  page: Page,
+  options: DemoEventRegistryRouteOptions = {},
+): Promise<void> {
+  const firstUseGuideSeen = options.firstUseGuideSeen ?? true;
+  if (firstUseGuideSeen) {
+    await page.addInitScript(() => {
+      localStorage.setItem("meirochou.first-use-guide-seen", "1");
+    });
+  }
   await page.route("**/assets/events/manifest.json", async (route) => {
     await route.fulfill({
       status: 200,
