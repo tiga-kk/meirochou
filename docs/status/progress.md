@@ -10,8 +10,8 @@
 - Phase 8 Task 1: meirochou generic event map contract — complete.
 - Phase 8 Task 2: meirochou_wrapper reproducible map.svg generation — complete.
 - Phase 8 Task 3: meirochou_wrapper reviewed event build pipeline — complete.
-- 現在Task: **Phase 8 Task 5 targeted application refactor — implementation complete / browser review pending**
-- 次に着手するTask: **Phase 8 Task 6 first-launch onboarding — Task 5 browser acceptanceまで開始禁止**
+- 現在Task: **Phase 8 Task 6 first-launch onboarding — implementation complete / browser review pending**
+- 次に着手するTask: **Phase 8 Task 7 event-addition/operator docs — Task 6 browser acceptanceまで開始禁止**
 - canonical Task 5 plan: `docs/plans/phase-08/task-05-targeted-application-refactor.md`
 - Task 5 design: `docs/specs/2026-08-20-phase-08-task-05-targeted-application-refactor-design.md`
 - Phase 7.6 / Phase 8 Task 0 verification report: `docs/reviews/phase-08-task-00-baseline-verification.md`
@@ -32,6 +32,18 @@
 - Browser review pending。Task 5はimplementation completeとして記録し、browser acceptance前に完了扱いにしない。
 
 Task開始時の基準commitは、実装開始直前の対象branch最新remote HEADから取得する。文書中の計画開始SHAを実装開始点として固定しない。
+
+## Phase 8 Task 6 verification / handoff
+
+- Task 6.0 focused baseline: 3 files / 22 tests passed、architecture 191 files、`git diff --check` PASS。指定manual-guide E2Eの`--project=chromium`はPlaywright設定上対象外のため`No tests found`（exit 1）。実対象のmobile-chromiumではTask 6実装前に同テストを実行し、環境の一時的な`ERR_INSUFFICIENT_RESOURCES`を確認した後、再実行でPASS。
+- Task 6.1 initial RED: `readFirstUseGuideSeen is not a function` / `markFirstUseGuideSeen is not a function`、3 tests failed。focused GREENは2 files / 6 tests passed。
+- Task 6.2 copy RED: first-use sequence assertion 1 failed / 2 tests。focused GREENは3 files / 22 tests passed。`npm run check:webapp` PASS。
+- Task 6.3 onboarding E2E: 2 passed / 0 failed / retryなし。existing manual-guide E2E: 1 passed / 0 failed / retryなし。対象projectはmobile-chromium。指定`--project=chromium`は`No tests found`。
+- Task 6 full focused unit: 4 files / 25 tests passed。
+- `npm run verify`: PASS。webapp 146 files / 904 tests、Route Guidance 6 files / 40 tests、Phase 05D 2 files / 4 tests、architecture 191 files、build 26 byte-identical map assets、GAS 2 files / 38 tests、catalog extension 24 tests passed。
+- `npm run test:e2e:ci`: PASS。82 tests中74 passed / 8 skipped、retryなし。
+- `node scripts/audit-public-tree.mjs`、`npm run check:webapp:architecture`、`git diff --check`: PASS。protected-path diff: empty。
+- Task 6はimplementation completeとして記録し、browser review pending。Task 7 event-addition/operator docsはTask 6 browser acceptanceまで開始禁止。
 
 ## 直前Phase
 
