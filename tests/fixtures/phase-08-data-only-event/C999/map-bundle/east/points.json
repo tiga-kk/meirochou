@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "map_id": "fixture-map",
+  "image": {
+    "width": 48,
+    "height": 32
+  },
+  "grid": {
+    "cell_size": 8,
+    "cols": 6,
+    "rows": 4,
+    "grid_file": "grid.bin",
+    "meta_file": "grid-meta.json"
+  },
+  "points": [
+    {
+      "id": "I_01-01-1",
+      "point_id": 1,
+      "group_id": "I_01",
+      "identifier": "A",
+      "number": "01",
+      "center_x": 12.0,
+      "center_y": 12.0,
+      "portals": [
+        {
+          "col": 1,
+          "row": 1,
+          "x": 12.0,
+          "y": 12.0
+        }
+      ]
+    }
+  ]
+}

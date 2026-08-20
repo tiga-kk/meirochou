@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 32" width="48" height="32">
+  <g id="navigation-grid">
+    <rect x="0" y="0" width="48" height="32" />
+  </g>
+  <g id="identifiers">
+    <text x="12" y="10">A</text>
+  </g>
+  <g id="space-numbers">
+    <text x="12" y="18">01</text>
+  </g>
+</svg>

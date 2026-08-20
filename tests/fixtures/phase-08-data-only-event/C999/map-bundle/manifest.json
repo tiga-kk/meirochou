@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "eventId": "C999",
+  "bundleVersion": "fixture-c999-v1",
+  "areas": [
+    {
+      "areaId": "east",
+      "displayName": "Fixture East",
+      "metersPerPixel": 0.125,
+      "prefixes": ["東"],
+      "labels": ["A", "B"],
+      "assets": {
+        "svg": "./east/map.svg",
+        "points": "./east/points.json",
+        "gridMeta": "./east/grid-meta.json",
+        "grid": "./east/grid.bin"
+      }
+    }
+  ]
+}

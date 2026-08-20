@@ -1,0 +1,13 @@
+{
+  "eventId": "C999",
+  "displayName": "Fixture Event C999",
+  "mapBundle": "../maps/C999/manifest.json",
+  "mapBundleContract": "event",
+  "days": [
+    {
+      "dayId": "day1",
+      "displayName": "Fixture Day 1",
+      "date": "2099-01-01"
+    }
+  ]
+}
