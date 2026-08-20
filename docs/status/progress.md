@@ -35,7 +35,7 @@ Task開始時の基準commitは、実装開始直前の対象branch最新remote 
 
 ## Phase 8 Task 6 verification / handoff
 
-- Task 6.0 focused baseline: 3 files / 22 tests passed、architecture 191 files、`git diff --check` PASS。指定manual-guide E2Eの`--project=chromium`はPlaywright設定上対象外のため`No tests found`（exit 1）。実対象のmobile-chromiumではTask 6実装前に同テストを実行し、環境の一時的な`ERR_INSUFFICIENT_RESOURCES`を確認した後、再実行でPASS。
+- Task 6.0 focused baseline: 3 files / 22 tests passed、architecture 191 files、`git diff --check` PASS。指定manual-guide E2Eの`--project=chromium`はPlaywright設定上対象外のため`No tests found`（exit 1）。実対象のmobile-chromiumでの確認はTask 6.3で行い、環境の一時的な`ERR_INSUFFICIENT_RESOURCES`を確認した後、再実行でPASS。
 - Task 6.1 initial RED: `readFirstUseGuideSeen is not a function` / `markFirstUseGuideSeen is not a function`、3 tests failed。focused GREENは2 files / 6 tests passed。
 - Task 6.2 copy RED: first-use sequence assertion 1 failed / 2 tests。focused GREENは3 files / 22 tests passed。`npm run check:webapp` PASS。
 - Task 6.3 onboarding E2E: 2 passed / 0 failed / retryなし。existing manual-guide E2E: 1 passed / 0 failed / retryなし。対象projectはmobile-chromium。指定`--project=chromium`は`No tests found`。
