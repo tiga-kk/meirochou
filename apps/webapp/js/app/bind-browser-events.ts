@@ -1,4 +1,5 @@
 import { bindCircleStatusEvents } from "./bind-circle-status-events";
+import { bindManagementActionEvents } from "./bind-management-action-events";
 import { bindRouteGuidanceEvents } from "./bind-route-guidance-events";
 import { bindSettingsShellEvents } from "./bind-settings-shell-events";
 import type { BrowserApplication } from "./browser-application";
@@ -24,6 +25,7 @@ export function bindBrowserEvents(
       dependencies.document,
       dependencies.application.ui.els.settingsArea,
     ),
+    bindManagementActionEvents(dependencies.application, dependencies.document),
   ];
   let stopped = false;
   return {

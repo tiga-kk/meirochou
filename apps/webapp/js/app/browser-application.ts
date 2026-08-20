@@ -569,7 +569,7 @@ export class BrowserApplication {
     await this.eventDayTransition.execute(ref);
   }
 
-  private async handleEventDayOpenRequest(detail: unknown): Promise<void> {
+  async handleEventDayOpenRequest(detail: unknown): Promise<void> {
     if (!isEventDayRef((detail as { ref?: unknown })?.ref)) return;
     try {
       await this.openEventDayForManagement((detail as { ref: EventDayRef }).ref);
@@ -582,7 +582,7 @@ export class BrowserApplication {
     }
   }
 
-  private async handleEventDayRefreshRequest(detail: unknown): Promise<void> {
+  async handleEventDayRefreshRequest(detail: unknown): Promise<void> {
     const ref = (detail as { ref?: unknown })?.ref;
     if (!isEventDayRef(ref)) return;
     try {
@@ -602,7 +602,7 @@ export class BrowserApplication {
     }
   }
 
-  private async handleEventDayOfflineRequest(detail: unknown): Promise<void> {
+  async handleEventDayOfflineRequest(detail: unknown): Promise<void> {
     const ref = (detail as { ref?: unknown })?.ref;
     if (!isEventDayRef(ref)) return;
     try {
@@ -646,7 +646,7 @@ export class BrowserApplication {
     }
   }
 
-  private async handleEventDayEditRequest(detail: unknown): Promise<void> {
+  async handleEventDayEditRequest(detail: unknown): Promise<void> {
     const ref = (detail as { ref?: unknown })?.ref;
     if (!isEventDayRef(ref)) return;
     try {
@@ -659,7 +659,7 @@ export class BrowserApplication {
     }
   }
 
-  private async handleEventDayDeleteRequest(detail: unknown): Promise<void> {
+  async handleEventDayDeleteRequest(detail: unknown): Promise<void> {
     const ref = (detail as { ref?: unknown })?.ref;
     if (!isEventDayRef(ref)) return;
     try {
@@ -670,26 +670,6 @@ export class BrowserApplication {
     } catch {
       this.ui.showToast("削除確認を開けませんでした", "error");
     }
-  }
-
-  private bindManagementActionEvents(): () => void {
-    const handlers: Record<string, (detail: unknown) => void> = {
-      "event-day-open-request": (detail) => void this.handleEventDayOpenRequest(detail),
-      "event-day-refresh-request": (detail) => void this.handleEventDayRefreshRequest(detail),
-      "event-day-offline-request": (detail) => void this.handleEventDayOfflineRequest(detail),
-      "event-day-edit-request": (detail) => void this.handleEventDayEditRequest(detail),
-      "event-day-delete-request": (detail) => void this.handleEventDayDeleteRequest(detail),
-    };
-    const listeners = Object.entries(handlers).map(([type, handler]) => {
-      const listener = (event: Event) => handler((event as CustomEvent).detail);
-      this.document.addEventListener(type, listener);
-      return [type, listener] as const;
-    });
-    return () => {
-      for (const [type, listener] of listeners) {
-        this.document.removeEventListener(type, listener);
-      }
-    };
   }
 
   handleOptimizationTimeLimitChange(detail: unknown) {
@@ -1792,11 +1772,7 @@ export class BrowserApplication {
       application: this,
       document: this.document,
     });
-    const managementActionCleanup = this.bindManagementActionEvents();
-    this.eventBindingCleanup = () => {
-      browserEvents.stop();
-      managementActionCleanup();
-    };
+    this.eventBindingCleanup = () => browserEvents.stop();
   }
 
   /**
