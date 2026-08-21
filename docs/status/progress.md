@@ -10,14 +10,26 @@
 - Phase 8 Task 1: meirochou generic event map contract — complete.
 - Phase 8 Task 2: meirochou_wrapper reproducible map.svg generation — complete.
 - Phase 8 Task 3: meirochou_wrapper reviewed event build pipeline — complete.
-- 現在Task: **Phase 8 Task 7 event-addition/operator docs — implementation complete / browser review pending**
-- 次に着手するTask: **Phase 8 final browser review / closure**
+- 現在Task: **Phase 8 Task 8 final regression / closure candidate — implementation complete / browser review pending**
+- 次に着手するTask: **Phase 8 browser acceptance / closure decision**
+- canonical Task 8 plan: `docs/plans/phase-08/task-08-final-regression-closure.md`
+- Task 8 design: `docs/specs/2026-08-21-phase-08-task-08-final-regression-closure-design.md`
+- Task 8 review: `docs/reviews/phase-08-task-08-final-regression-closure.md`
 - canonical Task 7 plan: `docs/plans/phase-08/task-07-event-addition-operator-docs.md`
 - Task 7 design: `docs/specs/2026-08-21-phase-08-task-07-event-addition-operator-docs-design.md`
 - canonical Task 5 plan: `docs/plans/phase-08/task-05-targeted-application-refactor.md`
 - Task 5 design: `docs/specs/2026-08-20-phase-08-task-05-targeted-application-refactor-design.md`
 - Phase 7.6 / Phase 8 Task 0 verification report: `docs/reviews/phase-08-task-00-baseline-verification.md`
 - Phase 7.6およびPhase 8 Task 0は2026-08-20のmanual/live acceptanceをもって完了。
+
+## Phase 8 Task 8 verification / handoff
+
+- `TASK_START_SHA`: `3e6fd975fe5abb10e289a7d568dbaa608a5f2925`。Task 7 planning/finalと実装3 commitのancestorおよびTask 7 actual diffを確認し、protected-path diffはempty。Task 7 review verdictはACCEPTABLE、追加material defectなし。
+- management scroll flakeはclick-time captureへtest-only修正。pre-fixは`20 passed / 0 failed / retries 0`、post-fix focusedは`1 passed`、stressは`50 passed / 0 failed / retries 0`、whole management specは`18 passed / 0 failed / retries 0`。
+- Task 8 focused Vitestは`7 files / 116 tests passed`、onboarding + management focused E2Eは`20 passed / 0 failed / retries 0`。
+- `npm run verify`: PASS（webapp 146 files / 906 tests、Route Guidance 6 / 40、Phase 05D 2 / 4、architecture 191 files、26 byte-identical map assets across 2 public bundles、GAS 2 / 38、catalog extension 24）。
+- strict full E2E `--retries=0`: `82 total / 74 passed / 0 failed / 8 skipped`。canonical `npm run test:e2e:ci`: 同じ`82 / 74 / 0 / 8`、retry/flaky 0。architecture、public-tree audit、`git diff --check`はPASS。protected pathsはempty。
+- production registryは`[C108]`、C109 bundleなし。Task 5 assembly、Task 6 first-use/onboarding、Task 7 other-v1 verifier/guide evidenceをreviewへ記録した。
 
 ## Phase 8 Task 5 verification / handoff
 
