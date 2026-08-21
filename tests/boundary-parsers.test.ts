@@ -404,6 +404,26 @@ const genericEventMapManifest = {
   }],
 };
 
+function genericArea(
+  areaId: string,
+  prefixes: readonly string[],
+  labels: readonly string[],
+) {
+  return {
+    areaId,
+    displayName: areaId,
+    metersPerPixel: 0.1,
+    prefixes,
+    labels,
+    assets: {
+      svg: `./${areaId}/map.svg`,
+      points: `./${areaId}/points.json`,
+      gridMeta: `./${areaId}/grid-meta.json`,
+      grid: `./${areaId}/grid.bin`,
+    },
+  };
+}
+
 test("parseEventMapBundleManifest accepts a generic one-area event manifest", () => {
   const manifest = parseEventMapBundleManifest(genericEventMapManifest);
   assert.equal(manifest.areas.length, 1);
@@ -434,6 +454,62 @@ test("parseEventMapBundleManifest rejects missing, empty, or duplicate area meta
       `${field} should be rejected`,
     );
   }
+});
+
+test("parseEventMapBundleManifest rejects unsupported strict space metadata", () => {
+  const invalidMetadata = [
+    ["prefixes", ["東館"]],
+    ["prefixes", ["Ａ"]],
+    ["prefixes", ["😀"]],
+    ["labels", ["1"]],
+    ["labels", ["東"]],
+    ["labels", ["Ａ"]],
+    ["labels", ["😀"]],
+  ] as const;
+
+  for (const [field, value] of invalidMetadata) {
+    assert.throws(
+      () => parseEventMapBundleManifest({
+        ...genericEventMapManifest,
+        areas: [{ ...genericEventMapManifest.areas[0], [field]: value }],
+      }),
+      new RegExp(`map bundle manifest\\.areas\\[0\\]\\.${field}`),
+      `${field}=${JSON.stringify(value)} should be rejected`,
+    );
+  }
+});
+
+test("parseEventMapBundleManifest rejects ambiguous cross-area ownership", () => {
+  assert.throws(
+    () => parseEventMapBundleManifest({
+      ...genericEventMapManifest,
+      areas: [
+        genericArea("east-a", ["東"], ["A", "B"]),
+        genericArea("east-b", ["東"], ["B", "C"]),
+      ],
+    }),
+    /map bundle manifest\.areas\[1\].*東B.*east-a/,
+  );
+});
+
+test("parseEventMapBundleManifest allows disjoint cross-area ownership", () => {
+  const samePrefix = parseEventMapBundleManifest({
+    ...genericEventMapManifest,
+    areas: [
+      genericArea("east-a", ["東"], ["A", "B"]),
+      genericArea("east-b", ["東"], ["C", "D"]),
+    ],
+  });
+  assert.equal(samePrefix.areas.length, 2);
+
+  const sameLabel = parseEventMapBundleManifest({
+    ...genericEventMapManifest,
+    areas: [
+      genericArea("east", ["東"], ["A"]),
+      genericArea("west", ["西"], ["A"]),
+    ],
+  });
+  assert.equal(sameLabel.areas.length, 2);
 });
 
 test("parseEventMapBundleManifest accepts valid 4-area C108 manifest", () => {
