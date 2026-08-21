@@ -145,6 +145,32 @@ test("documentation describes Phase 3 GAS sync contract accurately without claim
   assert.doesNotMatch(publicReadme, /\/macros\/s\/[A-Za-z0-9_-]+\/exec/);
 });
 
+test("event addition guide covers the data-only operator workflow", () => {
+  const guide = read("guides/event-addition.md");
+
+  for (const pattern of [
+    /meirochou_wrapper/,
+    /build-event/,
+    /event-registry-entry\.json/,
+    /map-bundle/,
+    /apps\/webapp\/events\/manifest\.json/,
+    /apps\/webapp\/map-bundles/,
+    /npm run verify/,
+    /npm run test:e2e:ci/,
+    /Cloudflare Pages/,
+    /guides\/cloudflare-pages-deployment\.md/,
+  ]) {
+    assert.match(guide, pattern);
+  }
+
+  assert.match(guide, /apps\/webapp\/js/);
+  assert.match(guide, /変更.*不要|変更しない|no[- ]diff/i);
+  assert.doesNotMatch(
+    guide,
+    /(?:CLOUDFLARE_API_TOKEN|CF_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|CF_ACCOUNT_ID|CLOUDFLARE_ZONE_ID)\s*(?:=|:)/,
+  );
+});
+
 test("Phase 4 user-data-management guide covers required workflows", () => {
   const guide = read("guides/user-data-management.md");
 

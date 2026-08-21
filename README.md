@@ -55,6 +55,7 @@ c. webアプリURLを控えておき、サイトの方に貼る)
 - [データ契約](guides/data-contracts.md) — LocalStorage スキーマ、ソースプレビュー、CSV境界
 - [GAS同期](guides/gas-sync.md) — GASネットワーク動作、outboxリトライ
 - [GASデプロイ手順](integrations/gas-spreadsheet/README.md) — スプレッドシート構造、デプロイ手順
+- [イベント追加・運用](guides/event-addition.md) — wrapper生成物をproduction registry/map bundleへdata-onlyで追加・検証・公開する手順
 - [Cloudflare Pages公開・運用](guides/cloudflare-pages-deployment.md) — 本番、PRプレビュー、Access、ロールバック
 
 ## セットアップ
