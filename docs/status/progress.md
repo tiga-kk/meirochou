@@ -1,17 +1,18 @@
 # 実装進捗
 
-更新日: 2026-08-21
+更新日: 2026-08-22
 
 この文書を、現在フェーズ、現在Task、次に着手するTask、未完了の外部確認の唯一の正本とする。
 
 ## 現在状態
 
-- 現在フェーズ: **Phase 8: event map / bundle汎用化**
+- 現在フェーズ: **Phase 8: event map / bundle汎用化 — CLOSED / browser accepted**
 - Phase 8 Task 1: meirochou generic event map contract — complete.
 - Phase 8 Task 2: meirochou_wrapper reproducible map.svg generation — complete.
 - Phase 8 Task 3: meirochou_wrapper reviewed event build pipeline — complete.
-- 現在Task: **Phase 8 Task 9 space metadata contract closure — implementation complete / browser review pending**
-- 次に着手するTask: **Phase 8 browser acceptance / final closure decision**
+- Phase 8 Task 9: space metadata contract closure — **ACCEPTED**.
+- 現在Task: **Phase 8 — CLOSED**
+- 次に着手するTask: **未設定。次Phaseは別計画として開始する。**
 - canonical Task 9 plan: `docs/plans/phase-08/task-09-space-metadata-contract-closure.md`
 - Task 9 design: `docs/specs/2026-08-21-phase-08-task-09-space-metadata-contract-closure-design.md`
 - canonical Task 8 plan: `docs/plans/phase-08/task-08-final-regression-closure.md`
@@ -45,7 +46,16 @@
 - meirochou scope gate: Task 9実装時点の変更は`apps/webapp/js/shared/domain/space-parser.ts`、`apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers.ts`、`tests/space-parser.test.ts`、`tests/boundary-parsers.test.ts`、`guides/event-addition.md`の5 files。protected-path gateはempty。C108 `apps/webapp/events/manifest.json` / `apps/webapp/map-bundles/C108` diff gateもempty。
 - wrapper focused `test_event_build`: 24 tests passed。`test_cli`: 4 tests passed。full unittest discover: 52 tests passed。Ruff: `All checks passed!`。Pyright: `0 errors, 0 warnings, 0 informations`。wrapper scope gateは`python/pathdata/comiket_pathdata/event_build.py`、`python/pathdata/tests/test_event_build.py`、`python/pathdata/README.md`の3 files、protected-path gateはempty。
 - Task 9 implementation commits: meirochou `502b7d3` (`refactor`), `627758b` (`style`), `0f8f322` (`fix`), `9f97c5b` (`test`), `831a677` (`docs`), `40ccd7e` (`test`); wrapper `d32d65b` (`fix`), `35ffd25` (`docs`), `2c57f10` (`fix`)。progress record commit後のmeirochou HEADはこの記録を反映する。
-- このTaskはruntime lookup、route-guidance、routing、nearby/gallery、C108 source dataを変更していない。Phase 8はbrowser review pendingであり、CLOSED/ACCEPTEDとは記録しない。
+- このTaskはruntime lookup、route-guidance、routing、nearby/gallery、C108 source dataを変更していない。browser reviewでU+FEFF parity修正を再確認し、Task 9をACCEPTEDと判定した。
+
+## Phase 8 browser acceptance / closure
+
+- 2026-08-22、Task 1〜9のPhase 8全体browser reviewを完了。最終blockerだったwrapper / webapp間のU+FEFF prefix parityを修正後に再確認し、危険方向（wrapper accept → webapp reject）のBMP prefix差が残っていないことを確認した。
+- `tiga-kk/meirochou_wrapper`はPR #1でTask 9を`main`へmerge。merge commit: `9c31e8ecd35c2705304d7dc910c2748d0e642549`。
+- `tiga-kk/meirochou`はPR #11でTask 9を`main`へmerge。merge commit: `1552d6915d87c2aacb49cfa79a158facfa39de3e`。
+- merge後の両repositoryでTask 9 branchはmainよりmerge commit 1件分だけbehind、file diffはempty。Task 9の全変更がmainへ統合されたことを確認した。
+- Phase 8を**CLOSED / ACCEPTED**とする。Task 5〜8節に残る`browser review pending`等の文言は各Task実装時点のhistorical handoffであり、このclosure記録が現在状態として優先する。
+- 実GASの2件は引き続き独立した`OPEN_EXTERNAL_DEBT`であり、Phase 8 closureを妨げない。
 
 ## Phase 8 Task 5 verification / handoff
 
@@ -80,7 +90,7 @@ Task開始時の基準commitは、実装開始直前の対象branch最新remote 
 - Task 7.0 baseline: focused 5 files / 105 tests passed、architecture 191 files、`git diff --check` PASS。Task 6のfirst-use marker、read/write adapter caller、onboarding E2E specは継承を確認した。Playwrightは`chromium`が4 spec限定で、一般webapp specは`mobile-chromium`のため、Task 6 historical focused commandの不一致をTask 7 guideへ伝播していない。開始時production registryは`[C108]`、C109 bundleなし。
 - Task 7.1: synthetic `other-v1` source/output bundleとmanifestをfixture内に追加し、旧verifierは`Phase 5B event registry must contain only C108`でRED。GREENはdeployment-build 1 file / 12 tests、event-registry 1 file / 14 tests。`result.eventIds`は`["C108", "other-v1", "public-v1"]`、`verifiedFiles`は39。C108 17-file/built-asset checks、missing/escape/symlink/credential、source/build byte-identical checksは維持。
 - Task 7.2: guide contract REDは`guides/event-addition.md`のENOENT。GREENはwebapp contracts/deployment/event-registry 3 files / 100 tests。wrapper `build-event`、staging review、safe copy、manual registry merge、data-only diff、unregistered bundle warning、regenerate-not-patch、`npm run verify`、`npm run test:e2e:ci`、manual smoke、Cloudflare Pages rollbackを記録。
-- Task 7 production behavior required no Task 6 repair. Historical Task 6 focused Playwright plan used a project name that did not select `webapp.spec`; Task 7 operator guidance uses canonical `npm run test:e2e:ci` and does not propagate that command.
+- Task 7 production behavior required no Task 6 repair. Historical Task 6 focused Playwright plan used a project name that did not select `webapp.spec`; Task 7 operator guidance uses canonical `npm run test:e2e:ci` and does not propagate that command。
 - Task 7 full focused suite: 5 files / 107 tests passed。`npm run verify`: exit 0、webapp 146 files / 906 tests、Route Guidance 6 files / 40 tests、Phase 05D 2 files / 4 tests、architecture 191 files、build 26 byte-identical map assets、GAS 2 files / 38 tests、catalog extension 24 tests。
 - `npm run test:e2e:ci`: exit 0、82 total、73 passed、0 failed、8 skipped、1 retry/flaky。flakyは`tests/e2e/management.spec.ts:174`の初回scroll assertion（Expected 160 / Received 166）がretryで成功したもの。指定testの単独再実行は1 passed。trace/screenshotはCI test-resultsへ生成された。
 - `npm run check:webapp:architecture` PASS（191 files）、`node scripts/audit-public-tree.mjs` PASS、`git diff --check` PASS、protected-path diff empty。Task 7はimplementation completeとして記録し、browser review pending。Phase 8 final browser review / closureが未完了である。
@@ -158,112 +168,3 @@ Phase 7.6 Task 1〜9のproduction実装は、`origin/main` に次の履歴とし
 - final `node scripts/audit-public-tree.mjs` / `git diff --check`: PASS。
 - 2026-08-20、Cloudflare/X live、実機mobile、gesture、200% text zoom、offline cache、gallery interactionをユーザーが確認し、5項目すべて問題なしとしてmanual/live acceptance完了。
 - GAS 2件のみ独立した`OPEN_EXTERNAL_DEBT`として継続。
-
-## Phase 8 Task 1で解決すること
-
-- strict production event map manifestのarea数をC108の4固定から1件以上へgeneric化する。
-- `prefixes` / `labels`をC108 TypeScript constantから各area manifestへ移す。
-- registry entryへoptional `mapBundleContract: "event" | "legacy"`を導入し、未指定をstrict production contract、legacyをdemo fixture専用として扱う。
-- production loaderから`eventId === "C108"`等のevent固有contract分岐を除去する。
-- C999等のnon-C108 strict fixtureでruntime manifest変換を証明する。
-- demo-v1 bundle自体は変更しない。
-
-## Phase 8 Task 1でやらないこと
-
-- wrapper側のmanifest/map.svg生成。
-- C109 production event追加。
-- bundle全体のcross-file integrity command。
-- application大規模refactor。
-- 初回onboarding。
-- route/ALNS/grid/points/wall semantics変更。
-
-## Phase 8 Task 1完了記録
-
-- 実装commit: `e02d676`, `3dd15e5`, `9b50715`。browser review対応commit: `7f3ffd4`。
-- Finding 1: domain `EventRegistryEntry`へ`mapBundleContract?: "event" | "legacy"`を追加し、transitionの`loadManifest` callbackへlegacy値が保持されるtestを追加。
-- Finding 2: production registryから取得した`c108Event`をruntime loaderへ直接渡し、`mapBundleContract`未指定をassert。production C108 registryは未変更。
-- E2E blockerは`TASK1_REGRESSION`。baseline 3回は各`18 passed / 0 failed`、headはFlow 2/3/7/9が再現。原因はmanagement specの5つのcustom legacy registry fixtureにdiscriminatorがなかったこと。`tests/e2e/management.spec.ts`へ`mapBundleContract: "legacy"`を追加。
-- focused Vitest: 6 files / 72 tests passed。
-- focused management E2E: 18 passed / 0 failed / exit 0。
-- `npm run check:webapp`: PASS。`npm run typecheck:functions`: PASS。`npm run build:webapp`: PASS。`node scripts/audit-public-tree.mjs`: PASS。`git diff --check`: PASS。
-- `npm run verify`: standalone clean checkoutでPASS（Vitest 142 files / 896 tests、route 40、Phase 5D 4、GAS 38、catalog 24）。linked worktreeでは`.git`ファイルの`/tmp`絶対パスを検出する既知環境差が1件発生したため、completion gateはstandalone結果で確認。
-- 通常`npm run test:e2e:ci`: exit 0（80 tests、71 passed / 1 flaky / 8 skipped）。flakyはALNS preview testの初回失敗・retry成功のみ。
-- baseline `76fa5ae`のfull `npm run test:e2e:ci`: exit 0（72 passed / 8 skipped）。未修正head `9b50715`のfull E2E: exit 1（67 passed / 5 failed / 8 skipped、Flow 2/3/7/9と既存ALNS preview test）。
-- hardcode scan: 指定4パターンは0件。
-## 進行規則
-
-- 一度に一Taskだけ実装・review・commitする。
-- 各Taskは意味のあるfocused REDから開始する。
-- visual snapshotは人間visual確認前に一括更新しない。
-- Phase 8 Task 1では各code commitを関連focused tests GREENの状態で残し、一時的broken commitを作らない。
-- Task 5以降を先取りしない。
-
-## Phase 8 Task 4 verification / handoff
-
-- focused Task 4: 1 file / 1 test passed、exit code 0。
-- adjacent contract regression: 4 files / 42 tests passed、exit code 0。
-- `npm run verify`: exit code 0。webapp 143 files / 897 tests、route-guidance 6 files / 40 tests、Phase 05D 2 files / 4 tests、architecture 189 files、GAS 2 files / 38 tests、catalog-extension 24 tests passed。build verificationは2 public bundlesの26 byte-identical map assetsを確認。
-- fixture: C999、strict area `east` 1件、internal `map_id` `fixture-map`、`grid.bin` 24 bytes（全byte 1）、`points.json.image.path`なし。
-- production registryはC108-only、public C999 bundleなし、application TypeScript / Vite / package / workflow / integrationsはno-diff gate passed。
-- Task 4はCLOSED。browser acceptanceは人間チェック完了。Task 5は未着手。
-
-## Phase 7.5 Task 1完了記録
-
-- route/nearby共通の`calculateMapStageLayout()`を追加し、aspect ratio維持、contain、短辺占有率0.8のbounded-cover、中心配置を統一。
-- nearbyの既存adapterとrouteのstage計算を共通helperへ寄せ、routeのviewport高さ決定と`overflow: hidden`は変更していない。
-- focused verification: map stage / nearby workspace / route contract tests 5 files / 15 tests passed、`npm run check:webapp` passed、`git diff --check` passed。
-
-## Phase 7.5 Task 2完了記録
-
-- route画面を`summary -> map -> action bar -> detail`のmap-first構成へ変更し、購入済/保留を詳細外へ移動。
-- 詳細は`aria-expanded`付きのcollapsed panelとし、候補選択時だけ自動展開。開閉処理はmap transformを変更しない。
-- navigation mapの高さ上限を除去し、CSSの実測`clientWidth/clientHeight`を共通`calculateMapStageLayout()`へ渡す構成へ変更。
-- focused verification: route map first Vitest 2 tests、関連route Vitest 14 tests、390/644/1024px Playwright geometry test passed、`npm run check:webapp` passed、`npm run build:webapp` passed、`git diff --check` passed。
-- 既存visual snapshotは人間確認前のため更新していない。旧baselineとの差分はTask 8の人間visual確認後に扱う。
-
-## Phase 7.5 Task 3完了記録
-
-- 独立地図のarea/origin/filter controlsを`条件`drawerへまとめ、open直後はcollapsedにした。
-- area・priority・件数・保留の状態からcompact summaryを生成し、drawerの開閉や再openでfilter stateをリセットしない。
-- drawerの開閉後に`applyViewportLayout()`を呼び、collapsed時のworkspace高を再取得する。
-- focused verification: nearby Vitest 4 files / 13 tests passed、nearby mobile E2E（drawer、workspace geometry、filter、origin）passed、`npm run check:webapp` passed、`npm run build:webapp` passed、`git diff --check` passed。
-
-## Phase 7.5 Task 4完了記録
-
-- `paginateNearbyCatalog()`を追加し、5/10件は全件、15/20件は1〜10 / 11〜末尾へ分割するページ制御を追加。
-- `buildNearbyPerimeterLayout()`でnarrow/mediumは上下、wideは四辺へcard slotを配置し、mapRectとcardの非重複を維持。
-- page/filter/area/origin変更時はpageを先頭へ戻し、pan/zoomではcard DOMを再生成せずleader geometryだけを更新する既存経路を維持。
-- selected cardの操作はcard内から`nearby-selection-toolbar`へ分離し、画像の自然aspect ratioを維持。
-- focused verification: Task 4 Vitest 5 files / 19 tests passed、mobile nearby E2E 3 tests passed、desktop workspace E2E 2 tests passed、`npm run check:webapp` passed、`npm run build:webapp` passed、`git diff --check` passed。
-
-## Phase 7.5 Task 5完了記録
-
-- map関連button/controlに44px操作領域、hover/active/focus-visible、selected/disabled/busyの視覚状態、reduced-motion時のtransition停止を追加。
-- 購入・保留とnearbyの目的地設定をpending中disabled/`aria-busy`にし、カードのdrag/pointerupを選択clickへ変換しないようにした。
-- route詳細のEscapeで詳細だけを閉じ、詳細toggleへfocusを戻す。nearbyの既存close focus復帰も維持。
-- focused verification: Task 5 Vitest 3 files / 15 tests passed、対象nearby/map-first E2E 2 tests passed、keyboard E2E 2 projects passed、`npm run check:webapp` passed、`git diff --check` passed。
-- 指定E2E全体は26 passed / 8 failed。失敗はTask 2 map-first変更に伴う既存visual snapshot差分と旧来の詳細表示前提で、snapshotは人間visual確認前のため更新していない。
-
-## Phase 7.5 Task 6完了記録
-
-- `PrepareRouteOptimizationUseCase`を追加し、fresh startで`searchNext()`から渡された同一`pendingCircles`だけをmatrix endpointsとALNS inputへ接続した。候補の再取得やpriority/holdの再解釈は行わない。
-- composition rootで既存`DistanceMatrixController`をLocalStorage repositoryとdistance-matrix workerへ接続し、cache hit時はworker再計算を避ける。matrix準備失敗時は表示中のcurrent exact routeを維持する。
-- `RouteOptimizationPreview`/callbacksを追加し、ALNS progressはpreview callbackのみ、completeだけがNavigationStateとsnapshotへcommitする。stale/cancelled jobは世代無効化でUI/stateを更新しない。
-- worker progressは初回即時、改善通知は250ms以上でcoalesceし、completeは即時通知する。
-- focused verification: Task 6 Vitest 6 files / 38 tests passed、`npm run check:webapp` passed、`npm run build:webapp` passed、`git diff --check` passed。
-
-## Phase 7.5 Task 7完了記録
-
-- ALNS progressをephemeralな青〜紫の`optimization-preview-overlay`とcompact statusへ接続し、同一overlayのpolylineだけを更新する構成を追加した。正式な赤current routeは維持し、complete時だけpreviewを消して正式best orderへ戻す。
-- previewの地図点は既存points JSONと`parseSpace`を再利用して解決し、drag/pinch中はDOM更新を保留して操作終了時に最新previewへ追従する。manual destination、購入/保留、reset、cancel/errorでもpreviewをclearする。
-- focused verification: preview model / route map contract / runtime controllerの3 files・12 tests passed、新規ALNS preview mobile E2E passed、`npm run check:webapp` passed、`npm run build:webapp` passed、`git diff --check` passed。
-- 指定mobile E2E全体は35件中27 passed / 8 failed。8件はTask 5時点から継続しているmap-first visual baselineまたはcatalog表示前提の既存失敗で、新規preview E2Eの失敗ではない。visual snapshotは人間確認前のため更新していない。
-
-## Phase 7.5 Task 8完了記録
-
-- focused verificationは指定10 files / 38 testsがpassed、`node scripts/audit-public-tree.mjs`と`git diff --check`もpassedした。
-- `npm run verify`は836 passed / 2 failedで終了した。失敗は`tests/route-map-candidate-preview.test.ts`のEscape経路と、worktreeの`.git`ファイルに含まれるローカル絶対パスを検出する`tests/public-boundary.test.mjs`。後者は直接実行したpublic tree auditではpassedした。
-- `npm run test:e2e:ci`は終了コード1、62 passed / 9 failed / 8 skipped（managementの1件はretry成功）。失敗には既存visual baseline差分に加え、`navigation-resume`の期待snapshot世代、candidate Escape、catalog表示前提が含まれる。Task 8の計画に従い、このTask内で場当たり的な修正やsnapshot更新は行わない。
-- 390px級Motorola Androidでのheaded実機操作、ALNS preview中のdrag/pinch、visual snapshotを含む人間受入はユーザー確認済みとして受入した。
-- `npm run verify` / `npm run test:e2e:ci`の既知FAILは`docs/reviews/phase-07-5-field-verification.md`へ記録済みの既存差分として扱い、Phase 7.5の完了を阻害しないものとした。
-- Phase 7.5は完了。Phase 7.6もTask 1〜9実装、Task 0 final automated verification、2026-08-20 manual/live acceptanceを経て完了。現在はPhase 8 Task 4のbrowser review pending。
