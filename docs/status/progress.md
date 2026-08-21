@@ -1,6 +1,6 @@
 # 実装進捗
 
-更新日: 2026-08-20
+更新日: 2026-08-21
 
 この文書を、現在フェーズ、現在Task、次に着手するTask、未完了の外部確認の唯一の正本とする。
 
@@ -10,8 +10,10 @@
 - Phase 8 Task 1: meirochou generic event map contract — complete.
 - Phase 8 Task 2: meirochou_wrapper reproducible map.svg generation — complete.
 - Phase 8 Task 3: meirochou_wrapper reviewed event build pipeline — complete.
-- 現在Task: **Phase 8 Task 6 first-launch onboarding — implementation complete / browser review pending**
-- 次に着手するTask: **Phase 8 Task 7 event-addition/operator docs — Task 6 browser acceptanceまで開始禁止**
+- 現在Task: **Phase 8 Task 7 event-addition/operator docs — implementation complete / browser review pending**
+- 次に着手するTask: **Phase 8 final browser review / closure**
+- canonical Task 7 plan: `docs/plans/phase-08/task-07-event-addition-operator-docs.md`
+- Task 7 design: `docs/specs/2026-08-21-phase-08-task-07-event-addition-operator-docs-design.md`
 - canonical Task 5 plan: `docs/plans/phase-08/task-05-targeted-application-refactor.md`
 - Task 5 design: `docs/specs/2026-08-20-phase-08-task-05-targeted-application-refactor-design.md`
 - Phase 7.6 / Phase 8 Task 0 verification report: `docs/reviews/phase-08-task-00-baseline-verification.md`
@@ -44,6 +46,16 @@ Task開始時の基準commitは、実装開始直前の対象branch最新remote 
 - `npm run test:e2e:ci`: PASS。82 tests中74 passed / 8 skipped、retryなし。
 - `node scripts/audit-public-tree.mjs`、`npm run check:webapp:architecture`、`git diff --check`: PASS。protected-path diff: empty。
 - Task 6はimplementation completeとして記録し、browser review pending。Task 7 event-addition/operator docsはTask 6 browser acceptanceまで開始禁止。
+
+## Phase 8 Task 7 verification / handoff
+
+- Task 7.0 baseline: focused 5 files / 105 tests passed、architecture 191 files、`git diff --check` PASS。Task 6のfirst-use marker、read/write adapter caller、onboarding E2E specは継承を確認した。Playwrightは`chromium`が4 spec限定で、一般webapp specは`mobile-chromium`のため、Task 6 historical focused commandの不一致をTask 7 guideへ伝播していない。開始時production registryは`[C108]`、C109 bundleなし。
+- Task 7.1: synthetic `other-v1` source/output bundleとmanifestをfixture内に追加し、旧verifierは`Phase 5B event registry must contain only C108`でRED。GREENはdeployment-build 1 file / 12 tests、event-registry 1 file / 14 tests。`result.eventIds`は`["C108", "other-v1", "public-v1"]`、`verifiedFiles`は39。C108 17-file/built-asset checks、missing/escape/symlink/credential、source/build byte-identical checksは維持。
+- Task 7.2: guide contract REDは`guides/event-addition.md`のENOENT。GREENはwebapp contracts/deployment/event-registry 3 files / 100 tests。wrapper `build-event`、staging review、safe copy、manual registry merge、data-only diff、unregistered bundle warning、regenerate-not-patch、`npm run verify`、`npm run test:e2e:ci`、manual smoke、Cloudflare Pages rollbackを記録。
+- Task 7 production behavior required no Task 6 repair. Historical Task 6 focused Playwright plan used a project name that did not select `webapp.spec`; Task 7 operator guidance uses canonical `npm run test:e2e:ci` and does not propagate that command.
+- Task 7 full focused suite: 5 files / 107 tests passed。`npm run verify`: exit 0、webapp 146 files / 906 tests、Route Guidance 6 files / 40 tests、Phase 05D 2 files / 4 tests、architecture 191 files、build 26 byte-identical map assets、GAS 2 files / 38 tests、catalog extension 24 tests。
+- `npm run test:e2e:ci`: exit 0、82 total、73 passed、0 failed、8 skipped、1 retry/flaky。flakyは`tests/e2e/management.spec.ts:174`の初回scroll assertion（Expected 160 / Received 166）がretryで成功したもの。指定testの単独再実行は1 passed。trace/screenshotはCI test-resultsへ生成された。
+- `npm run check:webapp:architecture` PASS（191 files）、`node scripts/audit-public-tree.mjs` PASS、`git diff --check` PASS、protected-path diff empty。Task 7はimplementation completeとして記録し、browser review pending。Phase 8 final browser review / closureが未完了である。
 
 ## 直前Phase
 
