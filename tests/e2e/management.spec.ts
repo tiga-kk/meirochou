@@ -175,15 +175,38 @@ test.describe("Mobile Management Flows", () => {
     page,
   }) => {
     await page.goto("/");
-    const before = await page.evaluate(() => {
+    await page.evaluate(() => {
       document.body.style.minHeight = "2000px";
-      window.scrollTo(0, 160);
-      return new Promise<number>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve(window.scrollY))),
+      delete document.body.dataset.managementScrollBeforeOpen;
+
+      const toggle = document.getElementById("toggle-settings");
+      if (!(toggle instanceof HTMLElement)) {
+        throw new Error("#toggle-settings is missing");
+      }
+
+      toggle.addEventListener(
+        "click",
+        () => {
+          document.body.dataset.managementScrollBeforeOpen = String(window.scrollY);
+        },
+        { capture: true, once: true },
       );
+
+      window.scrollTo(0, 160);
     });
 
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeGreaterThan(0);
+
     await page.locator("#toggle-settings").click();
+
+    const before = await page.evaluate(() =>
+      Number(document.body.dataset.managementScrollBeforeOpen),
+    );
+    expect(Number.isFinite(before)).toBe(true);
+    expect(before).toBeGreaterThan(0);
+
     const settings = page.locator("#settings-area");
     await expect(settings).toHaveClass(/show/);
     await expect
