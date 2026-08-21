@@ -460,6 +460,7 @@ test("parseEventMapBundleManifest rejects unsupported strict space metadata", ()
   const invalidMetadata = [
     ["prefixes", ["東館"]],
     ["prefixes", ["Ａ"]],
+    ["prefixes", ["①"]],
     ["prefixes", ["😀"]],
     ["labels", ["1"]],
     ["labels", ["東"]],
