@@ -21,9 +21,7 @@ interface SpaceParts {
 const spaceLabel = "[A-Za-z\\u3041-\\u3096\\u30A1-\\u30FA]";
 const runtimeSpaceLabelPattern = new RegExp(`^${spaceLabel}$`, "u");
 
-export function isRuntimeSpacePrefixCharacter(
-  value: unknown,
-): value is string {
+export function isRuntimeSpacePrefixCharacter(value: unknown): value is string {
   return (
     typeof value === "string" &&
     value.length === 1 &&
