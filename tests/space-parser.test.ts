@@ -36,7 +36,7 @@ describe("space parser", () => {
       expect(isRuntimeSpacePrefixCharacter(value)).toBe(true);
     }
 
-    for (const value of ["", " ", "東館", "Ａ", "①", "😀"]) {
+    for (const value of ["", " ", "\uFEFF", "東館", "Ａ", "①", "😀"]) {
       expect(isRuntimeSpacePrefixCharacter(value)).toBe(false);
     }
   });

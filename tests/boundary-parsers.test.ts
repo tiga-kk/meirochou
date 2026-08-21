@@ -459,6 +459,7 @@ test("parseEventMapBundleManifest rejects missing, empty, or duplicate area meta
 test("parseEventMapBundleManifest rejects unsupported strict space metadata", () => {
   const invalidMetadata = [
     ["prefixes", ["東館"]],
+    ["prefixes", ["\uFEFF"]],
     ["prefixes", ["Ａ"]],
     ["prefixes", ["①"]],
     ["prefixes", ["😀"]],
