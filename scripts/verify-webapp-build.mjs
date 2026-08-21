@@ -212,16 +212,16 @@ export function verifyWebappBuild({
   assert.equal(sourceRegistry.schemaVersion, 1, "invalid schema version");
   assert.ok(Array.isArray(sourceRegistry.events), "invalid events registry");
 
-  const registryEventIds = sourceRegistry.events.map((event) => event?.eventId);
-  assert.deepEqual(
-    registryEventIds,
-    ["C108"],
-    "Phase 5B event registry must contain only C108",
-  );
-
+  const registeredEventIds = new Set();
   for (const event of sourceRegistry.events) {
     const { eventId, mapBundle } = event;
     assert.ok(eventId && typeof eventId === "string", "invalid eventId");
+    assert.equal(
+      registeredEventIds.has(eventId),
+      false,
+      `duplicate eventId in event registry: ${eventId}`,
+    );
+    registeredEventIds.add(eventId);
     assert.ok(mapBundle && typeof mapBundle === "string", "invalid mapBundle");
     assert.ok(
       mapBundle.startsWith("../maps/"),

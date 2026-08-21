@@ -189,13 +189,17 @@ test("loadEventRegistry throws on fetch error", async () => {
   vi.unstubAllGlobals();
 });
 
-test("production registry contains only C108 with day1 and day2", () => {
+test("production registry preserves C108 without forbidding additional strict events", () => {
   const registry = parseEventRegistry(productionRegistryJson);
-  expect(registry.events.map((event) => event.eventId)).toEqual(["C108"]);
-  expect(registry.events[0]?.days.map((day) => day.dayId)).toEqual([
-    "day1",
-    "day2",
-  ]);
+  expect(registry.events.length).toBeGreaterThan(0);
+
+  const c108 = registry.events.find((event) => event.eventId === "C108");
+  expect(c108).toBeDefined();
+  expect(c108?.days.map((day) => day.dayId)).toEqual(["day1", "day2"]);
+
+  expect(
+    registry.events.every((event) => event.mapBundleContract !== "legacy"),
+  ).toBe(true);
 });
 
 test("production registry excludes demo-v1", () => {

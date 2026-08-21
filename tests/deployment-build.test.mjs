@@ -160,6 +160,50 @@ function rewriteMapManifest(value) {
   );
 }
 
+function addRegisteredBundle(eventId = "other-v1") {
+  const sourceC108 = join(
+    fixtureRoot,
+    "apps/webapp/map-bundles/C108",
+  );
+  const outputC108 = join(
+    fixtureRoot,
+    "dist/webapp/assets/maps/C108",
+  );
+  const sourceOther = join(
+    fixtureRoot,
+    `apps/webapp/map-bundles/${eventId}`,
+  );
+  const outputOther = join(
+    fixtureRoot,
+    `dist/webapp/assets/maps/${eventId}`,
+  );
+
+  cpSync(sourceC108, sourceOther, { recursive: true });
+  cpSync(outputC108, outputOther, { recursive: true });
+
+  const otherManifest = {
+    ...mapManifest,
+    eventId,
+    displayName: "Other fixture",
+  };
+  writeJson(join(sourceOther, "manifest.json"), otherManifest);
+  writeJson(join(outputOther, "manifest.json"), otherManifest);
+
+  rewriteRegistries({
+    ...registry,
+    events: [
+      ...registry.events,
+      {
+        eventId,
+        displayName: "Other fixture",
+        mapBundle: `../maps/${eventId}/manifest.json`,
+        mapBundleContract: "event",
+        days: [{ dayId: "day1", displayName: "Other Day 1" }],
+      },
+    ],
+  });
+}
+
 beforeEach(() => {
   fixtureRoot = createFixture();
 });
@@ -175,22 +219,24 @@ test("accepts registered and unregistered public static artifacts", () => {
   assert.equal(result.verifiedFiles, 22);
 });
 
-test("rejects a second published event", () => {
+test("accepts multiple registered events and unregistered public static artifacts", () => {
+  addRegisteredBundle();
+
+  const result = verifyWebappBuild({ repositoryRoot: fixtureRoot });
+
+  assert.deepEqual(result.eventIds, ["C108", "other-v1", "public-v1"]);
+  assert.equal(result.verifiedFiles, 39);
+});
+
+test("rejects duplicate registered event IDs", () => {
   rewriteRegistries({
     ...registry,
-    events: [
-      ...registry.events,
-      {
-        ...registry.events[0],
-        eventId: "other-v1",
-        displayName: "Other fixture",
-      },
-    ],
+    events: [...registry.events, structuredClone(registry.events[0])],
   });
 
   assert.throws(
     () => verifyWebappBuild({ repositoryRoot: fixtureRoot }),
-    /Phase 5B event registry must contain only C108/,
+    /duplicate eventId in event registry/,
   );
 });
 
