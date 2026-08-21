@@ -19,6 +19,25 @@ interface SpaceParts {
 }
 
 const spaceLabel = "[A-Za-z\\u3041-\\u3096\\u30A1-\\u30FA]";
+const runtimeSpaceLabelPattern = new RegExp(`^${spaceLabel}$`, "u");
+
+export function isRuntimeSpacePrefixCharacter(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length === 1 &&
+    !/\s/u.test(value) &&
+    value.normalize("NFKC") === value
+  );
+}
+
+export function isRuntimeSpaceLabelCharacter(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.normalize("NFKC") === value &&
+    runtimeSpaceLabelPattern.test(value)
+  );
+}
+
 const spacePartsPattern = new RegExp(
   `^(?<prefix>.)(?<label>${spaceLabel})-?(?<number>[0-9]+)(?:-?(?<side>[A-Za-z]{1,2}))?$`,
   "u",

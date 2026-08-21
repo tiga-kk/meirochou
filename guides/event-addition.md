@@ -62,6 +62,9 @@ copy前に、次を確認します。
 - registryの`mapBundleContract`が`"event"`である。
 - map manifestのareaが1件以上ある。
 - 各areaの`prefixes`と`labels`が空でない。
+- `prefixes`の各値は、current runtimeで1文字として扱えるNFKC-stableなBMP文字である。`東`、`西`、`南`のような値はvalidだが、`東館`、full-width compatibility文字、whitespace、emojiはinvalidである。
+- `labels`の各値は、current runtime grammarに一致するASCII英字・ひらがな・カタカナの1文字である。numeric label、kanji label、full-width compatibility label、emojiはinvalidである。
+- 別area間で同じ`prefix × label` combinationを所有しない。
 - 各areaのassetsが次の相対pathを指す。
 
   ```text
@@ -75,6 +78,8 @@ copy前に、次を確認します。
 - local absolute path、private review file、未解決のgenerated inputが含まれていない。
 
 web-facing `areaId`とpathdata内部の`map_id`は一致しなくても構いません。両者を無理に同じ名前へ変更しません。
+
+新しいprefix形式やlabel文字種が必要な場合はgenerated artifactを手修正せず、runtime space grammar変更を別Taskとしてreviewします。
 
 ## 3. map bundleをmeirochouへcopyする
 

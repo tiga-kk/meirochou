@@ -1,4 +1,8 @@
-import { canonicalizeSpace } from "../../../shared/domain/space-parser";
+import {
+  canonicalizeSpace,
+  isRuntimeSpaceLabelCharacter,
+  isRuntimeSpacePrefixCharacter,
+} from "../../../shared/domain/space-parser";
 import type {
   Circle,
   EventDay,
@@ -123,6 +127,38 @@ function uniqueTextArray(value: unknown, path: string): readonly string[] {
       "a non-empty array of unique strings",
     );
   }
+  return parsed;
+}
+
+function runtimeSpacePrefixArray(
+  value: unknown,
+  path: string,
+): readonly string[] {
+  const parsed = uniqueTextArray(value, path);
+  parsed.forEach((prefix, index) => {
+    if (!isRuntimeSpacePrefixCharacter(prefix)) {
+      throw new BoundaryValidationError(
+        `${path}[${index}]`,
+        "a single NFKC-stable runtime space prefix character",
+      );
+    }
+  });
+  return parsed;
+}
+
+function runtimeSpaceLabelArray(
+  value: unknown,
+  path: string,
+): readonly string[] {
+  const parsed = uniqueTextArray(value, path);
+  parsed.forEach((label, index) => {
+    if (!isRuntimeSpaceLabelCharacter(label)) {
+      throw new BoundaryValidationError(
+        `${path}[${index}]`,
+        "one runtime-supported ASCII letter, hiragana, or katakana label character",
+      );
+    }
+  });
   return parsed;
 }
 
@@ -612,6 +648,7 @@ export function parseEventMapBundleManifest(
   }
 
   const seenAreaIds = new Set<string>();
+  const seenSpaceAreaOwners = new Map<string, string>();
   const areas: EventMapAreaManifest[] = [];
 
   for (let i = 0; i < value.areas.length; i++) {
@@ -642,11 +679,24 @@ export function parseEventMapBundleManifest(
       areaObj.metersPerPixel,
       `${areaPath}.metersPerPixel`,
     );
-    const prefixes = uniqueTextArray(
+    const prefixes = runtimeSpacePrefixArray(
       areaObj.prefixes,
       `${areaPath}.prefixes`,
     );
-    const labels = uniqueTextArray(areaObj.labels, `${areaPath}.labels`);
+    const labels = runtimeSpaceLabelArray(areaObj.labels, `${areaPath}.labels`);
+    for (const prefix of prefixes) {
+      for (const label of labels) {
+        const ownershipKey = JSON.stringify([prefix, label]);
+        const previousAreaId = seenSpaceAreaOwners.get(ownershipKey);
+        if (previousAreaId !== undefined) {
+          throw new BoundaryValidationError(
+            areaPath,
+            `unambiguous space ownership; '${prefix}${label}' is already owned by area '${previousAreaId}'`,
+          );
+        }
+        seenSpaceAreaOwners.set(ownershipKey, areaId);
+      }
+    }
     const assetsObj = record(areaObj.assets, `${areaPath}.assets`);
 
     const assets: MapAssetPaths = Object.freeze({

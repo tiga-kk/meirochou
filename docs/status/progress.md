@@ -10,8 +10,10 @@
 - Phase 8 Task 1: meirochou generic event map contract — complete.
 - Phase 8 Task 2: meirochou_wrapper reproducible map.svg generation — complete.
 - Phase 8 Task 3: meirochou_wrapper reviewed event build pipeline — complete.
-- 現在Task: **Phase 8 Task 8 final regression / closure candidate — implementation complete / browser review pending**
-- 次に着手するTask: **Phase 8 browser acceptance / closure decision**
+- 現在Task: **Phase 8 Task 9 space metadata contract closure — implementation complete / browser review pending**
+- 次に着手するTask: **Phase 8 browser acceptance / final closure decision**
+- canonical Task 9 plan: `docs/plans/phase-08/task-09-space-metadata-contract-closure.md`
+- Task 9 design: `docs/specs/2026-08-21-phase-08-task-09-space-metadata-contract-closure-design.md`
 - canonical Task 8 plan: `docs/plans/phase-08/task-08-final-regression-closure.md`
 - Task 8 design: `docs/specs/2026-08-21-phase-08-task-08-final-regression-closure-design.md`
 - Task 8 review: `docs/reviews/phase-08-task-08-final-regression-closure.md`
@@ -30,6 +32,20 @@
 - `npm run verify`: PASS（webapp 146 files / 906 tests、Route Guidance 6 / 40、Phase 05D 2 / 4、architecture 191 files、26 byte-identical map assets across 2 public bundles、GAS 2 / 38、catalog extension 24）。
 - strict full E2E `--retries=0`: `82 total / 74 passed / 0 failed / 8 skipped`。canonical `npm run test:e2e:ci`: 同じ`82 / 74 / 0 / 8`、retry/flaky 0。architecture、public-tree audit、`git diff --check`はPASS。protected pathsはempty。
 - production registryは`[C108]`、C109 bundleなし。Task 5 assembly、Task 6 first-use/onboarding、Task 7 other-v1 verifier/guide evidenceをreviewへ記録した。
+
+## Phase 8 Task 9 verification / handoff
+
+- meirochou branch: `docs/phase-08-task-09-space-metadata-contract-closure-plan`。Task start SHA: `13f091617caa5df5eb8f302110c5695a3ccc9468`。U+FEFF修正後verification時点HEAD: `40ccd7e`。
+- wrapper branch: `feature/phase-08-task-09-space-metadata-contract-closure`。Task start SHA: `aa864f1ba80b87b63760248edc60b39a85d18d58`。U+FEFF修正後verification時点HEAD: `2c57f10`。
+- browser review blocker対応: Pythonの`prefix.isspace()`とECMAScript `\s`の差を埋めるため、wrapperのruntime prefix validationへU+FEFFの明示拒否を追加。meirochou production predicateは既に拒否していたため、space predicate/strict boundary testsへU+FEFFを追加し、wrapperでは`build_event_bundle()`のfinal/tmp無出力も検証した。
+- focused RED/GREEN: meirochou predicate/strict boundary追加後のGREENは4 files / 36 tests passed。wrapper blocker REDは24 tests中2 failures、修正後GREENは`test_event_build` 24 tests passed。
+- `npm run verify`: exit 0。webapp 146 files / 911 tests、Route Guidance 6 files / 40 tests、Phase 05D 2 files / 4 tests、architecture 191 files、26 byte-identical map assets across 2 public bundles、GAS 2 files / 38 tests、catalog extension 24 tests。
+- `npm run test:e2e:ci`: exit 0。82 total / 74 passed / 0 failed / 8 skipped、retry/flaky 0。Task 9由来のbrowser interaction変更なし。
+- `node scripts/audit-public-tree.mjs`: PASS。`npm run check:webapp:architecture`: PASS（191 files）。`git diff --check`: PASS。
+- meirochou scope gate: Task 9実装時点の変更は`apps/webapp/js/shared/domain/space-parser.ts`、`apps/webapp/js/features/event-day/infrastructure/application-boundary-parsers.ts`、`tests/space-parser.test.ts`、`tests/boundary-parsers.test.ts`、`guides/event-addition.md`の5 files。protected-path gateはempty。C108 `apps/webapp/events/manifest.json` / `apps/webapp/map-bundles/C108` diff gateもempty。
+- wrapper focused `test_event_build`: 24 tests passed。`test_cli`: 4 tests passed。full unittest discover: 52 tests passed。Ruff: `All checks passed!`。Pyright: `0 errors, 0 warnings, 0 informations`。wrapper scope gateは`python/pathdata/comiket_pathdata/event_build.py`、`python/pathdata/tests/test_event_build.py`、`python/pathdata/README.md`の3 files、protected-path gateはempty。
+- Task 9 implementation commits: meirochou `502b7d3` (`refactor`), `627758b` (`style`), `0f8f322` (`fix`), `9f97c5b` (`test`), `831a677` (`docs`), `40ccd7e` (`test`); wrapper `d32d65b` (`fix`), `35ffd25` (`docs`), `2c57f10` (`fix`)。progress record commit後のmeirochou HEADはこの記録を反映する。
+- このTaskはruntime lookup、route-guidance、routing、nearby/gallery、C108 source dataを変更していない。Phase 8はbrowser review pendingであり、CLOSED/ACCEPTEDとは記録しない。
 
 ## Phase 8 Task 5 verification / handoff
 

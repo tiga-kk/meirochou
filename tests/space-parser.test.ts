@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   canonicalizeSpace,
+  isRuntimeSpaceLabelCharacter,
+  isRuntimeSpacePrefixCharacter,
   parseSpace,
 } from "../apps/webapp/js/shared/domain/space-parser";
 
@@ -27,6 +29,26 @@ describe("space parser", () => {
 
   it("uses the same parser for hyphenated legacy inputs", () => {
     expect(parseSpace("東A-032-a")).toEqual(["", "A", 32]);
+  });
+
+  it("defines runtime-compatible area prefix characters", () => {
+    for (const value of ["東", "西", "南", "A"]) {
+      expect(isRuntimeSpacePrefixCharacter(value)).toBe(true);
+    }
+
+    for (const value of ["", " ", "\uFEFF", "東館", "Ａ", "①", "😀"]) {
+      expect(isRuntimeSpacePrefixCharacter(value)).toBe(false);
+    }
+  });
+
+  it("defines runtime-compatible area label characters", () => {
+    for (const value of ["A", "z", "あ", "ん", "ア", "ン"]) {
+      expect(isRuntimeSpaceLabelCharacter(value)).toBe(true);
+    }
+
+    for (const value of ["", " ", "1", "東", "AB", "Ａ", "😀"]) {
+      expect(isRuntimeSpaceLabelCharacter(value)).toBe(false);
+    }
   });
 
   it("rejects side suffixes longer than two ASCII letters", () => {
