@@ -4,7 +4,7 @@
 
 **Goal:** Remove the known retry-dependent management-scroll E2E flake, independently re-audit Task 7 and Phase 8 invariants, and produce a fully verified Phase 8 closure candidate without changing production runtime/data behavior.
 
-**Architecture:** Task 8 is a verification/closure task, not a feature task. Keep all production/runtime/event data frozen; replace the test's frame-count-based scroll baseline with click-time event capture, stress that regression with retries disabled, then run the complete Phase 8 and repository gates and write one final closure-candidate review record for browser acceptance.
+**Architecture:** Task 8 is a verification/closure task, not a feature task. Keep production runtime/event data frozen; replace the test's frame-count-based scroll baseline with click-time event capture, stress the corrected regression with retries disabled, then run the complete Phase 8/repository gates and write one closure-candidate review record for browser acceptance.
 
 **Tech Stack:** Playwright 1.61.1, Node.js 22.14.0, npm 10.9.2, Vitest 4, existing CI-equivalent Playwright Docker runner, Markdown review/status documentation.
 
@@ -15,16 +15,15 @@
 - Repository: `tiga-kk/meirochou`.
 - Work only on `docs/phase-08-task-08-final-regression-closure-plan`.
 - The branch is based on the current Phase 8 Task 7 implementation branch. Start from the current remote Task 8 branch HEAD; do not reset to a SHA copied from this document.
-- Task 8 is the Phase 8 final regression / closure **candidate**, not a new feature.
+- Task 8 is a Phase 8 final regression / closure **candidate**, not a new feature.
 - Do not add C109, C110, or any real second production event.
 - Do not modify `apps/webapp/js/**`, `apps/webapp/events/**`, `apps/webapp/map-bundles/**`, `functions/**`, `integrations/**`, `vite.config.ts`, `package.json`, `package-lock.json`, `.github/workflows/**`, or `playwright.config.ts`.
 - Do not modify `tiga-kk/meirochou_wrapper`.
-- Do not change Task 6 onboarding behavior or copy.
-- Do not refactor Task 5 application assembly further.
+- Do not change Task 6 onboarding behavior/copy or refactor Task 5 application assembly further.
 - Do not weaken Task 7 multi-event verification, C108 regressions, byte-equality checks, or operator-guide safeguards.
 - Do not add sleeps to hide the management-scroll flake.
 - Do not hard-code `166` or another observed browser-specific scroll value.
-- Do not raise Playwright retries, update snapshots, skip tests, loosen visual/assertion thresholds, or widen timeouts merely to obtain green.
+- Do not raise Playwright retries, update snapshots, skip tests, loosen assertions, or widen timeouts merely to obtain green.
 - The strict final browser signal is a full CI-container E2E run with `--retries=0`.
 - `npm run test:e2e:ci` is also required because it is the canonical documented operator/CI command.
 - The two existing GAS items remain `OPEN_EXTERNAL_DEBT`; Task 8 does not absorb them.
@@ -32,7 +31,7 @@
 
 ## Expected implementation scope
 
-Expected code/test change:
+Expected test change:
 
 ```text
 M tests/e2e/management.spec.ts
@@ -45,17 +44,15 @@ A docs/reviews/phase-08-task-08-final-regression-closure.md
 M docs/status/progress.md
 ```
 
-The design and plan already present on the branch are planning inputs, not Task 8 implementation changes.
-
-No other implementation file should be necessary. If a production file becomes necessary, stop and classify the reason instead of expanding scope.
+The Task 8 design and plan already on the branch are planning inputs, not implementation changes. If a production file becomes necessary, stop and classify the reason instead of expanding scope.
 
 ---
 
 ## Task 8.0: Capture the inherited baseline and adversarially review Task 7
 
-**Goal:** Record the exact Task 8 implementation start, prove the branch inherits the completed Task 7 tree, and independently verify that Task 7 has no unresolved material defect other than the known management-scroll E2E flake.
+**Goal:** Record the exact Task 8 implementation start, prove the branch inherits Task 7, and independently verify that Task 7 has no unresolved material defect other than the known management-scroll E2E flake.
 
-**Do not:** Edit files, merge main, repair unrelated failures, add an event, or assume the Task 7 self-report is browser acceptance.
+**Do not:** Edit files, merge main, repair unrelated failures, add an event, or treat the Task 7 self-report as browser acceptance.
 
 **Files:**
 - Read: `docs/specs/2026-08-21-phase-08-task-08-final-regression-closure-design.md`
@@ -73,8 +70,8 @@ No other implementation file should be necessary. If a production file becomes n
 - Read: `scripts/run-e2e-in-ci-container.sh`
 
 **Interfaces:**
-- Consumes: current Task 7 implementation tree and its recorded verification evidence.
-- Produces: `TASK_START_SHA`, exact baseline evidence, Task 7 browser-style source audit verdict.
+- Consumes: current Task 7 implementation tree and recorded verification evidence.
+- Produces: `TASK_START_SHA`, baseline measurements, Task 7 source/diff review verdict.
 
 - [ ] **Step 1: Sync the exact remote Task 8 branch and record `TASK_START_SHA`**
 
@@ -87,31 +84,44 @@ printf 'TASK_START_SHA=%s\n' "$TASK_START_SHA"
 git status --short
 ```
 
-Expected: branch is current and working tree is clean except unrelated user-owned files. Never reset/delete unrelated files.
+Expected: current branch and clean working tree except unrelated user-owned files. Never reset/delete unrelated files.
 
-- [ ] **Step 2: Prove the Task 7 implementation commits are inherited**
+- [ ] **Step 2: Prove the three Task 7 implementation/handoff commits are inherited**
 
 ```bash
-git log --oneline --decorate -12
+git log --oneline --decorate -15
 
 git log --oneline --all --grep='fix(build): allow multiple production events' -1
 git log --oneline --all --grep='docs(phase-08): add event addition operator guide' -1
 git log --oneline --all --grep='docs(phase-08): record task 7 verification' -1
 ```
 
-Expected: all three Task 7 implementation/handoff commits are ancestors of the current branch. If not, stop as:
+For each returned SHA, run:
 
-```text
-BLOCKED_WRONG_BASE
+```bash
+git merge-base --is-ancestor THE_RETURNED_SHA "$TASK_START_SHA"
 ```
 
-Do not recreate Task 7 manually.
+Replace `THE_RETURNED_SHA` with the SHA printed by the immediately preceding command. All three checks must exit 0. Otherwise stop as `BLOCKED_WRONG_BASE`; do not recreate Task 7 manually.
 
 - [ ] **Step 3: Audit the inherited Task 7 changed-file scope**
 
-Identify the Task 7 planning commit immediately before implementation from history and compare it to the Task 7 final handoff commit.
+Find the Task 7 planning commit and final handoff commit from history:
 
-At design time the expected Task 7 implementation file set is:
+```bash
+git log --oneline --all --grep='docs(phase-08): plan event addition operator workflow' -1
+git log --oneline --all --grep='docs(phase-08): record task 7 verification' -1
+```
+
+Use the first command's SHA as `TASK7_PLAN_SHA` and the second command's SHA as `TASK7_FINAL_SHA`:
+
+```bash
+export TASK7_PLAN_SHA="$(git log --all --format=%H --grep='docs(phase-08): plan event addition operator workflow' -1)"
+export TASK7_FINAL_SHA="$(git log --all --format=%H --grep='docs(phase-08): record task 7 verification' -1)"
+git diff --name-status "$TASK7_PLAN_SHA".."$TASK7_FINAL_SHA"
+```
+
+Expected Task 7 implementation file set:
 
 ```text
 M README.md
@@ -123,28 +133,25 @@ M tests/event-registry.test.ts
 M tests/webapp-contracts.test.mjs
 ```
 
-Verify from git history rather than trusting this list alone.
+Protected-path check:
 
-Task 7 must not have changed:
-
-```text
-apps/webapp/js/**
-apps/webapp/events/**
-apps/webapp/map-bundles/**
-vite.config.ts
-package.json
-package-lock.json
-integrations/**
-functions/**
-.github/workflows/**
-playwright.config.ts
+```bash
+git diff --name-only "$TASK7_PLAN_SHA".."$TASK7_FINAL_SHA" -- \
+  apps/webapp/js \
+  apps/webapp/events \
+  apps/webapp/map-bundles \
+  vite.config.ts \
+  package.json \
+  package-lock.json \
+  integrations \
+  functions \
+  .github/workflows \
+  playwright.config.ts
 ```
 
-If the actual Task 7 implementation touched a protected path, stop as `BLOCKED_TASK7_REVIEW` and report the exact path/diff.
+Expected: no output. Any protected-path change is `BLOCKED_TASK7_REVIEW`.
 
-- [ ] **Step 4: Re-audit the Task 7 verifier behavior from source**
-
-Run:
+- [ ] **Step 4: Re-audit Task 7 verifier policy from source**
 
 ```bash
 ! git grep -n 'Phase 5B event registry must contain only C108' -- \
@@ -168,29 +175,18 @@ git grep -n 'production registry excludes demo-v1' -- \
   tests/event-registry.test.ts
 ```
 
-Expected:
+Expected: historical one-event-only text is absent; duplicate protection, C108 regressions, and demo exclusion remain.
 
-- the two historical one-event-only searches produce no matches and exit success because of `!`;
-- duplicate registry protection exists;
-- C108-specific regression checks remain;
-- demo-v1 production exclusion remains.
+- [ ] **Step 5: Prove Task 7's second registered fixture is a real source/output bundle**
 
-- [ ] **Step 5: Prove the synthetic second event is a real temporary bundle path, not only a second ID string**
-
-Inspect `addRegisteredBundle()` in `tests/deployment-build.test.mjs` and verify it creates both:
+Inspect `addRegisteredBundle()` in `tests/deployment-build.test.mjs`. It must create both:
 
 ```text
-<temp>/apps/webapp/map-bundles/other-v1/**
-<temp>/dist/webapp/assets/maps/other-v1/**
+TEMP_ROOT/apps/webapp/map-bundles/other-v1/**
+TEMP_ROOT/dist/webapp/assets/maps/other-v1/**
 ```
 
-and rewrites the copied manifest to:
-
-```text
-eventId = "other-v1"
-```
-
-and registers:
+It must rewrite the copied manifest to `eventId: "other-v1"`, and the registry entry must use:
 
 ```json
 {
@@ -200,18 +196,16 @@ and registers:
 }
 ```
 
-Verify the positive test expects:
+The positive test must expect:
 
 ```text
 result.eventIds == ["C108", "other-v1", "public-v1"]
 result.verifiedFiles == 39
 ```
 
-If it only mutates an ID without source/output bundle files, stop as `BLOCKED_TASK7_REVIEW`.
+If the test only mutates an event ID without actual source/output bundle files, stop as `BLOCKED_TASK7_REVIEW`.
 
 - [ ] **Step 6: Re-audit the operator guide contract**
-
-Check that `guides/event-addition.md` contains all of these concepts:
 
 ```bash
 git grep -n 'build-event' -- guides/event-addition.md
@@ -225,15 +219,17 @@ git grep -n 'Cloudflare Pages' -- guides/event-addition.md
 git grep -n 'rollback' -- guides/event-addition.md
 ```
 
-Read the surrounding prose and verify it says:
+Read the matching sections and verify all five semantics:
 
-- staging `event-registry-entry.json` is merged into the registry and is not copied into public tree;
-- new-event copy refuses an existing target directory;
-- unregistered directories under `apps/webapp/map-bundles` may still be published;
-- generated assets are regenerated from wrapper inputs rather than hand-patched in meirochou;
-- application TypeScript changes are a stop condition for the normal event-addition workflow.
+```text
+event-registry-entry.json is merged, not copied into public tree
+new-event safe copy refuses an existing target directory
+unregistered map-bundle directories may still be published
+generated assets are regenerate-not-patch
+apps/webapp/js changes stop the normal data-only event-addition workflow
+```
 
-- [ ] **Step 7: Confirm current production data is still unchanged**
+- [ ] **Step 7: Confirm current production data still has no C109**
 
 ```bash
 node --input-type=module - <<'NODE'
@@ -248,9 +244,9 @@ NODE
 test ! -e apps/webapp/map-bundles/C109
 ```
 
-Expected: no C109 production registry entry or bundle.
+Both commands must succeed.
 
-- [ ] **Step 8: Run the inherited focused Task 7 suite before changing the E2E**
+- [ ] **Step 8: Run the inherited focused Task 7 suite**
 
 ```bash
 npx vitest run --root . \
@@ -263,46 +259,35 @@ npx vitest run --root . \
 
 Record exact file/test counts and exit code.
 
-- [ ] **Step 9: Record the Task 7 review verdict in working notes**
+- [ ] **Step 9: Classify the Task 7 review**
 
-The expected verdict is:
+Expected classification after the source/diff audit:
 
 ```text
 Task 7 source/diff review: ACCEPTABLE
 Known carryover: management scroll E2E retry/flaky only
 ```
 
-If another material defect is found, do not silently fix it. Apply the design's Task 7 defect gate:
-
-```text
-directly caused/exposed by Task 7
-AND small
-AND contained in Task 7-owned verifier/test/docs
-AND no production runtime/data change
-```
-
-If all four are not true, stop as `BLOCKED_TASK7_REVIEW`.
+If another material Task 7 issue appears, Task 8 may correct it only when it is directly caused/exposed by Task 7, small, confined to Task 7-owned verifier/test/docs files, and requires no runtime/event-data change. Otherwise stop as `BLOCKED_TASK7_REVIEW`.
 
 No commit for Task 8.0.
 
 ---
 
-## Task 8.1: Stabilize the management scroll E2E against browser settling
+## Task 8.1: Stabilize management scroll restoration E2E
 
-**Goal:** Make the E2E measure the actual scroll position at the settings-toggle click event, which is the product lock-time contract, rather than assuming a fixed number of animation frames is enough to preserve a synthetic scroll target.
+**Goal:** Measure the scroll position at the actual settings-toggle click event, which is the lock-time product contract, instead of assuming two animation frames are enough to preserve a synthetic scroll target.
 
-**Do not:** Change `ComipathSettings`, `bind-settings-shell-events.ts`, CSS, app runtime, retries, timeouts, snapshots, or expected equality semantics.
+**Do not:** Change `ComipathSettings`, `bind-settings-shell-events.ts`, CSS, app runtime, retries, timeouts, snapshots, or exact restore equality.
 
 **Files:**
 - Modify: `tests/e2e/management.spec.ts`
 
 **Interfaces:**
-- Consumes: existing `#toggle-settings` bubbling click binding and management scroll-lock behavior.
-- Produces: the same E2E user-flow assertion, with `before` defined as the click-capture-time `window.scrollY`.
+- Consumes: existing normal bubbling click listener on `#toggle-settings` and existing management scroll-lock behavior.
+- Produces: the same E2E user-flow contract with `before` defined as click-capture-time `window.scrollY`.
 
-### Root-cause contract
-
-The existing production event binder attaches a normal bubbling listener:
+The production binder currently uses a bubbling listener:
 
 ```ts
 listen(settingsToggle, "click", () => {
@@ -310,11 +295,9 @@ listen(settingsToggle, "click", () => {
 });
 ```
 
-A one-shot `{ capture: true }` listener installed by the E2E therefore observes `window.scrollY` before that production bubble listener locks the page.
+A one-shot `{ capture: true }` E2E listener on the same element therefore records the actual scroll position before the production bubble listener locks the page.
 
-### Characterization / historical RED evidence
-
-- [ ] **Step 1: Run the current test 20 times in the CI container with retries disabled**
+- [ ] **Step 1: Characterize the inherited test 20 times with retries disabled**
 
 ```bash
 scripts/run-e2e-in-ci-container.sh \
@@ -325,21 +308,11 @@ scripts/run-e2e-in-ci-container.sh \
   --retries=0
 ```
 
-Record:
-
-```text
-total
-passed
-failed
-exit code
-any Expected/Received values
-```
-
-Task 7 already recorded a real `Expected 160 / Received 166` retry-dependent occurrence, so 20/20 passing here does not invalidate the defect. Do not try to induce failure by changing browser timing.
+Record total/passed/failed/exit code and any Expected/Received values. Task 7 already recorded a real `Expected 160 / Received 166` retry-dependent occurrence, so 20/20 passing here does not invalidate the defect. Do not manipulate browser timing to force a failure.
 
 - [ ] **Step 2: Replace the double-animation-frame baseline with click-time capture**
 
-In the test `管理surfaceが背景scrollを固定し、viewport全体を遮蔽する`, replace this current block:
+In `管理surfaceが背景scrollを固定し、viewport全体を遮蔽する`, replace:
 
 ```ts
 const before = await page.evaluate(() => {
@@ -353,7 +326,7 @@ const before = await page.evaluate(() => {
 await page.locator("#toggle-settings").click();
 ```
 
-with:
+with exactly:
 
 ```ts
 await page.evaluate(() => {
@@ -389,15 +362,15 @@ expect(Number.isFinite(before)).toBe(true);
 expect(before).toBeGreaterThan(0);
 ```
 
-Keep all existing assertions after the click, including the final exact restoration:
+Keep the existing exact close assertion unchanged:
 
 ```ts
 await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(before);
 ```
 
-Do not replace exact equality with a tolerance.
+Do not replace equality with a tolerance.
 
-- [ ] **Step 3: Run the focused test once with retries disabled**
+- [ ] **Step 3: Run the corrected focused test once with retries disabled**
 
 ```bash
 scripts/run-e2e-in-ci-container.sh \
@@ -407,7 +380,7 @@ scripts/run-e2e-in-ci-container.sh \
   --retries=0
 ```
 
-Expected: 1 passed, 0 failed, 0 retries.
+Required: 1 passed, 0 failed, exit 0.
 
 - [ ] **Step 4: Stress the corrected test 50 times with retries disabled**
 
@@ -429,9 +402,9 @@ Required acceptance:
 exit 0
 ```
 
-If even one iteration fails, stop Task 8. Do not add sleep/retry/tolerance. Inspect trace/error and classify the real race.
+Any failure blocks Task 8. Do not add sleep/retry/tolerance; inspect the exact error/trace and classify the race.
 
-- [ ] **Step 5: Run the whole management E2E spec with retries disabled**
+- [ ] **Step 5: Run the whole management spec with retries disabled**
 
 ```bash
 scripts/run-e2e-in-ci-container.sh \
@@ -442,21 +415,21 @@ scripts/run-e2e-in-ci-container.sh \
 
 Record exact total/pass/fail/skip counts.
 
-- [ ] **Step 6: Verify only the intended test file changed**
+- [ ] **Step 6: Verify the intended diff and commit**
 
 ```bash
-git diff --name-status "$TASK_START_SHA" --
+git diff --name-status "$TASK_START_SHA"
 git diff -- tests/e2e/management.spec.ts
 git diff --check
 ```
 
-At this point expected implementation diff is only:
+At this point the implementation diff must contain only:
 
 ```text
 M tests/e2e/management.spec.ts
 ```
 
-- [ ] **Step 7: Commit the test-only correction**
+Commit:
 
 ```bash
 git add tests/e2e/management.spec.ts
@@ -467,17 +440,16 @@ git commit -m "test(e2e): stabilize management scroll restore"
 
 ## Task 8.2: Re-run focused Phase 8 outcomes and audit invariants
 
-**Goal:** Prove the major Phase 8 outcomes still exist together after Task 8.1, independently of the full-suite green signal.
+**Goal:** Prove the major Phase 8 outcomes still exist together after Task 8.1, independently of a generic full-suite green signal.
 
-**Do not:** Modify code to make the audit easier, add a real event, edit wrapper code, or replace source evidence with statements copied from old progress records.
+**Do not:** Modify code to satisfy the audit, add a real event, edit wrapper code, or substitute stale progress prose for current source/test evidence.
 
 **Files:**
-- Read: Phase 8 production/test/doc files listed below.
-- No file modification required in this task.
+- Read-only audit of current production/tests/docs.
 
 **Interfaces:**
-- Consumes: completed Task 1〜7 implementation and Task 8.1 test correction.
-- Produces: exact invariant evidence used by the final closure report.
+- Consumes: Task 1〜7 implementation and Task 8.1 test correction.
+- Produces: exact invariant evidence for the final review document.
 
 - [ ] **Step 1: Run the focused Phase 8 unit/integration suite**
 
@@ -494,7 +466,7 @@ npx vitest run --root . \
 
 Record exact file/test counts and exit code.
 
-- [ ] **Step 2: Run focused Task 6 + management browser coverage without retries**
+- [ ] **Step 2: Run onboarding + management browser coverage with retries disabled**
 
 ```bash
 scripts/run-e2e-in-ci-container.sh \
@@ -506,9 +478,7 @@ scripts/run-e2e-in-ci-container.sh \
 
 Record exact total/pass/fail/skip counts.
 
-- [ ] **Step 3: Prove strict production event loading remains event-generic**
-
-Run:
+- [ ] **Step 3: Prove runtime map loading remains event-generic**
 
 ```bash
 ! git grep -n 'C108' -- \
@@ -519,30 +489,27 @@ git grep -n 'mapBundleContract' -- \
   apps/webapp/js/features/event-day/infrastructure/http-map-manifest-loader.ts
 ```
 
-Expected:
+The loader must contain no C108-specific branch/string; strict/legacy selection must remain data-driven.
 
-- runtime HTTP map loader contains no C108-specific branch/string;
-- strict/legacy contract selection remains data-driven.
-
-Then inspect `tests/phase-08-data-only-event-addition.test.ts` and record that C999 proceeds through:
+Read `tests/phase-08-data-only-event-addition.test.ts` and record evidence that C999 travels through:
 
 ```text
-production registry parser
+parseEventRegistry
 -> resolveEventMapManifestUrl
--> strict runtime manifest loader
--> runtime map area catalog
+-> loadRuntimeMapBundleManifestFromUrl
+-> runtimeMapAreaCatalog
 -> HttpRouteMapAssetsLoader
 -> points/grid-meta/grid bytes
 ```
 
-and that raw strict `areaId` and pathdata `map_id` are intentionally allowed to differ.
+Also record that fixture `areaId` and raw pathdata `map_id` intentionally differ.
 
-- [ ] **Step 4: Prove manifest-owned area metadata remains in the strict contract**
+- [ ] **Step 4: Prove strict manifest metadata remains data-owned**
 
-Inspect strict map-manifest parser/types/tests and record evidence for:
+Read the strict manifest parser/type tests and record current evidence for:
 
 ```text
-areas: 1 or more
+one-or-more areas
 areaId
 metersPerPixel
 prefixes
@@ -553,11 +520,9 @@ assets.gridMeta
 assets.grid
 ```
 
-Do not add a new parser or schema.
+No parser/schema change is authorized.
 
-- [ ] **Step 5: Prove Task 7 build verification is multi-event without losing C108 regressions**
-
-Run:
+- [ ] **Step 5: Prove Task 7 verification remains multi-event while C108 regressions remain**
 
 ```bash
 git grep -n 'accepts multiple registered events' -- tests/deployment-build.test.mjs
@@ -566,9 +531,9 @@ git grep -n 'C108 public bundle must contain exactly 17 files' -- scripts/verify
 git grep -n 'built C108 asset missing' -- scripts/verify-webapp-build.mjs
 ```
 
-Record all matches.
+All four must match.
 
-- [ ] **Step 6: Prove Task 5 targeted application refactor remains present and bounded**
+- [ ] **Step 6: Prove Task 5 targeted application split remains present**
 
 ```bash
 test -f apps/webapp/js/app/bind-management-action-events.ts
@@ -577,15 +542,11 @@ test -f apps/webapp/js/app/browser-management-projection.ts
 git grep -n 'bindManagementActionEvents' -- \
   apps/webapp/js/app \
   tests/application-assembly.test.ts
-
-git grep -n 'BrowserManagementProjection\|browserManagementProjection' -- \
-  apps/webapp/js/app \
-  tests/application-assembly.test.ts
 ```
 
-Do not refactor these modules in Task 8.
+Read `tests/application-assembly.test.ts` and record the management/route-guidance assembly checks. Do not refactor these modules.
 
-- [ ] **Step 7: Prove Task 6 first-use UX remains present without modifying it**
+- [ ] **Step 7: Prove Task 6 first-use UX remains present**
 
 ```bash
 git grep -n 'meirochou.first-use-guide-seen' -- \
@@ -598,9 +559,9 @@ git grep -n 'readFirstUseGuideSeen\|markFirstUseGuideSeen' -- \
 test -f tests/e2e/first-launch-onboarding.spec.ts
 ```
 
-Read the focused tests and record that normal launch is one-time while `demo_ui` does not persist the marker.
+Read the focused tests and record normal one-time launch behavior and `demo_ui` non-persistence behavior. Do not change onboarding.
 
-- [ ] **Step 8: Prove the operator workflow remains linked and data-only**
+- [ ] **Step 8: Prove Task 7 operator workflow remains linked and data-only**
 
 ```bash
 git grep -n 'guides/event-addition.md' -- README.md
@@ -609,18 +570,9 @@ git grep -n 'git diff --name-only -- apps/webapp/js' -- guides/event-addition.md
 git grep -n 'npm run test:e2e:ci' -- guides/event-addition.md
 ```
 
-Read the relevant sections and record:
+Record evidence for wrapper generation ownership, registry-entry merge, unregistered-bundle warning, regenerate-not-patch, manual smoke, and Cloudflare rollback authority.
 
-```text
-wrapper owns generation
-registry entry is merged, not published as a file
-unregistered bundle directories may still publish
-regenerate-not-patch
-manual smoke
-Cloudflare Pages / rollback link
-```
-
-- [ ] **Step 9: Reconfirm Task 8 protected production paths are untouched**
+- [ ] **Step 9: Reconfirm protected production paths are untouched by Task 8**
 
 ```bash
 git diff --name-only "$TASK_START_SHA"..HEAD -- \
@@ -644,36 +596,24 @@ No commit for Task 8.2.
 
 ## Task 8.3: Run strict full closure verification
 
-**Goal:** Produce fresh whole-repository evidence that Phase 8 is a closure candidate, including a full browser run that cannot hide failures behind retries.
+**Goal:** Produce fresh whole-repository evidence, including a full browser run that cannot hide a failure behind retries.
 
-**Do not:** Continue after a regression without classification, rerun repeatedly until lucky green, change unrelated code, or update snapshots.
+**Do not:** Rerun repeatedly until lucky green, absorb unrelated fixes, update snapshots, or continue after an unclassified regression.
 
 **Files:**
 - No source modification expected.
 
 **Interfaces:**
 - Consumes: Task 8.1 correction and Task 8.2 invariant evidence.
-- Produces: final automated verification measurements for the closure report.
+- Produces: final automated measurements for the closure review.
 
-- [ ] **Step 1: Run fresh `npm run verify`**
+- [ ] **Step 1: Run fresh repository verification**
 
 ```bash
 npm run verify
 ```
 
-Record exact exit code and all reported suite counts, including:
-
-```text
-webapp Vitest files/tests
-Route Guidance files/tests
-Phase 05D regression files/tests
-architecture result/file count
-build verified asset count
-GAS files/tests
-catalog extension tests
-```
-
-Expected: exit 0.
+Record exit code and every printed suite count: webapp Vitest, Route Guidance, Phase 05D regressions, architecture, build verified assets, GAS, and catalog extension. Required: exit 0.
 
 - [ ] **Step 2: Run the entire Playwright suite with retries disabled**
 
@@ -681,37 +621,24 @@ Expected: exit 0.
 scripts/run-e2e-in-ci-container.sh --retries=0
 ```
 
-This is the strict Task 8 closure gate.
+Record total/passed/failed/skipped/exit code. Required: exit 0 and zero failed.
 
-Record:
+If a test fails, run that exact test once with `--retries=0` for diagnosis. Do not repeatedly rerun the full suite.
 
-```text
-total
-passed
-failed
-skipped
-flaky/retry (must be 0 because retries disabled)
-exit code
-```
-
-Required: exit 0 and zero failed.
-
-If a test fails, do one focused rerun of that exact test with `--retries=0` only for diagnosis. Do not repeatedly rerun the full suite until it happens to pass.
-
-Classification rules:
+Use exactly one classification:
 
 ```text
 TASK8_REGRESSION
-  failure is caused by tests/e2e/management.spec.ts correction
+  failure is caused by the management.spec.ts change
 
 PREEXISTING_OR_INDEPENDENT
   failure reproduces from TASK_START_SHA and is unrelated to Task 8 diff
 
 ENVIRONMENTAL
-  failure has concrete Docker/browser/system evidence and not assertion/product evidence
+  concrete Docker/browser/system evidence exists and assertion/product evidence does not
 ```
 
-A non-Task8 failure blocks Phase 8 closure unless the browser reviewer explicitly accepts it as external debt. Codex must not absorb unrelated fixes automatically.
+Any unresolved failure blocks the closure candidate.
 
 - [ ] **Step 3: Run the canonical documented E2E command**
 
@@ -719,20 +646,7 @@ A non-Task8 failure blocks Phase 8 closure unless the browser reviewer explicitl
 npm run test:e2e:ci
 ```
 
-Record exact:
-
-```text
-total
-passed
-failed
-skipped
-retry/flaky count
-exit code
-```
-
-Expected: exit 0. Any retry/flaky must be recorded even when exit 0.
-
-Task 8 acceptance target is zero retry/flaky here as well. If a retry occurs, diagnose the exact test and do not self-close Phase 8.
+Record total/passed/failed/skipped/retry-or-flaky count/exit code. Required for a closure candidate: exit 0 and no unresolved retry/flaky. If a retry occurs, diagnose that exact test and do not self-close Phase 8.
 
 - [ ] **Step 4: Run architecture/public-tree/hygiene gates**
 
@@ -742,9 +656,9 @@ node scripts/audit-public-tree.mjs
 git diff --check
 ```
 
-Expected: all pass.
+All must pass.
 
-- [ ] **Step 5: Confirm no real event or product data was added**
+- [ ] **Step 5: Reconfirm no C109 was added**
 
 ```bash
 node --input-type=module - <<'NODE'
@@ -759,9 +673,9 @@ NODE
 test ! -e apps/webapp/map-bundles/C109
 ```
 
-Expected: succeeds.
+Both must succeed.
 
-- [ ] **Step 6: Run final diff hygiene before writing evidence**
+- [ ] **Step 6: Inspect the pre-documentation diff**
 
 ```bash
 git status --short
@@ -769,13 +683,11 @@ git diff --name-status "$TASK_START_SHA"..HEAD
 git diff --check
 ```
 
-Expected before documentation changes:
+Expected implementation diff at this point:
 
 ```text
 M tests/e2e/management.spec.ts
 ```
-
-plus only the already-present planning docs relative to the Task 7 base, not as Task 8 implementation diff from `TASK_START_SHA`.
 
 No commit in Task 8.3.
 
@@ -783,105 +695,72 @@ No commit in Task 8.3.
 
 ## Task 8.4: Write the final closure-candidate review and progress handoff
 
-**Goal:** Convert the actual Task 8 measurements and source audit into one review artifact, update progress to browser-review-pending, and stop without self-closing Phase 8.
+**Goal:** Record the actual measurements/source audit in one final review artifact and set the canonical status to browser-review-pending.
 
-**Do not:** Invent counts, copy stale Task 7 measurements as fresh Task 8 results, mark browser acceptance, resolve external GAS debt, or merge main.
+**Do not:** Invent counts, copy Task 7 measurements as fresh Task 8 results, mark browser acceptance, resolve external GAS debt, or merge main.
 
 **Files:**
 - Create: `docs/reviews/phase-08-task-08-final-regression-closure.md`
 - Modify: `docs/status/progress.md`
 
 **Interfaces:**
-- Consumes: Task 8.0〜8.3 measured evidence.
-- Produces: closure candidate review artifact and canonical handoff status.
+- Consumes: measured evidence from Task 8.0〜8.3.
+- Produces: closure-candidate review artifact and canonical handoff state.
 
-- [ ] **Step 1: Create the review file with exact measured evidence**
+- [ ] **Step 1: Create the review file from measured evidence**
 
-Create `docs/reviews/phase-08-task-08-final-regression-closure.md` with this structure and fill every value from actual commands:
+Create `docs/reviews/phase-08-task-08-final-regression-closure.md` with these exact headings:
 
 ```markdown
 # Phase 8 Task 8 final regression / closure candidate
 
 ## Baseline
-
-- TASK_START_SHA: `<actual>`
-- Task 7 inherited final head: `<actual>`
-- Task 8 candidate head before docs: `<actual>`
-- Node/npm/Playwright environment: `<actual>`
-
 ## Task 7 adversarial review
-
-- changed-file scope: PASS / exact files
-- multi-event verifier: PASS / evidence
-- C108 regressions retained: PASS / evidence
-- production registry/map data unchanged: PASS
-- operator guide workflow: PASS / evidence
-- material defect found: none, except known management scroll test flake
-
 ## Management scroll flake
-
-- historical Task 7 occurrence: Expected 160 / Received 166, retry passed
-- Task 0 historical diagnosis: browser settling/scroll anchoring vs pre-click test baseline
-- pre-fix 20-repeat result: `<actual>`
-- correction: click-capture-time scroll measurement, test-only
-- post-fix 50-repeat result: `<actual>`
-- full management spec result: `<actual>`
-
 ## Phase 8 invariant audit
-
-| Invariant | Evidence | Verdict |
-|---|---|---|
-| strict runtime event map loading is not C108-branched | `<actual grep/test>` | PASS |
-| manifest owns area/prefix/label/meter metadata | `<actual>` | PASS |
-| data-only C999 reaches runtime route assets | `<actual>` | PASS |
-| build verifier accepts multiple registered events | `<actual>` | PASS |
-| C108 remains a regression, not a global restriction | `<actual>` | PASS |
-| wrapper remains generation owner | `<actual guide evidence>` | PASS |
-| Task 5 application split remains covered | `<actual>` | PASS |
-| Task 6 first-use UX remains covered | `<actual>` | PASS |
-| Task 7 operator workflow remains linked/data-only | `<actual>` | PASS |
-
 ## Focused verification
-
-- Phase 8 Vitest set: `<actual files/tests/result>`
-- onboarding + management E2E no-retry: `<actual>`
-
 ## Full verification
-
-- npm run verify: `<actual>`
-- full E2E --retries=0: `<actual totals>`
-- npm run test:e2e:ci: `<actual totals/retries>`
-- architecture: `<actual>`
-- public-tree audit: `<actual>`
-- git diff --check: PASS
-
 ## Scope audit
-
-- production runtime diff: none
-- production registry diff: none
-- production map-bundle diff: none
-- package/workflow/Vite diff: none
-- wrapper diff: none
-- Task 8 implementation files: `<actual>`
-
 ## External debt
-
-The existing two GAS evidence items remain OPEN_EXTERNAL_DEBT and are not Phase 8 Task 8 implementation scope.
-
 ## Verdict
-
-`CLOSURE_CANDIDATE_BROWSER_REVIEW_PENDING`
-
-Do not mark Phase 8 closed until browser-side review accepts this evidence.
 ```
 
-Do not leave angle-bracket placeholders in the committed file. Replace all with actual values.
+Under `## Baseline`, write the literal SHA values printed by Task 8.0 Step 1 and the Task 7 history commands, plus the actual Node/npm/Playwright versions printed by the environment.
+
+Under `## Task 7 adversarial review`, list the exact Task 7 changed files, protected-path result, multi-event fixture evidence, C108 regression evidence, production-data result, guide evidence, and the review verdict.
+
+Under `## Management scroll flake`, record:
+
+```text
+historical Task 7 occurrence: Expected 160 / Received 166, retry passed
+Task 0 root cause: browser settling/scroll anchoring vs pre-click test baseline
+pre-fix 20-repeat measured totals
+exact click-capture-time test correction
+post-fix 50-repeat measured totals
+whole management-spec measured totals
+```
+
+Under `## Phase 8 invariant audit`, use a Markdown table with one row for each invariant from Task 8.2 Steps 3〜8. Each row must cite the exact file/test/grep evidence used and a PASS/FAIL verdict.
+
+Under `## Focused verification`, write the exact counts printed by Task 8.2 Steps 1〜2.
+
+Under `## Full verification`, write the exact counts/results printed by Task 8.3 Steps 1〜4, including both no-retry full E2E and canonical `npm run test:e2e:ci`.
+
+Under `## Scope audit`, explicitly state the actual Task 8 implementation file set and that runtime, registry, map-bundle, package/workflow/Vite/Playwright-config, and wrapper diffs are absent.
+
+Under `## External debt`, preserve the existing two GAS evidence items as `OPEN_EXTERNAL_DEBT` and state they are not Task 8 implementation scope.
+
+Under `## Verdict`, write exactly:
+
+```text
+CLOSURE_CANDIDATE_BROWSER_REVIEW_PENDING
+```
+
+Then state that Phase 8 is not closed until browser-side review accepts the evidence.
 
 - [ ] **Step 2: Update `docs/status/progress.md` minimally**
 
-Preserve all prior Phase 8 Task 1〜7 history.
-
-Change current state to the equivalent of:
+Preserve all Task 1〜7 history. Set the current state to the equivalent of:
 
 ```text
 現在Task: Phase 8 Task 8 final regression / closure candidate — implementation complete / browser review pending
@@ -891,31 +770,13 @@ Task 8 design: docs/specs/2026-08-21-phase-08-task-08-final-regression-closure-d
 Task 8 review: docs/reviews/phase-08-task-08-final-regression-closure.md
 ```
 
-Add a concise Task 8 verification/handoff section containing actual:
-
-```text
-Task 7 source review verdict
-management pre-fix repeat result
-management post-fix 50-repeat result
-focused Phase 8 counts
-npm run verify counts/result
-full no-retry E2E totals
-canonical E2E totals/retries
-architecture/public-tree/diff results
-protected-path audit
-```
+Add a concise Task 8 verification/handoff section containing the actual Task 7 review verdict, pre/post flake results, focused counts, full verification counts, E2E no-retry/canonical totals, architecture/public-tree/diff results, and protected-path result.
 
 Keep the two GAS items as `OPEN_EXTERNAL_DEBT`.
 
-Do not write:
+Do not write `Phase 8 CLOSED`, `Task 8 browser accepted`, or `browser acceptance complete`.
 
-```text
-Phase 8 CLOSED
-Task 8 browser accepted
-browser acceptance complete
-```
-
-- [ ] **Step 3: Run documentation/hygiene checks after the review/status edits**
+- [ ] **Step 3: Verify review/status semantics**
 
 ```bash
 git diff --check
@@ -928,7 +789,7 @@ git grep -n 'CLOSURE_CANDIDATE_BROWSER_REVIEW_PENDING' -- \
   docs/status/progress.md
 ```
 
-Expected: all succeed.
+All commands must succeed.
 
 - [ ] **Step 4: Commit the review/status handoff**
 
@@ -944,18 +805,18 @@ git commit -m "docs(phase-08): record final closure candidate"
 
 ## Task 8.5: Final adversarial scope audit and push
 
-**Goal:** Ensure the pushed Task 8 branch contains only the test stabilization and evidence necessary for browser closure review.
+**Goal:** Ensure the pushed Task 8 implementation contains only the test stabilization and evidence needed for browser closure review.
 
-**Do not:** Make new corrections after the final audit without rerunning affected gates, merge main, start another Phase, or push unrelated user-owned files.
+**Do not:** Merge main, start Task 9/another Phase, or push unrelated user-owned files.
 
 **Files:**
-- Read-only audit of the whole Task 8 implementation diff.
+- Read-only audit of the complete Task 8 implementation diff.
 
 **Interfaces:**
 - Consumes: final Task 8 commits.
-- Produces: pushed branch ready for browser review.
+- Produces: pushed branch ready for browser-side review.
 
-- [ ] **Step 1: Inspect the exact Task 8 implementation diff from `TASK_START_SHA`**
+- [ ] **Step 1: Inspect the exact Task 8 implementation diff**
 
 ```bash
 git diff --name-status "$TASK_START_SHA"..HEAD
@@ -991,59 +852,52 @@ git diff --name-only "$TASK_START_SHA"..HEAD -- \
 
 Expected: no output.
 
-- [ ] **Step 3: Answer the final 24 adversarial questions from the actual tree**
+- [ ] **Step 3: Answer the final adversarial checklist from the actual tree**
 
 ```text
-1. Did Task 8 add a real event? Must be no.
-2. Did Task 8 modify apps/webapp/js? Must be no.
-3. Did Task 8 modify production registry/map bundles? Must be no.
-4. Did Task 8 modify wrapper? Must be no.
-5. Did Task 8 modify package/workflow/Vite/Playwright config? Must be no.
-6. Did Task 7 source review find any unresolved material defect? Must be no.
-7. Does Task 7 still accept an actual second temporary source/output bundle? Must be yes.
-8. Does Task 7 still reject duplicate registry IDs? Must be yes.
-9. Do C108 17-file checks remain? Must be yes.
-10. Do C108 explicit built-asset checks remain? Must be yes.
-11. Does production still exclude demo-v1? Must be yes.
-12. Does the management E2E capture scroll at click time? Must be yes.
-13. Does the management E2E still require exact restore equality? Must be yes.
-14. Was no sleep/hard-coded 166/tolerance added? Must be yes.
-15. Did the corrected focused test pass 50/50 with retries disabled? Must be yes.
-16. Did the full E2E suite pass with retries disabled? Must be yes.
-17. Did canonical npm run test:e2e:ci pass with zero unresolved flaky? Must be yes for closure candidate.
-18. Did npm run verify pass? Must be yes.
-19. Did architecture/public-tree/diff gates pass? Must be yes.
-20. Does the source audit still prove data-only C999 runtime route assets? Must be yes.
-21. Are Task 5 refactor and Task 6 onboarding regressions still covered? Must be yes.
-22. Is the Task 7 operator guide still linked/data-only? Must be yes.
-23. Are GAS items still separated as OPEN_EXTERNAL_DEBT? Must be yes.
-24. Is Phase 8 still browser-review-pending rather than self-closed? Must be yes.
+1. Real event added? no.
+2. apps/webapp/js modified? no.
+3. Production registry/map bundles modified? no.
+4. Wrapper modified? no.
+5. Package/workflow/Vite/Playwright config modified? no.
+6. Unresolved Task 7 material defect? no.
+7. Actual second temporary source/output bundle test retained? yes.
+8. Duplicate registry guard retained? yes.
+9. C108 exact 17-file check retained? yes.
+10. C108 explicit built-asset checks retained? yes.
+11. Production demo-v1 exclusion retained? yes.
+12. Management E2E captures scroll at click time? yes.
+13. Exact restore equality retained? yes.
+14. Sleep/hard-coded 166/tolerance/retry increase added? no.
+15. Corrected focused test passed 50/50 with retries disabled? yes.
+16. Full E2E passed with retries disabled? yes.
+17. Canonical E2E has no unresolved retry/flaky? yes.
+18. npm run verify passed? yes.
+19. Architecture/public-tree/diff gates passed? yes.
+20. C999 data-only runtime route-asset proof retained? yes.
+21. Task 5 refactor and Task 6 onboarding coverage retained? yes.
+22. Task 7 operator guide remains linked/data-only? yes.
+23. GAS items remain OPEN_EXTERNAL_DEBT? yes.
+24. Phase 8 remains browser-review-pending? yes.
 ```
 
-If any answer is not the required value, do not push a closure candidate. Correct only if it is within this Task's allowed scope and rerun every affected gate; otherwise stop with the exact blocker.
+If any answer differs, do not push a closure candidate. Correct only when the issue is within Task 8's allowed scope and rerun every affected gate; otherwise stop with the blocker.
 
-- [ ] **Step 4: Run final hygiene**
+- [ ] **Step 4: Run final hygiene and push**
 
 ```bash
 git diff --check
 git status --short
-```
-
-Expected: clean working tree after committed changes, except unrelated pre-existing user-owned files that must remain untouched.
-
-- [ ] **Step 5: Push the same Task 8 branch and stop**
-
-```bash
 git push origin docs/phase-08-task-08-final-regression-closure-plan
 ```
 
-Do not merge main. Do not create Task 9. Do not begin another Phase. Stop for browser-side adversarial review.
+After push, stop. Do not merge main or start another Task/Phase.
 
 ---
 
 ## Final report required from the implementing agent
 
-The final Codex report must include all of the following.
+Report all of the following from actual commands, not memory.
 
 ### Identity
 
@@ -1054,13 +908,13 @@ commit list
 complete changed-file list from TASK_START_SHA
 ```
 
-### Task 7 browser-style audit
+### Task 7 audit
 
 ```text
 Task 7 implementation commit ancestry
 Task 7 changed-file scope
-protected-path result
-multi-event source/output fixture evidence
+Task 7 protected-path result
+other-v1 source/output fixture evidence
 result.eventIds expectation
 verifiedFiles expectation
 duplicate registry guard evidence
@@ -1074,9 +928,9 @@ Task 7 audit verdict
 ### Management flake
 
 ```text
-historical Task 7 flaky: Expected 160 / Received 166, retry passed
+historical Task 7 flaky occurrence: Expected 160 / Received 166, retry passed
 pre-fix 20-repeat no-retry totals/result
-exact test-only code correction
+exact test-only correction
 post-fix focused single result
 post-fix 50-repeat no-retry totals/result
 whole management spec no-retry totals/result
@@ -1088,12 +942,12 @@ confirmation: no sleep, no hard-coded 166, no tolerance, no retry increase
 ```text
 focused Vitest files/tests/result
 first-launch + management E2E no-retry totals
-runtime loader no-C108 grep
+runtime-loader no-C108 result
 strict map metadata evidence
-C999 data-only runtime route asset evidence
+C999 data-only runtime route-asset evidence
 Task 5 assembly evidence
 Task 6 first-use evidence
-Task 7 operator guide evidence
+Task 7 operator-guide evidence
 ```
 
 ### Full closure gates
@@ -1101,18 +955,18 @@ Task 7 operator guide evidence
 ```text
 npm run verify exact counts/result
 full CI-container E2E --retries=0 exact totals/result
-npm run test:e2e:ci exact total/pass/fail/skip/retry
+npm run test:e2e:ci exact totals and retry/flaky count
 npm run check:webapp:architecture result
 node scripts/audit-public-tree.mjs result
 git diff --check result
 protected-path audit result
 ```
 
-### Closure docs/status
+### Closure handoff
 
 ```text
 review file path
-review verdict = CLOSURE_CANDIDATE_BROWSER_REVIEW_PENDING
+review verdict: CLOSURE_CANDIDATE_BROWSER_REVIEW_PENDING
 progress current Task
 progress next step
 OPEN_EXTERNAL_DEBT preserved
